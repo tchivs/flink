@@ -289,19 +289,19 @@ class MetricStoreTest {
 
         QueryScopeInfo.OperatorQueryScopeInfo operator =
                 new QueryScopeInfo.OperatorQueryScopeInfo(
-                        JOB_ID.toString(), "taskid", 8, 2, "opname", "abc");
+                        JOB_ID.toString(), "taskid", 8, 2, "opname", "opid", "abc");
         MetricDump.CounterDump cd6 = new MetricDump.CounterDump(operator, "metric6", 5);
         MetricDump.CounterDump cd7 = new MetricDump.CounterDump(operator, "metric7", 6);
 
         QueryScopeInfo.OperatorQueryScopeInfo operator2 =
                 new QueryScopeInfo.OperatorQueryScopeInfo(
-                        JOB_ID.toString(), "taskid", 1, 3, "opname", "abc");
+                        JOB_ID.toString(), "taskid", 1, 3, "opname", "opid", "abc");
         MetricDump.CounterDump cd62 = new MetricDump.CounterDump(operator2, "metric6", 5);
         MetricDump.CounterDump cd72 = new MetricDump.CounterDump(operator2, "metric7", 6);
 
         QueryScopeInfo.OperatorQueryScopeInfo speculativeOperator2 =
                 new QueryScopeInfo.OperatorQueryScopeInfo(
-                        JOB_ID.toString(), "taskid", 8, 4, "opname", "abc");
+                        JOB_ID.toString(), "taskid", 8, 4, "opname", "opid", "abc");
         MetricDump.CounterDump cd63 =
                 new MetricDump.CounterDump(speculativeOperator2, "metric6", 15);
         MetricDump.CounterDump cd73 =
@@ -309,7 +309,7 @@ class MetricStoreTest {
 
         QueryScopeInfo.OperatorQueryScopeInfo speculativeOperator3 =
                 new QueryScopeInfo.OperatorQueryScopeInfo(
-                        JOB_ID.toString(), "taskid", 8, 5, "opname", "abc");
+                        JOB_ID.toString(), "taskid", 8, 5, "opname", "opid", "abc");
         MetricDump.CounterDump cd64 =
                 new MetricDump.CounterDump(speculativeOperator3, "metric6", 17);
         MetricDump.CounterDump cd74 =

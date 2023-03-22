@@ -80,6 +80,7 @@ import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationRejection;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationSuccess;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorThreadInfoGateway;
 import org.apache.flink.runtime.taskexecutor.partition.ClusterPartitionReport;
+import org.apache.flink.types.SerializableOptional;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -745,6 +746,39 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
                         totalBlockedFreeSlots,
                         totalResource,
                         freeResource));
+    }
+
+    @Override
+    public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(Time timeout, JobID jobId) {
+        final Collection<TaskExecutorConnection> connections =
+                slotManager.getTaskExecutorsWithAllocatedSlotsForJob(jobId);
+        final ArrayList<CompletableFuture<Optional<Tuple2<ResourceID, String>>>>
+                metricQueryServiceAddressFutures = new ArrayList<>(connections.size());
+        for (TaskExecutorConnection connection : connections) {
+            final CompletableFuture<Optional<Tuple2<ResourceID, String>>>
+                    metricQueryServiceAddressFuture =
+                            connection
+                                    .getTaskExecutorGateway()
+                                    .requestMetricQueryServiceAddress(timeout)
+                                    .thenApply(SerializableOptional::toOptional)
+                                    .thenApply(
+                                            o ->
+                                                    o.map(
+                                                            address ->
+                                                                    Tuple2.of(
+                                                                            connection
+                                                                                    .getResourceID(),
+                                                                            address)));
+            metricQueryServiceAddressFutures.add(metricQueryServiceAddressFuture);
+        }
+        return FutureUtils.combineAll(metricQueryServiceAddressFutures)
+                .thenApply(
+                        collection ->
+                                collection.stream()
+                                        .filter(Optional::isPresent)
+                                        .map(Optional::get)
+                                        .collect(Collectors.toList()));
     }
 
     @Override

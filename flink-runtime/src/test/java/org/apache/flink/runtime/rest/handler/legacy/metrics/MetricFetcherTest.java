@@ -136,7 +136,7 @@ class MetricFetcherTest {
                 c1,
                 new Tuple2<>(
                         new QueryScopeInfo.OperatorQueryScopeInfo(
-                                jobID.toString(), "taskid", 2, 0, "opname", "abc"),
+                                jobID.toString(), "taskid", 2, 0, "opname", "opid", "abc"),
                         "oc"));
         counters.put(
                 c2,
@@ -277,7 +277,7 @@ class MetricFetcherTest {
         // ================================================================================
 
         final MetricQueryServiceGateway jmQueryService =
-                new TestingMetricQueryServiceGateway.Builder()
+                TestingMetricQueryServiceGateway.newBuilder()
                         .setQueryMetricsSupplier(
                                 () ->
                                         CompletableFuture.completedFuture(
@@ -296,7 +296,7 @@ class MetricFetcherTest {
         MetricDumpSerialization.MetricSerializationResult requestMetricsAnswer =
                 createRequestDumpAnswer(tmRID, jobID);
         final MetricQueryServiceGateway tmQueryService =
-                new TestingMetricQueryServiceGateway.Builder()
+                TestingMetricQueryServiceGateway.newBuilder()
                         .setQueryMetricsSupplier(
                                 () -> {
                                     if (waitTimeBeforeReturnMetricResults > 0) {

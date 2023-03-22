@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.blocklist.BlockedTaskManagerChecker;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
@@ -154,5 +155,18 @@ public interface SlotManager extends AutoCloseable {
         SUCCESS, // task manager has not been registered before and is registered successfully
         IGNORED, // task manager has been registered before and is ignored
         REJECTED, // task manager is rejected and should be disconnected
+    }
+
+    /**
+     * Returns all task executors that have at least 1 pending/completed allocation for the given
+     * job.
+     *
+     * @param jobId the job for which the task executors must have a slot
+     * @return task executors with at least 1 slot for the job
+     */
+    @Confluent
+    default Collection<TaskExecutorConnection> getTaskExecutorsWithAllocatedSlotsForJob(
+            JobID jobId) {
+        throw new UnsupportedOperationException("Not implemented.");
     }
 }

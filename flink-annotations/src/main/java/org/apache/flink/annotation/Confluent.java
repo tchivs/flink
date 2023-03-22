@@ -14,24 +14,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
-package org.apache.flink.runtime.webmonitor.retriever;
+package org.apache.flink.annotation;
 
-import org.apache.flink.annotation.Confluent;
-import org.apache.flink.api.common.time.Time;
-import org.apache.flink.runtime.metrics.dump.MetricDumpSerialization;
-import org.apache.flink.runtime.metrics.dump.MetricQueryService;
-import org.apache.flink.runtime.rpc.RpcGateway;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 
-import java.util.concurrent.CompletableFuture;
-
-/** {@link MetricQueryService} rpc gateway interface. */
-public interface MetricQueryServiceGateway extends RpcGateway {
-
-    @Confluent
-    CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryJobMetrics(
-            Time timeout, JobMetricsFilter filter);
-
-    CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryMetrics(Time timeout);
-}
+/** Annotation to mark methods within Confluent internal developer API. */
+@Documented
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.FIELD})
+@Public
+public @interface Confluent {}

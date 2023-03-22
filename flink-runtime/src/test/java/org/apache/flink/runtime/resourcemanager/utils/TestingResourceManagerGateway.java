@@ -128,6 +128,10 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
             notifyNewBlockedNodesFunction =
                     ignored -> CompletableFuture.completedFuture(Acknowledge.get());
 
+    private volatile Function<JobID, CompletableFuture<Collection<Tuple2<ResourceID, String>>>>
+            requestTaskManagerMetricQueryServiceAddressesFunction =
+                    ignored -> CompletableFuture.completedFuture(Collections.emptyList());
+
     public TestingResourceManagerGateway() {
         this(
                 ResourceManagerId.generate(),
@@ -247,6 +251,13 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
             Function<Collection<BlockedNode>, CompletableFuture<Acknowledge>>
                     notifyNewBlockedNodesFunction) {
         this.notifyNewBlockedNodesFunction = notifyNewBlockedNodesFunction;
+    }
+
+    public void setRequestTaskManagerMetricQueryServiceAddressesFunction(
+            Function<JobID, CompletableFuture<Collection<Tuple2<ResourceID, String>>>>
+                    requestTaskManagerMetricQueryServiceAddressesFunction) {
+        this.requestTaskManagerMetricQueryServiceAddressesFunction =
+                requestTaskManagerMetricQueryServiceAddressesFunction;
     }
 
     @Override
@@ -413,6 +424,12 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
     public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
             requestTaskManagerMetricQueryServiceAddresses(Time timeout) {
         return CompletableFuture.completedFuture(Collections.emptyList());
+    }
+
+    @Override
+    public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(Time timeout, JobID jobId) {
+        return requestTaskManagerMetricQueryServiceAddressesFunction.apply(jobId);
     }
 
     @Override

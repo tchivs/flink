@@ -81,6 +81,7 @@ import org.apache.flink.runtime.rest.handler.job.coordination.ClientCoordination
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingJobsMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingSubtasksMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingTaskManagersMetricsHandler;
+import org.apache.flink.runtime.rest.handler.job.metrics.AutopilotMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobManagerMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobVertexMetricsHandler;
@@ -503,6 +504,15 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         final JobMetricsHandler jobMetricsHandler =
                 new JobMetricsHandler(leaderRetriever, timeout, responseHeaders, metricFetcher);
 
+        final AutopilotMetricsHandler autopilotMetricsHandler =
+                new AutopilotMetricsHandler(
+                        leaderRetriever,
+                        timeout,
+                        responseHeaders,
+                        resourceManagerRetriever,
+                        metricFetcher.getMetricQueryServiceRetriever(),
+                        executor);
+
         final SubtaskMetricsHandler subtaskMetricsHandler =
                 new SubtaskMetricsHandler(leaderRetriever, timeout, responseHeaders, metricFetcher);
 
@@ -776,6 +786,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         jobVertexWatermarksHandler.getMessageHeaders(),
                         jobVertexWatermarksHandler));
         handlers.add(Tuple2.of(jobMetricsHandler.getMessageHeaders(), jobMetricsHandler));
+        handlers.add(
+                Tuple2.of(autopilotMetricsHandler.getMessageHeaders(), autopilotMetricsHandler));
         handlers.add(Tuple2.of(subtaskMetricsHandler.getMessageHeaders(), subtaskMetricsHandler));
         handlers.add(
                 Tuple2.of(

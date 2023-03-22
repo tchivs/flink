@@ -1059,6 +1059,76 @@
       }
     }
   }, {
+    "url" : "/jobs/:jobid/autopilot-metrics",
+    "method" : "GET",
+    "status-code" : "200 OK",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ {
+        "key" : "jobid"
+      } ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:metrics:AutopilotMetricsRequestBody",
+      "properties" : {
+        "taskManagerMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "taskMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "operatorMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:metrics:AutopilotMetricsResponseBody",
+      "properties" : {
+        "taskManagerMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
+          }
+        },
+        "taskMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
+          }
+        },
+        "operatorMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
+          }
+        }
+      }
+    }
+  }, {
     "url" : "/jobs/:jobid/checkpoints",
     "method" : "GET",
     "status-code" : "200 OK",

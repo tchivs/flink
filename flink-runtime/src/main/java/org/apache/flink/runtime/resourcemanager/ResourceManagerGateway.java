@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.resourcemanager;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
@@ -209,6 +210,10 @@ public interface ResourceManagerGateway
      */
     CompletableFuture<Collection<Tuple2<ResourceID, String>>>
             requestTaskManagerMetricQueryServiceAddresses(@RpcTimeout Time timeout);
+
+    @Confluent
+    CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(@RpcTimeout Time timeout, JobID jobId);
 
     /**
      * Request the file upload from the given {@link TaskExecutor} to the cluster's {@link

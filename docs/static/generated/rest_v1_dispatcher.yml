@@ -472,6 +472,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobAccumulatorsInfo'
+  /jobs/{jobid}/autopilot-metrics:
+    get:
+      description: Provides access to job metrics.
+      operationId: getAutopilotMetrics
+      parameters:
+      - name: jobid
+        in: path
+        description: 32-character hexadecimal string value that identifies a job.
+        required: true
+        schema:
+          $ref: '#/components/schemas/JobID'
+      responses:
+        "200":
+          description: The request was successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutopilotMetricsResponseBody'
   /jobs/{jobid}/checkpoints:
     get:
       description: Returns checkpointing statistics for a job.
@@ -1675,6 +1693,27 @@ components:
           - $ref: '#/components/schemas/SavepointInfo'
         status:
           $ref: '#/components/schemas/QueueStatus'
+    AutopilotMetricsResponseBody:
+      type: object
+      properties:
+        operatorMetrics:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
+        taskManagerMetrics:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
+        taskMetrics:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
     CheckpointAlignment:
       type: object
       properties:

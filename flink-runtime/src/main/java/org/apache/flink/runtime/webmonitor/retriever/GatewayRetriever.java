@@ -31,6 +31,10 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface GatewayRetriever<T extends RpcGateway> {
 
+    static <T extends RpcGateway> GatewayRetriever<T> resolved(T gateway) {
+        return () -> CompletableFuture.completedFuture(gateway);
+    }
+
     /**
      * Get future of object to retrieve.
      *

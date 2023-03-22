@@ -127,6 +127,11 @@ public class MetricFetcherImpl<T extends RestfulGateway> implements MetricFetche
         }
     }
 
+    @Override
+    public MetricQueryServiceRetriever getMetricQueryServiceRetriever() {
+        return queryServiceRetriever;
+    }
+
     private CompletableFuture<Void> fetchMetrics() {
         LOG.debug("Start fetching metrics.");
 
