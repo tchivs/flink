@@ -1060,7 +1060,7 @@
     }
   }, {
     "url" : "/jobs/:jobid/autopilot-metrics",
-    "method" : "GET",
+    "method" : "POST",
     "status-code" : "200 OK",
     "file-upload" : false,
     "path-parameters" : {

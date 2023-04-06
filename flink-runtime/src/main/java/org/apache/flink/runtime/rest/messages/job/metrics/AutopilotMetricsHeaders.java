@@ -59,7 +59,7 @@ public final class AutopilotMetricsHeaders
 
     @Override
     public HttpMethodWrapper getHttpMethod() {
-        return HttpMethodWrapper.GET;
+        return HttpMethodWrapper.POST;
     }
 
     @Override
@@ -75,5 +75,10 @@ public final class AutopilotMetricsHeaders
     @Override
     public Class<AutopilotMetricsRequestBody> getRequestClass() {
         return AutopilotMetricsRequestBody.class;
+    }
+
+    @Override
+    public String operationId() {
+        return "getAutopilotMetrics";
     }
 }

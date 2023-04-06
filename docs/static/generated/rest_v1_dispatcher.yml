@@ -473,7 +473,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/JobAccumulatorsInfo'
   /jobs/{jobid}/autopilot-metrics:
-    get:
+    post:
       description: Provides access to job metrics.
       operationId: getAutopilotMetrics
       parameters:
@@ -483,6 +483,11 @@ paths:
         required: true
         schema:
           $ref: '#/components/schemas/JobID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutopilotMetricsRequestBody'
       responses:
         "200":
           description: The request was successful.
@@ -1693,6 +1698,24 @@ components:
           - $ref: '#/components/schemas/SavepointInfo'
         status:
           $ref: '#/components/schemas/QueueStatus'
+    AutopilotMetricsRequestBody:
+      type: object
+      properties:
+        operatorMetrics:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+        taskManagerMetrics:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+        taskMetrics:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
     AutopilotMetricsResponseBody:
       type: object
       properties:
