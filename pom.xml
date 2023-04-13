@@ -749,6 +749,13 @@ under the License.
 				<version>1.7</version>
 			</dependency>
 
+			<dependency>
+				<!-- for security reasons -->
+				<groupId>net.minidev</groupId>
+				<artifactId>json-smart</artifactId>
+				<version>2.4.10</version>
+			</dependency>
+
 			<!-- kryo used in different versions by Flink an chill -->
 			<dependency>
 				<groupId>com.esotericsoftware.kryo</groupId>
