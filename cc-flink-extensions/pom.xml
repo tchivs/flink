@@ -17,6 +17,6 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>cc-flink-table</module>
+		<module>cc-flink-table-extended</module>
 	</modules>
 </project>

@@ -10,7 +10,7 @@
 		<version>1.18-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>cc-flink-table</artifactId>
+	<artifactId>cc-flink-table-extended_${scala.binary.version}</artifactId>
 	<name>Confluent Flink : Table</name>
 
 	<dependencies>
@@ -31,6 +31,13 @@
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-table-planner_${scala.binary.version}</artifactId>
+			<version>${project.version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-table-runtime</artifactId>
 			<version>${project.version}</version>
 			<scope>provided</scope>
@@ -44,5 +51,26 @@
 		</dependency>
 
 	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>forbid-direct-table-planner-dependencies</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<!-- We need to depend on table planner because we rely on its internals -->
+							<skip>true</skip>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
 </project>
