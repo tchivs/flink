@@ -18,15 +18,25 @@
 
 package org.apache.flink.runtime.rest.messages.job.metrics;
 
+import org.apache.flink.runtime.metrics.dump.MetricDump;
+import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.rest.messages.RestResponseMarshallingTestBase;
 
+import org.junit.Test;
+
+import java.text.ParseException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** Tests for the {@link AutopilotMetricsResponseBody}. */
 public class AutopilotMetricsResponseBodyTest
         extends RestResponseMarshallingTestBase<AutopilotMetricsResponseBody> {
+
+    private static final QueryScopeInfo.TaskManagerQueryScopeInfo queryScopeInfo =
+            new QueryScopeInfo.TaskManagerQueryScopeInfo("tm1");
 
     @Override
     protected Class<AutopilotMetricsResponseBody> getTestResponseClass() {
@@ -42,5 +52,46 @@ public class AutopilotMetricsResponseBodyTest
         taskManagerMetrics.putIfAbsent("counters", taskManagerCounters);
         return new AutopilotMetricsResponseBody(
                 taskManagerMetrics, Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Test
+    public void testSpecialGaugeDoubleValuesOmitted() throws ParseException {
+        final AutopilotMetricsResponseBody response = new AutopilotMetricsResponseBody();
+
+        response.addMetric(
+                new MetricDump.GaugeDump(
+                        queryScopeInfo,
+                        "infinity-positive",
+                        Double.toString(Double.POSITIVE_INFINITY)));
+        response.addMetric(
+                new MetricDump.GaugeDump(
+                        queryScopeInfo,
+                        "infinity-negative",
+                        Double.toString(Double.NEGATIVE_INFINITY)));
+
+        response.addMetric(
+                new MetricDump.GaugeDump(queryScopeInfo, "NaN", Double.toString(Double.NaN)));
+
+        assertThat(response.getTaskManagerMetrics())
+                .hasEntrySatisfying(
+                        queryScopeInfo.taskManagerID, metrics -> assertThat(metrics).isEmpty());
+    }
+
+    @Test
+    public void testSpecialMeterDoubleValuesOmitted() throws ParseException {
+        final AutopilotMetricsResponseBody response = new AutopilotMetricsResponseBody();
+
+        response.addMetric(
+                new MetricDump.MeterDump(
+                        queryScopeInfo, "infinity-positive", Double.POSITIVE_INFINITY));
+        response.addMetric(
+                new MetricDump.MeterDump(
+                        queryScopeInfo, "infinity-negative", Double.NEGATIVE_INFINITY));
+
+        response.addMetric(new MetricDump.MeterDump(queryScopeInfo, "NaN", Double.NaN));
+
+        assertThat(response.getTaskManagerMetrics())
+                .hasEntrySatisfying(
+                        queryScopeInfo.taskManagerID, metrics -> assertThat(metrics).isEmpty());
     }
 }

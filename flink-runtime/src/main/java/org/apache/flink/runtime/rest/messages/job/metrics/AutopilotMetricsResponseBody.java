@@ -145,11 +145,25 @@ public final class AutopilotMetricsResponseBody implements ResponseBody {
                 break;
             case MetricDump.METRIC_CATEGORY_GAUGE:
                 final MetricDump.GaugeDump gaugeDump = (MetricDump.GaugeDump) metricDump;
-                metrics.put(fullName, NumberFormat.getInstance().parse(gaugeDump.value));
+                // filter out special double values
+                // this may have a side-effect of an empty 'metrics' map being returned
+                // note: use string comparison because parsing of "Infinity" fails
+                // because we're using completely different format/parse implementations
+                if (gaugeDump.value.equals(Double.toString(Double.NaN))
+                        || gaugeDump.value.equals(Double.toString(Double.POSITIVE_INFINITY))
+                        || gaugeDump.value.equals(Double.toString(Double.NEGATIVE_INFINITY))) {
+                    return;
+                }
+                Number parsedNumber = NumberFormat.getInstance().parse(gaugeDump.value);
+                metrics.put(fullName, parsedNumber);
                 break;
             case MetricDump.METRIC_CATEGORY_METER:
                 final MetricDump.MeterDump meterDump = (MetricDump.MeterDump) metricDump;
-                metrics.put(fullName, meterDump.rate);
+                // filter out special double values
+                // this may have a side-effect of an empty 'metrics' map being returned
+                if (Double.isFinite(meterDump.rate)) {
+                    metrics.put(fullName, meterDump.rate);
+                }
                 break;
         }
     }
