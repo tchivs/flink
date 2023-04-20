@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.connectors;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -15,38 +16,44 @@ import org.apache.flink.table.connector.ProviderContext;
 import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.types.RowKind;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Objects;
 
 /** Confluent result serving table sink for powering foreground queries. */
-public class ForegroundDynamicSink implements DynamicTableSink {
+@Confluent
+public class ForegroundResultTableSink implements DynamicTableSink {
 
     public static final String TRANSFORMATION_NAME = "cc-foreground-sink";
-
     public static final String ACCUMULATOR_NAME = "cc-foreground-sink";
-
     public static final String SINK_NAME = "cc-foreground-sink";
 
     private final MemorySize maxBatchSize;
-
     private final Duration socketTimeout;
-
     private final DataType consumedDataType;
+    private final ZoneId zoneId;
 
-    public ForegroundDynamicSink(
-            MemorySize maxBatchSize, Duration socketTimeout, DataType consumedDataType) {
+    private ChangelogMode changelogMode = ChangelogMode.all();
+
+    public ForegroundResultTableSink(
+            MemorySize maxBatchSize,
+            Duration socketTimeout,
+            DataType consumedDataType,
+            ZoneId zoneId) {
         this.maxBatchSize = maxBatchSize;
         this.socketTimeout = socketTimeout;
         this.consumedDataType = consumedDataType;
+        this.zoneId = zoneId;
     }
 
     @Override
     public ChangelogMode getChangelogMode(ChangelogMode requestedMode) {
+        changelogMode = requestedMode;
         // Should never be upsert as no primary key is set.
-        return requestedMode;
+        return changelogMode;
     }
 
     @Override
@@ -57,7 +64,10 @@ public class ForegroundDynamicSink implements DynamicTableSink {
                     ProviderContext providerContext, DataStream<RowData> inputStream) {
 
                 final TypeSerializer<RowData> serializer =
-                        InternalSerializers.create(consumedDataType.getLogicalType());
+                        new ForegroundResultJsonSerializer(
+                                consumedDataType.getLogicalType(),
+                                zoneId,
+                                changelogMode.containsOnly(RowKind.INSERT));
 
                 final CollectSinkOperatorFactory<RowData> factory =
                         new CollectSinkOperatorFactory<>(
@@ -75,12 +85,16 @@ public class ForegroundDynamicSink implements DynamicTableSink {
 
     @Override
     public DynamicTableSink copy() {
-        return new ForegroundDynamicSink(maxBatchSize, socketTimeout, consumedDataType);
+        final ForegroundResultTableSink copy =
+                new ForegroundResultTableSink(
+                        maxBatchSize, socketTimeout, consumedDataType, zoneId);
+        copy.changelogMode = changelogMode;
+        return copy;
     }
 
     @Override
     public String asSummaryString() {
-        return ForegroundDynamicSink.class.getSimpleName();
+        return ForegroundResultTableSink.class.getSimpleName();
     }
 
     @Override
@@ -91,14 +105,16 @@ public class ForegroundDynamicSink implements DynamicTableSink {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ForegroundDynamicSink that = (ForegroundDynamicSink) o;
-        return maxBatchSize.equals(that.maxBatchSize)
-                && socketTimeout.equals(that.socketTimeout)
-                && consumedDataType.equals(that.consumedDataType);
+        ForegroundResultTableSink sink = (ForegroundResultTableSink) o;
+        return maxBatchSize.equals(sink.maxBatchSize)
+                && socketTimeout.equals(sink.socketTimeout)
+                && consumedDataType.equals(sink.consumedDataType)
+                && zoneId.equals(sink.zoneId)
+                && changelogMode.equals(sink.changelogMode);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(maxBatchSize, socketTimeout, consumedDataType);
+        return Objects.hash(maxBatchSize, socketTimeout, consumedDataType, zoneId, changelogMode);
     }
 }

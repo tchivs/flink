@@ -4,10 +4,12 @@
 
 package io.confluent.flink.table.connectors;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -19,25 +21,28 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.junit.Test;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Tests for {@link ForegroundDynamicTableFactory} and {@link ForegroundDynamicSink}. */
-public class ForegroundDynamicSinkTest {
+/** Tests for {@link ForegroundResultTableFactory} and {@link ForegroundResultTableSink}. */
+@Confluent
+public class ForegroundResultTableSinkTest {
 
     @Test
     public void testTableFactory() {
         final DynamicTableSink expectedSink =
-                new ForegroundDynamicSink(
+                new ForegroundResultTableSink(
                         MemorySize.ofMebiBytes(8),
                         Duration.ofSeconds(30),
                         DataTypes.ROW(
                                         DataTypes.FIELD("a", DataTypes.INT()),
                                         DataTypes.FIELD("b", DataTypes.STRING()))
-                                .notNull());
+                                .notNull(),
+                        ZoneId.of("UTC"));
 
         final ResolvedSchema schema =
                 ResolvedSchema.of(
@@ -45,9 +50,12 @@ public class ForegroundDynamicSinkTest {
                         Column.physical("b", DataTypes.STRING()));
 
         final Map<String, String> options = new HashMap<>();
-        options.put("connector", "cc-foreground");
-        options.put("batch-size-max", "8mb");
-        options.put("socket-timeout", "30s");
+        options.put("connector", "cc-foreground-sink");
+
+        final Configuration configuration = new Configuration();
+        configuration.set(ForegroundResultTableFactory.MAX_BATCH_SIZE, MemorySize.ofMebiBytes(8));
+        configuration.set(ForegroundResultTableFactory.SOCKET_TIMEOUT, Duration.ofSeconds(30));
+        configuration.set(TableConfigOptions.LOCAL_TIME_ZONE, "UTC");
 
         final DynamicTableSink actualSink =
                 FactoryUtil.createDynamicTableSink(
@@ -61,8 +69,8 @@ public class ForegroundDynamicSinkTest {
                                         options),
                                 schema),
                         Collections.emptyMap(),
-                        new Configuration(),
-                        ForegroundDynamicSinkTest.class.getClassLoader(),
+                        configuration,
+                        ForegroundResultTableSinkTest.class.getClassLoader(),
                         true);
 
         assertThat(actualSink).isEqualTo(expectedSink);

@@ -4,7 +4,7 @@
 
 package io.confluent.flink.table.utils;
 
-import org.apache.flink.annotation.Internal;
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.data.ArrayData;
 import org.apache.flink.table.data.ArrayData.ElementGetter;
 import org.apache.flink.table.data.MapData;
@@ -39,7 +39,7 @@ import java.util.stream.IntStream;
  * {"op":0,"row":["101","Jay",[null,"abc"],[null,"456"],"1990-01-12 12:00.12",[[null,"Alice"],["42","Bob"]]]}
  * </pre>
  */
-@Internal
+@Confluent
 public final class RowDataJsonFormatter {
     private final Context castRuleContext;
     private final Converter rowConverter;

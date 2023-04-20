@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.utils;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
@@ -33,6 +34,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link RowDataJsonFormatter}. */
+@Confluent
 public class RowDataJsonFormatterTest {
 
     private static Stream<Arguments> params() {

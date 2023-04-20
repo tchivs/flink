@@ -1489,15 +1489,27 @@ under the License.
 								<pattern>Licensed to the Apache Software Foundation (ASF) under one</pattern>
 							</patterns>
 						</license>
+						<!-- Enforce this license:
+							Copyright 2023 Confluent Inc.
+						-->
+						<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+							<licenseFamilyCategory>CFLT</licenseFamilyCategory>
+							<licenseFamilyName>Confluent Copyright</licenseFamilyName>
+							<notes />
+							<patterns>
+								<pattern>Copyright 2023 Confluent Inc.</pattern>
+							</patterns>
+						</license>
 					</licenses>
 					<licenseFamilies>
 						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
 							<familyName>Apache License 2.0</familyName>
 						</licenseFamily>
+						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+							<familyName>Confluent Copyright</familyName>
+						</licenseFamily>
 					</licenseFamilies>
 					<excludes>
-						<!-- Confluent extensions -->
-						<exclude>cc-flink-extensions/**</exclude>
 						<!-- Additional files like .gitignore etc.-->
 						<exclude>**/.*/**</exclude>
 						<exclude>**/*.prefs</exclude>

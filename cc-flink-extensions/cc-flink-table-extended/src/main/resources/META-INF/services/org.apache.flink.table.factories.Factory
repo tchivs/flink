@@ -1,3 +1,3 @@
 # Copyright 2023 Confluent Inc.
 
-io.confluent.flink.table.connectors.ForegroundDynamicTableFactory
+io.confluent.flink.table.connectors.ForegroundResultTableFactory

@@ -89,6 +89,7 @@ import org.apache.flink.runtime.rest.handler.job.metrics.JobVertexWatermarksHand
 import org.apache.flink.runtime.rest.handler.job.metrics.SubtaskMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.TaskManagerMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.rescaling.RescalingHandlers;
+import org.apache.flink.runtime.rest.handler.job.results.ForegroundResultHandler;
 import org.apache.flink.runtime.rest.handler.job.savepoints.SavepointDisposalHandlers;
 import org.apache.flink.runtime.rest.handler.job.savepoints.SavepointHandlers;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
@@ -143,6 +144,7 @@ import org.apache.flink.runtime.rest.messages.job.SubtaskCurrentAttemptDetailsHe
 import org.apache.flink.runtime.rest.messages.job.SubtaskExecutionAttemptAccumulatorsHeaders;
 import org.apache.flink.runtime.rest.messages.job.SubtaskExecutionAttemptDetailsHeaders;
 import org.apache.flink.runtime.rest.messages.job.coordination.ClientCoordinationHeaders;
+import org.apache.flink.runtime.rest.messages.job.results.ForegroundResultHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerCustomLogHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerDetailsHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerLogFileHeaders;
@@ -708,6 +710,13 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         responseHeaders,
                         ClientCoordinationHeaders.getInstance());
 
+        final ForegroundResultHandler foregroundResultHandler =
+                new ForegroundResultHandler(
+                        leaderRetriever,
+                        timeout,
+                        responseHeaders,
+                        ForegroundResultHeaders.getInstance());
+
         final ShutdownHandler shutdownHandler =
                 new ShutdownHandler(
                         leaderRetriever, timeout, responseHeaders, ShutdownHeaders.getInstance());
@@ -896,6 +905,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         handlers.add(
                 Tuple2.of(
                         clientCoordinationHandler.getMessageHeaders(), clientCoordinationHandler));
+        handlers.add(
+                Tuple2.of(foregroundResultHandler.getMessageHeaders(), foregroundResultHandler));
 
         // TODO: Remove once the Yarn proxy can forward all REST verbs
         handlers.add(
