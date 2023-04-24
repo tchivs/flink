@@ -21,5 +21,6 @@ Copyright 2023 Confluent Inc.
 
 	<modules>
 		<module>cc-flink-table-extended</module>
+		<module>cc-flink-integration-api</module>
 	</modules>
 </project>
