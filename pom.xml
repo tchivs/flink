@@ -1667,6 +1667,9 @@ under the License.
 						<exclude>Makefile</exclude>
 						<exclude>service.yaml</exclude>
 						<exclude>tools/ci/confluent/**</exclude>
+
+						<!-- confluent-specific json files -->
+						<exclude>cc-flink-extensions/**/*.json</exclude>
 					</excludes>
 				</configuration>
 			</plugin>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2023 Confluent Inc.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.confluent.flink</groupId>
+    <artifactId>cc-flink-extensions</artifactId>
+    <version>1.18-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>flink-integration-impl</artifactId>
+  <name>Confluent Flink : Integration Implementation</name>
+
+  <properties>
+    <scala.binary.version>2.12</scala.binary.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <!-- Required by the JobGraphWrapperImpl -->
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-runtime</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <!-- Required by the JobClientWrapperImpl -->
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-clients</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.confluent.flink</groupId>
+      <artifactId>flink-integration-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-test-utils</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-table-api-java</artifactId>
+      <version>${project.version}</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-table-planner_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-connector-kafka</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-sql-avro-confluent-registry</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.confluent.flink</groupId>
+      <artifactId>cc-flink-table-extended_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.knaufk</groupId>
+      <artifactId>flink-faker</artifactId>
+      <!-- This is our internally published version of Faker -->
+      <version>0.5.3-2</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <configuration>
+            <excludes>
+              <!--
+              Similar to https://github.com/hazelcast/hazelcast/issues/20945.
+              Jacoco injects methods such as this:
+                 private static boolean[] org.apache.calcite.rel.metadata.BuiltInMetadata$RowCount$Handler.$jacocoInit()
+              This then breaks an assertion in org.apache.calcite.rel.metadata.MetadataDef.
+              -->
+              <exclude>org/apache/calcite/rel/metadata/BuiltInMetadata$*$Handler</exclude>
+            </excludes>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
