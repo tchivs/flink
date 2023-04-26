@@ -12,10 +12,14 @@ Copyright 2023 Confluent Inc.
     <version>1.18-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-integration-impl_${scala.binary.version}</artifactId>
+  <artifactId>flink-integration-impl</artifactId>
   <name>Confluent Flink : Integration Implementation</name>
 
-  <dependencies>
+	<properties>
+		<japicmp.skip>true</japicmp.skip>
+	</properties>
+
+	<dependencies>
     <dependency>
       <!-- Required by the JobGraphWrapperImpl -->
       <groupId>org.apache.flink</groupId>
@@ -116,6 +120,34 @@ Copyright 2023 Confluent Inc.
             <configuration>
               <!-- We need to depend on table planner because we rely on its internals -->
               <skip>true</skip>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>shade-integration-impl</id>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <shadeTestJar>false</shadeTestJar>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <createDependencyReducedPom>true</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>LICENSE</exclude>
+                    <exclude>NOTICE</exclude>
+                  </excludes>
+                </filter>
+              </filters>
             </configuration>
           </execution>
         </executions>

@@ -59,6 +59,7 @@ public class ScalaSuffixChecker {
     private static final Set<String> EXCLUDED_MODULES =
             new HashSet<>(
                     Arrays.asList(
+                            "flink-integration-impl",
                             // we ignore flink-rpc-akka because it is loaded through a separate
                             // class loader
                             "flink-rpc-akka",

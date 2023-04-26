@@ -103,6 +103,27 @@ under the License.
 			<scope>test</scope>
 		</dependency>
 
+		<!-- ===================================================
+		  Serving flink-integration-impl.jar with StaticFileServerHandler
+			  the dependency only enforces build order
+			  the actual files are added by maven-shade-plugin at the bottom
+			=================================================== -->
+
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>flink-integration-impl</artifactId>
+			<version>${project.version}</version>
+			<scope>runtime</scope>
+			<optional>true</optional>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+
 	</dependencies>
 
 	<profiles>
@@ -300,6 +321,41 @@ under the License.
 						<parameterJarWithEagerSinkName>${test.ParameterProgramWithEagerSink.name}</parameterJarWithEagerSinkName>
 					</systemPropertyVariables>
 				</configuration>
+			</plugin>
+
+			<plugin>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/classes/web/assets/cc</outputDirectory>
+							<includeGroupIds>io.confluent.flink</includeGroupIds>
+							<includeArtifactIds>flink-integration-impl</includeArtifactIds>
+							<stripClassifier>true</stripClassifier>
+							<stripVersion>true</stripVersion>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>forbid-direct-table-planner-dependencies</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<!-- We need to depend on table planner because cc-flink-integratiopn-impl relies on its internals -->
+							<skip>true</skip>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
