@@ -23,31 +23,38 @@ public class ForegroundResultResponseBody implements ResponseBody {
     public static final String FIELD_NAME_VERSION = "version";
     public static final String FIELD_NAME_LAST_CHECKPOINTED_OFFSET = "lastCheckpointedOffset";
     public static final String FIELD_NAME_DATA = "data";
+    public static final String FIELD_NAME_ROW_COUNT = "rowCount";
 
     @JsonProperty(FIELD_NAME_VERSION)
-    private String version;
+    private final String version;
 
     @JsonProperty(FIELD_NAME_LAST_CHECKPOINTED_OFFSET)
-    private Long lastCheckpointedOffset;
+    private final Long lastCheckpointedOffset;
 
     @JsonProperty(FIELD_NAME_DATA)
     @JsonRawValue
-    private String data;
+    private final String data;
+
+    @JsonProperty(FIELD_NAME_ROW_COUNT)
+    private final Integer rowCount;
 
     @JsonCreator
     public ForegroundResultResponseBody(
             @JsonProperty(FIELD_NAME_VERSION) String version,
             @JsonProperty(FIELD_NAME_LAST_CHECKPOINTED_OFFSET) Long lastCheckpointedOffset,
-            @JsonProperty(FIELD_NAME_DATA) String data) {
+            @JsonProperty(FIELD_NAME_DATA) String data,
+            @JsonProperty(FIELD_NAME_ROW_COUNT) Integer rowCount) {
         this.version = version;
         this.lastCheckpointedOffset = lastCheckpointedOffset;
         this.data = data;
+        this.rowCount = rowCount;
     }
 
     @JsonIgnore
     public static ForegroundResultResponseBody of(
             String version, Long lastCheckpointedOffset, List<byte[]> data) {
-        return new ForegroundResultResponseBody(version, lastCheckpointedOffset, formatData(data));
+        return new ForegroundResultResponseBody(
+                version, lastCheckpointedOffset, formatData(data), data.size());
     }
 
     @JsonIgnore
@@ -63,6 +70,11 @@ public class ForegroundResultResponseBody implements ResponseBody {
     @JsonIgnore
     public String getData() {
         return data;
+    }
+
+    @JsonIgnore
+    public Integer getRowCount() {
+        return rowCount;
     }
 
     private static String formatData(List<byte[]> data) {

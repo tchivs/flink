@@ -86,6 +86,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo("");
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
             assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getRowCount()).isEqualTo(0);
         }
 
         @Test
@@ -114,6 +115,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(NEW_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
             assertThat(response.getData()).isEqualTo("[A,B,C]");
+            assertThat(response.getRowCount()).isEqualTo(3);
         }
 
         @Test
