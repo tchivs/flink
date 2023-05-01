@@ -17,11 +17,13 @@
 
 package org.apache.flink.streaming.runtime.operators.sink;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.UserCodeClassLoader;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -31,12 +33,17 @@ class InitContextInitializationContextAdapter implements SerializationSchema.Ini
 
     private final UserCodeClassLoader userCodeClassLoader;
     private final Supplier<MetricGroup> metricGroupSupplier;
+
+    private final JobID jobID;
     private MetricGroup cachedMetricGroup;
 
     public InitContextInitializationContextAdapter(
-            UserCodeClassLoader userCodeClassLoader, Supplier<MetricGroup> metricGroupSupplier) {
+            UserCodeClassLoader userCodeClassLoader,
+            Supplier<MetricGroup> metricGroupSupplier,
+            JobID jobID) {
         this.userCodeClassLoader = userCodeClassLoader;
         this.metricGroupSupplier = metricGroupSupplier;
+        this.jobID = jobID;
     }
 
     @Override
@@ -50,5 +57,10 @@ class InitContextInitializationContextAdapter implements SerializationSchema.Ini
     @Override
     public UserCodeClassLoader getUserCodeClassLoader() {
         return userCodeClassLoader;
+    }
+
+    @Override
+    public Optional<JobID> getJobID() {
+        return Optional.of(jobID);
     }
 }

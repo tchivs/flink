@@ -18,7 +18,9 @@ limitations under the License.
 
 package org.apache.flink.streaming.api.operators;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
@@ -45,4 +47,10 @@ public interface CoordinatedOperatorFactory<OUT> extends StreamOperatorFactory<O
      * @return the provider of the {@link OperatorCoordinator} for this operator.
      */
     OperatorCoordinator.Provider getCoordinatorProvider(String operatorName, OperatorID operatorID);
+
+    @Confluent
+    default OperatorCoordinator.Provider getCoordinatorProvider(
+            String operatorName, OperatorID operatorID, JobID jobID) {
+        return getCoordinatorProvider(operatorName, operatorID);
+    }
 }

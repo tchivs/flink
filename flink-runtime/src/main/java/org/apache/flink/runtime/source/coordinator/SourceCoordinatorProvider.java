@@ -18,6 +18,7 @@ limitations under the License.
 
 package org.apache.flink.runtime.source.coordinator;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.connector.source.SourceSplit;
@@ -46,6 +47,7 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
     private final int numWorkerThreads;
     private final WatermarkAlignmentParams alignmentParams;
     @Nullable private final String coordinatorListeningID;
+    private final JobID jobID;
 
     /**
      * Construct the {@link SourceCoordinatorProvider}.
@@ -64,13 +66,15 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
             Source<?, SplitT, ?> source,
             int numWorkerThreads,
             WatermarkAlignmentParams alignmentParams,
-            @Nullable String coordinatorListeningID) {
+            @Nullable String coordinatorListeningID,
+            JobID jobID) {
         super(operatorID);
         this.operatorName = operatorName;
         this.source = source;
         this.numWorkerThreads = numWorkerThreads;
         this.alignmentParams = alignmentParams;
         this.coordinatorListeningID = coordinatorListeningID;
+        this.jobID = jobID;
     }
 
     @Override
@@ -86,7 +90,8 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
                         numWorkerThreads,
                         context,
                         splitSerializer,
-                        context.isConcurrentExecutionAttemptsSupported());
+                        context.isConcurrentExecutionAttemptsSupported(),
+                        jobID);
         return new SourceCoordinator<>(
                 operatorName,
                 source,

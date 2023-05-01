@@ -18,6 +18,7 @@
 
 package org.apache.flink.connector.base.source.hybrid;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.connector.source.ReaderInfo;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.connector.source.SourceEvent;
@@ -40,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -422,6 +424,11 @@ public class HybridSourceSplitEnumerator
         @Override
         public void runInCoordinatorThread(Runnable runnable) {
             realContext.runInCoordinatorThread(runnable);
+        }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return realContext.getJobID();
         }
     }
 

@@ -18,6 +18,7 @@ limitations under the License.
 
 package org.apache.flink.streaming.api.operators;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -133,13 +134,20 @@ public class SourceOperatorFactory<OUT> extends AbstractStreamOperatorFactory<OU
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public OperatorCoordinator.Provider getCoordinatorProvider(
+            String operatorName, OperatorID operatorID, JobID jobID) {
         return new SourceCoordinatorProvider<>(
                 operatorName,
                 operatorID,
                 source,
                 numCoordinatorWorkerThread,
                 watermarkStrategy.getAlignmentParameters(),
-                coordinatorListeningID);
+                coordinatorListeningID,
+                jobID);
     }
 
     @SuppressWarnings("rawtypes")

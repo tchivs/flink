@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.source.coordinator;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -394,7 +395,8 @@ class SourceCoordinatorTest extends SourceCoordinatorTestBase {
                         source,
                         1,
                         WatermarkAlignmentParams.WATERMARK_ALIGNMENT_DISABLED,
-                        null);
+                        null,
+                        JobID.generate());
 
         final OperatorCoordinator coordinator = provider.getCoordinator(context);
         coordinator.start();
@@ -422,7 +424,8 @@ class SourceCoordinatorTest extends SourceCoordinatorTestBase {
                         source,
                         1,
                         WatermarkAlignmentParams.WATERMARK_ALIGNMENT_DISABLED,
-                        null);
+                        null,
+                        JobID.generate());
 
         final OperatorCoordinator coordinator = provider.getCoordinator(context);
         coordinator.resetToCheckpoint(1L, createEmptyCheckpoint());

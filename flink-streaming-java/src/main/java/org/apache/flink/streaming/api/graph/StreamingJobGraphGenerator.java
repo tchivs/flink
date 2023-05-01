@@ -606,7 +606,8 @@ public class StreamingJobGraphGenerator {
                     final SourceOperatorFactory<?> sourceOpFact =
                             (SourceOperatorFactory<?>) sourceNode.getOperatorFactory();
                     final OperatorCoordinator.Provider coord =
-                            sourceOpFact.getCoordinatorProvider(sourceNode.getOperatorName(), opId);
+                            sourceOpFact.getCoordinatorProvider(
+                                    sourceNode.getOperatorName(), opId, jobGraph.getJobID());
 
                     final OperatorChainInfo chainInfo =
                             chainEntryPoints.computeIfAbsent(
@@ -718,7 +719,8 @@ public class StreamingJobGraphGenerator {
             OperatorID currentOperatorId =
                     chainInfo.addNodeToChain(
                             currentNodeId,
-                            streamGraph.getStreamNode(currentNodeId).getOperatorName());
+                            streamGraph.getStreamNode(currentNodeId).getOperatorName(),
+                            jobGraph.getJobID());
 
             if (currentNode.getInputFormat() != null) {
                 getOrCreateFormatContainer(startNodeId)
@@ -2107,7 +2109,7 @@ public class StreamingJobGraphGenerator {
             return chainedSources;
         }
 
-        private OperatorID addNodeToChain(int currentNodeId, String operatorName) {
+        private OperatorID addNodeToChain(int currentNodeId, String operatorName, JobID jobID) {
             recordChainedNode(currentNodeId);
             StreamNode streamNode = streamGraph.getStreamNode(currentNodeId);
 
@@ -2121,7 +2123,8 @@ public class StreamingJobGraphGenerator {
             }
 
             streamNode
-                    .getCoordinatorProvider(operatorName, new OperatorID(getHash(currentNodeId)))
+                    .getCoordinatorProvider(
+                            operatorName, new OperatorID(getHash(currentNodeId)), jobID)
                     .map(coordinatorProviders::add);
 
             return new OperatorID(primaryHashBytes);

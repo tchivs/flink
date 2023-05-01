@@ -357,7 +357,9 @@ class SinkWriterOperator<InputT, CommT> extends AbstractStreamOperator<Committab
         @Override
         public InitializationContext asSerializationSchemaInitializationContext() {
             return new InitContextInitializationContextAdapter(
-                    getUserCodeClassLoader(), () -> metricGroup.addGroup("user"));
+                    getUserCodeClassLoader(),
+                    () -> metricGroup.addGroup("user"),
+                    runtimeContext.getJobId());
         }
 
         @Override

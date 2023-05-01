@@ -19,10 +19,12 @@
 package org.apache.flink.api.common.serialization;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.UserCodeClassLoader;
 
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -74,6 +76,11 @@ public final class RuntimeContextInitializationContextAdapters {
         public UserCodeClassLoader getUserCodeClassLoader() {
             return new RuntimeContextUserCodeClassLoaderAdapter(runtimeContext);
         }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return Optional.of(runtimeContext.getJobId());
+        }
     }
 
     private static final class RuntimeContextSerializationInitializationContextAdapter
@@ -95,6 +102,11 @@ public final class RuntimeContextInitializationContextAdapters {
         @Override
         public UserCodeClassLoader getUserCodeClassLoader() {
             return new RuntimeContextUserCodeClassLoaderAdapter(runtimeContext);
+        }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return Optional.of(runtimeContext.getJobId());
         }
     }
 

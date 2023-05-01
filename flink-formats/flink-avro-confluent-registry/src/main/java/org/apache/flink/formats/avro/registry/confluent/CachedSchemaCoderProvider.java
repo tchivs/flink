@@ -20,6 +20,7 @@ package org.apache.flink.formats.avro.registry.confluent;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.formats.avro.SchemaCoder;
+import org.apache.flink.formats.avro.SchemaCoderProviderContext;
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 
@@ -60,6 +61,11 @@ class CachedSchemaCoderProvider implements SchemaCoder.SchemaCoderProvider {
         return new ConfluentSchemaRegistryCoder(
                 this.subject,
                 new CachedSchemaRegistryClient(url, identityMapCapacity, registryConfigs));
+    }
+
+    @Override
+    public SchemaCoder get(SchemaCoderProviderContext context) {
+        return get();
     }
 
     @Override
