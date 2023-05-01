@@ -21,6 +21,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.api.connector.sink2.CommitterContext;
 import org.apache.flink.api.connector.sink2.StatefulSink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
@@ -89,6 +90,13 @@ public class KafkaSink<IN>
     @Internal
     @Override
     public Committer<KafkaCommittable> createCommitter() throws IOException {
+        return new KafkaCommitter(kafkaProducerConfig);
+    }
+
+    @Internal
+    @Override
+    public Committer<KafkaCommittable> createCommitter(CommitterContext committerContext)
+            throws IOException {
         return new KafkaCommitter(kafkaProducerConfig);
     }
 
