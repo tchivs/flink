@@ -1,6 +1,7 @@
 /*
  * Copyright 2023 Confluent Inc.
  */
+
 package io.confluent.flink.jobgraph;
 
 import org.apache.flink.api.common.JobID;
@@ -11,6 +12,7 @@ import org.apache.flink.runtime.jobmaster.JobResult;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.InjectClusterClient;
 import org.apache.flink.test.junit5.MiniClusterExtension;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 

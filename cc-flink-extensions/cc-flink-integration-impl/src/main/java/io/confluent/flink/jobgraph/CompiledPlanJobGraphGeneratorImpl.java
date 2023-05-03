@@ -1,6 +1,7 @@
 /*
  * Copyright 2023 Confluent Inc.
  */
+
 package io.confluent.flink.jobgraph;
 
 import org.apache.flink.api.dag.Pipeline;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.List;
 
+/** CompiledPlan-based {@link JobGraphGenerator} implementation. */
 public class CompiledPlanJobGraphGeneratorImpl implements JobGraphGenerator {
     @Override
     public JobGraphWrapper generateJobGraph(List<String> arguments, Downloader downloader) {

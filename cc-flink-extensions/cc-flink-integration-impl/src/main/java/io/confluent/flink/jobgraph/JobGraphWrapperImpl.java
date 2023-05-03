@@ -1,6 +1,7 @@
 /*
  * Copyright 2023 Confluent Inc.
  */
+
 package io.confluent.flink.jobgraph;
 
 import org.apache.flink.api.common.JobID;
@@ -11,6 +12,7 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+/** {@link JobGraphWrapper} implementation. */
 public class JobGraphWrapperImpl implements JobGraphWrapper {
 
     private final JobGraph jobGraph;

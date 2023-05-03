@@ -1,6 +1,7 @@
 /*
  * Copyright 2023 Confluent Inc.
  */
+
 package io.confluent.flink.jobgraph;
 
 import org.apache.flink.client.deployment.StandaloneClusterId;
@@ -13,6 +14,7 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
+/** {@link FlinkClientWrapper} implementation. */
 public class FlinkClientWrapperImpl implements FlinkClientWrapper {
     @Override
     public Future<?> submitJobGraph(

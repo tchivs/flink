@@ -1,16 +1,19 @@
 /*
  * Copyright 2023 Confluent Inc.
  */
+
 package io.confluent.flink.jobgraph;
 
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.util.IOUtils;
+
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,16 +35,17 @@ class CompiledPlanJobGraphGeneratorImplTest {
     }
 
     static JobGraphWrapper compileJob() throws IOException {
-        final String compiledPlan =
-                Files.readString(
-                        Paths.get(
-                                Objects.requireNonNull(
-                                                CompiledPlanJobGraphGeneratorImpl.class.getResource(
-                                                        "/compiled_plan.json"))
-                                        .getPath()));
+        final String compiledPlan = loadResource("/compiled_plan.json");
 
         final JobGraphGenerator jobGraphGenerator = new CompiledPlanJobGraphGeneratorImpl();
 
         return jobGraphGenerator.generateJobGraph(Collections.singletonList(compiledPlan), null);
+    }
+
+    private static String loadResource(String name) throws IOException {
+        InputStream in = CompiledPlanJobGraphGeneratorImpl.class.getResourceAsStream(name);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        IOUtils.copyBytes(in, out);
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 }
