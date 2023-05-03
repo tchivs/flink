@@ -294,6 +294,8 @@ public class JarFileChecker {
                                     path ->
                                             !path.endsWith(
                                                     "web/3rdpartylicenses.txt")) // a false positive
+                            // datafaker (Confluent-specific)
+                            .filter(path -> !path.endsWith("driving_license.yml"))
                             // in
                             // flink-runtime-web
                             .collect(Collectors.toList());
