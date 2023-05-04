@@ -11,13 +11,13 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 /** {@link FlinkClientWrapper} implementation. */
 public class FlinkClientWrapperImpl implements FlinkClientWrapper {
     @Override
-    public Future<?> submitJobGraph(
+    public CompletableFuture<?> submitJobGraph(
             JobGraphWrapper jobGraphWrapper, JobManagerLocation jobManagerLocation) {
         final Configuration configuration =
                 new Configuration().set(RestOptions.ADDRESS, jobManagerLocation.getHost());
@@ -39,4 +39,7 @@ public class FlinkClientWrapperImpl implements FlinkClientWrapper {
 
         return submissionFuture;
     }
+
+    @Override
+    public void close() throws IOException {}
 }
