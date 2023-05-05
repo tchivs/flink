@@ -207,6 +207,21 @@ public class ForegroundResultHandler
                                         remainingRows);
                             }
 
+                            // Temporary logging for debugging
+                            LOG.info(
+                                    "EOS result for job {}. "
+                                            + "Request version: {}, "
+                                            + "Request offset: {}, "
+                                            + "Final response version: {}, "
+                                            + "Final response offset: {}, "
+                                            + "Final response rows: {}",
+                                    jobId.toString(),
+                                    requestVersion,
+                                    requestOffset,
+                                    finalResponse.version,
+                                    finalResponse.offset,
+                                    finalResponse.rows.size());
+
                             // End-of-stream (EOS)
                             // Communicate that job terminated with lastCheckpointOffset = -1 which
                             // should have no impact on user-visible buffer
