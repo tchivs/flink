@@ -9,6 +9,7 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -49,5 +50,10 @@ public class JobGraphWrapperImpl implements JobGraphWrapper {
     @Override
     public Object unwrapJobGraph() {
         return jobGraph;
+    }
+
+    @Override
+    public void setConfiguration(Map<String, String> map) {
+        map.forEach((key, value) -> jobGraph.getJobConfiguration().setString(key, value));
     }
 }

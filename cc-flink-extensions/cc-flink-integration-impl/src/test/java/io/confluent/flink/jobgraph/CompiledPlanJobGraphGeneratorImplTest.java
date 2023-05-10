@@ -39,7 +39,8 @@ class CompiledPlanJobGraphGeneratorImplTest {
 
         final JobGraphGenerator jobGraphGenerator = new CompiledPlanJobGraphGeneratorImpl();
 
-        return jobGraphGenerator.generateJobGraph(Collections.singletonList(compiledPlan), null);
+        return jobGraphGenerator.generateJobGraph(
+                Collections.singletonList(compiledPlan), null, Collections.emptyMap());
     }
 
     private static String loadResource(String name) throws IOException {

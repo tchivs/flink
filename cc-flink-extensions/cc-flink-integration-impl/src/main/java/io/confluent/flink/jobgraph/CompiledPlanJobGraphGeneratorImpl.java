@@ -20,11 +20,13 @@ import org.apache.flink.table.planner.delegation.PlannerBase;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.List;
+import java.util.Map;
 
 /** CompiledPlan-based {@link JobGraphGenerator} implementation. */
 public class CompiledPlanJobGraphGeneratorImpl implements JobGraphGenerator {
     @Override
-    public JobGraphWrapper generateJobGraph(List<String> arguments, Downloader downloader) {
+    public JobGraphWrapper generateJobGraph(
+            List<String> arguments, Downloader downloader, Map<String, String> metaInfo) {
         Configuration configuration = new Configuration();
         ClassLoader loader = CompiledPlanJobGraphGeneratorImpl.class.getClassLoader();
 

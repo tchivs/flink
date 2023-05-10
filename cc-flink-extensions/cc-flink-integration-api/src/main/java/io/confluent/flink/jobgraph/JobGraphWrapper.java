@@ -5,6 +5,7 @@
 package io.confluent.flink.jobgraph;
 
 import java.util.Collection;
+import java.util.Map;
 
 /** A wrapper around Flink JobGraph (of some version). */
 public interface JobGraphWrapper {
@@ -26,4 +27,7 @@ public interface JobGraphWrapper {
      *     actually submit the job for execution
      */
     Object unwrapJobGraph();
+
+    /** Should call {@code jobGraph.getJobConfiguration.setString} for each entry. */
+    void setConfiguration(Map<String, String> map);
 }
