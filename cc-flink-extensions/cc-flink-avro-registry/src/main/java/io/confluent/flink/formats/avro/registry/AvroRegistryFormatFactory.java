@@ -10,10 +10,14 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.format.DecodingFormat;
 import org.apache.flink.table.connector.format.EncodingFormat;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
+import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.DeserializationFormatFactory;
 import org.apache.flink.table.factories.DynamicTableFactory;
+import org.apache.flink.table.factories.DynamicTableFactory.Context;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.SerializationFormatFactory;
 import org.apache.flink.table.types.DataType;
@@ -35,9 +39,40 @@ import java.util.stream.Stream;
  * SerializationSchema} and {@link DeserializationSchema}.
  */
 @Confluent
-public class AvroRegistryFormatFactory implements SerializationFormatFactory {
+public class AvroRegistryFormatFactory
+        implements SerializationFormatFactory, DeserializationFormatFactory {
 
     public static final String IDENTIFIER = "avro-registry";
+
+    @Override
+    public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
+            Context context, ReadableConfig formatOptions) {
+        FactoryUtil.validateFactoryOptions(this, formatOptions);
+
+        final String schemaRegistryURL = formatOptions.get(AvroRegistryFormatOptions.URL);
+        final int schemaId = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_ID);
+        final int cacheSize = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_CACHE_SIZE);
+        final Map<String, ?> schemaClientProperties =
+                getSchemaRegistryClientProperties(formatOptions);
+
+        return new DecodingFormat<DeserializationSchema<RowData>>() {
+            @Override
+            public DeserializationSchema<RowData> createRuntimeDecoder(
+                    DynamicTableSource.Context context, DataType physicalDataType) {
+                final RowType rowType = (RowType) physicalDataType.getLogicalType();
+                return new AvroRegistryDeserializationSchema(
+                        new DefaultSchemaRegistryConfig(
+                                schemaRegistryURL, cacheSize, schemaId, schemaClientProperties),
+                        rowType,
+                        context.createTypeInformation(physicalDataType));
+            }
+
+            @Override
+            public ChangelogMode getChangelogMode() {
+                return ChangelogMode.insertOnly();
+            }
+        };
+    }
 
     @Override
     public EncodingFormat<SerializationSchema<RowData>> createEncodingFormat(
