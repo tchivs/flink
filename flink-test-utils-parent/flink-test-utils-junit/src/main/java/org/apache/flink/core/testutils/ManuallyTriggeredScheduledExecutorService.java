@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
  */
 public class ManuallyTriggeredScheduledExecutorService implements ScheduledExecutorService {
 
-    private final ArrayDeque<Runnable> queuedRunnables = new ArrayDeque<>();
+    protected final ArrayDeque<Runnable> queuedRunnables = new ArrayDeque<>();
 
     private final ConcurrentLinkedQueue<ScheduledTask<?>> nonPeriodicScheduledTasks =
             new ConcurrentLinkedQueue<>();

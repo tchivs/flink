@@ -20,6 +20,7 @@ package org.apache.flink.runtime.security.token;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.SecurityOptions;
 import org.apache.flink.core.plugin.PluginManager;
@@ -383,6 +384,52 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
 
         stopTokensUpdate();
 
+        for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+            try {
+                provider.stop();
+            } catch (Throwable t) {
+                LOG.error("Failed to stop delegation token provider {}", provider.serviceName(), t);
+            }
+        }
+
         LOG.info("Stopped credential renewal");
+    }
+
+    @Override
+    public void registerJob(JobID jobId, Configuration jobConfiguration) throws Exception {
+        try {
+            boolean obtainNewToken = false;
+            for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+                if (provider.registerJob(jobId, jobConfiguration)) {
+                    obtainNewToken = true;
+                }
+            }
+            if (obtainNewToken) {
+                synchronized (tokensUpdateFutureLock) {
+                    stopTokensUpdate();
+                    tokensUpdateFuture =
+                            scheduledExecutor.schedule(
+                                    () -> ioExecutor.execute(this::startTokensUpdate),
+                                    0,
+                                    TimeUnit.MILLISECONDS);
+                }
+            }
+        } catch (Exception e) {
+            // If any of the providers fail to register, then unregister the job from them all.
+            unregisterJob(jobId);
+            LOG.error("Failed to register job {}", jobId.toHexString(), e);
+            throw e;
+        }
+    }
+
+    @Override
+    public void unregisterJob(JobID jobId) throws Exception {
+        for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+            try {
+                provider.unregisterJob(jobId);
+            } catch (Exception e) {
+                LOG.error("Failed to unregister job  for provider {}", provider.serviceName(), e);
+            }
+        }
     }
 }

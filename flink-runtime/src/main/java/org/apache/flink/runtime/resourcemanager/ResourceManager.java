@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.blocklist.BlockedNode;
 import org.apache.flink.runtime.blocklist.BlocklistContext;
@@ -363,12 +364,14 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
             final ResourceID jobManagerResourceId,
             final String jobManagerAddress,
             final JobID jobId,
+            final Configuration jobConfiguration,
             final Time timeout) {
 
         checkNotNull(jobMasterId);
         checkNotNull(jobManagerResourceId);
         checkNotNull(jobManagerAddress);
         checkNotNull(jobId);
+        checkNotNull(jobConfiguration);
 
         if (!jobLeaderIdService.containsJob(jobId)) {
             try {
@@ -418,6 +421,13 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
                         jobMasterIdFuture,
                         (JobMasterGateway jobMasterGateway, JobMasterId leadingJobMasterId) -> {
                             if (Objects.equals(leadingJobMasterId, jobMasterId)) {
+                                // First register the job with the delegation token manager, so that
+                                // if anything fails, we don't register the job master.
+                                try {
+                                    delegationTokenManager.registerJob(jobId, jobConfiguration);
+                                } catch (Exception e) {
+                                    return new RegistrationResponse.Failure(e);
+                                }
                                 return registerJobMasterInternal(
                                         jobMasterGateway,
                                         jobId,
@@ -1190,6 +1200,15 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 
         if (jobManagerRegistrations.containsKey(jobId)) {
             closeJobManagerConnection(jobId, ResourceRequirementHandling.CLEAR, cause);
+        }
+
+        try {
+            delegationTokenManager.unregisterJob(jobId);
+        } catch (Exception e) {
+            log.warn(
+                    "Could not properly remove the job {} from the delegation token manager.",
+                    jobId,
+                    e);
         }
     }
 

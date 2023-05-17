@@ -28,7 +28,7 @@ import org.apache.flink.annotation.Internal;
  * secure services to obtain delegation tokens to be distributed to the rest of the application.
  */
 @Internal
-public interface DelegationTokenManager {
+public interface DelegationTokenManager extends DelegationTokenManagerConfluent {
     /**
      * Listener for events in the {@link DelegationTokenManager}.
      *

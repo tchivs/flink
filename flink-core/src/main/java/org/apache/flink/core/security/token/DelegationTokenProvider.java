@@ -30,7 +30,7 @@ import java.util.Optional;
  * DelegationTokenReceiver} instances both on JobManager and TaskManager side.
  */
 @Experimental
-public interface DelegationTokenProvider {
+public interface DelegationTokenProvider extends DelegationTokenProviderConfluent {
 
     /** Config prefix of providers. */
     String CONFIG_PREFIX = "security.delegation.token.provider";
