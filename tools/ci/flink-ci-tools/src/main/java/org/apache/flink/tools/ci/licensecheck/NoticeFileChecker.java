@@ -183,7 +183,10 @@ public class NoticeFileChecker {
                                             entry.getKey(), ignored -> new LinkedHashSet<>());
 
                             for (Dependency dependency : entry.getValue()) {
-                                if (!dependency.getGroupId().contains("org.apache.flink")) {
+                                if (!dependency.getGroupId().contains("org.apache.flink")
+                                        && !dependency
+                                                .getGroupId()
+                                                .contains("io.confluent.flink")) {
                                     dependencies.add(dependency);
                                 }
                             }
