@@ -21,11 +21,13 @@ package org.apache.flink.formats.avro.registry.confluent;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.formats.avro.SchemaCoder;
 import org.apache.flink.formats.avro.SchemaCoderProviderContext;
+import org.apache.flink.formats.avro.registry.confluent.credentials.DPATCredentialProvider;
 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 
 import javax.annotation.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -65,7 +67,16 @@ class CachedSchemaCoderProvider implements SchemaCoder.SchemaCoderProvider {
 
     @Override
     public SchemaCoder get(SchemaCoderProviderContext context) {
-        return get();
+        Map<String, ?> config = this.registryConfigs;
+        if (context.getJobID().isPresent()) {
+            config =
+                    addConfig(
+                            config,
+                            DPATCredentialProvider.JOB_ID_PROPERTY,
+                            context.getJobID().get().toHexString());
+        }
+        return new ConfluentSchemaRegistryCoder(
+                this.subject, new CachedSchemaRegistryClient(url, identityMapCapacity, config));
     }
 
     @Override
@@ -86,5 +97,13 @@ class CachedSchemaCoderProvider implements SchemaCoder.SchemaCoderProvider {
     @Override
     public int hashCode() {
         return Objects.hash(subject, url, identityMapCapacity, registryConfigs);
+    }
+
+    private static Map<String, ?> addConfig(
+            Map<String, ?> registryConfigs, String key, Object value) {
+        HashMap<String, Object> newRegistryConfigs =
+                registryConfigs == null ? new HashMap<>() : new HashMap<>(registryConfigs);
+        newRegistryConfigs.put(key, value);
+        return newRegistryConfigs;
     }
 }
