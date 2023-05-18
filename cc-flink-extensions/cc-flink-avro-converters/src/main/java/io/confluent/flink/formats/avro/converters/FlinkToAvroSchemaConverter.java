@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.formats.avro.registry.converters;
+package io.confluent.flink.formats.avro.converters;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.types.logical.ArrayType;
@@ -37,7 +37,7 @@ public class FlinkToAvroSchemaConverter {
      * Converts a Flink's logical type into an Avro schema. Uses Kafka Connect annotations to store
      * types that are not natively supported by Avro.
      */
-    public org.apache.avro.Schema fromFlinkSchema(LogicalType logicalType, String rowName) {
+    public static org.apache.avro.Schema fromFlinkSchema(LogicalType logicalType, String rowName) {
         boolean nullable = logicalType.isNullable();
         org.apache.avro.Schema notNullSchema;
         if (Objects.requireNonNull(logicalType.getTypeRoot()) == LogicalTypeRoot.NULL) {
@@ -49,7 +49,7 @@ public class FlinkToAvroSchemaConverter {
         return nullable ? nullableSchema(notNullSchema) : notNullSchema;
     }
 
-    public org.apache.avro.Schema fromFlinkSchemaIgnoreNullable(
+    private static org.apache.avro.Schema fromFlinkSchemaIgnoreNullable(
             LogicalType logicalType, String rowName) {
         switch (logicalType.getTypeRoot()) {
             case BOOLEAN:
@@ -136,7 +136,7 @@ public class FlinkToAvroSchemaConverter {
         }
     }
 
-    private Schema convertMap(MapType logicalType, String rowName) {
+    private static Schema convertMap(MapType logicalType, String rowName) {
         final LogicalType keyType = logicalType.getKeyType();
         final LogicalType valueType = logicalType.getValueType();
 

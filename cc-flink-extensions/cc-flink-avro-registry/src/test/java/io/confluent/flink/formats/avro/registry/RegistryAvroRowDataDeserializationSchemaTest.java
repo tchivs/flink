@@ -20,7 +20,7 @@ import org.apache.flink.util.SimpleUserCodeClassLoader;
 import org.apache.flink.util.TestLoggerExtension;
 import org.apache.flink.util.UserCodeClassLoader;
 
-import io.confluent.flink.formats.avro.registry.converters.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.avro.converters.AvroToFlinkSchemaConverter;
 import io.confluent.kafka.schemaregistry.avro.AvroSchema;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;

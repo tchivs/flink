@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.formats.avro.registry.converters;
+package io.confluent.flink.formats.avro.converters;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.types.logical.ArrayType;

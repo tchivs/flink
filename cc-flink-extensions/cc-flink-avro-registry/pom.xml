@@ -56,6 +56,12 @@ under the License.
 
 	<dependencies>
 		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-avro-converters</artifactId>
+			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
 			<version>${schema.registry.version}</version>

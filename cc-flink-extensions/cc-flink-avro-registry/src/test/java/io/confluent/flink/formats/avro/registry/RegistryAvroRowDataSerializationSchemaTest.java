@@ -14,7 +14,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.TestLoggerExtension;
 
-import io.confluent.flink.formats.avro.registry.converters.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.avro.converters.AvroToFlinkSchemaConverter;
 import io.confluent.flink.formats.avro.registry.utils.MockInitializationContext;
 import io.confluent.flink.formats.avro.registry.utils.TestSchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.avro.AvroSchema;

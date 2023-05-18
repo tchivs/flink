@@ -11,6 +11,7 @@ import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.TestLoggerExtension;
 
+import io.confluent.flink.formats.avro.converters.AvroToFlinkSchemaConverter;
 import io.confluent.flink.formats.avro.registry.converters.RowDataToAvroConverters.RowDataToAvroConverter;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
