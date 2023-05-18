@@ -105,7 +105,17 @@ public class AvroRegistryFormatFactory
 
     private Map<String, ?> getSchemaRegistryClientProperties(ReadableConfig formatOptions) {
         final Map<String, Object> properties = new HashMap<>();
-        properties.put("bearer.auth.credentials.source", "OAUTHBEARER_DPAT");
+        switch (formatOptions.get(AvroRegistryFormatOptions.CREDENTIALS_SOURCE)) {
+            case KEYS:
+                properties.put("basic.auth.credentials.source", "USER_INFO");
+                properties.put(
+                        "basic.auth.user.info",
+                        formatOptions.get(AvroRegistryFormatOptions.BASIC_AUTH_USER_INFO));
+                break;
+            case DPAT:
+                properties.put("bearer.auth.credentials.source", "OAUTHBEARER_DPAT");
+                break;
+        }
         properties.put(
                 "confluent.schema.registry.logical.cluster.id",
                 formatOptions.get(AvroRegistryFormatOptions.LOGICAL_CLUSTER_ID));

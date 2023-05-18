@@ -40,7 +40,25 @@ public class AvroRegistryFormatOptions {
             ConfigOptions.key("logical-cluster-id")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("");
+                    .withDescription("The kafka logical cluster id in CC");
+
+    public static final ConfigOption<CredentialsSource> CREDENTIALS_SOURCE =
+            ConfigOptions.key("credentials-source")
+                    .enumType(CredentialsSource.class)
+                    .defaultValue(CredentialsSource.DPAT)
+                    .withDescription("Where to get the credentials from");
+
+    public static final ConfigOption<String> BASIC_AUTH_USER_INFO =
+            ConfigOptions.key("basic-auth.user-info")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Basic auth user info for schema registry");
+
+    /** Where to get the credentials from. */
+    public enum CredentialsSource {
+        KEYS,
+        DPAT
+    }
 
     private AvroRegistryFormatOptions() {}
 }
