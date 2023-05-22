@@ -4,8 +4,12 @@
 
 package io.confluent.flink.formats.avro.registry.utils;
 
+import org.apache.flink.api.common.JobID;
+
 import io.confluent.flink.formats.avro.registry.SchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+
+import javax.annotation.Nullable;
 
 /**
  * A test {@link SchemaRegistryConfig} that passes the given {@link SchemaRegistryClient}. This lets
@@ -28,7 +32,7 @@ public final class TestSchemaRegistryConfig implements SchemaRegistryConfig {
     }
 
     @Override
-    public SchemaRegistryClient createClient() {
+    public SchemaRegistryClient createClient(@Nullable JobID jobID) {
         return client;
     }
 }

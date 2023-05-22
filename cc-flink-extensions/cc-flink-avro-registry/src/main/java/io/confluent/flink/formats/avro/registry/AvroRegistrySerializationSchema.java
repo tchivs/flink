@@ -63,7 +63,8 @@ public class AvroRegistrySerializationSchema implements SerializationSchema<RowD
 
     @Override
     public void open(InitializationContext context) throws Exception {
-        final SchemaRegistryClient schemaRegistryClient = schemaRegistryConfig.createClient();
+        final SchemaRegistryClient schemaRegistryClient =
+                schemaRegistryConfig.createClient(context.getJobID().orElse(null));
         final ParsedSchema schema =
                 schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         final Schema avroSchema = (Schema) schema.rawSchema();

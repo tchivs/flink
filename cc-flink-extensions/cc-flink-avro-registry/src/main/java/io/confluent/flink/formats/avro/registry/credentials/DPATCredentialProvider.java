@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package org.apache.flink.formats.avro.registry.confluent.credentials;
+package io.confluent.flink.formats.avro.registry.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.JobID;

@@ -21,6 +21,7 @@ import org.apache.flink.util.TestLoggerExtension;
 import org.apache.flink.util.UserCodeClassLoader;
 
 import io.confluent.flink.formats.avro.converters.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.avro.registry.utils.TestSchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.avro.AvroSchema;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -247,28 +248,6 @@ class RegistryAvroRowDataDeserializationSchemaTest {
         stream.write(schemaId >>> 16);
         stream.write(schemaId >>> 8);
         stream.write(schemaId);
-    }
-
-    private static final class TestSchemaRegistryConfig implements SchemaRegistryConfig {
-
-        private final int schemaId;
-
-        private final SchemaRegistryClient client;
-
-        private TestSchemaRegistryConfig(int schemaId, SchemaRegistryClient client) {
-            this.schemaId = schemaId;
-            this.client = client;
-        }
-
-        @Override
-        public int getSchemaId() {
-            return schemaId;
-        }
-
-        @Override
-        public SchemaRegistryClient createClient() {
-            return client;
-        }
     }
 
     private static class MockInitializationContext

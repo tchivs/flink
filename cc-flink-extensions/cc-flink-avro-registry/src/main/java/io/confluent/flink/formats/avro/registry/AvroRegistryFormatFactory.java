@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.avro.registry;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.ConfigOption;
@@ -23,8 +24,11 @@ import org.apache.flink.table.factories.SerializationFormatFactory;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.confluent.flink.formats.avro.registry.credentials.DPATCredentialProvider;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+
+import javax.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,7 +56,7 @@ public class AvroRegistryFormatFactory
         final String schemaRegistryURL = formatOptions.get(AvroRegistryFormatOptions.URL);
         final int schemaId = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_ID);
         final int cacheSize = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_CACHE_SIZE);
-        final Map<String, ?> schemaClientProperties =
+        final Map<String, Object> schemaClientProperties =
                 getSchemaRegistryClientProperties(formatOptions);
 
         return new DecodingFormat<DeserializationSchema<RowData>>() {
@@ -82,7 +86,7 @@ public class AvroRegistryFormatFactory
         final String schemaRegistryURL = formatOptions.get(AvroRegistryFormatOptions.URL);
         final int schemaId = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_ID);
         final int cacheSize = formatOptions.get(AvroRegistryFormatOptions.SCHEMA_CACHE_SIZE);
-        final Map<String, ?> schemaClientProperties =
+        final Map<String, Object> schemaClientProperties =
                 getSchemaRegistryClientProperties(formatOptions);
 
         return new EncodingFormat<SerializationSchema<RowData>>() {
@@ -103,7 +107,7 @@ public class AvroRegistryFormatFactory
         };
     }
 
-    private Map<String, ?> getSchemaRegistryClientProperties(ReadableConfig formatOptions) {
+    private Map<String, Object> getSchemaRegistryClientProperties(ReadableConfig formatOptions) {
         final Map<String, Object> properties = new HashMap<>();
         switch (formatOptions.get(AvroRegistryFormatOptions.CREDENTIALS_SOURCE)) {
             case KEYS:
@@ -117,7 +121,7 @@ public class AvroRegistryFormatFactory
                 break;
         }
         properties.put(
-                "confluent.schema.registry.logical.cluster.id",
+                DPATCredentialProvider.LOGICAL_CLUSTER_PROPERTY,
                 formatOptions.get(AvroRegistryFormatOptions.LOGICAL_CLUSTER_ID));
         return properties;
     }
@@ -159,13 +163,13 @@ public class AvroRegistryFormatFactory
         private final String schemaRegistryUrl;
         private final int identityMapCapacity;
         private final int schemaId;
-        private final Map<String, ?> properties;
+        private final Map<String, Object> properties;
 
         DefaultSchemaRegistryConfig(
                 String schemaRegistryUrl,
                 int identityMapCapacity,
                 int schemaId,
-                Map<String, ?> properties) {
+                Map<String, Object> properties) {
             this.schemaRegistryUrl = schemaRegistryUrl;
             this.identityMapCapacity = identityMapCapacity;
             this.schemaId = schemaId;
@@ -178,7 +182,10 @@ public class AvroRegistryFormatFactory
         }
 
         @Override
-        public SchemaRegistryClient createClient() {
+        public SchemaRegistryClient createClient(@Nullable JobID jobID) {
+            if (jobID != null) {
+                properties.put(DPATCredentialProvider.JOB_ID_PROPERTY, jobID.toHexString());
+            }
             return new CachedSchemaRegistryClient(
                     schemaRegistryUrl, identityMapCapacity, properties);
         }

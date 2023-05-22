@@ -5,8 +5,11 @@
 package io.confluent.flink.formats.avro.registry;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.common.JobID;
 
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
 
@@ -18,5 +21,5 @@ public interface SchemaRegistryConfig extends Serializable {
     int getSchemaId();
 
     /** Client to use for connecting with Schema Registry. */
-    SchemaRegistryClient createClient();
+    SchemaRegistryClient createClient(@Nullable JobID jobID);
 }

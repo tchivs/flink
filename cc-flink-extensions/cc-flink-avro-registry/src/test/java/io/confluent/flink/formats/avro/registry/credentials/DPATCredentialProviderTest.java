@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package org.apache.flink.formats.avro.registry.confluent.credentials;
+package io.confluent.flink.formats.avro.registry.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
@@ -17,8 +17,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Optional;
 
-import static org.apache.flink.formats.avro.registry.confluent.credentials.DPATCredentialProvider.JOB_ID_PROPERTY;
-import static org.apache.flink.formats.avro.registry.confluent.credentials.DPATCredentialProvider.LOGICAL_CLUSTER_PROPERTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,7 +39,8 @@ public class DPATCredentialProviderTest {
 
     @Test
     void testNoJobId() {
-        provider.configure(ImmutableMap.of(LOGICAL_CLUSTER_PROPERTY, "lsrc-abc"));
+        provider.configure(
+                ImmutableMap.of(DPATCredentialProvider.LOGICAL_CLUSTER_PROPERTY, "lsrc-abc"));
         assertThatThrownBy(() -> provider.getBearerToken(new URL("http://example.com")))
                 .hasMessageContaining("Configuration must provide jobId");
     }
@@ -52,9 +51,9 @@ public class DPATCredentialProviderTest {
                 jobID -> Optional.of(new KafkaCredentials("token-123")));
         provider.configure(
                 ImmutableMap.of(
-                        LOGICAL_CLUSTER_PROPERTY,
+                        DPATCredentialProvider.LOGICAL_CLUSTER_PROPERTY,
                         "lsrc-abc",
-                        JOB_ID_PROPERTY,
+                        DPATCredentialProvider.JOB_ID_PROPERTY,
                         "00000000000000000000000000000abc"));
         assertThat(provider.getBearerToken(new URL("http://example.com"))).isEqualTo("token-123");
     }
