@@ -24,6 +24,7 @@ public class ForegroundResultResponseBody implements ResponseBody {
     public static final String FIELD_NAME_LAST_CHECKPOINTED_OFFSET = "lastCheckpointedOffset";
     public static final String FIELD_NAME_DATA = "data";
     public static final String FIELD_NAME_ROW_COUNT = "rowCount";
+    public static final String FIELD_NAME_IS_FINISHED = "isFinished";
 
     @JsonProperty(FIELD_NAME_VERSION)
     private final String version;
@@ -38,23 +39,28 @@ public class ForegroundResultResponseBody implements ResponseBody {
     @JsonProperty(FIELD_NAME_ROW_COUNT)
     private final Integer rowCount;
 
+    @JsonProperty(FIELD_NAME_IS_FINISHED)
+    private final Boolean isFinished;
+
     @JsonCreator
     public ForegroundResultResponseBody(
             @JsonProperty(FIELD_NAME_VERSION) String version,
             @JsonProperty(FIELD_NAME_LAST_CHECKPOINTED_OFFSET) Long lastCheckpointedOffset,
             @JsonProperty(FIELD_NAME_DATA) String data,
-            @JsonProperty(FIELD_NAME_ROW_COUNT) Integer rowCount) {
+            @JsonProperty(FIELD_NAME_ROW_COUNT) Integer rowCount,
+            @JsonProperty(FIELD_NAME_IS_FINISHED) Boolean isFinished) {
         this.version = version;
         this.lastCheckpointedOffset = lastCheckpointedOffset;
         this.data = data;
         this.rowCount = rowCount;
+        this.isFinished = isFinished;
     }
 
     @JsonIgnore
     public static ForegroundResultResponseBody of(
-            String version, Long lastCheckpointedOffset, List<byte[]> data) {
+            String version, Long lastCheckpointedOffset, List<byte[]> data, Boolean isFinished) {
         return new ForegroundResultResponseBody(
-                version, lastCheckpointedOffset, formatData(data), data.size());
+                version, lastCheckpointedOffset, formatData(data), data.size(), isFinished);
     }
 
     @JsonIgnore
@@ -75,6 +81,11 @@ public class ForegroundResultResponseBody implements ResponseBody {
     @JsonIgnore
     public Integer getRowCount() {
         return rowCount;
+    }
+
+    @JsonIgnore
+    public Boolean getIsFinished() {
+        return isFinished;
     }
 
     private static String formatData(List<byte[]> data) {

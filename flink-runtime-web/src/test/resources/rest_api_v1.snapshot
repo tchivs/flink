@@ -2210,6 +2210,9 @@
         },
         "rowCount" : {
           "type" : "integer"
+        },
+        "isFinished" : {
+          "type" : "boolean"
         }
       }
     }

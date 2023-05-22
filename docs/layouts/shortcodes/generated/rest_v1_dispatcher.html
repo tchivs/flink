@@ -2795,6 +2795,80 @@ Using 'curl' you can upload a jar via 'curl -X POST -H "Expect:" -F "jarfile=@pa
 <table class="rest-api table table-bordered">
   <tbody>
     <tr>
+      <td class="text-left" colspan="2"><h5><strong>/jobs/:jobid/foreground-result/:operatorid</strong></h5></td>
+    </tr>
+    <tr>
+      <td class="text-left" style="width: 20%">Verb: <code>POST</code></td>
+      <td class="text-left">Response code: <code>200 OK</code></td>
+    </tr>
+    <tr>
+      <td colspan="2">Sends a request to a specified coordinator of the specified job for foreground query results. This API is for internal use only.</td>
+    </tr>
+    <tr>
+      <td colspan="2">Path parameters</td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <ul>
+<li><code>jobid</code> - 32-character hexadecimal string value that identifies a job.</li>
+<li><code>operatorid</code> - string value that identifies an operator.</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <label>
+          <details>
+          <summary>Request</summary>
+          <pre><code>{
+  "type" : "object",
+  "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:results:ForegroundResultRequestBody",
+  "properties" : {
+    "offset" : {
+      "type" : "integer"
+    },
+    "version" : {
+      "type" : "string"
+    }
+  }
+}</code></pre>
+        </label>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <label>
+          <details>
+          <summary>Response</summary>
+          <pre><code>{
+  "type" : "object",
+  "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:results:ForegroundResultResponseBody",
+  "properties" : {
+    "data" : {
+      "type" : "string"
+    },
+    "isFinished" : {
+      "type" : "boolean"
+    },
+    "lastCheckpointedOffset" : {
+      "type" : "integer"
+    },
+    "rowCount" : {
+      "type" : "integer"
+    },
+    "version" : {
+      "type" : "string"
+    }
+  }
+}</code></pre>
+        </label>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<table class="rest-api table table-bordered">
+  <tbody>
+    <tr>
       <td class="text-left" colspan="2"><h5><strong>/jobs/:jobid/jobmanager/config</strong></h5></td>
     </tr>
     <tr>

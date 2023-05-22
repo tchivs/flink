@@ -161,7 +161,8 @@ public class ForegroundResultHandler
                             return ForegroundResultResponseBody.of(
                                     intermediateResponse.version,
                                     intermediateResponse.lastCheckpointedOffset,
-                                    intermediateResponse.rows);
+                                    intermediateResponse.rows,
+                                    false);
                         })
                 .exceptionally(
                         t -> {
@@ -172,10 +173,10 @@ public class ForegroundResultHandler
                             if (!isJobTerminated(gateway, jobId)) {
                                 // Job is running but not reachable (yet)
 
-                                // Communicate to retry with lastCheckpointOffset = 0 which
+                                // Communicate to retry with lastCheckpointOffset = -1 which
                                 // should have no impact on user-visible buffer
                                 return ForegroundResultResponseBody.of(
-                                        requestVersion, 0L, Collections.emptyList());
+                                        requestVersion, -1L, Collections.emptyList(), false);
                             }
 
                             // Job terminated
@@ -204,7 +205,8 @@ public class ForegroundResultHandler
                                 return ForegroundResultResponseBody.of(
                                         finalResponse.version,
                                         finalResponse.lastCheckpointedOffset,
-                                        remainingRows);
+                                        remainingRows,
+                                        true);
                             }
 
                             // Temporary logging for debugging
@@ -226,7 +228,7 @@ public class ForegroundResultHandler
                             // Communicate that job terminated with lastCheckpointOffset = -1 which
                             // should have no impact on user-visible buffer
                             return ForegroundResultResponseBody.of(
-                                    finalResponse.version, -1L, Collections.emptyList());
+                                    finalResponse.version, -1L, Collections.emptyList(), true);
                         });
     }
 

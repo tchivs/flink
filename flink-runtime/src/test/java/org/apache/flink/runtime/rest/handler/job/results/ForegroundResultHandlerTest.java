@@ -84,9 +84,10 @@ public class ForegroundResultHandlerTest {
                             coordinationResponseError(),
                             jobResultError());
             assertThat(response.getVersion()).isEqualTo("");
-            assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
+            assertThat(response.getLastCheckpointedOffset()).isEqualTo(-1L);
             assertThat(response.getData()).isEqualTo("[]");
             assertThat(response.getRowCount()).isEqualTo(0);
+            assertThat(response.getIsFinished()).isFalse();
         }
 
         @Test
@@ -101,6 +102,22 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(NEW_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
             assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getIsFinished()).isFalse();
+        }
+
+        @Test
+        void testCoordinatorReachableWithoutDataReturningMinusOne() throws Exception {
+            final ForegroundResultResponseBody response =
+                    testResponse(
+                            "",
+                            0L,
+                            jobStatus(JobStatus.RUNNING),
+                            coordinationResponse(NEW_VERSION, -1L),
+                            jobResultError());
+            assertThat(response.getVersion()).isEqualTo(NEW_VERSION);
+            assertThat(response.getLastCheckpointedOffset()).isEqualTo(-1L);
+            assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getIsFinished()).isFalse();
         }
 
         @Test
@@ -116,6 +133,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
             assertThat(response.getData()).isEqualTo("[A,B,C]");
             assertThat(response.getRowCount()).isEqualTo(3);
+            assertThat(response.getIsFinished()).isFalse();
         }
 
         @Test
@@ -143,6 +161,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(NEW_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(0L);
             assertThat(response.getData()).isEqualTo("[A,B,C]");
+            assertThat(response.getIsFinished()).isTrue();
         }
 
         @Test
@@ -158,6 +177,7 @@ public class ForegroundResultHandlerTest {
             // indicates completion by returning -1
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(-1L);
             assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getIsFinished()).isTrue();
         }
     }
 
@@ -178,6 +198,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(OLD_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(1L);
             assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getIsFinished()).isFalse();
         }
 
         @Test
@@ -192,6 +213,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(OLD_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(1L);
             assertThat(response.getData()).isEqualTo("[C,D]");
+            assertThat(response.getIsFinished()).isFalse();
         }
 
         @Test
@@ -206,6 +228,7 @@ public class ForegroundResultHandlerTest {
             assertThat(response.getVersion()).isEqualTo(OLD_VERSION);
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(1L);
             assertThat(response.getData()).isEqualTo("[C,D]");
+            assertThat(response.getIsFinished()).isTrue();
         }
 
         @Test
@@ -218,9 +241,9 @@ public class ForegroundResultHandlerTest {
                             coordinationResponseError(),
                             jobResult(2L, OLD_VERSION, 1L, "C", "D"));
             assertThat(response.getVersion()).isEqualTo(OLD_VERSION);
-            // indicates completion by returning -1
             assertThat(response.getLastCheckpointedOffset()).isEqualTo(-1L);
             assertThat(response.getData()).isEqualTo("[]");
+            assertThat(response.getIsFinished()).isTrue();
         }
 
         @Test

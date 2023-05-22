@@ -63,4 +63,9 @@ public class ForegroundResultHeaders
         return "Sends a request to a specified coordinator of the specified job for foreground query results. "
                 + "This API is for internal use only.";
     }
+
+    @Override
+    public String operationId() {
+        return "getForegroundResults";
+    }
 }

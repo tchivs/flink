@@ -733,6 +733,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobExecutionResultResponseBody'
+  /jobs/{jobid}/foreground-result/{operatorid}:
+    post:
+      description: Sends a request to a specified coordinator of the specified job
+        for foreground query results. This API is for internal use only.
+      operationId: getForegroundResults
+      parameters:
+      - name: jobid
+        in: path
+        description: 32-character hexadecimal string value that identifies a job.
+        required: true
+        schema:
+          $ref: '#/components/schemas/JobID'
+      - name: operatorid
+        in: path
+        description: string value that identifies an operator.
+        required: true
+        schema:
+          $ref: '#/components/schemas/OperatorID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForegroundResultRequestBody'
+      responses:
+        "200":
+          description: The request was successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForegroundResultResponseBody'
   /jobs/{jobid}/jobmanager/config:
     get:
       description: Returns the jobmanager's configuration of a specific job.
@@ -2180,6 +2210,29 @@ components:
           type: boolean
         web-submit:
           type: boolean
+    ForegroundResultRequestBody:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        version:
+          type: string
+    ForegroundResultResponseBody:
+      type: object
+      properties:
+        data:
+          type: string
+        isFinished:
+          type: boolean
+        lastCheckpointedOffset:
+          type: integer
+          format: int64
+        rowCount:
+          type: integer
+          format: int32
+        version:
+          type: string
     GarbageCollectorInfo:
       type: object
       properties:
@@ -2754,6 +2807,20 @@ components:
         value:
           type: integer
           format: int32
+    OperatorID:
+      type: object
+      properties:
+        bytes:
+          type: array
+          items:
+            type: string
+            format: byte
+        lowerPart:
+          type: integer
+          format: int64
+        upperPart:
+          type: integer
+          format: int64
     Parallelism:
       type: object
       properties:
