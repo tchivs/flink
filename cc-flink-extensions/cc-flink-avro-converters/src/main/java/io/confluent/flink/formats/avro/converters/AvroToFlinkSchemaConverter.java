@@ -10,6 +10,7 @@ import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DateType;
 import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
@@ -122,7 +123,7 @@ public class AvroToFlinkSchemaConverter {
                     return new VarBinaryType(isOptional, VarBinaryType.MAX_LENGTH);
                 }
             case DOUBLE:
-                return new BigIntType(isOptional);
+                return new DoubleType(isOptional);
             case FLOAT:
                 return new FloatType(isOptional);
             case INT:
@@ -163,7 +164,7 @@ public class AvroToFlinkSchemaConverter {
                     return new BigIntType(isOptional);
                 }
             case STRING:
-                return new VarCharType(VarCharType.MAX_LENGTH);
+                return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
 
             case ARRAY:
                 Schema elemSchema = schema.getElementType();
@@ -216,7 +217,7 @@ public class AvroToFlinkSchemaConverter {
 
             case ENUM:
                 // enums are unwrapped to strings and the original enum is not preserved
-                return new VarCharType(VarCharType.MAX_LENGTH);
+                return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
 
             case UNION:
                 {
