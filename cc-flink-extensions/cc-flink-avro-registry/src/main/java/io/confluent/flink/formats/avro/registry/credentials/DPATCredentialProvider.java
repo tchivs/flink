@@ -5,9 +5,11 @@
 package io.confluent.flink.formats.avro.registry.credentials;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
+import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 
 import io.confluent.kafka.schemaregistry.client.security.bearerauth.BearerAuthCredentialProvider;
 
@@ -30,6 +32,16 @@ public class DPATCredentialProvider implements BearerAuthCredentialProvider {
     private JobID jobID;
     private String targetSchemaRegistry;
     private String targetIdentityPoolId;
+    private KafkaCredentialsCache kafkaCredentialsCache;
+
+    public DPATCredentialProvider() {
+        kafkaCredentialsCache = KafkaCredentialsCacheImpl.INSTANCE;
+    }
+
+    @VisibleForTesting
+    DPATCredentialProvider(KafkaCredentialsCache kafkaCredentialsCache) {
+        this.kafkaCredentialsCache = kafkaCredentialsCache;
+    }
 
     @Override
     public String alias() {
@@ -39,7 +51,7 @@ public class DPATCredentialProvider implements BearerAuthCredentialProvider {
     @Override
     public String getBearerToken(URL url) {
         checkNotNull(jobID, "Configuration must provide jobId before token is " + "provided");
-        Optional<KafkaCredentials> credentials = KafkaCredentialsCache.getCredentials(jobID);
+        Optional<KafkaCredentials> credentials = kafkaCredentialsCache.getCredentials(jobID);
         return credentials.map(KafkaCredentials::getDpatToken).orElse(null);
     }
 

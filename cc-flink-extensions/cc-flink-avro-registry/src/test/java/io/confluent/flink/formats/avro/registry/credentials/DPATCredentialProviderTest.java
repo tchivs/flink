@@ -5,8 +5,9 @@
 package io.confluent.flink.formats.avro.registry.credentials;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
-import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
+import org.apache.flink.core.security.token.kafka.util.MockKafkaCredentialsCache;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,12 +23,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Tests {@link DPATCredentialProvider}. */
 @Confluent
 public class DPATCredentialProviderTest {
+    private static final JobID JOB_ID = JobID.fromHexString("00000000000000000000000000000abc");
 
     private DPATCredentialProvider provider;
+    private MockKafkaCredentialsCache kafkaCredentialsCache;
 
     @BeforeEach
     void setUp() {
-        provider = new DPATCredentialProvider();
+        kafkaCredentialsCache = new MockKafkaCredentialsCache();
+        provider = new DPATCredentialProvider(kafkaCredentialsCache);
     }
 
     @Test
@@ -47,14 +50,14 @@ public class DPATCredentialProviderTest {
 
     @Test
     void testSuccess() throws MalformedURLException {
-        KafkaCredentialsCache.setCacheRetriever(
-                jobID -> Optional.of(new KafkaCredentials("token-123")));
+        kafkaCredentialsCache.onNewCredentialsObtained(
+                ImmutableMap.of(JOB_ID, new KafkaCredentials("token-123")));
         provider.configure(
                 ImmutableMap.of(
                         DPATCredentialProvider.LOGICAL_CLUSTER_PROPERTY,
                         "lsrc-abc",
                         DPATCredentialProvider.JOB_ID_PROPERTY,
-                        "00000000000000000000000000000abc"));
+                        JOB_ID.toHexString()));
         assertThat(provider.getBearerToken(new URL("http://example.com"))).isEqualTo("token-123");
     }
 }

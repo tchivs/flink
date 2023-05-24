@@ -62,6 +62,8 @@ import java.util.Properties;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static org.apache.flink.streaming.connectors.kafka.credentials.KafkaClientProperties.addCredentialsToProperties;
+
 /**
  * The Source implementation of Kafka. Please use a {@link KafkaSourceBuilder} to construct a {@link
  * KafkaSource}. The following example shows how to create a KafkaSource emitting records of <code>
@@ -163,6 +165,8 @@ public class KafkaSource<OUT>
         final KafkaSourceReaderMetrics kafkaSourceReaderMetrics =
                 new KafkaSourceReaderMetrics(readerContext.metricGroup());
 
+        addCredentialsToProperties(readerContext.getJobID(), props);
+
         Supplier<KafkaPartitionSplitReader> splitReaderSupplier =
                 () -> new KafkaPartitionSplitReader(props, readerContext, kafkaSourceReaderMetrics);
         KafkaRecordEmitter<OUT> recordEmitter = new KafkaRecordEmitter<>(deserializationSchema);
@@ -181,6 +185,8 @@ public class KafkaSource<OUT>
     @Override
     public SplitEnumerator<KafkaPartitionSplit, KafkaSourceEnumState> createEnumerator(
             SplitEnumeratorContext<KafkaPartitionSplit> enumContext) {
+        addCredentialsToProperties(enumContext.getJobID(), props);
+
         return new KafkaSourceEnumerator(
                 subscriber,
                 startingOffsetsInitializer,
@@ -196,6 +202,7 @@ public class KafkaSource<OUT>
             SplitEnumeratorContext<KafkaPartitionSplit> enumContext,
             KafkaSourceEnumState checkpoint)
             throws IOException {
+        addCredentialsToProperties(enumContext.getJobID(), props);
         return new KafkaSourceEnumerator(
                 subscriber,
                 startingOffsetsInitializer,

@@ -91,6 +91,14 @@ under the License.
                                         <exclude>common/**</exclude>
                                     </excludes>
                                 </filter>
+                                <!-- Do not include Confluent Token Provider -->
+                                <filter>
+                                    <artifact>org.apache.flink:flink-connector-kafka</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/services/org.apache.flink.core.security.token.DelegationTokenProvider</exclude>
+                                        <exclude>META-INF/services/org.apache.flink.core.security.token.DelegationTokenReceiver</exclude>
+                                    </excludes>
+                                </filter>
                             </filters>
                             <relocations>
                                 <relocation>

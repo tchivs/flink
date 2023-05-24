@@ -32,6 +32,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Properties;
 
+import static org.apache.flink.streaming.connectors.kafka.credentials.KafkaClientProperties.addCredentialsToProperties;
+
 /**
  * Flink Sink to produce data into a Kafka topic. The sink supports all delivery guarantees
  * described by {@link DeliveryGuarantee}.
@@ -97,6 +99,8 @@ public class KafkaSink<IN>
     @Override
     public Committer<KafkaCommittable> createCommitter(CommitterContext committerContext)
             throws IOException {
+        addCredentialsToProperties(committerContext.getJobID(), kafkaProducerConfig);
+
         return new KafkaCommitter(kafkaProducerConfig);
     }
 
@@ -109,6 +113,8 @@ public class KafkaSink<IN>
     @Internal
     @Override
     public KafkaWriter<IN> createWriter(InitContext context) throws IOException {
+        addCredentialsToProperties(context.getJobId(), kafkaProducerConfig);
+
         return new KafkaWriter<IN>(
                 deliveryGuarantee,
                 kafkaProducerConfig,
@@ -123,6 +129,8 @@ public class KafkaSink<IN>
     @Override
     public KafkaWriter<IN> restoreWriter(
             InitContext context, Collection<KafkaWriterState> recoveredState) throws IOException {
+        addCredentialsToProperties(context.getJobId(), kafkaProducerConfig);
+
         return new KafkaWriter<>(
                 deliveryGuarantee,
                 kafkaProducerConfig,

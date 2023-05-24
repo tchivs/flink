@@ -220,6 +220,8 @@ public class JarFileChecker {
                             path ->
                                     !pathStartsWith(
                                             path, "/org/apache/pulsar/shade/org/glassfish/jersey/"))
+                    // (Confluent-specific) dual-licensed under GPL 2 and CDDL 1.1
+                    .filter(path -> !pathStartsWith(path, "/javax/annotation"))
                     .map(
                             path -> {
                                 try {
@@ -296,6 +298,8 @@ public class JarFileChecker {
                                                     "web/3rdpartylicenses.txt")) // a false positive
                             // datafaker (Confluent-specific)
                             .filter(path -> !path.endsWith("driving_license.yml"))
+                            // okhttp3 (Confluent-specific)
+                            .filter(path -> !path.contains("publicsuffix"))
                             // in
                             // flink-runtime-web
                             .collect(Collectors.toList());

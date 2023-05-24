@@ -206,6 +206,7 @@ under the License.
 		<!-- Can be set to any value to reproduce a specific build. -->
 		<test.randomization.seed/>
 		<test.unit.pattern>**/*Test.*</test.unit.pattern>
+		<animal-sniffer-annotations.version>1.18</animal-sniffer-annotations.version>
 	</properties>
 
 	<dependencies>

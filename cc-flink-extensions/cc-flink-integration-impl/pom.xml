@@ -19,6 +19,23 @@ Copyright 2023 Confluent Inc.
 		<japicmp.skip>true</japicmp.skip>
 	</properties>
 
+	<dependencyManagement>
+		<dependencies>
+			<!-- Have to pick versions for things pulled in by Confluent -->
+			<dependency>
+				<groupId>com.google.protobuf</groupId>
+				<artifactId>protobuf-java</artifactId>
+				<version>${protoc.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>animal-sniffer-annotations</artifactId>
+				<version>${animal-sniffer-annotations.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
     <dependency>
       <!-- Required by the JobGraphWrapperImpl -->

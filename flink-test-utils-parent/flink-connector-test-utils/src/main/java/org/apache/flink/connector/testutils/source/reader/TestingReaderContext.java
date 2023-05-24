@@ -18,6 +18,7 @@
 
 package org.apache.flink.connector.testutils.source.reader;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.configuration.Configuration;
@@ -28,6 +29,7 @@ import org.apache.flink.util.UserCodeClassLoader;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** A testing implementation of the {@link SourceReaderContext}. */
 public class TestingReaderContext implements SourceReaderContext {
@@ -103,5 +105,10 @@ public class TestingReaderContext implements SourceReaderContext {
 
     public void clearSentEvents() {
         sentEvents.clear();
+    }
+
+    // All of these tests require a job id
+    public Optional<JobID> getJobID() {
+        return Optional.of(JobID.generate());
     }
 }
