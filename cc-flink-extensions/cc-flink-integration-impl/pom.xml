@@ -66,6 +66,12 @@ Copyright 2023 Confluent Inc.
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+	<dependency>
+		<groupId>io.confluent.flink</groupId>
+		<artifactId>cc-flink-avro-registry</artifactId>
+		<version>${project.version}</version>
+		<scope>runtime</scope>
+	</dependency>
     <dependency>
       <groupId>io.confluent.flink</groupId>
       <artifactId>cc-flink-table-extended_${scala.binary.version}</artifactId>
