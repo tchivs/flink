@@ -21,6 +21,7 @@ Copyright 2023 Confluent Inc.
 
 	<modules>
 		<module>cc-flink-table-extended</module>
+		<module>cc-flink-managed-table</module>
 		<module>cc-flink-integration-api</module>
 		<module>cc-flink-integration-impl</module>
 		<module>cc-flink-avro-registry</module>
