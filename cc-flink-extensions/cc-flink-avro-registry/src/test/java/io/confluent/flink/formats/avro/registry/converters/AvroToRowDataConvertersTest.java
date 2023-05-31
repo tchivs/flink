@@ -9,7 +9,12 @@ import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.MultisetType;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
+import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.confluent.flink.formats.avro.converters.AvroToFlinkSchemaConverter;
@@ -23,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -134,6 +140,85 @@ class AvroToRowDataConvertersTest {
                                                                                 .toUnscaledBytes()))
                                                         .set("value", 123f)
                                                         .build()))
+                                .build());
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    void testMultiset() {
+        final Schema fixedSchema = SchemaBuilder.fixed("test").size(2);
+        final Schema mapEntrySchema =
+                SchemaBuilder.record("MapEntry")
+                        .namespace("io.confluent.connect.avro")
+                        .fields()
+                        .name("key")
+                        .type(LogicalTypes.decimal(4, 2).addToSchema(fixedSchema))
+                        .noDefault()
+                        .name("value")
+                        .type()
+                        .intType()
+                        .noDefault()
+                        .endRecord();
+        final Schema schema =
+                SchemaBuilder.builder()
+                        .record("top")
+                        .namespace("io.confluent.test")
+                        .fields()
+                        .name("custom_multiset")
+                        .type()
+                        .array()
+                        .items(mapEntrySchema)
+                        .noDefault()
+                        .name("string_multiset")
+                        .type()
+                        .map()
+                        .values()
+                        .intType()
+                        .noDefault()
+                        .endRecord();
+
+        final LogicalType flinkSchema =
+                new RowType(
+                        false,
+                        Arrays.asList(
+                                new RowField(
+                                        "custom_multiset",
+                                        new MultisetType(false, new DecimalType(false, 4, 2))),
+                                new RowField(
+                                        "string_multiset",
+                                        new MultisetType(
+                                                false,
+                                                new VarCharType(false, VarCharType.MAX_LENGTH)))));
+        final AvroToRowDataConverter converter =
+                AvroToRowDataConverters.createConverter(schema, flinkSchema);
+
+        final GenericRowData expected = new GenericRowData(2);
+        final Map<DecimalData, Integer> customMap = new HashMap<>();
+        final DecimalData decimalData = DecimalData.fromBigDecimal(new BigDecimal("12.34"), 4, 2);
+        customMap.put(decimalData, 12);
+        expected.setField(0, new GenericMapData(customMap));
+        final Map<StringData, Integer> stringMap = new HashMap<>();
+        final StringData stringData = StringData.fromString("ABCDEF");
+        stringMap.put(stringData, 22);
+        expected.setField(1, new GenericMapData(stringMap));
+        final Map<String, Integer> stringMultiset = new HashMap<>();
+        stringMultiset.put("ABCDEF", 22);
+        final Object actual =
+                converter.convert(
+                        new GenericRecordBuilder(schema)
+                                .set(
+                                        "custom_multiset",
+                                        Collections.singletonList(
+                                                new GenericRecordBuilder(mapEntrySchema)
+                                                        .set(
+                                                                "key",
+                                                                new GenericData.Fixed(
+                                                                        fixedSchema,
+                                                                        decimalData
+                                                                                .toUnscaledBytes()))
+                                                        .set("value", 12)
+                                                        .build()))
+                                .set("string_multiset", stringMultiset)
                                 .build());
         assertThat(actual).isEqualTo(expected);
     }

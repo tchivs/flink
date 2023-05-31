@@ -8,11 +8,13 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
@@ -121,6 +123,8 @@ public class FlinkToAvroSchemaConverter {
                 return SchemaBuilder.builder()
                         .array()
                         .items(fromFlinkSchema(arrayType.getElementType(), rowName));
+            case MULTISET:
+                return convertMultiset((MultisetType) logicalType, rowName);
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
             case INTERVAL_DAY_TIME:
@@ -129,7 +133,6 @@ public class FlinkToAvroSchemaConverter {
             case SYMBOL:
             case UNRESOLVED:
             case RAW:
-            case MULTISET:
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported to derive Schema for type: " + logicalType);
@@ -140,22 +143,39 @@ public class FlinkToAvroSchemaConverter {
         final LogicalType keyType = logicalType.getKeyType();
         final LogicalType valueType = logicalType.getValueType();
 
+        return convertMapLikeType(rowName, keyType, valueType);
+    }
+
+    private static Schema convertMultiset(MultisetType logicalType, String rowName) {
+        final LogicalType keyType = logicalType.getElementType();
+        final LogicalType valueType = new IntType(false);
+
+        return convertMapLikeType(rowName, keyType, valueType);
+    }
+
+    private static Schema convertMapLikeType(
+            String rowName, LogicalType keyType, LogicalType valueType) {
         if (keyType.is(LogicalTypeFamily.CHARACTER_STRING)) {
             return SchemaBuilder.builder().map().values(fromFlinkSchema(valueType, rowName));
         } else {
-            return SchemaBuilder.array()
-                    .items(
-                            SchemaBuilder.record("MapEntry")
-                                    .namespace("io.confluent.connect.avro")
-                                    .fields()
-                                    .name(KEY_FIELD)
-                                    .type(fromFlinkSchema(keyType, rowName + "_key"))
-                                    .noDefault()
-                                    .name(VALUE_FIELD)
-                                    .type(fromFlinkSchema(valueType, rowName + "_value"))
-                                    .noDefault()
-                                    .endRecord());
+            return connectCustomMap(rowName, keyType, valueType);
         }
+    }
+
+    private static Schema connectCustomMap(
+            String rowName, LogicalType keyType, LogicalType valueType) {
+        return SchemaBuilder.array()
+                .items(
+                        SchemaBuilder.record("MapEntry")
+                                .namespace("io.confluent.connect.avro")
+                                .fields()
+                                .name(KEY_FIELD)
+                                .type(fromFlinkSchema(keyType, rowName + "_key"))
+                                .noDefault()
+                                .name(VALUE_FIELD)
+                                .type(fromFlinkSchema(valueType, rowName + "_value"))
+                                .noDefault()
+                                .endRecord());
     }
 
     private static Schema convertTime(TimeType logicalType) {

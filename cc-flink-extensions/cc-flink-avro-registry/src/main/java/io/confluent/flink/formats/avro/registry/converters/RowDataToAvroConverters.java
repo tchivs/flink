@@ -6,14 +6,17 @@ package io.confluent.flink.formats.avro.registry.converters;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.data.ArrayData;
+import org.apache.flink.table.data.ArrayData.ElementGetter;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.MapData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 
@@ -144,9 +147,11 @@ public class RowDataToAvroConverters {
                 converter = createRowConverter((RowType) type, targetSchema);
                 break;
             case MAP:
-                converter = createMapConverter(type, targetSchema);
+                converter = createMapConverter((MapType) type, targetSchema);
                 break;
             case MULTISET:
+                converter = createMultisetConverter((MultisetType) type, targetSchema);
+                break;
             case RAW:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
@@ -354,14 +359,31 @@ public class RowDataToAvroConverters {
         };
     }
 
-    private static RowDataToAvroConverter createMapConverter(
-            LogicalType type, Schema targetSchema) {
-        MapType mapType = (MapType) type;
-        final LogicalType keyType = mapType.getKeyType();
-        final LogicalType valueType = mapType.getValueType();
+    private static RowDataToAvroConverter createMultisetConverter(
+            MultisetType type, Schema targetSchema) {
+        final LogicalType keyType = type.getElementType();
+        final LogicalType valueType = new IntType(false);
         final ArrayData.ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
         final ArrayData.ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
 
+        return createMapConverter(targetSchema, keyType, valueType, valueGetter, keyGetter);
+    }
+
+    private static RowDataToAvroConverter createMapConverter(MapType type, Schema targetSchema) {
+        final LogicalType keyType = type.getKeyType();
+        final LogicalType valueType = type.getValueType();
+        final ArrayData.ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
+        final ArrayData.ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
+
+        return createMapConverter(targetSchema, keyType, valueType, valueGetter, keyGetter);
+    }
+
+    private static RowDataToAvroConverter createMapConverter(
+            Schema targetSchema,
+            LogicalType keyType,
+            LogicalType valueType,
+            ElementGetter valueGetter,
+            ElementGetter keyGetter) {
         switch (targetSchema.getType()) {
             case MAP:
                 {

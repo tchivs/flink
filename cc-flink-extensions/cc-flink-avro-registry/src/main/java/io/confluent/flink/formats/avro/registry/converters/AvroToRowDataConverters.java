@@ -32,6 +32,7 @@ import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
@@ -129,7 +130,13 @@ public class AvroToRowDataConverters {
                 return createArrayConverter(readSchema, targetType);
 
             case MAP:
-                return createMapConverter(readSchema, (MapType) targetType);
+                if (targetType.is(LogicalTypeRoot.MAP)) {
+                    return createMapConverter(readSchema, (MapType) targetType);
+                } else if (targetType.is(LogicalTypeRoot.MULTISET)) {
+                    return createMapToMultiSetConverter();
+                } else {
+                    throw new IllegalStateException("Unexpected target type: " + targetType);
+                }
 
             case RECORD:
                 return createRecordConverter(readSchema, (RowType) targetType);
@@ -215,8 +222,25 @@ public class AvroToRowDataConverters {
                 final Map<?, ?> map = (Map<?, ?>) object;
                 Map<Object, Object> result = new HashMap<>();
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    Object key = entry.getKey().toString();
+                    Object key = StringData.fromString(entry.getKey().toString());
                     Object value = valueConverter.convert(entry.getValue());
+                    result.put(key, value);
+                }
+                return new GenericMapData(result);
+            }
+        };
+    }
+
+    private static AvroToRowDataConverter createMapToMultiSetConverter() {
+        return new AvroToRowDataConverter() {
+            @Override
+            public Object convert(Object object) {
+                final Map<?, ?> map = (Map<?, ?>) object;
+                Map<Object, Object> result = new HashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    Object key = StringData.fromString(entry.getKey().toString());
+                    // this must be an integer
+                    Object value = entry.getValue();
                     result.put(key, value);
                 }
                 return new GenericMapData(result);
@@ -226,10 +250,12 @@ public class AvroToRowDataConverters {
 
     private static AvroToRowDataConverter createArrayConverter(
             Schema readSchema, LogicalType targetType) {
-        if (targetType.getTypeRoot() == LogicalTypeRoot.ARRAY) {
+        if (targetType.is(LogicalTypeRoot.ARRAY)) {
             return createArrayToArrayConverter(readSchema, (ArrayType) targetType);
-        } else if (targetType.getTypeRoot() == LogicalTypeRoot.MAP) {
+        } else if (targetType.is(LogicalTypeRoot.MAP)) {
             return createArrayToMapConverter(readSchema, (MapType) targetType);
+        } else if (targetType.is(LogicalTypeRoot.MULTISET)) {
+            return createArrayToMultisetConverter(readSchema, (MultisetType) targetType);
         } else {
             throw new IllegalStateException("Unexpected target type: " + targetType);
         }
@@ -369,6 +395,30 @@ public class AvroToRowDataConverters {
                     final GenericRecord mapEntry = (GenericRecord) list.get(i);
                     Object key = keyConverter.convert(mapEntry.get("key"));
                     Object value = valueConverter.convert(mapEntry.get("value"));
+                    map.put(key, value);
+                }
+                return new GenericMapData(map);
+            }
+        };
+    }
+
+    private static AvroToRowDataConverter createArrayToMultisetConverter(
+            Schema readSchema, MultisetType targetType) {
+        final Schema keySchema = readSchema.getElementType().getField("key").schema();
+        final AvroToRowDataConverter keyConverter =
+                createConverter(keySchema, targetType.getElementType());
+
+        return new AvroToRowDataConverter() {
+            @Override
+            public Object convert(Object object) {
+                final List<?> list = (List<?>) object;
+                final int length = list.size();
+                final Map<Object, Object> map = new HashMap<>();
+                for (int i = 0; i < length; ++i) {
+                    final GenericRecord mapEntry = (GenericRecord) list.get(i);
+                    Object key = keyConverter.convert(mapEntry.get("key"));
+                    // this must be an int
+                    Object value = mapEntry.get("value");
                     map.put(key, value);
                 }
                 return new GenericMapData(map);
