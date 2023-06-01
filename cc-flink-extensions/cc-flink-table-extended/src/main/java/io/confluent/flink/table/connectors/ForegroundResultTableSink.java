@@ -77,6 +77,7 @@ public class ForegroundResultTableSink implements DynamicTableSink {
                         new CollectStreamSink<>(inputStream, factory);
 
                 providerContext.generateUid(TRANSFORMATION_NAME).ifPresent(sink::uid);
+                sink.getTransformation().setMaxParallelism(1);
 
                 return sink.name(SINK_NAME);
             }

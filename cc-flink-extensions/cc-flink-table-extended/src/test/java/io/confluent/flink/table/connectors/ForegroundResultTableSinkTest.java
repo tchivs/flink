@@ -7,6 +7,8 @@ package io.confluent.flink.table.connectors;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.config.TableConfigOptions;
@@ -15,25 +17,29 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
+import org.apache.flink.table.data.binary.BinaryRowData;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.runtime.connector.sink.SinkRuntimeProviderContext;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link ForegroundResultTableFactory} and {@link ForegroundResultTableSink}. */
 @Confluent
-public class ForegroundResultTableSinkTest {
+class ForegroundResultTableSinkTest {
 
     @Test
-    public void testTableFactory() {
+    void testTableFactory() {
         final DynamicTableSink expectedSink =
                 new ForegroundResultTableSink(
                         MemorySize.ofMebiBytes(8),
@@ -74,5 +80,25 @@ public class ForegroundResultTableSinkTest {
                         true);
 
         assertThat(actualSink).isEqualTo(expectedSink);
+    }
+
+    @Test
+    void testMaxParallelismIsSetToOne() {
+        final DynamicTableSink tableSink =
+                new ForegroundResultTableSink(
+                        MemorySize.ofMebiBytes(8),
+                        Duration.ofSeconds(30),
+                        DataTypes.ROW(DataTypes.FIELD("foo", DataTypes.STRING())).notNull(),
+                        ZoneId.of("UTC"));
+
+        final DataStreamSinkProvider sinkProvider =
+                (DataStreamSinkProvider)
+                        tableSink.getSinkRuntimeProvider(new SinkRuntimeProviderContext(false));
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        final DataStreamSink<?> generated =
+                sinkProvider.consumeDataStream(
+                        name -> Optional.of("generated"), env.fromElements(new BinaryRowData(1)));
+        assertThat(generated.getTransformation().getUid()).isEqualTo("generated");
+        assertThat(generated.getTransformation().getMaxParallelism()).isEqualTo(1);
     }
 }
