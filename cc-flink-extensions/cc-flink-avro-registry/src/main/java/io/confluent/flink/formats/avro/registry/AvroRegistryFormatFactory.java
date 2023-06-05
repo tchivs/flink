@@ -137,6 +137,7 @@ public class AvroRegistryFormatFactory
         options.add(AvroRegistryFormatOptions.URL);
         options.add(AvroRegistryFormatOptions.SCHEMA_ID);
         options.add(AvroRegistryFormatOptions.LOGICAL_CLUSTER_ID);
+        options.add(AvroRegistryFormatOptions.CREDENTIALS_SOURCE);
         return options;
     }
 
@@ -144,6 +145,7 @@ public class AvroRegistryFormatFactory
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(AvroRegistryFormatOptions.SCHEMA_CACHE_SIZE);
+        options.add(AvroRegistryFormatOptions.BASIC_AUTH_USER_INFO);
         return options;
     }
 
@@ -153,7 +155,9 @@ public class AvroRegistryFormatFactory
                         AvroRegistryFormatOptions.URL,
                         AvroRegistryFormatOptions.SCHEMA_ID,
                         AvroRegistryFormatOptions.SCHEMA_CACHE_SIZE,
-                        AvroRegistryFormatOptions.LOGICAL_CLUSTER_ID)
+                        AvroRegistryFormatOptions.LOGICAL_CLUSTER_ID,
+                        AvroRegistryFormatOptions.BASIC_AUTH_USER_INFO,
+                        AvroRegistryFormatOptions.CREDENTIALS_SOURCE)
                 .collect(Collectors.toSet());
     }
 
