@@ -12,6 +12,9 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.clock.Clock;
 import org.apache.flink.util.clock.SystemClock;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.concurrent.GuardedBy;
 
 import java.util.HashMap;
@@ -25,6 +28,7 @@ import java.util.Optional;
  */
 @Confluent
 public class KafkaCredentialsCacheImpl implements KafkaCredentialsCache {
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaCredentialsCacheImpl.class);
 
     @GuardedBy("this")
     private Map<JobID, KafkaCredentials> credentialsByJobId = new HashMap<>();
@@ -81,6 +85,11 @@ public class KafkaCredentialsCacheImpl implements KafkaCredentialsCache {
             return Optional.of(kafkaCredentials);
         } else {
             if (configuration.getBoolean(KafkaCredentialsCacheOptions.RECEIVE_ERROR_ON_TIMEOUT)) {
+                LOG.error(
+                        "Timed out waiting for credentials for {}. (Cache contains credentials "
+                                + "for jobs {})",
+                        jobID,
+                        credentialsByJobId.keySet());
                 throw new FlinkRuntimeException("Timed out while waiting for credentials");
             } else {
                 return Optional.empty();

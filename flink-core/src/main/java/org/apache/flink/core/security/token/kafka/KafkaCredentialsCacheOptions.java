@@ -15,7 +15,7 @@ public class KafkaCredentialsCacheOptions {
     public static final ConfigOption<Long> RECEIVE_TIMEOUT_MS =
             ConfigOptions.key("confluent.kafka.credential.receive.timeout.ms")
                     .longType()
-                    .defaultValue(10000L)
+                    .defaultValue(30000L)
                     .withDescription("The timeout in ms to wait for credentials to arrive");
 
     public static final ConfigOption<Boolean> RECEIVE_ERROR_ON_TIMEOUT =

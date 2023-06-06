@@ -94,6 +94,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
     public void init(Configuration configuration) throws Exception {
         enabled = configuration.getBoolean(DPAT_ENABLED);
         if (!enabled) {
+            LOG.info("DPAT fetching is DISABLED.");
             return;
         }
         credentialDecrypter.init(configuration);
@@ -112,17 +113,23 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
                         credentialService, tokenExchanger, credentialDecrypter);
         expirationMs = configuration.getLong(CREDENTIAL_EXPIRATION_MS);
         checkPeriodMs = configuration.getLong(CREDENTIAL_CHECK_PERIOD_MS);
+        LOG.info(
+                "DPAT fetching is enabled with expirationMs {}, checkPeriodMs {}.",
+                expirationMs,
+                checkPeriodMs);
         clock = SystemClock.getInstance();
     }
 
     @Override
     public boolean registerJob(JobID jobId, Configuration jobConfiguration) {
+        LOG.info("Registering new job {}", jobId.toHexString());
         jobsToFetch.put(jobId, jobConfiguration);
         return true;
     }
 
     @Override
     public void unregisterJob(JobID jobId) {
+        LOG.info("Unregistering job {}", jobId.toHexString());
         credentialsByJobID.remove(jobId);
         jobsToFetch.remove(jobId);
     }
@@ -148,6 +155,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
     public ObtainedDelegationTokens obtainDelegationTokens() throws Exception {
         Set<JobID> jobIds = jobsToFetch.keySet();
         for (JobID jobID : jobIds) {
+            LOG.info("Fetching DPAT for new job {}", jobID.toHexString());
             Configuration jobConfiguration = jobsToFetch.remove(jobID);
             if (jobConfiguration == null) {
                 continue;
@@ -164,6 +172,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
         }
         for (Pair<JobCredentialsMetadata, KafkaCredentials> p : credentialsByJobID.values()) {
             if (clock.absoluteTimeMillis() - p.getKey().getTokenUpdateTimeMs() > expirationMs) {
+                LOG.info("Updating DPAT for job {}", p.getKey().getJobID().toHexString());
                 JobCredentialsMetadata jobCredentialsMetadata =
                         p.getKey().withNewTokenUpdateTime(clock.absoluteTimeMillis());
                 fetchToken(jobCredentialsMetadata);
@@ -175,6 +184,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
                 credentialsByJobID.entrySet().stream()
                         .collect(Collectors.toMap(Entry::getKey, e -> e.getValue().getValue()));
 
+        LOG.info("Sending credentials for jobs {}", credentials.keySet());
         return new ObtainedDelegationTokens(
                 InstantiationUtil.serializeObject(credentials),
                 Optional.of(clock.absoluteTimeMillis() + checkPeriodMs));
