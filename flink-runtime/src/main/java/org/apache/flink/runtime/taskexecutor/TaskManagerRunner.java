@@ -24,6 +24,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.AkkaOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JMXServerOptions;
+import org.apache.flink.configuration.TaskManagerConfluentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.configuration.TaskManagerOptionsInternal;
 import org.apache.flink.core.fs.FileSystem;
@@ -86,6 +87,7 @@ import org.apache.flink.util.function.FunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
@@ -101,6 +103,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.concurrent.FutureUtils.composeAfterwards;
+import static org.apache.flink.util.concurrent.FutureUtils.runAfterwards;
 
 /**
  * This class is the executable entry point for the task manager in yarn or standalone mode. It
@@ -160,6 +164,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     @GuardedBy("lock")
     private boolean shutdown;
+
+    @GuardedBy("lock")
+    private StandbyTaskManager standbyTaskManager;
 
     public TaskManagerRunner(
             Configuration configuration,
@@ -289,10 +296,43 @@ public class TaskManagerRunner implements FatalErrorHandler {
     // --------------------------------------------------------------------------------------------
 
     public void start() throws Exception {
+        handleStandbyConfiguration();
         synchronized (lock) {
             startTaskManagerRunnerServices();
             taskExecutorService.start();
         }
+    }
+
+    private void handleStandbyConfiguration() throws Exception {
+        if (!configuration.get(TaskManagerConfluentOptions.STANDBY_MODE)) {
+            return;
+        }
+
+        if (!configuration.contains(TaskManagerOptions.HOST)) {
+            throw new FlinkException(
+                    String.format(
+                            "%s option is mandatory when %s is enabled",
+                            TaskManagerOptions.HOST.key(),
+                            TaskManagerConfluentOptions.STANDBY_MODE.key()));
+        }
+
+        CompletableFuture<Void> closeableFuture;
+        synchronized (lock) {
+            rpcSystem = RpcSystem.load(configuration);
+            rpcService = createRpcService(configuration, null, rpcSystem);
+            standbyTaskManager = new StandbyTaskManager(rpcService);
+            standbyTaskManager.start();
+
+            CompletableFuture<Void> activationFuture =
+                    standbyTaskManager.getActivationFuture().thenAccept(configuration::addAll);
+
+            // StandbyTaskManager endpoint is only for one-time use. Close it after successful.
+            closeableFuture = composeAfterwards(activationFuture, standbyTaskManager::closeAsync);
+            closeableFuture = composeAfterwards(closeableFuture, rpcService::closeAsync);
+            closeableFuture = runAfterwards(closeableFuture, rpcSystem::close);
+        }
+
+        closeableFuture.get();
     }
 
     public void close() throws Exception {
@@ -316,11 +356,17 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 return terminationFuture;
             }
 
-            final CompletableFuture<Void> taskManagerTerminationFuture;
-            if (taskExecutorService != null) {
-                taskManagerTerminationFuture = taskExecutorService.closeAsync();
+            CompletableFuture<Void> taskManagerTerminationFuture;
+            if (standbyTaskManager != null) {
+                taskManagerTerminationFuture = standbyTaskManager.closeAsync();
             } else {
                 taskManagerTerminationFuture = FutureUtils.completedVoidFuture();
+            }
+
+            if (taskExecutorService != null) {
+                taskManagerTerminationFuture =
+                        FutureUtils.composeAfterwards(
+                                taskManagerTerminationFuture, taskExecutorService::closeAsync);
             }
 
             final CompletableFuture<Void> serviceTerminationFuture =
@@ -684,7 +730,6 @@ public class TaskManagerRunner implements FatalErrorHandler {
             throws Exception {
 
         checkNotNull(configuration);
-        checkNotNull(haServices);
 
         return RpcUtils.createRemoteRpcService(
                 rpcSystem,
@@ -710,6 +755,7 @@ public class TaskManagerRunner implements FatalErrorHandler {
                     configuredTaskManagerHostname);
             return configuredTaskManagerHostname;
         } else {
+            checkNotNull(haServices);
             return determineTaskManagerBindAddressByConnectingToResourceManager(
                     configuration, haServices, rpcSystemUtils);
         }
@@ -775,6 +821,14 @@ public class TaskManagerRunner implements FatalErrorHandler {
                                     return DeterminismEnvelope.nondeterministicValue(
                                             new ResourceID(value, metadata));
                                 }));
+    }
+
+    @VisibleForTesting
+    @Nullable
+    public StandbyTaskManager getStandbyTaskManager() {
+        synchronized (lock) {
+            return standbyTaskManager;
+        }
     }
 
     /** Factory for {@link TaskExecutor}. */

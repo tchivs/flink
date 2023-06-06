@@ -96,6 +96,7 @@ import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
 import org.apache.flink.runtime.rest.handler.legacy.files.StaticFileServerHandler;
 import org.apache.flink.runtime.rest.handler.legacy.files.WebContentHandlerSpecification;
 import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
+import org.apache.flink.runtime.rest.handler.taskmanager.StandbyTaskManagerActivationHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerCustomLogHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerDetailsHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerLogFileHandler;
@@ -728,6 +729,9 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         responseHeaders,
                         JobClientHeartbeatHeaders.getInstance());
 
+        final StandbyTaskManagerActivationHandler standbyTaskManagerActivationHandler =
+                new StandbyTaskManagerActivationHandler(leaderRetriever, timeout, responseHeaders);
+
         final File webUiDir = restConfiguration.getWebUiDir();
 
         Optional<StaticFileServerHandler<T>> optWebContent;
@@ -921,6 +925,11 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         handlers.add(
                 Tuple2.of(
                         jobClientHeartbeatHandler.getMessageHeaders(), jobClientHeartbeatHandler));
+
+        handlers.add(
+                Tuple2.of(
+                        standbyTaskManagerActivationHandler.getMessageHeaders(),
+                        standbyTaskManagerActivationHandler));
 
         optWebContent.ifPresent(
                 webContent -> {

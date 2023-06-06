@@ -31,6 +31,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.HighAvailabilityOptions;
+import org.apache.flink.configuration.JobManagerConfluentOptions;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.configuration.WebOptions;
 import org.apache.flink.core.execution.CheckpointType;
@@ -91,6 +92,7 @@ import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcServiceUtils;
 import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
+import org.apache.flink.runtime.taskexecutor.StandbyTaskManagerGateway;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
@@ -1571,5 +1573,32 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
                 vertex.setParallelism(overrideParallelism);
             }
         }
+    }
+
+    @Override
+    public CompletableFuture<Void> activateStandbyTaskManager(String rpcHost, String rpcPort) {
+        log.info("Activate standby task manager on address ({}:{}).", rpcHost, rpcPort);
+
+        CompletableFuture<StandbyTaskManagerGateway> taskManagerConnect =
+                getRpcService()
+                        .connect(
+                                String.format(
+                                        "pekko.tcp://flink@%s:%s/user/rpc/standby_taskmanager",
+                                        rpcHost, rpcPort),
+                                StandbyTaskManagerGateway.class);
+
+        return taskManagerConnect.thenAccept(
+                gateway -> gateway.activate(getOverriddenTaskManagerConfig()));
+    }
+
+    private Configuration getOverriddenTaskManagerConfig() {
+        List<String> overriddenOptions =
+                configuration.get(JobManagerConfluentOptions.STANDBY_TASK_MANAGER_OVERRIDE_OPTIONS);
+        Map<String, String> jobManagerConfig = configuration.toMap();
+        Map<String, String> taskManagerConfig =
+                overriddenOptions.stream()
+                        .filter(jobManagerConfig::containsKey)
+                        .collect(Collectors.toMap(Function.identity(), jobManagerConfig::get));
+        return Configuration.fromMap(taskManagerConfig);
     }
 }
