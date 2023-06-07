@@ -18,7 +18,6 @@ limitations under the License.
 
 package org.apache.flink.runtime.source.coordinator;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.mocks.MockSource;
@@ -43,7 +42,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SourceCoordinatorProviderTest {
 
     private static final OperatorID OPERATOR_ID = new OperatorID(1234L, 5678L);
-    private static final JobID JOB_ID = new JobID(1234L, 4321L);
     private static final int NUM_SPLITS = 10;
 
     private SourceCoordinatorProvider<MockSourceSplit> provider;
@@ -57,8 +55,7 @@ class SourceCoordinatorProviderTest {
                         new MockSource(Boundedness.BOUNDED, NUM_SPLITS),
                         1,
                         WatermarkAlignmentParams.WATERMARK_ALIGNMENT_DISABLED,
-                        null,
-                        JOB_ID);
+                        null);
     }
 
     @Test

@@ -20,7 +20,6 @@ package org.apache.flink.streaming.api.graph;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.ExecutionConfig;
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.api.common.operators.ResourceSpec;
@@ -393,11 +392,11 @@ public class StreamNode {
     }
 
     public Optional<OperatorCoordinator.Provider> getCoordinatorProvider(
-            String operatorName, OperatorID operatorID, JobID jobID) {
+            String operatorName, OperatorID operatorID) {
         if (operatorFactory instanceof CoordinatedOperatorFactory) {
             return Optional.of(
                     ((CoordinatedOperatorFactory) operatorFactory)
-                            .getCoordinatorProvider(operatorName, operatorID, jobID));
+                            .getCoordinatorProvider(operatorName, operatorID));
         } else {
             return Optional.empty();
         }

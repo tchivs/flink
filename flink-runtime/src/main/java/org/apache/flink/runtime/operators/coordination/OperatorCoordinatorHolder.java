@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.operators.coordination;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.OperatorCoordinatorMetricGroup;
 import org.apache.flink.runtime.checkpoint.OperatorCoordinatorCheckpointContext;
@@ -44,6 +45,7 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -488,6 +490,7 @@ public class OperatorCoordinatorHolder
                     jobVertex.getGraph().getUserClassLoader(),
                     jobVertex.getParallelism(),
                     jobVertex.getMaxParallelism(),
+                    jobVertex.getJobId(),
                     taskAccesses,
                     supportsConcurrentExecutionAttempts,
                     taskInformation,
@@ -504,6 +507,7 @@ public class OperatorCoordinatorHolder
             final ClassLoader userCodeClassLoader,
             final int operatorParallelism,
             final int operatorMaxParallelism,
+            final JobID jobID,
             final SubtaskAccess.SubtaskAccessFactory taskAccesses,
             final boolean supportsConcurrentExecutionAttempts,
             final TaskInformation taskInformation,
@@ -521,6 +525,7 @@ public class OperatorCoordinatorHolder
                         operatorName,
                         userCodeClassLoader,
                         operatorParallelism,
+                        jobID,
                         coordinatorStore,
                         supportsConcurrentExecutionAttempts,
                         new InternalOperatorCoordinatorMetricGroup(parentMetricGroup));
@@ -559,6 +564,7 @@ public class OperatorCoordinatorHolder
         private final String operatorName;
         private final ClassLoader userCodeClassLoader;
         private final int operatorParallelism;
+        private final JobID jobID;
         private final CoordinatorStore coordinatorStore;
         private final boolean supportsConcurrentExecutionAttempts;
         private final OperatorCoordinatorMetricGroup metricGroup;
@@ -573,6 +579,7 @@ public class OperatorCoordinatorHolder
                 final String operatorName,
                 final ClassLoader userCodeClassLoader,
                 final int operatorParallelism,
+                final JobID jobID,
                 final CoordinatorStore coordinatorStore,
                 final boolean supportsConcurrentExecutionAttempts,
                 final OperatorCoordinatorMetricGroup metricGroup) {
@@ -580,6 +587,7 @@ public class OperatorCoordinatorHolder
             this.operatorName = checkNotNull(operatorName);
             this.userCodeClassLoader = checkNotNull(userCodeClassLoader);
             this.operatorParallelism = operatorParallelism;
+            this.jobID = jobID;
             this.coordinatorStore = checkNotNull(coordinatorStore);
             this.supportsConcurrentExecutionAttempts = supportsConcurrentExecutionAttempts;
             this.metricGroup = checkNotNull(metricGroup);
@@ -660,6 +668,11 @@ public class OperatorCoordinatorHolder
         @Override
         public boolean isConcurrentExecutionAttemptsSupported() {
             return supportsConcurrentExecutionAttempts;
+        }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return Optional.of(jobID);
         }
     }
 }

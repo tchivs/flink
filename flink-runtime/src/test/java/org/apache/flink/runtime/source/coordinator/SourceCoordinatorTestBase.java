@@ -79,7 +79,7 @@ abstract class SourceCoordinatorTestBase {
         closeableRegistry = new AutoCloseableRegistry();
         receivingTasks = EventReceivingTasks.createForRunningTasks();
         operatorCoordinatorContext =
-                new MockOperatorCoordinatorContext(TEST_OPERATOR_ID, NUM_SUBTASKS);
+                new MockOperatorCoordinatorContext(TEST_OPERATOR_ID, NUM_SUBTASKS, JOB_ID);
         splitSplitAssignmentTracker = new SplitAssignmentTracker<>();
         coordinatorThreadName = TEST_OPERATOR_ID.toHexString();
 
@@ -210,8 +210,7 @@ abstract class SourceCoordinatorTestBase {
                         operatorCoordinatorContext,
                         new MockSourceSplitSerializer(),
                         splitSplitAssignmentTracker,
-                        supportsConcurrentExecutionAttempts,
-                        JOB_ID);
+                        supportsConcurrentExecutionAttempts);
         closeableRegistry.registerCloseable(coordinatorContext);
         return coordinatorContext;
     }

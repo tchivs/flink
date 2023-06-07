@@ -18,11 +18,13 @@ limitations under the License.
 
 package org.apache.flink.runtime.operators.coordination;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.metrics.groups.OperatorCoordinatorMetricGroup;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.metrics.groups.InternalOperatorCoordinatorMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** A simple implementation of {@link OperatorCoordinator.Context} for testing purposes. */
@@ -31,6 +33,7 @@ public class MockOperatorCoordinatorContext implements OperatorCoordinator.Conte
     private final OperatorID operatorID;
     private final ClassLoader userCodeClassLoader;
     private final int numSubtasks;
+    private final JobID jobID;
     private final CoordinatorStore coordinatorStore = new CoordinatorStoreImpl();
 
     private boolean jobFailed;
@@ -38,17 +41,26 @@ public class MockOperatorCoordinatorContext implements OperatorCoordinator.Conte
     private final CompletableFuture<Void> jobFailedFuture = new CompletableFuture<>();
 
     public MockOperatorCoordinatorContext(OperatorID operatorID, int numSubtasks) {
-        this(operatorID, numSubtasks, MockOperatorCoordinatorContext.class.getClassLoader());
+        this(
+                operatorID,
+                numSubtasks,
+                MockOperatorCoordinatorContext.class.getClassLoader(),
+                JobID.generate());
     }
 
     public MockOperatorCoordinatorContext(OperatorID operatorID, ClassLoader userCodeClassLoader) {
-        this(operatorID, 1, userCodeClassLoader);
+        this(operatorID, 1, userCodeClassLoader, JobID.generate());
+    }
+
+    public MockOperatorCoordinatorContext(OperatorID operatorID, int numSubtasks, JobID jobID) {
+        this(operatorID, numSubtasks, MockOperatorCoordinatorContext.class.getClassLoader(), jobID);
     }
 
     public MockOperatorCoordinatorContext(
-            OperatorID operatorID, int numSubtasks, ClassLoader userCodeClassLoader) {
+            OperatorID operatorID, int numSubtasks, ClassLoader userCodeClassLoader, JobID jobID) {
         this.operatorID = operatorID;
         this.numSubtasks = numSubtasks;
+        this.jobID = jobID;
         this.jobFailed = false;
         this.jobFailureReason = null;
         this.userCodeClassLoader = userCodeClassLoader;
@@ -104,5 +116,9 @@ public class MockOperatorCoordinatorContext implements OperatorCoordinator.Conte
 
     public CompletableFuture<Void> getJobFailedFuture() {
         return jobFailedFuture;
+    }
+
+    public Optional<JobID> getJobID() {
+        return Optional.of(jobID);
     }
 }

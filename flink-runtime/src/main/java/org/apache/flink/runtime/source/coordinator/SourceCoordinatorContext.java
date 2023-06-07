@@ -103,7 +103,6 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
     private final ExecutorNotifier notifier;
     private final OperatorCoordinator.Context operatorCoordinatorContext;
     private final SimpleVersionedSerializer<SplitT> splitSerializer;
-    private final JobID jobID;
     private final ConcurrentMap<Integer, ConcurrentMap<Integer, ReaderInfo>> registeredReaders;
     private final SplitAssignmentTracker<SplitT> assignmentTracker;
     private final SourceCoordinatorProvider.CoordinatorExecutorThreadFactory
@@ -119,8 +118,7 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
             int numWorkerThreads,
             OperatorCoordinator.Context operatorCoordinatorContext,
             SimpleVersionedSerializer<SplitT> splitSerializer,
-            boolean supportsConcurrentExecutionAttempts,
-            JobID jobID) {
+            boolean supportsConcurrentExecutionAttempts) {
         this(
                 Executors.newScheduledThreadPool(1, coordinatorThreadFactory),
                 Executors.newScheduledThreadPool(
@@ -131,8 +129,7 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
                 operatorCoordinatorContext,
                 splitSerializer,
                 new SplitAssignmentTracker<>(),
-                supportsConcurrentExecutionAttempts,
-                jobID);
+                supportsConcurrentExecutionAttempts);
     }
 
     // Package private method for unit test.
@@ -144,14 +141,12 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
             OperatorCoordinator.Context operatorCoordinatorContext,
             SimpleVersionedSerializer<SplitT> splitSerializer,
             SplitAssignmentTracker<SplitT> splitAssignmentTracker,
-            boolean supportsConcurrentExecutionAttempts,
-            JobID jobID) {
+            boolean supportsConcurrentExecutionAttempts) {
         this.workerExecutor = workerExecutor;
         this.coordinatorExecutor = coordinatorExecutor;
         this.coordinatorThreadFactory = coordinatorThreadFactory;
         this.operatorCoordinatorContext = operatorCoordinatorContext;
         this.splitSerializer = splitSerializer;
-        this.jobID = jobID;
         this.registeredReaders = new ConcurrentHashMap<>();
         this.assignmentTracker = splitAssignmentTracker;
         this.coordinatorThreadName = coordinatorThreadFactory.getCoordinatorThreadName();
@@ -169,26 +164,6 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
                                         this::handleUncaughtExceptionFromAsyncCall, runnable));
 
         this.notifier = new ExecutorNotifier(workerExecutor, errorHandlingCoordinatorExecutor);
-    }
-
-    @VisibleForTesting
-    SourceCoordinatorContext(
-            ScheduledExecutorService coordinatorExecutor,
-            ScheduledExecutorService workerExecutor,
-            SourceCoordinatorProvider.CoordinatorExecutorThreadFactory coordinatorThreadFactory,
-            OperatorCoordinator.Context operatorCoordinatorContext,
-            SimpleVersionedSerializer<SplitT> splitSerializer,
-            SplitAssignmentTracker<SplitT> splitAssignmentTracker,
-            boolean supportsConcurrentExecutionAttempts) {
-        this(
-                coordinatorExecutor,
-                workerExecutor,
-                coordinatorThreadFactory,
-                operatorCoordinatorContext,
-                splitSerializer,
-                splitAssignmentTracker,
-                supportsConcurrentExecutionAttempts,
-                JobID.generate());
     }
 
     boolean isConcurrentExecutionAttemptsSupported() {
@@ -710,6 +685,6 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
 
     @Override
     public Optional<JobID> getJobID() {
-        return Optional.of(jobID);
+        return operatorCoordinatorContext.getJobID();
     }
 }

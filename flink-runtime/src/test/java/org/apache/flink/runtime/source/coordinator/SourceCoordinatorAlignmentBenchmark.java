@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.source.coordinator;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.mocks.MockSource;
@@ -54,8 +53,7 @@ public class SourceCoordinatorAlignmentBenchmark {
                         new MockSource(Boundedness.BOUNDED, 2),
                         1,
                         new WatermarkAlignmentParams(1000L, "group1", Long.MAX_VALUE),
-                        null,
-                        JobID.generate());
+                        null);
         this.sourceCoordinator =
                 (SourceCoordinator<?, ?>)
                         provider.getCoordinator(

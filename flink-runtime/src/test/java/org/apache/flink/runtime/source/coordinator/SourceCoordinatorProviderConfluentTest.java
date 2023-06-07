@@ -38,14 +38,13 @@ public class SourceCoordinatorProviderConfluentTest {
                         new MockSource(Boundedness.BOUNDED, NUM_SPLITS),
                         1,
                         WatermarkAlignmentParams.WATERMARK_ALIGNMENT_DISABLED,
-                        null,
-                        JOB_ID);
+                        null);
     }
 
     @Test
     public void testJobId() throws Exception {
         MockOperatorCoordinatorContext context =
-                new MockOperatorCoordinatorContext(OPERATOR_ID, NUM_SPLITS);
+                new MockOperatorCoordinatorContext(OPERATOR_ID, NUM_SPLITS, JOB_ID);
         RecreateOnResetOperatorCoordinator coordinator =
                 (RecreateOnResetOperatorCoordinator) provider.create(context);
         SourceCoordinator<?, ?> sourceCoordinator =

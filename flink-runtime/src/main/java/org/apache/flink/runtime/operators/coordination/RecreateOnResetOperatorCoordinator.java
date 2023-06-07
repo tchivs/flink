@@ -19,6 +19,7 @@ limitations under the License.
 package org.apache.flink.runtime.operators.coordination;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.metrics.groups.OperatorCoordinatorMetricGroup;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.util.Preconditions;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -266,6 +268,11 @@ public class RecreateOnResetOperatorCoordinator implements OperatorCoordinator {
         @Override
         public boolean isConcurrentExecutionAttemptsSupported() {
             return context.isConcurrentExecutionAttemptsSupported();
+        }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return context.getJobID();
         }
 
         @VisibleForTesting
