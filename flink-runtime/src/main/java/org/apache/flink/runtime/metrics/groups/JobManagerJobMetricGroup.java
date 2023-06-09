@@ -27,6 +27,7 @@ import org.apache.flink.util.AbstractID;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,11 +47,21 @@ public class JobManagerJobMetricGroup extends JobMetricGroup<JobManagerMetricGro
             JobManagerMetricGroup parent,
             JobID jobId,
             @Nullable String jobName) {
+        this(registry, parent, jobId, jobName, Collections.emptyMap());
+    }
+
+    JobManagerJobMetricGroup(
+            MetricRegistry registry,
+            JobManagerMetricGroup parent,
+            JobID jobId,
+            @Nullable String jobName,
+            Map<String, String> customVariables) {
         super(
                 registry,
                 checkNotNull(parent),
                 jobId,
                 jobName,
+                customVariables,
                 registry.getScopeFormats()
                         .getJobManagerJobFormat()
                         .formatScope(checkNotNull(parent), jobId, jobName));

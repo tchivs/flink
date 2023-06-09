@@ -45,6 +45,8 @@ public abstract class JobMetricGroup<C extends ComponentMetricGroup<C>>
     /** The name of the job represented by this metrics group. */
     @Nullable protected final String jobName;
 
+    private final Map<String, String> customVariables;
+
     // ------------------------------------------------------------------------
 
     protected JobMetricGroup(
@@ -52,11 +54,13 @@ public abstract class JobMetricGroup<C extends ComponentMetricGroup<C>>
             C parent,
             JobID jobId,
             @Nullable String jobName,
+            Map<String, String> customVariables,
             String[] scope) {
         super(registry, scope, parent);
 
         this.jobId = jobId;
         this.jobName = jobName;
+        this.customVariables = customVariables;
     }
 
     public JobID jobId() {
@@ -82,6 +86,7 @@ public abstract class JobMetricGroup<C extends ComponentMetricGroup<C>>
     protected void putVariables(Map<String, String> variables) {
         variables.put(ScopeFormat.SCOPE_JOB_ID, jobId.toString());
         variables.put(ScopeFormat.SCOPE_JOB_NAME, jobName);
+        variables.putAll(customVariables);
     }
 
     @Override

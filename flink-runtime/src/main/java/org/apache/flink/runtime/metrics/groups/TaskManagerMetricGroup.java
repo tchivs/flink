@@ -28,6 +28,7 @@ import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 import org.apache.flink.util.Preconditions;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -81,13 +82,20 @@ public class TaskManagerMetricGroup extends ComponentMetricGroup<TaskManagerMetr
     // ------------------------------------------------------------------------
 
     public TaskManagerJobMetricGroup addJob(JobID jobId, String jobName) {
+        return addJob(jobId, jobName, Collections.emptyMap());
+    }
+
+    public TaskManagerJobMetricGroup addJob(
+            JobID jobId, String jobName, Map<String, String> customVariables) {
         Preconditions.checkNotNull(jobId);
         String resolvedJobName = jobName == null || jobName.isEmpty() ? jobId.toString() : jobName;
         TaskManagerJobMetricGroup jobGroup;
         synchronized (this) { // synchronization isn't strictly necessary as of FLINK-24864
             jobGroup = jobs.get(jobId);
             if (jobGroup == null) {
-                jobGroup = new TaskManagerJobMetricGroup(registry, this, jobId, resolvedJobName);
+                jobGroup =
+                        new TaskManagerJobMetricGroup(
+                                registry, this, jobId, resolvedJobName, customVariables);
                 jobs.put(jobId, jobGroup);
             }
         }

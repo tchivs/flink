@@ -26,6 +26,7 @@ import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 import org.apache.flink.util.concurrent.FutureUtils;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -72,6 +73,11 @@ public class JobManagerMetricGroup extends ComponentMetricGroup<JobManagerMetric
     // ------------------------------------------------------------------------
 
     public JobManagerJobMetricGroup addJob(JobID jobId, String jobName) {
+        return addJob(jobId, jobName, Collections.emptyMap());
+    }
+
+    public JobManagerJobMetricGroup addJob(
+            JobID jobId, String jobName, Map<String, String> customVariables) {
         // get or create a jobs metric group
         JobManagerJobMetricGroup currentJobGroup;
         synchronized (this) {
@@ -79,7 +85,9 @@ public class JobManagerMetricGroup extends ComponentMetricGroup<JobManagerMetric
                 currentJobGroup = jobs.get(jobId);
 
                 if (currentJobGroup == null || currentJobGroup.isClosed()) {
-                    currentJobGroup = new JobManagerJobMetricGroup(registry, this, jobId, jobName);
+                    currentJobGroup =
+                            new JobManagerJobMetricGroup(
+                                    registry, this, jobId, jobName, customVariables);
                     jobs.put(jobId, currentJobGroup);
                 }
                 return currentJobGroup;

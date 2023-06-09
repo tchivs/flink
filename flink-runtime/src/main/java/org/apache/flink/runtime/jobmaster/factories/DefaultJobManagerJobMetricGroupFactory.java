@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.jobmaster.factories;
 
+import org.apache.flink.configuration.ConfluentMetricOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 import org.apache.flink.runtime.metrics.groups.JobManagerMetricGroup;
@@ -39,6 +40,9 @@ public class DefaultJobManagerJobMetricGroupFactory implements JobManagerJobMetr
 
     @Override
     public JobManagerJobMetricGroup create(@Nonnull JobGraph jobGraph) {
-        return jobManagerMetricGroup.addJob(jobGraph.getJobID(), jobGraph.getName());
+        return jobManagerMetricGroup.addJob(
+                jobGraph.getJobID(),
+                jobGraph.getName(),
+                jobGraph.getJobConfiguration().get(ConfluentMetricOptions.CUSTOM_METRIC_VARIABLES));
     }
 }

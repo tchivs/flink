@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.ClusterOptions;
+import org.apache.flink.configuration.ConfluentMetricOptions;
 import org.apache.flink.management.jmx.JMXService;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.blob.JobPermanentBlobService;
@@ -691,7 +692,11 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
             TaskManagerJobMetricGroup jobGroup =
                     taskManagerMetricGroup.addJob(
-                            jobInformation.getJobId(), jobInformation.getJobName());
+                            jobInformation.getJobId(),
+                            jobInformation.getJobName(),
+                            jobInformation
+                                    .getJobConfiguration()
+                                    .get(ConfluentMetricOptions.CUSTOM_METRIC_VARIABLES));
 
             // note that a pre-existing job group can NOT be closed concurrently - this is done by
             // the same TM thread in removeJobMetricsGroup

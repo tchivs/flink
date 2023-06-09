@@ -25,6 +25,7 @@ import org.apache.flink.runtime.metrics.MetricRegistry;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,11 +52,21 @@ public class TaskManagerJobMetricGroup extends JobMetricGroup<TaskManagerMetricG
             TaskManagerMetricGroup parent,
             JobID jobId,
             @Nullable String jobName) {
+        this(registry, parent, jobId, jobName, Collections.emptyMap());
+    }
+
+    public TaskManagerJobMetricGroup(
+            MetricRegistry registry,
+            TaskManagerMetricGroup parent,
+            JobID jobId,
+            @Nullable String jobName,
+            Map<String, String> customVariables) {
         super(
                 registry,
                 parent,
                 jobId,
                 jobName,
+                customVariables,
                 registry.getScopeFormats()
                         .getTaskManagerJobFormat()
                         .formatScope(checkNotNull(parent), jobId, jobName));
