@@ -781,7 +781,7 @@ public class RestClient implements AutoCloseableAsync {
             JsonNode rawResponse;
             try (InputStream in = new ByteBufInputStream(content)) {
                 rawResponse = objectMapper.readTree(in);
-                LOG.debug("Received response {}.", rawResponse);
+                LOG.debug("Received response.");
             } catch (JsonProcessingException je) {
                 LOG.error("Response was not valid JSON.", je);
                 // let's see if it was a plain-text message instead
