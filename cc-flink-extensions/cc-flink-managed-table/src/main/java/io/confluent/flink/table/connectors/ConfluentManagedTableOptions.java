@@ -7,17 +7,28 @@ package io.confluent.flink.table.connectors;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.table.connector.ChangelogMode;
 
+import io.confluent.flink.table.connectors.ConfluentManagedFormats.PublicAvroRegistryFormat;
+
 import java.io.Serializable;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Options for Confluent managed tables. */
 @Confluent
 public class ConfluentManagedTableOptions {
 
-    // PUBLIC
+    // --------------------------------------------------------------------------------------------
+    // PUBLIC - RUNTIME SPECIFIC
+    // --------------------------------------------------------------------------------------------
+
+    // Note: Use default value only if they should show up after a CREATE TABLE by default.
 
     public static final ConfigOption<ManagedChangelogMode> CHANGELOG_MODE =
             ConfigOptions.key("changelog.mode")
@@ -35,7 +46,7 @@ public class ConfluentManagedTableOptions {
     public static final ConfigOption<ScanStartupMode> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")
                     .enumType(ScanStartupMode.class)
-                    .noDefaultValue()
+                    .defaultValue(ScanStartupMode.EARLIEST_OFFSET)
                     .withDescription("Kafka start-up mode.");
 
     public static final ConfigOption<List<Map<String, String>>> SCAN_STARTUP_SPECIFIC_OFFSETS =
@@ -54,7 +65,7 @@ public class ConfluentManagedTableOptions {
     public static final ConfigOption<ScanBoundedMode> SCAN_BOUNDED_MODE =
             ConfigOptions.key("scan.bounded.mode")
                     .enumType(ScanBoundedMode.class)
-                    .noDefaultValue()
+                    .defaultValue(ScanBoundedMode.UNBOUNDED)
                     .withDescription("Kafka bounded mode.");
 
     public static final ConfigOption<List<Map<String, String>>> SCAN_BOUNDED_SPECIFIC_OFFSETS =
@@ -85,16 +96,96 @@ public class ConfluentManagedTableOptions {
     public static final ConfigOption<String> VALUE_FORMAT =
             ConfigOptions.key("value.format")
                     .stringType()
-                    .noDefaultValue()
+                    .defaultValue(PublicAvroRegistryFormat.IDENTIFIER)
                     .withDescription("Message value format.");
 
     public static final ConfigOption<FieldsInclude> VALUE_FIELDS_INCLUDE =
             ConfigOptions.key("value.fields-include")
                     .enumType(FieldsInclude.class)
-                    .defaultValue(FieldsInclude.EXCEPT_KEY)
+                    .noDefaultValue()
                     .withDescription("Whether to include the key fields in the value.");
 
-    // PRIVATE - SET BY METASTORE
+    public static final Set<ConfigOption<?>> PUBLIC_RUNTIME_OPTIONS = initPublicRuntimeOptions();
+
+    private static Set<ConfigOption<?>> initPublicRuntimeOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(CHANGELOG_MODE);
+        options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSETS);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
+        options.add(SCAN_BOUNDED_MODE);
+        options.add(SCAN_BOUNDED_SPECIFIC_OFFSETS);
+        options.add(SCAN_BOUNDED_TIMESTAMP_MILLIS);
+        options.add(KEY_FORMAT);
+        options.add(KEY_FIELDS_PREFIX);
+        options.add(VALUE_FORMAT);
+        options.add(VALUE_FIELDS_INCLUDE);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // PUBLIC - CREATE TABLE SPECIFIC
+    // --------------------------------------------------------------------------------------------
+
+    public static final ConfigOption<CleanupPolicy> KAFKA_CLEANUP_POLICY =
+            ConfigOptions.key("kafka.cleanup-policy")
+                    .enumType(CleanupPolicy.class)
+                    .defaultValue(CleanupPolicy.DELETE)
+                    .withDescription("Translates to Kafka's log.cleanup.policy.");
+
+    public static final ConfigOption<Integer> KAFKA_PARTITIONS =
+            ConfigOptions.key("kafka.partitions")
+                    .intType()
+                    .defaultValue(6)
+                    .withDescription("Translates to Kafka's num.partitions.");
+
+    public static final ConfigOption<Duration> KAFKA_RETENTION_TIME =
+            ConfigOptions.key("kafka.retention.time")
+                    .durationType()
+                    .defaultValue(Duration.ofDays(7))
+                    .withDescription("Translates to Kafka's log.retention.ms.");
+
+    public static final ConfigOption<MemorySize> KAFKA_RETENTION_SIZE =
+            ConfigOptions.key("kafka.retention.size")
+                    .memoryType()
+                    .defaultValue(MemorySize.ZERO)
+                    .withDescription("Translates to Kafka's log.retention.bytes.");
+
+    public static final ConfigOption<MemorySize> KAFKA_MAX_MESSAGE_SIZE =
+            ConfigOptions.key("kafka.max-message-size")
+                    .memoryType()
+                    .defaultValue(new MemorySize(2097164L))
+                    .withDescription("Translates to Kafka's max.message.bytes.");
+
+    public static final Set<ConfigOption<?>> PUBLIC_CREATION_OPTIONS = initPublicCreationOptions();
+
+    private static Set<ConfigOption<?>> initPublicCreationOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(KAFKA_CLEANUP_POLICY);
+        options.add(KAFKA_PARTITIONS);
+        options.add(KAFKA_RETENTION_TIME);
+        options.add(KAFKA_RETENTION_SIZE);
+        options.add(KAFKA_MAX_MESSAGE_SIZE);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // PUBLIC - IMMUTABLE
+    // --------------------------------------------------------------------------------------------
+
+    public static final Set<ConfigOption<?>> PUBLIC_IMMUTABLE_OPTIONS =
+            initPublicImmutableOptions();
+
+    private static Set<ConfigOption<?>> initPublicImmutableOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(KAFKA_CLEANUP_POLICY);
+        options.add(KAFKA_PARTITIONS);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // PRIVATE - RUNTIME SPECIFIC - SET BY METASTORE
+    // --------------------------------------------------------------------------------------------
 
     public static final ConfigOption<String> KAFKA_TOPIC =
             ConfigOptions.key("kafka.topic")
@@ -127,7 +218,9 @@ public class ConfluentManagedTableOptions {
                     .withDescription(
                             "Properties for advanced configuration or custom credentials.");
 
-    // PRIVATE - SET BY JOB SUBMISSION SERVICE
+    // --------------------------------------------------------------------------------------------
+    // PRIVATE - RUNTIME SPECIFIC - SET BY JOB SUBMISSION SERVICE
+    // --------------------------------------------------------------------------------------------
 
     public static final ConfigOption<String> KAFKA_CONSUMER_GROUP_ID =
             ConfigOptions.key("kafka.consumer-group-id")
@@ -241,6 +334,24 @@ public class ConfluentManagedTableOptions {
         private final String value;
 
         CredentialsSource(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+    }
+
+    /** Enum for {@link #KAFKA_CLEANUP_POLICY}. */
+    public enum CleanupPolicy {
+        DELETE("delete"),
+        COMPACT("compact"),
+        DELETE_COMPACT("delete-compact");
+
+        private final String value;
+
+        CleanupPolicy(String value) {
             this.value = value;
         }
 

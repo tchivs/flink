@@ -12,32 +12,40 @@ import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
 import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
-import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.Format;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
-import org.apache.flink.table.types.logical.utils.LogicalTypeChecks;
 import org.apache.flink.types.RowKind;
-import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CleanupPolicy;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CredentialsSource;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.FieldsInclude;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_BOOTSTRAP_SERVERS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CONSUMER_GROUP_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CREDENTIALS_SOURCE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_LOGICAL_CLUSTER_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_PROPERTIES;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TOPIC;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TRANSACTIONAL_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_MODE;
@@ -53,8 +61,157 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.V
 @Confluent
 public class ConfluentManagedTableUtils {
 
+    public static void validateDynamicTableParameters(
+            String tableIdentifier,
+            List<String> primaryKeys,
+            List<String> partitionKeys,
+            List<String> physicalColumns,
+            ReadableConfig options,
+            @Nullable Format keyFormat,
+            Format valueFormat) {
+        // If this call succeeds all parameters should be correct.
+        createDynamicTableParameters(
+                tableIdentifier,
+                primaryKeys,
+                partitionKeys,
+                physicalColumns,
+                options,
+                keyFormat,
+                valueFormat,
+                null);
+    }
+
+    public static DynamicTableParameters createDynamicTableParameters(
+            String tableIdentifier,
+            List<String> primaryKeys,
+            List<String> partitionKeys,
+            List<String> physicalColumns,
+            ReadableConfig options,
+            @Nullable Format keyFormat,
+            Format valueFormat,
+            @Nullable DataType physicalDataType) {
+        final List<String> keyFields = createKeyFields(primaryKeys, partitionKeys);
+
+        // The table mode is the overall mode of the table including the format.
+        // If the format is insert-only, it's the connector that does the heavy lifting.
+        final ManagedChangelogMode tableMode = options.get(CHANGELOG_MODE);
+        final ChangelogMode formatMode = valueFormat.getChangelogMode();
+        // This ensures that the table mode is equal to or a superset of the format mode.
+        validateValueFormat(options, tableMode, formatMode);
+        validateScanStartupMode(options);
+        validateScanBoundedMode(options);
+        validatePrimaryKey(primaryKeys, tableMode);
+        validateKeyFormat(options, tableMode, primaryKeys, keyFormat, keyFields);
+
+        final int[] keyProjection = createKeyFormatProjection(options, physicalColumns, keyFields);
+
+        final int[] valueProjection =
+                createValueFormatProjection(options, physicalColumns, keyFields);
+
+        final String keyPrefix = options.getOptional(KEY_FIELDS_PREFIX).orElse(null);
+
+        final Properties properties = getProperties(options);
+
+        final StartupOptions startupOptions = getStartupOptions(options);
+
+        final BoundedOptions boundedOptions = getBoundedOptions(options);
+
+        return new DynamicTableParameters(
+                physicalDataType,
+                keyProjection,
+                valueProjection,
+                keyPrefix,
+                options.get(KAFKA_TOPIC),
+                properties,
+                startupOptions,
+                boundedOptions,
+                options.getOptional(KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
+                tableMode,
+                tableIdentifier);
+    }
+
+    /** Set of parameters for the dynamic table. */
+    public static class DynamicTableParameters {
+        final DataType physicalDataType;
+        final int[] keyProjection;
+        final int[] valueProjection;
+        final @Nullable String keyPrefix;
+        final String topic;
+        final Properties properties;
+        final StartupOptions startupOptions;
+        final BoundedOptions boundedOptions;
+        final @Nullable String transactionalIdPrefix;
+        final ManagedChangelogMode tableMode;
+        final String tableIdentifier;
+
+        DynamicTableParameters(
+                DataType physicalDataType,
+                int[] keyProjection,
+                int[] valueProjection,
+                @Nullable String keyPrefix,
+                String topic,
+                Properties properties,
+                StartupOptions startupOptions,
+                BoundedOptions boundedOptions,
+                @Nullable String transactionalIdPrefix,
+                ManagedChangelogMode tableMode,
+                String tableIdentifier) {
+            this.physicalDataType = physicalDataType;
+            this.keyProjection = keyProjection;
+            this.valueProjection = valueProjection;
+            this.keyPrefix = keyPrefix;
+            this.topic = topic;
+            this.properties = properties;
+            this.startupOptions = startupOptions;
+            this.boundedOptions = boundedOptions;
+            this.transactionalIdPrefix = transactionalIdPrefix;
+            this.tableMode = tableMode;
+            this.tableIdentifier = tableIdentifier;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            DynamicTableParameters that = (DynamicTableParameters) o;
+            return physicalDataType.equals(that.physicalDataType)
+                    && Arrays.equals(keyProjection, that.keyProjection)
+                    && Arrays.equals(valueProjection, that.valueProjection)
+                    && Objects.equals(keyPrefix, that.keyPrefix)
+                    && topic.equals(that.topic)
+                    && properties.equals(that.properties)
+                    && startupOptions.equals(that.startupOptions)
+                    && boundedOptions.equals(that.boundedOptions)
+                    && Objects.equals(transactionalIdPrefix, that.transactionalIdPrefix)
+                    && tableMode == that.tableMode
+                    && tableIdentifier.equals(that.tableIdentifier);
+        }
+
+        @Override
+        public int hashCode() {
+            int result =
+                    Objects.hash(
+                            physicalDataType,
+                            keyPrefix,
+                            topic,
+                            properties,
+                            startupOptions,
+                            boundedOptions,
+                            transactionalIdPrefix,
+                            tableMode,
+                            tableIdentifier);
+            result = 31 * result + Arrays.hashCode(keyProjection);
+            result = 31 * result + Arrays.hashCode(valueProjection);
+            return result;
+        }
+    }
+
     /** Kafka startup options. */
-    static class StartupOptions {
+    public static class StartupOptions {
         public final StartupMode startupMode;
         public final Map<KafkaTopicPartition, Long> specificOffsets;
         public final long startupTimestampMillis;
@@ -89,7 +246,7 @@ public class ConfluentManagedTableUtils {
     }
 
     /** Kafka bounded options. */
-    static class BoundedOptions {
+    public static class BoundedOptions {
         public final BoundedMode boundedMode;
         public final Map<KafkaTopicPartition, Long> specificOffsets;
         public final long boundedTimestampMillis;
@@ -123,7 +280,11 @@ public class ConfluentManagedTableUtils {
         }
     }
 
-    static StartupOptions getStartupOptions(ReadableConfig options) {
+    // --------------------------------------------------------------------------------------------
+    // Supporting methods
+    // --------------------------------------------------------------------------------------------
+
+    private static StartupOptions getStartupOptions(ReadableConfig options) {
         final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
         final StartupMode startupMode =
                 options.getOptional(SCAN_STARTUP_MODE)
@@ -143,7 +304,7 @@ public class ConfluentManagedTableUtils {
                 options.getOptional(SCAN_STARTUP_TIMESTAMP_MILLIS).orElse(0L));
     }
 
-    static BoundedOptions getBoundedOptions(ReadableConfig options) {
+    private static BoundedOptions getBoundedOptions(ReadableConfig options) {
         final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
         final BoundedMode boundedMode = fromOption(options.get(SCAN_BOUNDED_MODE));
         if (boundedMode == BoundedMode.SPECIFIC_OFFSETS) {
@@ -214,17 +375,16 @@ public class ConfluentManagedTableUtils {
         }
     }
 
-    static int[] createValueFormatProjection(
-            ReadableConfig options, DataType physicalDataType, @Nullable List<String> keyFields) {
-        final LogicalType physicalType = physicalDataType.getLogicalType();
-        Preconditions.checkArgument(
-                physicalType.is(LogicalTypeRoot.ROW), "Row data type expected.");
-        final int physicalFieldCount = LogicalTypeChecks.getFieldCount(physicalType);
-        final IntStream physicalFields = IntStream.range(0, physicalFieldCount);
+    private static int[] createValueFormatProjection(
+            ReadableConfig options,
+            List<String> physicalColumns,
+            @Nullable List<String> keyFields) {
+        final IntStream physicalFields = IntStream.range(0, physicalColumns.size());
 
         final String keyPrefix = options.getOptional(KEY_FIELDS_PREFIX).orElse("");
 
-        final FieldsInclude strategy = options.get(VALUE_FIELDS_INCLUDE);
+        final FieldsInclude strategy =
+                options.getOptional(VALUE_FIELDS_INCLUDE).orElse(FieldsInclude.EXCEPT_KEY);
         if (strategy == FieldsInclude.ALL) {
             if (keyPrefix.length() > 0) {
                 throw new ValidationException(
@@ -238,7 +398,7 @@ public class ConfluentManagedTableUtils {
             return physicalFields.toArray();
         } else if (strategy == FieldsInclude.EXCEPT_KEY) {
             final int[] keyProjection =
-                    createKeyFormatProjection(options, physicalDataType, keyFields);
+                    createKeyFormatProjection(options, physicalColumns, keyFields);
             return physicalFields
                     .filter(pos -> IntStream.of(keyProjection).noneMatch(k -> k == pos))
                     .toArray();
@@ -246,11 +406,10 @@ public class ConfluentManagedTableUtils {
         throw new TableException("Unknown value fields strategy:" + strategy);
     }
 
-    static int[] createKeyFormatProjection(
-            ReadableConfig options, DataType physicalDataType, @Nullable List<String> keyFields) {
-        final LogicalType physicalType = physicalDataType.getLogicalType();
-        Preconditions.checkArgument(
-                physicalType.is(LogicalTypeRoot.ROW), "Row data type expected.");
+    private static int[] createKeyFormatProjection(
+            ReadableConfig options,
+            List<String> physicalColumns,
+            @Nullable List<String> keyFields) {
         final Optional<String> optionalKeyFormat = options.getOptional(KEY_FORMAT);
 
         if (!optionalKeyFormat.isPresent() || keyFields == null) {
@@ -259,11 +418,10 @@ public class ConfluentManagedTableUtils {
 
         final String keyPrefix = options.getOptional(KEY_FIELDS_PREFIX).orElse("");
 
-        final List<String> physicalFields = LogicalTypeChecks.getFieldNames(physicalType);
         return keyFields.stream()
                 .mapToInt(
                         keyField -> {
-                            final int pos = physicalFields.indexOf(keyField);
+                            final int pos = physicalColumns.indexOf(keyField);
                             // check that field name exists
                             if (pos < 0) {
                                 throw new ValidationException(
@@ -272,7 +430,7 @@ public class ConfluentManagedTableUtils {
                                                         + "A key field must be a regular, physical column. "
                                                         + "The following columns can be selected:\n"
                                                         + "%s",
-                                                keyField, physicalFields));
+                                                keyField, physicalColumns));
                             }
                             // check that field name is prefixed correctly
                             if (!keyField.startsWith(keyPrefix)) {
@@ -287,8 +445,8 @@ public class ConfluentManagedTableUtils {
                 .toArray();
     }
 
-    static @Nullable List<String> createKeyFields(ResolvedCatalogTable table) {
-        final List<String> partitionKeys = table.getPartitionKeys();
+    private static @Nullable List<String> createKeyFields(
+            List<String> primaryKeys, List<String> partitionKeys) {
         if (!partitionKeys.isEmpty()) {
             final Set<String> duplicateColumns =
                     partitionKeys.stream()
@@ -306,21 +464,20 @@ public class ConfluentManagedTableUtils {
 
         // regardless of the mode, it makes sense to partition by primary key such that efficient
         // point lookups can be implemented
-        if (table.getResolvedSchema().getPrimaryKey().isPresent()) {
-            return table.getResolvedSchema().getPrimaryKey().get().getColumns();
+        if (!primaryKeys.isEmpty()) {
+            return primaryKeys;
         }
 
         return null;
     }
 
-    static void validateKeyFormat(
+    private static void validateKeyFormat(
             ReadableConfig options,
             ManagedChangelogMode tableMode,
-            List<String> columns,
-            int[] primaryKeyIndexes,
+            List<String> primaryKeys,
             @Nullable Format keyDecodingFormat,
-            @Nullable List<String> keyFields) {
-        final boolean hasKeys = keyFields != null && keyFields.size() > 0;
+            @Nullable List<String> partitionKeys) {
+        final boolean hasKeys = partitionKeys != null && partitionKeys.size() > 0;
         if (keyDecodingFormat == null) {
             if (tableMode == ManagedChangelogMode.UPSERT) {
                 throw new ValidationException(
@@ -350,27 +507,40 @@ public class ConfluentManagedTableUtils {
                                         + "But %s has a changelog mode of %s.",
                                 options.get(KEY_FORMAT), keyFormatMode));
             }
-            final Set<String> primaryKeyNames =
-                    IntStream.of(primaryKeyIndexes)
-                            .mapToObj(columns::get)
-                            .collect(Collectors.toSet());
-            if (!primaryKeyNames.isEmpty() && !primaryKeyNames.containsAll(keyFields)) {
+            final Set<String> primaryKeySet = new HashSet<>(primaryKeys);
+            if (!primaryKeySet.isEmpty() && !primaryKeySet.containsAll(partitionKeys)) {
                 throw new ValidationException(
                         String.format(
                                 "Key fields in PARTITIONED BY must fully contain primary key columns %s "
                                         + "if a primary key is defined.",
-                                primaryKeyNames));
+                                primaryKeySet));
+            }
+            final CleanupPolicy cleanupPolicy = options.get(KAFKA_CLEANUP_POLICY);
+            final boolean isCompacted =
+                    cleanupPolicy == CleanupPolicy.DELETE_COMPACT
+                            || cleanupPolicy == CleanupPolicy.COMPACT;
+            final Set<String> partitionKeySet = new HashSet<>(partitionKeys);
+            if (isCompacted
+                    && tableMode == ManagedChangelogMode.UPSERT
+                    && !primaryKeySet.equals(partitionKeySet)) {
+                throw new ValidationException(
+                        String.format(
+                                "A custom PARTITIONED BY clause is not allowed if compaction is enabled in "
+                                        + "upsert mode. The compaction key must be equal to the primary "
+                                        + "key %s which is used for upserts.",
+                                primaryKeySet));
             }
         }
     }
 
-    static void validatePrimaryKey(int[] keys, ManagedChangelogMode tableMode) {
-        if (tableMode == ManagedChangelogMode.UPSERT && keys.length == 0) {
+    private static void validatePrimaryKey(
+            List<String> primaryKeys, ManagedChangelogMode tableMode) {
+        if (tableMode == ManagedChangelogMode.UPSERT && primaryKeys.isEmpty()) {
             throw new ValidationException("An upsert table requires a PRIMARY KEY constraint.");
         }
     }
 
-    static void validateValueFormat(
+    private static void validateValueFormat(
             ReadableConfig options, ManagedChangelogMode tableMode, ChangelogMode formatMode) {
         if (!formatMode.containsOnly(RowKind.INSERT)
                 && !formatMode.equals(tableMode.toChangelogMode())) {
@@ -383,7 +553,7 @@ public class ConfluentManagedTableUtils {
         }
     }
 
-    static void validateScanStartupMode(ReadableConfig options) {
+    private static void validateScanStartupMode(ReadableConfig options) {
         options.getOptional(SCAN_STARTUP_MODE)
                 .ifPresent(
                         mode -> {
@@ -417,7 +587,7 @@ public class ConfluentManagedTableUtils {
                         });
     }
 
-    static void validateScanBoundedMode(ReadableConfig options) {
+    private static void validateScanBoundedMode(ReadableConfig options) {
         options.getOptional(SCAN_BOUNDED_MODE)
                 .ifPresent(
                         mode -> {
@@ -478,6 +648,21 @@ public class ConfluentManagedTableUtils {
             }
         }
         return offsetMap;
+    }
+
+    private static Properties getProperties(ReadableConfig options) {
+        final Properties properties = new Properties();
+        options.getOptional(KAFKA_BOOTSTRAP_SERVERS)
+                .ifPresent(servers -> properties.put("bootstrap.servers", servers));
+        options.getOptional(KAFKA_LOGICAL_CLUSTER_ID)
+                .ifPresent(lkc -> properties.put("confluent.kafka.logical.cluster.id", lkc));
+        if (options.get(KAFKA_CREDENTIALS_SOURCE) == CredentialsSource.DPAT) {
+            properties.put("confluent.kafka.dpat.enabled", true);
+        }
+        options.getOptional(KAFKA_CONSUMER_GROUP_ID)
+                .ifPresent(id -> properties.put("group.id", id));
+        options.getOptional(KAFKA_PROPERTIES).ifPresent(properties::putAll);
+        return properties;
     }
 
     private ConfluentManagedTableUtils() {

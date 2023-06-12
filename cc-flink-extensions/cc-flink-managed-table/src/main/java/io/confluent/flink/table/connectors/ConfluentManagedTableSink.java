@@ -28,8 +28,8 @@ import org.apache.flink.table.types.utils.DataTypeUtils;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Preconditions;
 
-import io.confluent.flink.table.connectors.ConfluentManagedTableFactory.DynamicTableParameters;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
 import org.apache.kafka.common.header.Header;
 
 import javax.annotation.Nullable;

@@ -26,8 +26,8 @@ import org.apache.flink.table.factories.utils.FactoryMocks;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 
-import io.confluent.flink.table.connectors.ConfluentManagedTableFactory.DynamicTableParameters;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -358,6 +358,20 @@ public class ConfluentManagedTableFactoryTest {
                     },
                     "An upsert table requires a PRIMARY KEY constraint.");
         }
+
+        @Test
+        void testInvalidCustomPartitioningWithCompaction() {
+            testError(
+                    SCHEMA_WITH_PK,
+                    (options, keys) -> {
+                        options.put("changelog.mode", "upsert");
+                        options.put("kafka.cleanup-policy", "compact");
+                        keys.add(KEY_K1);
+                    },
+                    "A custom PARTITIONED BY clause is not allowed if compaction is enabled in "
+                            + "upsert mode. The compaction key must be equal to the primary key "
+                            + "[key_k1, key_k2] which is used for upserts.");
+        }
     }
 
     @Nested
@@ -447,6 +461,11 @@ public class ConfluentManagedTableFactoryTest {
         options.put("kafka.logical-cluster-id", "lkc-4242");
         options.put("kafka.consumer-group-id", "generated_consumer_id_4242");
         options.put("kafka.transactional-id-prefix", "generated_transact_id_4242");
+        options.put("kafka.cleanup-policy", "delete");
+        options.put("kafka.partitions", "6");
+        options.put("kafka.retention.time", "7 d");
+        options.put("kafka.retention.size", "0");
+        options.put("kafka.max-message-size", "2097164 bytes");
         return options;
     }
 

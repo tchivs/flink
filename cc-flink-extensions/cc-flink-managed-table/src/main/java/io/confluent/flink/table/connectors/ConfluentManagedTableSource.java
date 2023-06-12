@@ -37,8 +37,8 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.table.connectors.ConfluentManagedKafkaDeserializationSchema.MetadataConverter;
-import io.confluent.flink.table.connectors.ConfluentManagedTableFactory.DynamicTableParameters;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
