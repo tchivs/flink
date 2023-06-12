@@ -11,27 +11,38 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
+import org.apache.flink.table.api.config.TableConfigOptions;
+import org.apache.flink.table.api.config.TableConfigOptions.CatalogPlanCompilation;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.delegation.InternalPlan;
+import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 import org.apache.flink.table.planner.plan.ExecNodeGraphInternalPlan;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
+import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
+import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecLookupJoin;
+import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
+import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecTableSourceScan;
 
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hasher;
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
 
+import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Default implementation of {@link ServiceTasks}. */
 @Confluent
@@ -119,5 +130,87 @@ class DefaultServiceTasks implements ServiceTasks {
         // Generate OperatorID
         final OperatorID operatorId = new OperatorID(hash);
         return operatorId.toHexString();
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // compileBackgroundQueries
+    // --------------------------------------------------------------------------------------------
+
+    @Override
+    public BackgroundResultPlan compileBackgroundQueries(
+            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations) {
+        final CompilationResult compilationResult = compilePlan(tableEnvironment, modifyOperations);
+        return new BackgroundResultPlan(
+                compilationResult.compiledPlan, compilationResult.connectorMetadata);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Common methods
+    // --------------------------------------------------------------------------------------------
+
+    private static class CompilationResult {
+        final String compiledPlan;
+        final List<ConnectorMetadata> connectorMetadata;
+
+        CompilationResult(String compiledPlan, List<ConnectorMetadata> connectorMetadata) {
+            this.compiledPlan = compiledPlan;
+            this.connectorMetadata = connectorMetadata;
+        }
+    }
+
+    private static CompilationResult compilePlan(
+            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations) {
+        final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
+
+        // Ensure that connector options do not end up in the compiled plan.
+        // They will be maintained separately.
+        tableEnv.getConfig()
+                .set(
+                        TableConfigOptions.PLAN_COMPILE_CATALOG_OBJECTS,
+                        CatalogPlanCompilation.SCHEMA);
+
+        final InternalPlan plan = tableEnv.getPlanner().compilePlan(modifyOperations);
+
+        final ExecNodeGraph graph = ((ExecNodeGraphInternalPlan) plan).getExecNodeGraph();
+
+        final List<ConnectorMetadata> connectorMetadata = new ArrayList<>();
+        graph.getRootNodes().forEach(node -> collectConnectorMetadata(connectorMetadata, node));
+
+        return new CompilationResult(plan.asJsonString(), connectorMetadata);
+    }
+
+    private static void collectConnectorMetadata(
+            List<ConnectorMetadata> connectorMetadata, ExecNode<?> node) {
+        node.getInputEdges()
+                .forEach(edge -> collectConnectorMetadata(connectorMetadata, edge.getSource()));
+
+        final ContextResolvedTable contextTable;
+        if (node instanceof StreamExecTableSourceScan) {
+            final StreamExecTableSourceScan scan = (StreamExecTableSourceScan) node;
+            contextTable = scan.getTableSourceSpec().getContextResolvedTable();
+        } else if (node instanceof StreamExecLookupJoin) {
+            final StreamExecLookupJoin lookupJoin = (StreamExecLookupJoin) node;
+            contextTable =
+                    lookupJoin
+                            .getTemporalTableSourceSpec()
+                            .getTableSourceSpec()
+                            .getContextResolvedTable();
+        } else if (node instanceof StreamExecSink) {
+            final StreamExecSink sink = (StreamExecSink) node;
+            contextTable = sink.getTableSinkSpec().getContextResolvedTable();
+        } else {
+            return;
+        }
+
+        if (!(contextTable.getTable() instanceof ConfluentCatalogTable)) {
+            throw new IllegalArgumentException("Confluent managed catalog table expected.");
+        }
+        final ConfluentCatalogTable catalogTable = contextTable.getTable();
+
+        final Map<String, String> allOptions = new HashMap<>();
+        allOptions.putAll(catalogTable.getOptions());
+        allOptions.putAll(catalogTable.getPrivateOptions());
+
+        connectorMetadata.add(new ConnectorMetadata(contextTable.getIdentifier(), allOptions));
     }
 }

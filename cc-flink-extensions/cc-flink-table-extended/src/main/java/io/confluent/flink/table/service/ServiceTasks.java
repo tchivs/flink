@@ -6,7 +6,10 @@ package io.confluent.flink.table.service;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
+
+import java.util.List;
 
 /**
  * Provides abstractions that can be used by the SQL Service without depending on internal Flink
@@ -26,4 +29,12 @@ public interface ServiceTasks {
      */
     ForegroundResultPlan compileForegroundQuery(
             TableEnvironment tableEnvironment, QueryOperation queryOperation) throws Exception;
+
+    /**
+     * Compiles one or more {@link ModifyOperation}s (i.e. an INSERT INTO or STATEMENT SET) for
+     * background queries.
+     */
+    BackgroundResultPlan compileBackgroundQueries(
+            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations)
+            throws Exception;
 }
