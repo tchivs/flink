@@ -32,7 +32,7 @@ import java.net.URL;
  */
 @Confluent
 public class TokenExchangerImpl implements TokenExchanger {
-    private static final String PATH = "/api/flink/access_tokens";
+    private static final String PATH = "/flink/access_tokens";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     public static final MediaType JSON = MediaType.get("application/json");
 
