@@ -35,7 +35,7 @@ public class FlinkClientWrapperImpl implements FlinkClientWrapper {
         final CompletableFuture<?> submissionFuture =
                 client.submitJob((JobGraph) jobGraphWrapper.unwrapJobGraph());
 
-        submissionFuture.whenComplete((ign, err) -> client.close());
+        submissionFuture.whenCompleteAsync((ign, err) -> client.close());
 
         return submissionFuture;
     }
