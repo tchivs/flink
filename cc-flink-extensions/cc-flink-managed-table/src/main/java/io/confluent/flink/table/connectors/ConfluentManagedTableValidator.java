@@ -36,6 +36,7 @@ import java.util.stream.StreamSupport;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.PRIVATE_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableUtils.validateDynamicTableParameters;
 import static org.apache.flink.configuration.ConfigurationUtils.canBePrefixMap;
@@ -50,6 +51,20 @@ import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapK
  */
 @Confluent
 public class ConfluentManagedTableValidator {
+
+    /** Clears maps that contain both private and public options. */
+    public static Map<String, String> filterForPublicOptions(Map<String, String> options) {
+        return options.entrySet().stream()
+                .filter(e -> !e.getKey().startsWith(PRIVATE_PREFIX))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /** Clears maps that contain both private and public options. */
+    public static Map<String, String> filterForPrivateOptions(Map<String, String> options) {
+        return options.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(PRIVATE_PREFIX))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
 
     /**
      * This enriches and validates options coming directly from the user for CREATE TABLE.

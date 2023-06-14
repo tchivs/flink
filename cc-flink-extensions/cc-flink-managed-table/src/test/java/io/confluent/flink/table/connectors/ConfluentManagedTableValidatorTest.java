@@ -20,10 +20,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.confluent.flink.table.connectors.ConfluentManagedTableValidator.filterForPrivateOptions;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableValidator.filterForPublicOptions;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableValidator.validateAlterTableOptions;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableValidator.validateCreateTableOptions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /** Tests for {@link ConfluentManagedTableValidator}. */
@@ -166,6 +169,23 @@ public class ConfluentManagedTableValidatorTest {
                                 + "Unsupported options:\n"
                                 + "\n"
                                 + "kafka.partitions");
+    }
+
+    @Test
+    public void testOptionSeparation() {
+        final Map<String, String> options = new HashMap<>();
+        options.put("confluent.my-custom-option", "42");
+        options.put("other-stuff", "42");
+        options.put("more-stuff", "43");
+        options.put("confluent.my-custom-option-2", "43");
+
+        assertThat(filterForPrivateOptions(options))
+                .containsOnly(
+                        entry("confluent.my-custom-option", "42"),
+                        entry("confluent.my-custom-option-2", "43"));
+
+        assertThat(filterForPublicOptions(options))
+                .containsOnly(entry("other-stuff", "42"), entry("more-stuff", "43"));
     }
 
     private void testCreateTableError(String sql, String error) {
