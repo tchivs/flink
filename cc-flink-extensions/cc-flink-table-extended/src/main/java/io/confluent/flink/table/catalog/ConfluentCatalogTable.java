@@ -5,12 +5,14 @@
 package io.confluent.flink.table.catalog;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.CompiledPlan;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 
 import javax.annotation.Nullable;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +26,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * {@link CatalogTable} that splits public options and private options.
  *
  * <p>Only public options are exposed to the planner. Private options are forwarded under the hood.
+ * Once the planning has been completed, private options can be exposed using {@link
+ * #exposePrivateOptions(Map)} for serializing them into a {@link CompiledPlan}.
  */
 @Confluent
 public class ConfluentCatalogTable implements CatalogTable {
@@ -33,6 +37,8 @@ public class ConfluentCatalogTable implements CatalogTable {
     private final List<String> partitionKeys;
     private final Map<String, String> publicOptions;
     private final Map<String, String> privateOptions;
+
+    private final Map<String, String> exposedOptions;
 
     public ConfluentCatalogTable(
             Schema schema,
@@ -50,6 +56,17 @@ public class ConfluentCatalogTable implements CatalogTable {
                 Stream.concat(publicOptions.entrySet().stream(), privateOptions.entrySet().stream())
                         .allMatch(e -> e.getKey() != null && e.getValue() != null),
                 "Options cannot have null keys or values.");
+
+        this.exposedOptions = new HashMap<>(publicOptions);
+    }
+
+    /**
+     * Exposes private options to {@link #getOptions()} for serializing them into a {@link
+     * CompiledPlan}.
+     */
+    public void exposePrivateOptions(Map<String, String> morePrivateOptions) {
+        this.exposedOptions.putAll(privateOptions);
+        this.exposedOptions.putAll(morePrivateOptions);
     }
 
     public Map<String, String> getPrivateOptions() {
@@ -78,7 +95,7 @@ public class ConfluentCatalogTable implements CatalogTable {
 
     @Override
     public Map<String, String> getOptions() {
-        return publicOptions;
+        return exposedOptions;
     }
 
     @Override
@@ -121,11 +138,13 @@ public class ConfluentCatalogTable implements CatalogTable {
                 && Objects.equals(comment, that.comment)
                 && partitionKeys.equals(that.partitionKeys)
                 && publicOptions.equals(that.publicOptions)
-                && privateOptions.equals(that.privateOptions);
+                && privateOptions.equals(that.privateOptions)
+                && exposedOptions.equals(that.exposedOptions);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(schema, comment, partitionKeys, publicOptions, privateOptions);
+        return Objects.hash(
+                schema, comment, partitionKeys, publicOptions, privateOptions, exposedOptions);
     }
 }

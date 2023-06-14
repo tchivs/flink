@@ -28,13 +28,18 @@ public interface ServiceTasks {
      * Compiles a {@link QueryOperation} (i.e. a SELECT statement) for foreground result serving.
      */
     ForegroundResultPlan compileForegroundQuery(
-            TableEnvironment tableEnvironment, QueryOperation queryOperation) throws Exception;
+            TableEnvironment tableEnvironment,
+            QueryOperation queryOperation,
+            ConnectorOptionsProvider connectorOptions)
+            throws Exception;
 
     /**
      * Compiles one or more {@link ModifyOperation}s (i.e. an INSERT INTO or STATEMENT SET) for
      * background queries.
      */
     BackgroundResultPlan compileBackgroundQueries(
-            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations)
+            TableEnvironment tableEnvironment,
+            List<ModifyOperation> modifyOperations,
+            ConnectorOptionsProvider connectorOptions)
             throws Exception;
 }

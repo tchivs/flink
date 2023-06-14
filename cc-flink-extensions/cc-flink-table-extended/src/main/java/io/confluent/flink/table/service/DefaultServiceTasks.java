@@ -11,26 +11,26 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
-import org.apache.flink.table.api.config.TableConfigOptions;
-import org.apache.flink.table.api.config.TableConfigOptions.CatalogPlanCompilation;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.delegation.InternalPlan;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
+import org.apache.flink.table.planner.delegation.StreamPlanner;
 import org.apache.flink.table.planner.plan.ExecNodeGraphInternalPlan;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
+import org.apache.flink.table.planner.plan.nodes.exec.serde.JsonSerdeUtil;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecLookupJoin;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecTableSourceScan;
 
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hasher;
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
@@ -38,9 +38,7 @@ import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -54,17 +52,21 @@ class DefaultServiceTasks implements ServiceTasks {
 
     @Override
     public ForegroundResultPlan compileForegroundQuery(
-            TableEnvironment tableEnvironment, QueryOperation queryOperation) {
-        final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
-
+            TableEnvironment tableEnvironment,
+            QueryOperation queryOperation,
+            ConnectorOptionsProvider connectorOptions) {
         final SinkModifyOperation modifyOperation = convertToModifyOperation(queryOperation);
 
-        final InternalPlan plan =
-                tableEnv.getPlanner().compilePlan(Collections.singletonList(modifyOperation));
+        final CompilationResult compilationResult =
+                compilePlan(
+                        tableEnvironment,
+                        Collections.singletonList(modifyOperation),
+                        connectorOptions);
 
-        final String operatorId = extractOperatorId(tableEnv.getConfig(), plan);
+        final String operatorId =
+                extractOperatorId(tableEnvironment.getConfig(), compilationResult.execNodeGraph);
 
-        return new ForegroundResultPlan(plan.asJsonString(), operatorId);
+        return new ForegroundResultPlan(compilationResult.compiledPlan, operatorId);
     }
 
     /**
@@ -99,11 +101,10 @@ class DefaultServiceTasks implements ServiceTasks {
 
     private static final String UID_FORMAT = "<id>_<transformation>";
 
-    private static String extractOperatorId(ReadableConfig config, InternalPlan plan)
+    private static String extractOperatorId(ReadableConfig config, ExecNodeGraph graph)
             throws IllegalArgumentException {
         // Extract ExecNode
-        final ExecNodeGraphInternalPlan internalPlan = (ExecNodeGraphInternalPlan) plan;
-        final List<ExecNode<?>> rootNodes = internalPlan.getExecNodeGraph().getRootNodes();
+        final List<ExecNode<?>> rootNodes = graph.getRootNodes();
         if (rootNodes.size() != 1 || !(rootNodes.get(0) instanceof CommonExecSink)) {
             throw new IllegalArgumentException("Foreground queries should produce a single sink.");
         }
@@ -138,10 +139,13 @@ class DefaultServiceTasks implements ServiceTasks {
 
     @Override
     public BackgroundResultPlan compileBackgroundQueries(
-            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations) {
-        final CompilationResult compilationResult = compilePlan(tableEnvironment, modifyOperations);
-        return new BackgroundResultPlan(
-                compilationResult.compiledPlan, compilationResult.connectorMetadata);
+            TableEnvironment tableEnvironment,
+            List<ModifyOperation> modifyOperations,
+            ConnectorOptionsProvider connectorOptions) {
+        final CompilationResult compilationResult =
+                compilePlan(tableEnvironment, modifyOperations, connectorOptions);
+
+        return new BackgroundResultPlan(compilationResult.compiledPlan);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -149,40 +153,45 @@ class DefaultServiceTasks implements ServiceTasks {
     // --------------------------------------------------------------------------------------------
 
     private static class CompilationResult {
+        final ExecNodeGraph execNodeGraph;
         final String compiledPlan;
-        final List<ConnectorMetadata> connectorMetadata;
 
-        CompilationResult(String compiledPlan, List<ConnectorMetadata> connectorMetadata) {
+        CompilationResult(ExecNodeGraph execNodeGraph, String compiledPlan) {
+            this.execNodeGraph = execNodeGraph;
             this.compiledPlan = compiledPlan;
-            this.connectorMetadata = connectorMetadata;
         }
     }
 
     private static CompilationResult compilePlan(
-            TableEnvironment tableEnvironment, List<ModifyOperation> modifyOperations) {
+            TableEnvironment tableEnvironment,
+            List<ModifyOperation> modifyOperations,
+            ConnectorOptionsProvider connectorOptions) {
         final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
 
-        // Ensure that connector options do not end up in the compiled plan.
-        // They will be maintained separately.
-        tableEnv.getConfig()
-                .set(
-                        TableConfigOptions.PLAN_COMPILE_CATALOG_OBJECTS,
-                        CatalogPlanCompilation.SCHEMA);
+        final StreamPlanner planner = (StreamPlanner) tableEnv.getPlanner();
+        final ExecNodeGraphInternalPlan internalPlan =
+                (ExecNodeGraphInternalPlan) tableEnv.getPlanner().compilePlan(modifyOperations);
+        final ExecNodeGraph graph = internalPlan.getExecNodeGraph();
 
-        final InternalPlan plan = tableEnv.getPlanner().compilePlan(modifyOperations);
+        graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
 
-        final ExecNodeGraph graph = ((ExecNodeGraphInternalPlan) plan).getExecNodeGraph();
+        final String compiledPlan;
+        try {
+            compiledPlan =
+                    JsonSerdeUtil.createObjectWriter(planner.createSerdeContext())
+                            .withDefaultPrettyPrinter()
+                            .writeValueAsString(graph);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Unable to serialize given ExecNodeGraph", e);
+        }
 
-        final List<ConnectorMetadata> connectorMetadata = new ArrayList<>();
-        graph.getRootNodes().forEach(node -> collectConnectorMetadata(connectorMetadata, node));
-
-        return new CompilationResult(plan.asJsonString(), connectorMetadata);
+        return new CompilationResult(graph, compiledPlan);
     }
 
-    private static void collectConnectorMetadata(
-            List<ConnectorMetadata> connectorMetadata, ExecNode<?> node) {
+    private static void exposePrivateConnectorOptions(
+            ExecNode<?> node, ConnectorOptionsProvider connectorOptions) {
         node.getInputEdges()
-                .forEach(edge -> collectConnectorMetadata(connectorMetadata, edge.getSource()));
+                .forEach(edge -> exposePrivateConnectorOptions(edge.getSource(), connectorOptions));
 
         final ContextResolvedTable contextTable;
         if (node instanceof StreamExecTableSourceScan) {
@@ -202,15 +211,18 @@ class DefaultServiceTasks implements ServiceTasks {
             return;
         }
 
+        // This excludes generated connectors like the foreground sink
+        if (contextTable.isAnonymous()) {
+            return;
+        }
+
         if (!(contextTable.getTable() instanceof ConfluentCatalogTable)) {
             throw new IllegalArgumentException("Confluent managed catalog table expected.");
         }
         final ConfluentCatalogTable catalogTable = contextTable.getTable();
 
-        final Map<String, String> allOptions = new HashMap<>();
-        allOptions.putAll(catalogTable.getOptions());
-        allOptions.putAll(catalogTable.getPrivateOptions());
-
-        connectorMetadata.add(new ConnectorMetadata(contextTable.getIdentifier(), allOptions));
+        final Map<String, String> morePrivateOptions =
+                connectorOptions.generateOptions(contextTable.getIdentifier(), node.getId());
+        catalogTable.exposePrivateOptions(morePrivateOptions);
     }
 }

@@ -10,18 +10,16 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.Catalog;
-import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.QueryOperation;
+import org.apache.flink.table.operations.SinkModifyOperation;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +38,11 @@ public class DefaultServiceTasksTest {
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery("SELECT * FROM (VALUES (1), (2), (3))").getQueryOperation();
 
-        final ForegroundResultPlan plan = INSTANCE.compileForegroundQuery(tableEnv, queryOperation);
+        final ForegroundResultPlan plan =
+                INSTANCE.compileForegroundQuery(
+                        tableEnv,
+                        queryOperation,
+                        (identifier, execNodeId) -> Collections.emptyMap());
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -82,37 +84,25 @@ public class DefaultServiceTasksTest {
                         .getPlanner()
                         .getParser()
                         .parse("INSERT INTO sink SELECT * FROM source");
+        final SinkModifyOperation modifyOperation = (SinkModifyOperation) operations.get(0);
+        assertThat(modifyOperation.getContextResolvedTable().getTable().getOptions())
+                .doesNotContainKey("confluent.specific");
+
+        final ConnectorOptionsProvider optionsProvider =
+                (identifier, execNodeId) -> {
+                    // execNodeId is omitted because it is not deterministic
+                    return Collections.singletonMap(
+                            "transactional-id", "my_" + identifier.getObjectName());
+                };
 
         final BackgroundResultPlan plan =
                 INSTANCE.compileBackgroundQueries(
-                        tableEnv, Collections.singletonList((ModifyOperation) operations.get(0)));
+                        tableEnv, Collections.singletonList(modifyOperation), optionsProvider);
 
-        assertThat(plan.getCompiledPlan())
-                .doesNotContain("datagen")
-                .doesNotContain("blackhole")
-                .doesNotContain("confluent.specific");
-
-        final Map<String, String> expectedSourceMetadata = new HashMap<>();
-        expectedSourceMetadata.put("connector", "datagen");
-        expectedSourceMetadata.putAll(privateOptions);
-
-        final Map<String, String> expectedSinkMetadata = new HashMap<>();
-        expectedSinkMetadata.put("connector", "blackhole");
-        expectedSinkMetadata.putAll(privateOptions);
-
-        assertThat(plan.getConnectorMetadata())
-                .containsExactlyInAnyOrder(
-                        new ConnectorMetadata(
-                                ObjectIdentifier.of(
-                                        tableEnv.getCurrentCatalog(),
-                                        tableEnv.getCurrentDatabase(),
-                                        "source"),
-                                expectedSourceMetadata),
-                        new ConnectorMetadata(
-                                ObjectIdentifier.of(
-                                        tableEnv.getCurrentCatalog(),
-                                        tableEnv.getCurrentDatabase(),
-                                        "sink"),
-                                expectedSinkMetadata));
+        assertThat(plan.getCompiledPlan().replaceAll("[\\s\"]", ""))
+                .contains(
+                        "options:{connector:datagen,confluent.specific:option,transactional-id:my_source}")
+                .contains(
+                        "options:{connector:blackhole,confluent.specific:option,transactional-id:my_sink}");
     }
 }
