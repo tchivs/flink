@@ -485,9 +485,9 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
         allOptions.put("scan.startup.mode", "earliest-offset");
         allOptions.put("scan.bounded.mode", "timestamp");
         allOptions.put("scan.bounded.timestamp-millis", "100");
-        allOptions.put("kafka.topic", topicName);
-        allOptions.put("kafka.bootstrap-servers", getBootstrapServers());
-        allOptions.put("kafka.logical-cluster-id", "lkc-4242");
+        allOptions.put("confluent.kafka.topic", topicName);
+        allOptions.put("confluent.kafka.bootstrap-servers", getBootstrapServers());
+        allOptions.put("confluent.kafka.logical-cluster-id", "lkc-4242");
         allOptions.put("value.format", "csv");
         Stream.of(options)
                 .forEach(e -> allOptions.put(e.getKey().toString(), e.getValue().toString()));

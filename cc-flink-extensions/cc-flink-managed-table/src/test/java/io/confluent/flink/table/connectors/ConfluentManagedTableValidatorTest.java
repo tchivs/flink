@@ -38,20 +38,26 @@ public class ConfluentManagedTableValidatorTest {
     }
 
     @Test
-    void testInvalidInternalConnectorOptions() {
+    void testInvalidInternalConnectorOption() {
         testCreateTableError(
-                "CREATE TABLE t (i INT) "
-                        + "WITH ('connector' = 'datagen', 'kafka.bootstrap-servers' = 'localhost:8080')",
+                "CREATE TABLE t (i INT) WITH ('connector' = 'datagen')",
+                "Invalid value for option 'connector'.");
+    }
+
+    @Test
+    void testInvalidInternalOptions() {
+        testCreateTableError(
+                "CREATE TABLE t (i INT) WITH ('kafka.bootstrap-servers' = 'localhost:8080')",
                 "Unsupported options found for 't'.\n"
                         + "\n"
                         + "Unsupported options:\n"
                         + "\n"
-                        + "connector\n"
                         + "kafka.bootstrap-servers\n"
                         + "\n"
                         + "Supported options:\n"
                         + "\n"
                         + "changelog.mode\n"
+                        + "connector\n"
                         + "kafka.cleanup-policy\n"
                         + "kafka.max-message-size\n"
                         + "kafka.partitions\n"
@@ -82,6 +88,7 @@ public class ConfluentManagedTableValidatorTest {
                         + "Supported options:\n"
                         + "\n"
                         + "changelog.mode\n"
+                        + "connector\n"
                         + "kafka.cleanup-policy\n"
                         + "kafka.max-message-size\n"
                         + "kafka.partitions\n"
@@ -105,6 +112,7 @@ public class ConfluentManagedTableValidatorTest {
     @Test
     void testDefaultOptions() {
         assertThat(testCreateTableOptions("CREATE TABLE t (i INT, s STRING)"))
+                .containsEntry("connector", "confluent")
                 .containsEntry("changelog.mode", "retract")
                 .containsEntry("kafka.cleanup-policy", "delete")
                 .containsEntry("kafka.max-message-size", "2097164 bytes")

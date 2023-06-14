@@ -34,13 +34,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_BOOTSTRAP_SERVERS;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CONSUMER_GROUP_ID;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CREDENTIALS_SOURCE;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_LOGICAL_CLUSTER_ID;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_PROPERTIES;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TOPIC;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TRANSACTIONAL_ID_PREFIX;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_BOOTSTRAP_SERVERS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CONSUMER_GROUP_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CREDENTIALS_SOURCE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_PROPERTIES;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TOPIC;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.PUBLIC_CREATION_OPTIONS;
@@ -88,9 +88,9 @@ public class ConfluentManagedTableFactory
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_BOUNDED_MODE);
         options.add(VALUE_FORMAT);
-        options.add(KAFKA_TOPIC);
-        options.add(KAFKA_BOOTSTRAP_SERVERS);
-        options.add(KAFKA_LOGICAL_CLUSTER_ID);
+        options.add(CONFLUENT_KAFKA_TOPIC);
+        options.add(CONFLUENT_KAFKA_BOOTSTRAP_SERVERS);
+        options.add(CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID);
         // Accepts *creation specific options* (public)
         options.addAll(PUBLIC_CREATION_OPTIONS);
         return options;
@@ -107,10 +107,10 @@ public class ConfluentManagedTableFactory
         options.add(KEY_FORMAT);
         options.add(KEY_FIELDS_PREFIX);
         options.add(VALUE_FIELDS_INCLUDE);
-        options.add(KAFKA_CREDENTIALS_SOURCE);
-        options.add(KAFKA_PROPERTIES);
-        options.add(KAFKA_CONSUMER_GROUP_ID);
-        options.add(KAFKA_TRANSACTIONAL_ID_PREFIX);
+        options.add(CONFLUENT_KAFKA_CREDENTIALS_SOURCE);
+        options.add(CONFLUENT_KAFKA_PROPERTIES);
+        options.add(CONFLUENT_KAFKA_CONSUMER_GROUP_ID);
+        options.add(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX);
         return options;
     }
 

@@ -38,14 +38,14 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_BOOTSTRAP_SERVERS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_BOOTSTRAP_SERVERS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CONSUMER_GROUP_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CREDENTIALS_SOURCE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_PROPERTIES;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TOPIC;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CONSUMER_GROUP_ID;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CREDENTIALS_SOURCE;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_LOGICAL_CLUSTER_ID;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_PROPERTIES;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TOPIC;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_TRANSACTIONAL_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_MODE;
@@ -121,11 +121,11 @@ public class ConfluentManagedTableUtils {
                 keyProjection,
                 valueProjection,
                 keyPrefix,
-                options.get(KAFKA_TOPIC),
+                options.get(CONFLUENT_KAFKA_TOPIC),
                 properties,
                 startupOptions,
                 boundedOptions,
-                options.getOptional(KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
+                options.getOptional(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
                 tableMode,
                 tableIdentifier);
     }
@@ -294,7 +294,7 @@ public class ConfluentManagedTableUtils {
             buildSpecificOffsets(
                     options,
                     SCAN_STARTUP_SPECIFIC_OFFSETS,
-                    options.get(KAFKA_TOPIC),
+                    options.get(CONFLUENT_KAFKA_TOPIC),
                     specificOffsets);
         }
 
@@ -311,7 +311,7 @@ public class ConfluentManagedTableUtils {
             buildSpecificOffsets(
                     options,
                     SCAN_BOUNDED_SPECIFIC_OFFSETS,
-                    options.get(KAFKA_TOPIC),
+                    options.get(CONFLUENT_KAFKA_TOPIC),
                     specificOffsets);
         }
 
@@ -652,16 +652,16 @@ public class ConfluentManagedTableUtils {
 
     private static Properties getProperties(ReadableConfig options) {
         final Properties properties = new Properties();
-        options.getOptional(KAFKA_BOOTSTRAP_SERVERS)
+        options.getOptional(CONFLUENT_KAFKA_BOOTSTRAP_SERVERS)
                 .ifPresent(servers -> properties.put("bootstrap.servers", servers));
-        options.getOptional(KAFKA_LOGICAL_CLUSTER_ID)
+        options.getOptional(CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID)
                 .ifPresent(lkc -> properties.put("confluent.kafka.logical.cluster.id", lkc));
-        if (options.get(KAFKA_CREDENTIALS_SOURCE) == CredentialsSource.DPAT) {
+        if (options.get(CONFLUENT_KAFKA_CREDENTIALS_SOURCE) == CredentialsSource.DPAT) {
             properties.put("confluent.kafka.dpat.enabled", true);
         }
-        options.getOptional(KAFKA_CONSUMER_GROUP_ID)
+        options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
-        options.getOptional(KAFKA_PROPERTIES).ifPresent(properties::putAll);
+        options.getOptional(CONFLUENT_KAFKA_PROPERTIES).ifPresent(properties::putAll);
         return properties;
     }
 

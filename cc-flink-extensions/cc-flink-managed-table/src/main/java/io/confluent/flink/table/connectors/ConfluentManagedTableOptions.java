@@ -24,6 +24,12 @@ import java.util.Set;
 @Confluent
 public class ConfluentManagedTableOptions {
 
+    public static final ConfigOption<ManagedConnector> CONNECTOR =
+            ConfigOptions.key("connector")
+                    .enumType(ManagedConnector.class)
+                    .defaultValue(ManagedConnector.CONFLUENT)
+                    .withDescription("Confluent-managed connectors that can be used.");
+
     // --------------------------------------------------------------------------------------------
     // PUBLIC - RUNTIME SPECIFIC
     // --------------------------------------------------------------------------------------------
@@ -187,49 +193,49 @@ public class ConfluentManagedTableOptions {
     // PRIVATE - RUNTIME SPECIFIC - SET BY METASTORE
     // --------------------------------------------------------------------------------------------
 
-    public static final ConfigOption<String> KAFKA_TOPIC =
-            ConfigOptions.key("kafka.topic")
+    public static final ConfigOption<String> CONFLUENT_KAFKA_TOPIC =
+            ConfigOptions.key("confluent.kafka.topic")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Topic name.");
 
-    public static final ConfigOption<String> KAFKA_BOOTSTRAP_SERVERS =
-            ConfigOptions.key("kafka.bootstrap-servers")
+    public static final ConfigOption<String> CONFLUENT_KAFKA_BOOTSTRAP_SERVERS =
+            ConfigOptions.key("confluent.kafka.bootstrap-servers")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Forwarded as 'bootstrap.servers' for CC.");
 
-    public static final ConfigOption<String> KAFKA_LOGICAL_CLUSTER_ID =
-            ConfigOptions.key("kafka.logical-cluster-id")
+    public static final ConfigOption<String> CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID =
+            ConfigOptions.key("confluent.kafka.logical-cluster-id")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Forwarded as 'confluent.kafka.logical.cluster.id' for CC.");
 
-    public static final ConfigOption<CredentialsSource> KAFKA_CREDENTIALS_SOURCE =
-            ConfigOptions.key("kafka.credentials-source")
+    public static final ConfigOption<CredentialsSource> CONFLUENT_KAFKA_CREDENTIALS_SOURCE =
+            ConfigOptions.key("confluent.kafka.credentials-source")
                     .enumType(CredentialsSource.class)
                     .defaultValue(CredentialsSource.DPAT)
                     .withDescription("Where to get the credentials from.");
 
-    public static final ConfigOption<Map<String, String>> KAFKA_PROPERTIES =
-            ConfigOptions.key("kafka.properties")
+    public static final ConfigOption<Map<String, String>> CONFLUENT_KAFKA_PROPERTIES =
+            ConfigOptions.key("confluent.kafka.properties")
                     .mapType()
                     .noDefaultValue()
                     .withDescription(
                             "Properties for advanced configuration or custom credentials.");
 
     // --------------------------------------------------------------------------------------------
-    // PRIVATE - RUNTIME SPECIFIC - SET BY JOB SUBMISSION SERVICE
+    // PRIVATE - RUNTIME SPECIFIC - SET BY SQL SERVICE
     // --------------------------------------------------------------------------------------------
 
-    public static final ConfigOption<String> KAFKA_CONSUMER_GROUP_ID =
-            ConfigOptions.key("kafka.consumer-group-id")
+    public static final ConfigOption<String> CONFLUENT_KAFKA_CONSUMER_GROUP_ID =
+            ConfigOptions.key("confluent.kafka.consumer-group-id")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Forwarded as 'properties.group.id' for CC.");
 
-    public static final ConfigOption<String> KAFKA_TRANSACTIONAL_ID_PREFIX =
-            ConfigOptions.key("kafka.transactional-id-prefix")
+    public static final ConfigOption<String> CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX =
+            ConfigOptions.key("confluent.kafka.transactional-id-prefix")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Prefix for 'transactional.id' for CC.");
@@ -237,6 +243,22 @@ public class ConfluentManagedTableOptions {
     // --------------------------------------------------------------------------------------------
     // Enums
     // --------------------------------------------------------------------------------------------
+
+    /** Enum for {@link #CONNECTOR}. */
+    public enum ManagedConnector {
+        CONFLUENT("confluent");
+
+        private final String value;
+
+        ManagedConnector(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+    }
 
     /** Enum for {@link #CHANGELOG_MODE}. */
     public enum ManagedChangelogMode implements Serializable {
@@ -326,7 +348,7 @@ public class ConfluentManagedTableOptions {
         }
     }
 
-    /** Enum for {@link #KAFKA_CREDENTIALS_SOURCE}. */
+    /** Enum for {@link #CONFLUENT_KAFKA_CREDENTIALS_SOURCE}. */
     public enum CredentialsSource {
         PROPERTIES("properties"),
         DPAT("dpat");

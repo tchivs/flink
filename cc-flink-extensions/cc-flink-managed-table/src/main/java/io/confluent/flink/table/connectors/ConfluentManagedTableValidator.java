@@ -209,6 +209,7 @@ public class ConfluentManagedTableValidator {
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
             final Set<ConfigOption<?>> options = new HashSet<>();
+            options.add(ConfluentManagedTableOptions.CONNECTOR);
             options.addAll(ConfluentManagedTableOptions.PUBLIC_RUNTIME_OPTIONS);
             options.addAll(ConfluentManagedTableOptions.PUBLIC_CREATION_OPTIONS);
             return options;

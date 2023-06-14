@@ -129,8 +129,8 @@ public class ConfluentManagedTableFactoryTest {
             // The factory should also produce a table without these properties.
             // Unique IDs can be created in a later stage.
             final Map<String, String> options = getComplexOptions();
-            options.remove("kafka.consumer-group-id");
-            options.remove("kafka.transactional-id-prefix");
+            options.remove("confluent.kafka.consumer-group-id");
+            options.remove("confluent.kafka.transactional-id-prefix");
 
             final Consumer<DynamicTableParameters> testParameters =
                     (parameters) -> {
@@ -456,16 +456,16 @@ public class ConfluentManagedTableFactoryTest {
         options.put("key.fields-prefix", "key_");
         options.put("value.format", "raw");
         options.put("value.fields-include", "except-key");
-        options.put("kafka.topic", "MyTopic");
-        options.put("kafka.bootstrap-servers", "localhost:8080");
-        options.put("kafka.logical-cluster-id", "lkc-4242");
-        options.put("kafka.consumer-group-id", "generated_consumer_id_4242");
-        options.put("kafka.transactional-id-prefix", "generated_transact_id_4242");
         options.put("kafka.cleanup-policy", "delete");
         options.put("kafka.partitions", "6");
         options.put("kafka.retention.time", "7 d");
         options.put("kafka.retention.size", "0");
         options.put("kafka.max-message-size", "2097164 bytes");
+        options.put("confluent.kafka.topic", "MyTopic");
+        options.put("confluent.kafka.bootstrap-servers", "localhost:8080");
+        options.put("confluent.kafka.logical-cluster-id", "lkc-4242");
+        options.put("confluent.kafka.consumer-group-id", "generated_consumer_id_4242");
+        options.put("confluent.kafka.transactional-id-prefix", "generated_transact_id_4242");
         return options;
     }
 
