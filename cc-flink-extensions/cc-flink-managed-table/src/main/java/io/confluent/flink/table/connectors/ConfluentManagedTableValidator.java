@@ -52,17 +52,36 @@ import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapK
 @Confluent
 public class ConfluentManagedTableValidator {
 
+    private static final List<String> PRIVATE_PREFIXES;
+
+    static {
+        final List<String> prefixes = new ArrayList<>();
+        prefixes.add(PRIVATE_PREFIX);
+
+        for (String formatIdentifier : ConfluentManagedFormats.FORMATS.keySet()) {
+            prefixes.add(
+                    FactoryUtil.getFormatPrefix(KEY_FORMAT, formatIdentifier) + PRIVATE_PREFIX);
+        }
+
+        for (String formatIdentifier : ConfluentManagedFormats.FORMATS.keySet()) {
+            prefixes.add(
+                    FactoryUtil.getFormatPrefix(VALUE_FORMAT, formatIdentifier) + PRIVATE_PREFIX);
+        }
+
+        PRIVATE_PREFIXES = Collections.unmodifiableList(prefixes);
+    }
+
     /** Clears maps that contain both private and public options. */
     public static Map<String, String> filterForPublicOptions(Map<String, String> options) {
         return options.entrySet().stream()
-                .filter(e -> !e.getKey().startsWith(PRIVATE_PREFIX))
+                .filter(e -> PRIVATE_PREFIXES.stream().noneMatch(p -> e.getKey().startsWith(p)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /** Clears maps that contain both private and public options. */
     public static Map<String, String> filterForPrivateOptions(Map<String, String> options) {
         return options.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(PRIVATE_PREFIX))
+                .filter(e -> PRIVATE_PREFIXES.stream().anyMatch(p -> e.getKey().startsWith(p)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 

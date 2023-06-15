@@ -14,22 +14,30 @@ import org.apache.flink.table.factories.Factory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /** Public formats within Confluent managed tables. */
 @Confluent
 public class ConfluentManagedFormats {
 
+    public static final Map<String, PublicFormat> FORMATS;
+
+    static {
+        final Map<String, PublicFormat> formats = new HashMap<>();
+        formats.put(PublicRawFormat.IDENTIFIER, PublicRawFormat.INSTANCE);
+        formats.put(PublicAvroRegistryFormat.IDENTIFIER, PublicAvroRegistryFormat.INSTANCE);
+        FORMATS = Collections.unmodifiableMap(formats);
+    }
+
     public static PublicFormat getPublicFormatFor(String formatIdentifier) {
-        switch (formatIdentifier) {
-            case PublicRawFormat.IDENTIFIER:
-                return PublicRawFormat.INSTANCE;
-            case PublicAvroRegistryFormat.IDENTIFIER:
-                return PublicAvroRegistryFormat.INSTANCE;
-            default:
-                throw new ValidationException("Unsupported format: " + formatIdentifier);
+        final PublicFormat format = FORMATS.get(formatIdentifier);
+        if (format == null) {
+            throw new ValidationException("Unsupported format: " + formatIdentifier);
         }
+        return format;
     }
 
     /**

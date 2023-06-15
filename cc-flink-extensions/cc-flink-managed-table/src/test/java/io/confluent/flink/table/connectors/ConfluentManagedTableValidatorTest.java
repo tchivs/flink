@@ -178,11 +178,13 @@ public class ConfluentManagedTableValidatorTest {
         options.put("other-stuff", "42");
         options.put("more-stuff", "43");
         options.put("confluent.my-custom-option-2", "43");
+        options.put("value.raw.confluent.private-option", "secret");
 
         assertThat(filterForPrivateOptions(options))
                 .containsOnly(
                         entry("confluent.my-custom-option", "42"),
-                        entry("confluent.my-custom-option-2", "43"));
+                        entry("confluent.my-custom-option-2", "43"),
+                        entry("value.raw.confluent.private-option", "secret"));
 
         assertThat(filterForPublicOptions(options))
                 .containsOnly(entry("other-stuff", "42"), entry("more-stuff", "43"));
