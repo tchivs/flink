@@ -223,6 +223,12 @@ public class ConfluentManagedTableOptions {
                     .defaultValue(CredentialsSource.DPAT)
                     .withDescription("Where to get the credentials from.");
 
+    public static final ConfigOption<Integer> CONFLUENT_KAFKA_REPLICATION_FACTOR =
+            ConfigOptions.key(PRIVATE_PREFIX + "kafka.replication-factor")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription("Replication factor. Must be a short value.");
+
     public static final ConfigOption<Map<String, String>> CONFLUENT_KAFKA_PROPERTIES =
             ConfigOptions.key(PRIVATE_PREFIX + "kafka.properties")
                     .mapType()

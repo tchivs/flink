@@ -39,6 +39,7 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CREDENTIALS_SOURCE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_PROPERTIES;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_REPLICATION_FACTOR;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TOPIC;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
@@ -108,6 +109,7 @@ public class ConfluentManagedTableFactory
         options.add(KEY_FIELDS_PREFIX);
         options.add(VALUE_FIELDS_INCLUDE);
         options.add(CONFLUENT_KAFKA_CREDENTIALS_SOURCE);
+        options.add(CONFLUENT_KAFKA_REPLICATION_FACTOR);
         options.add(CONFLUENT_KAFKA_PROPERTIES);
         options.add(CONFLUENT_KAFKA_CONSUMER_GROUP_ID);
         options.add(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX);

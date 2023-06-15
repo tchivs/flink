@@ -657,7 +657,7 @@ public class ConfluentManagedTableUtils {
         options.getOptional(CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID)
                 .ifPresent(lkc -> properties.put("confluent.kafka.logical.cluster.id", lkc));
         if (options.get(CONFLUENT_KAFKA_CREDENTIALS_SOURCE) == CredentialsSource.DPAT) {
-            properties.put("confluent.kafka.dpat.enabled", true);
+            properties.put("confluent.kafka.dpat.enabled", "true");
         }
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
