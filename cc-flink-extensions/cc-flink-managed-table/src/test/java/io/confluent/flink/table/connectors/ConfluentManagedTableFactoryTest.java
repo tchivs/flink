@@ -6,9 +6,6 @@ package io.confluent.flink.table.connectors;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.connectors.kafka.config.BoundedMode;
-import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
-import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -27,7 +24,10 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
+import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.ScanTopicPartition;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -94,13 +94,13 @@ public class ConfluentManagedTableFactoryTest {
                     (parameters) -> {
                         assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.RETRACT);
                         assertThat(parameters.startupOptions.startupMode)
-                                .isEqualTo(StartupMode.SPECIFIC_OFFSETS);
+                                .isEqualTo(ScanStartupMode.SPECIFIC_OFFSETS);
                         assertThat(parameters.startupOptions.specificOffsets)
-                                .containsEntry(new KafkaTopicPartition("MyTopic", 0), 1L)
-                                .containsEntry(new KafkaTopicPartition("MyTopic", 1), 0L)
-                                .containsEntry(new KafkaTopicPartition("MyTopic", 2), 42L);
+                                .containsEntry(new ScanTopicPartition("MyTopic", 0), 1L)
+                                .containsEntry(new ScanTopicPartition("MyTopic", 1), 0L)
+                                .containsEntry(new ScanTopicPartition("MyTopic", 2), 42L);
                         assertThat(parameters.boundedOptions.boundedMode)
-                                .isEqualTo(BoundedMode.TIMESTAMP);
+                                .isEqualTo(ScanBoundedMode.TIMESTAMP);
                         assertThat(parameters.boundedOptions.boundedTimestampMillis)
                                 .isEqualTo(100001L);
                         assertThat(parameters.keyProjection).containsExactly(1, 4);

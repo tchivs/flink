@@ -7,9 +7,6 @@ package io.confluent.flink.table.connectors;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.streaming.connectors.kafka.config.BoundedMode;
-import org.apache.flink.streaming.connectors.kafka.config.StartupMode;
-import org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -21,6 +18,8 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CleanupP
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CredentialsSource;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.FieldsInclude;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
 
 import javax.annotation.Nullable;
 
@@ -57,7 +56,7 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.S
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FIELDS_INCLUDE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FORMAT;
 
-/** Utilities for {@link ConfluentManagedTableFactory}. */
+/** Utilities for Confluent-native tables. */
 @Confluent
 public class ConfluentManagedTableUtils {
 
@@ -210,15 +209,43 @@ public class ConfluentManagedTableUtils {
         }
     }
 
+    /** Kafka topic partition mapping. */
+    public static final class ScanTopicPartition {
+        public final String topic;
+        public final int partition;
+
+        ScanTopicPartition(String topic, int partition) {
+            this.topic = topic;
+            this.partition = partition;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ScanTopicPartition that = (ScanTopicPartition) o;
+            return partition == that.partition && topic.equals(that.topic);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(topic, partition);
+        }
+    }
+
     /** Kafka startup options. */
-    public static class StartupOptions {
-        public final StartupMode startupMode;
-        public final Map<KafkaTopicPartition, Long> specificOffsets;
+    public static final class StartupOptions {
+        public final ScanStartupMode startupMode;
+        public final Map<ScanTopicPartition, Long> specificOffsets;
         public final long startupTimestampMillis;
 
         StartupOptions(
-                StartupMode startupMode,
-                Map<KafkaTopicPartition, Long> specificOffsets,
+                ScanStartupMode startupMode,
+                Map<ScanTopicPartition, Long> specificOffsets,
                 long startupTimestampMillis) {
             this.startupMode = startupMode;
             this.specificOffsets = specificOffsets;
@@ -246,14 +273,14 @@ public class ConfluentManagedTableUtils {
     }
 
     /** Kafka bounded options. */
-    public static class BoundedOptions {
-        public final BoundedMode boundedMode;
-        public final Map<KafkaTopicPartition, Long> specificOffsets;
+    public static final class BoundedOptions {
+        public final ScanBoundedMode boundedMode;
+        public final Map<ScanTopicPartition, Long> specificOffsets;
         public final long boundedTimestampMillis;
 
         BoundedOptions(
-                BoundedMode boundedMode,
-                Map<KafkaTopicPartition, Long> specificOffsets,
+                ScanBoundedMode boundedMode,
+                Map<ScanTopicPartition, Long> specificOffsets,
                 long boundedTimestampMillis) {
             this.boundedMode = boundedMode;
             this.specificOffsets = specificOffsets;
@@ -285,12 +312,10 @@ public class ConfluentManagedTableUtils {
     // --------------------------------------------------------------------------------------------
 
     private static StartupOptions getStartupOptions(ReadableConfig options) {
-        final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
-        final StartupMode startupMode =
-                options.getOptional(SCAN_STARTUP_MODE)
-                        .map(ConfluentManagedTableUtils::fromOption)
-                        .orElse(StartupMode.GROUP_OFFSETS);
-        if (startupMode == StartupMode.SPECIFIC_OFFSETS) {
+        final Map<ScanTopicPartition, Long> specificOffsets = new HashMap<>();
+        final ScanStartupMode startupMode =
+                options.getOptional(SCAN_STARTUP_MODE).orElse(ScanStartupMode.GROUP_OFFSETS);
+        if (startupMode == ScanStartupMode.SPECIFIC_OFFSETS) {
             buildSpecificOffsets(
                     options,
                     SCAN_STARTUP_SPECIFIC_OFFSETS,
@@ -305,9 +330,9 @@ public class ConfluentManagedTableUtils {
     }
 
     private static BoundedOptions getBoundedOptions(ReadableConfig options) {
-        final Map<KafkaTopicPartition, Long> specificOffsets = new HashMap<>();
-        final BoundedMode boundedMode = fromOption(options.get(SCAN_BOUNDED_MODE));
-        if (boundedMode == BoundedMode.SPECIFIC_OFFSETS) {
+        final Map<ScanTopicPartition, Long> specificOffsets = new HashMap<>();
+        final ScanBoundedMode boundedMode = options.get(SCAN_BOUNDED_MODE);
+        if (boundedMode == ScanBoundedMode.SPECIFIC_OFFSETS) {
             buildSpecificOffsets(
                     options,
                     SCAN_BOUNDED_SPECIFIC_OFFSETS,
@@ -325,54 +350,14 @@ public class ConfluentManagedTableUtils {
             ReadableConfig options,
             ConfigOption<List<Map<String, String>>> option,
             String topic,
-            Map<KafkaTopicPartition, Long> specificOffsets) {
+            Map<ScanTopicPartition, Long> specificOffsets) {
         final Map<Integer, Long> offsetMap = parseSpecificOffsets(options, option);
         offsetMap.forEach(
                 (partition, offset) -> {
-                    final KafkaTopicPartition topicPartition =
-                            new KafkaTopicPartition(topic, partition);
+                    final ScanTopicPartition topicPartition =
+                            new ScanTopicPartition(topic, partition);
                     specificOffsets.put(topicPartition, offset);
                 });
-    }
-
-    private static StartupMode fromOption(
-            ConfluentManagedTableOptions.ScanStartupMode startupMode) {
-        switch (startupMode) {
-            case EARLIEST_OFFSET:
-                return StartupMode.EARLIEST;
-            case LATEST_OFFSET:
-                return StartupMode.LATEST;
-            case GROUP_OFFSETS:
-                return StartupMode.GROUP_OFFSETS;
-            case SPECIFIC_OFFSETS:
-                return StartupMode.SPECIFIC_OFFSETS;
-            case TIMESTAMP:
-                return StartupMode.TIMESTAMP;
-
-            default:
-                throw new TableException(
-                        "Unsupported startup mode. Validator should have checked that.");
-        }
-    }
-
-    private static BoundedMode fromOption(
-            ConfluentManagedTableOptions.ScanBoundedMode boundedMode) {
-        switch (boundedMode) {
-            case UNBOUNDED:
-                return BoundedMode.UNBOUNDED;
-            case LATEST_OFFSET:
-                return BoundedMode.LATEST;
-            case GROUP_OFFSETS:
-                return BoundedMode.GROUP_OFFSETS;
-            case TIMESTAMP:
-                return BoundedMode.TIMESTAMP;
-            case SPECIFIC_OFFSETS:
-                return BoundedMode.SPECIFIC_OFFSETS;
-
-            default:
-                throw new TableException(
-                        "Unsupported bounded mode. Validator should have checked that.");
-        }
     }
 
     private static int[] createValueFormatProjection(
@@ -566,8 +551,7 @@ public class ConfluentManagedTableUtils {
                                                         "'%s' is required in '%s' startup mode"
                                                                 + " but missing.",
                                                         SCAN_STARTUP_TIMESTAMP_MILLIS.key(),
-                                                        ConfluentManagedTableOptions.ScanStartupMode
-                                                                .TIMESTAMP));
+                                                        ScanStartupMode.TIMESTAMP));
                                     }
                                     break;
                                 case SPECIFIC_OFFSETS:
@@ -578,8 +562,7 @@ public class ConfluentManagedTableUtils {
                                                         "'%s' is required in '%s' startup mode"
                                                                 + " but missing.",
                                                         SCAN_STARTUP_SPECIFIC_OFFSETS.key(),
-                                                        ConfluentManagedTableOptions.ScanStartupMode
-                                                                .SPECIFIC_OFFSETS));
+                                                        ScanStartupMode.SPECIFIC_OFFSETS));
                                     }
                                     parseSpecificOffsets(options, SCAN_STARTUP_SPECIFIC_OFFSETS);
                                     break;
@@ -600,8 +583,7 @@ public class ConfluentManagedTableUtils {
                                                         "'%s' is required in '%s' bounded mode"
                                                                 + " but missing.",
                                                         SCAN_BOUNDED_TIMESTAMP_MILLIS.key(),
-                                                        ConfluentManagedTableOptions.ScanBoundedMode
-                                                                .TIMESTAMP));
+                                                        ScanBoundedMode.TIMESTAMP));
                                     }
 
                                     break;
@@ -613,8 +595,7 @@ public class ConfluentManagedTableUtils {
                                                         "'%s' is required in '%s' bounded mode"
                                                                 + " but missing.",
                                                         SCAN_BOUNDED_SPECIFIC_OFFSETS.key(),
-                                                        ConfluentManagedTableOptions.ScanBoundedMode
-                                                                .SPECIFIC_OFFSETS));
+                                                        ScanBoundedMode.SPECIFIC_OFFSETS));
                                     }
                                     parseSpecificOffsets(options, SCAN_BOUNDED_SPECIFIC_OFFSETS);
                                     break;

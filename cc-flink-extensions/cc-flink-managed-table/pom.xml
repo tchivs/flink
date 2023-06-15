@@ -13,7 +13,7 @@ Copyright 2023 Confluent Inc.
 		<version>1.18-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>cc-flink-managed-table_${scala.binary.version}</artifactId>
+	<artifactId>cc-flink-managed-table</artifactId>
 	<name>Confluent Flink : Managed Table</name>
 	<description>
 		This module contains the table factory for Confluent-native tables. The table is fully
@@ -25,6 +25,14 @@ Copyright 2023 Confluent Inc.
 	</description>
 
 	<dependencies>
+
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-managed-table-validation</artifactId>
+			<version>${project.version}</version>
+			<scope>compile</scope>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
@@ -91,13 +99,6 @@ Copyright 2023 Confluent Inc.
 		</dependency>
 
 		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-test-utils</artifactId>
-			<version>${project.version}</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
@@ -132,6 +133,28 @@ Copyright 2023 Confluent Inc.
 						<configuration>
 							<!-- We need to depend on table planner because we rely on its internals -->
 							<skip>true</skip>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>shade-flink</id>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<artifactSet>
+								<includes combine.children="append">
+									<include>
+										io.confluent.flink:cc-flink-managed-table-validation
+									</include>
+								</includes>
+							</artifactSet>
 						</configuration>
 					</execution>
 				</executions>

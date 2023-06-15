@@ -256,10 +256,10 @@ public class ConfluentManagedTableSource
         kafkaSourceBuilder.setTopics(parameters.topic);
 
         switch (parameters.startupOptions.startupMode) {
-            case EARLIEST:
+            case EARLIEST_OFFSET:
                 kafkaSourceBuilder.setStartingOffsets(OffsetsInitializer.earliest());
                 break;
-            case LATEST:
+            case LATEST_OFFSET:
                 kafkaSourceBuilder.setStartingOffsets(OffsetsInitializer.latest());
                 break;
             case GROUP_OFFSETS:
@@ -275,9 +275,7 @@ public class ConfluentManagedTableSource
                 Map<TopicPartition, Long> offsets = new HashMap<>();
                 parameters.startupOptions.specificOffsets.forEach(
                         (tp, offset) ->
-                                offsets.put(
-                                        new TopicPartition(tp.getTopic(), tp.getPartition()),
-                                        offset));
+                                offsets.put(new TopicPartition(tp.topic, tp.partition), offset));
                 kafkaSourceBuilder.setStartingOffsets(OffsetsInitializer.offsets(offsets));
                 break;
             case TIMESTAMP:
@@ -291,7 +289,7 @@ public class ConfluentManagedTableSource
             case UNBOUNDED:
                 kafkaSourceBuilder.setUnbounded(new NoStoppingOffsetsInitializer());
                 break;
-            case LATEST:
+            case LATEST_OFFSET:
                 kafkaSourceBuilder.setBounded(OffsetsInitializer.latest());
                 break;
             case GROUP_OFFSETS:
@@ -301,9 +299,7 @@ public class ConfluentManagedTableSource
                 Map<TopicPartition, Long> offsets = new HashMap<>();
                 parameters.boundedOptions.specificOffsets.forEach(
                         (tp, offset) ->
-                                offsets.put(
-                                        new TopicPartition(tp.getTopic(), tp.getPartition()),
-                                        offset));
+                                offsets.put(new TopicPartition(tp.topic, tp.partition), offset));
                 kafkaSourceBuilder.setBounded(OffsetsInitializer.offsets(offsets));
                 break;
             case TIMESTAMP:
