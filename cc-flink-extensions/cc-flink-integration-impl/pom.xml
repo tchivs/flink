@@ -102,6 +102,12 @@ Copyright 2023 Confluent Inc.
       <scope>runtime</scope>
     </dependency>
 	<dependency>
+		<groupId>io.confluent.flink</groupId>
+		<artifactId>cc-flink-managed-table</artifactId>
+		<version>${project.version}</version>
+		<scope>runtime</scope>
+	</dependency>
+	<dependency>
 	 <groupId>com.github.knaufk</groupId>
 	 <artifactId>flink-faker</artifactId>
      <!-- This is our internally published version of Faker -->
