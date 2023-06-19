@@ -88,6 +88,29 @@ class RowDataToAvroConvertersTest {
     }
 
     @Test
+    void testNullableColumns() {
+        final Schema schema =
+                SchemaBuilder.builder()
+                        .record("topLevelRow")
+                        .namespace("io.confluent.test")
+                        .fields()
+                        .name("nullable_string")
+                        .type()
+                        .optional()
+                        .stringType()
+                        .endRecord();
+
+        final LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(schema);
+        final RowDataToAvroConverter converter =
+                RowDataToAvroConverters.createConverter(flinkSchema, schema);
+
+        final GenericRowData rowData = new GenericRowData(1);
+        rowData.setField(0, null);
+        assertThat(converter.convert(rowData))
+                .isEqualTo(new GenericRecordBuilder(schema).set("nullable_string", null).build());
+    }
+
+    @Test
     void testCustomMap() {
         final Schema fixedSchema = SchemaBuilder.fixed("test").size(2);
         final Schema mapEntrySchema =

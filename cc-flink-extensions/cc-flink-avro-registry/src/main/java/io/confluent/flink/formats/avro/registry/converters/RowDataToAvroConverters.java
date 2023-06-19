@@ -22,6 +22,7 @@ import org.apache.flink.table.types.logical.TimestampType;
 
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 /** Tool class used to convert from {@link RowData} to Avro {@link GenericRecord}. */
@@ -66,6 +68,60 @@ public class RowDataToAvroConverters {
      * Flink Table & SQL internal data structures to corresponding Avro data structures.
      */
     public static RowDataToAvroConverter createConverter(LogicalType type, Schema targetSchema) {
+
+        if (type.isNullable()) {
+            final Optional<Schema> nonNullType = extractTypeFromNullableUnion(targetSchema);
+            if (!nonNullType.isPresent()) {
+                throw new IllegalArgumentException(
+                        "Nullable type should map to avro union. Got: " + targetSchema);
+            }
+
+            final RowDataToAvroConverter converter =
+                    createConverterNotNull(type, nonNullType.get());
+
+            // wrap into nullable converter
+            return new RowDataToAvroConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object convert(Object object) {
+                    if (object == null) {
+                        return null;
+                    }
+
+                    return converter.convert(object);
+                }
+            };
+        } else {
+            return createConverterNotNull(type, targetSchema);
+        }
+    }
+
+    private static Optional<Schema> extractTypeFromNullableUnion(Schema targetSchema) {
+        if (!targetSchema.isUnion()) {
+            return Optional.empty();
+        }
+        final List<Schema> unionTypes = targetSchema.getTypes();
+        if (unionTypes.size() != 2) {
+            return Optional.empty();
+        }
+
+        final Schema firstType = unionTypes.get(0);
+        final Schema secondType = unionTypes.get(1);
+
+        if (firstType.getType() != Type.NULL && secondType.getType() != Type.NULL) {
+            return Optional.empty();
+        }
+
+        if (firstType.getType() == Type.NULL) {
+            return Optional.of(secondType);
+        } else {
+            return Optional.of(firstType);
+        }
+    }
+
+    private static RowDataToAvroConverter createConverterNotNull(
+            LogicalType type, Schema targetSchema) {
         final RowDataToAvroConverter converter;
         switch (type.getTypeRoot()) {
             case NULL:
@@ -157,19 +213,7 @@ public class RowDataToAvroConverters {
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
 
-        // wrap into nullable converter
-        return new RowDataToAvroConverter() {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public Object convert(Object object) {
-                if (object == null) {
-                    return null;
-                }
-
-                return converter.convert(object);
-            }
-        };
+        return converter;
     }
 
     private static RowDataToAvroConverter createDecimalConverter(Schema targetSchema) {
@@ -196,7 +240,7 @@ public class RowDataToAvroConverters {
                 };
             default:
                 throw new IllegalStateException(
-                        "Unsupported target type for a STRING: " + targetSchema);
+                        "Unsupported target type for a DECIMAL: " + targetSchema);
         }
     }
 
@@ -261,7 +305,7 @@ public class RowDataToAvroConverters {
                 };
             default:
                 throw new IllegalStateException(
-                        "Unsupported target type for a STRING: " + targetSchema);
+                        "Unsupported target type for a BINARY: " + targetSchema);
         }
     }
 
@@ -444,7 +488,7 @@ public class RowDataToAvroConverters {
                 }
             default:
                 throw new IllegalStateException(
-                        "Unsupported target type for a STRING: " + targetSchema);
+                        "Unsupported target type for a MAP: " + targetSchema);
         }
     }
 }
