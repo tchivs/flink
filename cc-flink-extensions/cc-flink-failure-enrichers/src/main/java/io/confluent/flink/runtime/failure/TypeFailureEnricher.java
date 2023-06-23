@@ -6,6 +6,7 @@ package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkException;
 
 import java.time.DateTimeException;
 import java.util.HashMap;
@@ -62,19 +63,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                             labels.put(codeKey, "SYSTEM");
                         }
                     }
-                    // Particular error is System or User based
-                    if (ExceptionUtils.isJvmFatalOrOutOfMemoryError(cause)) {
-                        labels.put(typeKey, "SYSTEM");
-                    } else if (ExceptionUtils.findThrowable(cause, ArithmeticException.class)
-                            .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    }
-                    // Catch cast exceptions
-                    if (ExceptionUtils.findThrowable(cause, NumberFormatException.class).isPresent()
-                            || ExceptionUtils.findThrowable(cause, DateTimeException.class)
-                                    .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    }
+
                     // This is meant to capture any exception that has "serializ" in the error
                     // message, such as "(de)serialize", "(de)serialization", or "(de)serializable"
                     Optional<Throwable> serializationException =
@@ -89,8 +78,20 @@ public class TypeFailureEnricher implements FailureEnricher {
                         } else {
                             labels.put(typeKey, "USER");
                         }
+                    } else if (ExceptionUtils.findThrowable(cause, ArithmeticException.class)
+                            .isPresent()) {
+                        labels.put(typeKey, "USER");
                     }
-                    if (!labels.containsKey(typeKey)) {
+                    // Catch cast exceptions
+                    else if (ExceptionUtils.findThrowable(cause, NumberFormatException.class)
+                                    .isPresent()
+                            || ExceptionUtils.findThrowable(cause, DateTimeException.class)
+                                    .isPresent()) {
+                        labels.put(typeKey, "USER");
+                    } else if (ExceptionUtils.findThrowable(cause, FlinkException.class).isPresent()
+                            || ExceptionUtils.isJvmFatalOrOutOfMemoryError(cause)) {
+                        labels.put(typeKey, "SYSTEM");
+                    } else {
                         labels.put(typeKey, "UNKNOWN");
                     }
                     return labels;
