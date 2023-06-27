@@ -313,8 +313,7 @@ public class ConfluentManagedTableUtils {
 
     private static StartupOptions getStartupOptions(ReadableConfig options) {
         final Map<ScanTopicPartition, Long> specificOffsets = new HashMap<>();
-        final ScanStartupMode startupMode =
-                options.getOptional(SCAN_STARTUP_MODE).orElse(ScanStartupMode.GROUP_OFFSETS);
+        final ScanStartupMode startupMode = options.get(SCAN_STARTUP_MODE);
         if (startupMode == ScanStartupMode.SPECIFIC_OFFSETS) {
             buildSpecificOffsets(
                     options,
