@@ -2,14 +2,16 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.jobgraph;
+package io.confluent.flink.jobgraph.v2;
+
+import io.confluent.flink.jobgraph.JobGraphWrapper;
 
 import java.util.List;
 import java.util.Map;
 
 /** Generate the JobGraph from the given arguments. */
-@Deprecated
-public interface JobGraphGenerator {
+public interface JobGraphGeneratorV2 {
+
     /**
      * Generate the JobGraph from the given arguments. For Streaming SQL, the arguments would
      * contain a CompiledPlan.
@@ -18,12 +20,8 @@ public interface JobGraphGenerator {
      * and initial job requirements and submitted for execution.
      *
      * @param arguments the arguments passed from SQL service via FCP.
-     * @param downloader that should be used to download any argument payload if needed
-     * @param metaInfo arbitrary information about this submission that might be necessary to
-     *     execute the job. For example: Identity Pool ID, Compute Pool ID for Authorization. JSS
-     *     will also set these on Job Configuration
-     * @return a JobGraph (wrapped for version compatibility)
+     * @param generatorConfiguration flink configuration used during job graph generation
      */
     JobGraphWrapper generateJobGraph(
-            List<String> arguments, Downloader downloader, Map<String, String> metaInfo);
+            List<String> arguments, Map<String, String> generatorConfiguration);
 }

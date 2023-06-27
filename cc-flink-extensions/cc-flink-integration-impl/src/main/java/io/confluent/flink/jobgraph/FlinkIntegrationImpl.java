@@ -6,6 +6,7 @@ package io.confluent.flink.jobgraph;
 
 import org.apache.flink.runtime.util.EnvironmentInformation;
 
+import io.confluent.flink.jobgraph.v2.FlinkClientWrapperV2Impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,7 @@ public class FlinkIntegrationImpl implements FlinkIntegration {
 
     @Override
     public FlinkClientWrapper getClientWrapper() {
-        return new FlinkClientWrapperImpl();
+        return new FlinkClientWrapperV2Impl();
     }
 
     @Override

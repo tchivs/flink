@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.jobgraph;
+package io.confluent.flink.jobgraph.v2;
 
 import org.apache.flink.client.deployment.StandaloneClusterId;
 import org.apache.flink.client.program.ClusterClient;
@@ -11,11 +11,16 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
+import io.confluent.flink.jobgraph.FlinkClientWrapper;
+import io.confluent.flink.jobgraph.JobGraphWrapper;
+import io.confluent.flink.jobgraph.JobManagerLocation;
+
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
-/** {@link FlinkClientWrapper} implementation. */
-public class FlinkClientWrapperImpl implements FlinkClientWrapper {
+/** {@link FlinkClientWrapperV2} implementation. */
+public class FlinkClientWrapperV2Impl implements FlinkClientWrapperV2, FlinkClientWrapper {
+
     @Override
     public CompletableFuture<?> submitJobGraph(
             JobGraphWrapper jobGraphWrapper, JobManagerLocation jobManagerLocation) {
@@ -41,5 +46,7 @@ public class FlinkClientWrapperImpl implements FlinkClientWrapper {
     }
 
     @Override
-    public void close() throws IOException {}
+    public void close() throws IOException {
+        // No-op. This is needed for legacy reasons.
+    }
 }
