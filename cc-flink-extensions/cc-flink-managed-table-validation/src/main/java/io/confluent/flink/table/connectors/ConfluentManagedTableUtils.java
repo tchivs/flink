@@ -630,6 +630,7 @@ public class ConfluentManagedTableUtils {
         return offsetMap;
     }
 
+    /** This sets all default properties for Kafka. */
     private static Properties getProperties(ReadableConfig options) {
         final Properties properties = new Properties();
         options.getOptional(CONFLUENT_KAFKA_BOOTSTRAP_SERVERS)
@@ -641,6 +642,12 @@ public class ConfluentManagedTableUtils {
         }
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
+
+        // Maximum transaction timeout (15 min) as allowed by CCloud
+        properties.setProperty("transaction.timeout.ms", "900000");
+
+        // Note: Make sure to set default properties before this line is applied in order to
+        // allow DevOps overwriting defaults via the CompiledPlan if necessary.
         options.getOptional(CONFLUENT_KAFKA_PROPERTIES).ifPresent(properties::putAll);
         return properties;
     }

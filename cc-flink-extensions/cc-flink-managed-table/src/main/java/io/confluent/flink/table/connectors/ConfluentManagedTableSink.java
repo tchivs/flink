@@ -30,7 +30,6 @@ import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.header.Header;
 
 import javax.annotation.Nullable;
@@ -42,7 +41,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Stream;
 
 /** {@link DynamicTableSink} for Confluent-native tables. */
@@ -98,19 +96,16 @@ public class ConfluentManagedTableSink
     @Override
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
         final KafkaSinkBuilder<RowData> sinkBuilder = KafkaSink.builder();
-        final Properties producerProperties = parameters.properties;
 
         if (parameters.transactionalIdPrefix != null) {
             sinkBuilder.setTransactionalIdPrefix(parameters.transactionalIdPrefix);
             sinkBuilder.setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE);
-            // maximum transaction timeout (15mins) as allowed by CCloud
-            producerProperties.setProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "900000");
         } else {
             sinkBuilder.setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE);
         }
         final KafkaSink<RowData> kafkaSink =
                 sinkBuilder
-                        .setKafkaProducerConfig(producerProperties)
+                        .setKafkaProducerConfig(parameters.properties)
                         .setRecordSerializer(createKafkaSerializationSchema(context))
                         .build();
 
