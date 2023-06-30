@@ -8,9 +8,11 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
+import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
@@ -42,9 +44,38 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
+import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
+
 /** Default implementation of {@link ServiceTasks}. */
 @Confluent
 class DefaultServiceTasks implements ServiceTasks {
+
+    // --------------------------------------------------------------------------------------------
+    // configureEnvironment
+    // --------------------------------------------------------------------------------------------
+
+    @Override
+    public void configureEnvironment(TableEnvironment tableEnvironment) {
+        final TableConfig config = tableEnvironment.getConfig();
+
+        // Prevents invalid retractions e.g. through non-deterministic time functions like NOW()
+        config.set(
+                TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY,
+                NonDeterministicUpdateStrategy.TRY_RESOLVE);
+
+        // Disable OPTION hints
+        config.set(TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED, false);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // classifyException
+    // --------------------------------------------------------------------------------------------
+
+    @Override
+    public ClassifiedException classifyException(Exception e) {
+        return ClassifiedException.of(e);
+    }
 
     // --------------------------------------------------------------------------------------------
     // compileForegroundQuery

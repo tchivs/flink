@@ -12,17 +12,25 @@ import org.apache.flink.table.operations.QueryOperation;
 import java.util.List;
 
 /**
- * Provides abstractions that can be used by the SQL Service without depending on internal Flink
- * classes. Since Flink evolves over time it is saver to detect breaking changes of internal classes
- * here instead of downstream repositories.
+ * Provides abstractions that can be used by the SQL Service or Job Submission Service (JSS) without
+ * depending on internal Flink classes. Since Flink evolves over time it is saver to detect breaking
+ * changes of internal classes here instead of downstream repositories.
  *
  * <p>The method signatures should remain stable across Flink versions. Otherwise, changes in the
- * SQL Service are necessary.
+ * SQL or Job Submission Service are necessary.
  */
 @Confluent
 public interface ServiceTasks {
 
     ServiceTasks INSTANCE = new DefaultServiceTasks();
+
+    /** Applies default configuration options to the given {@link TableEnvironment}. */
+    void configureEnvironment(TableEnvironment tableEnvironment);
+
+    /**
+     * Classifies exceptions thrown by the planner with {@link ClassifiedException.ExceptionClass}.
+     */
+    ClassifiedException classifyException(Exception e);
 
     /**
      * Compiles a {@link QueryOperation} (i.e. a SELECT statement) for foreground result serving.
