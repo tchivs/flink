@@ -28,17 +28,14 @@ public class ConfluentAdapter {
     static final String COMMITTER_PATTERN = "(.*): Committer(.*)";
     static final String INPUT_INDEX_LABEL_KEY = "input_index";
     static final String OPERATOR_NAME = "operator_name";
-    static final String TASK_NAME = "task_name";
     static final String OPERATOR_TYPE = "operator_type";
-    static final String TASK_TYPE = "task_type";
-    /**
-     * Possible task/operator types: {@link ConfluentAdapter#SOURCE}, {@link ConfluentAdapter#SINK},
-     * {@link ConfluentAdapter#MIDDLE}.
-     */
+    /** Possible operator types. */
     static final String SOURCE = "source";
 
     static final String SINK = "sink";
-    static final String MIDDLE = "middle";
+    static final String UNKNOWN = "unknown";
+    static final String WRITER = "writer";
+    static final String COMMITTER = "committer";
 
     /**
      * adaptMetricName makes changes to the metric name if any are required. Currently, we must
@@ -70,9 +67,6 @@ public class ConfluentAdapter {
             String inputNIndex = currentInputNWatermarkMatcher.group(INPUT_INDEX_CAPTURING_GROUP);
             confluentVariables.put(INPUT_INDEX_LABEL_KEY, inputNIndex);
         }
-        if (variables.containsKey(TASK_NAME)) {
-            confluentVariables.put(TASK_TYPE, getTypeByName(variables.get(TASK_NAME)));
-        }
         if (variables.containsKey(OPERATOR_NAME)) {
             confluentVariables.put(OPERATOR_TYPE, getTypeByName(variables.get(OPERATOR_NAME)));
         }
@@ -80,15 +74,18 @@ public class ConfluentAdapter {
     }
 
     private static String getTypeByName(String nameLabel) {
-        String type = MIDDLE;
+        if (nameLabel.matches(WRITER_PATTERN)) {
+            return WRITER;
+        }
+        if (nameLabel.matches(COMMITTER_PATTERN)) {
+            return COMMITTER;
+        }
         if (nameLabel.matches(SOURCE_PATTERN)) {
-            type = SOURCE;
+            return SOURCE;
         }
-        if (nameLabel.matches(SINK_PATTERN)
-                || nameLabel.matches(WRITER_PATTERN)
-                || nameLabel.matches(COMMITTER_PATTERN)) {
-            type = SINK;
+        if (nameLabel.matches(SINK_PATTERN)) {
+            return SINK;
         }
-        return type;
+        return UNKNOWN;
     }
 }

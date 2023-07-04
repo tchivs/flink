@@ -33,41 +33,32 @@ public class ConfluentAdapterTest {
                 .containsEntry(ConfluentAdapter.INPUT_INDEX_LABEL_KEY, "14");
         assertThat(ConfluentAdapter.adaptVariables("currentInput3Watermark", labels))
                 .containsEntry(ConfluentAdapter.INPUT_INDEX_LABEL_KEY, "3");
-        labels.put(ConfluentAdapter.TASK_NAME, "output_js_1[437]: Writer");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.TASK_TYPE, ConfluentAdapter.SINK);
-        labels.put(ConfluentAdapter.TASK_NAME, "output_js_1[437]: Committer");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.TASK_TYPE, ConfluentAdapter.SINK);
 
-        labels.put(ConfluentAdapter.TASK_NAME, "Sink: jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.TASK_TYPE, ConfluentAdapter.SINK);
-        labels.put(ConfluentAdapter.TASK_NAME, "Source: jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.TASK_TYPE, ConfluentAdapter.SOURCE);
-        labels.put(ConfluentAdapter.TASK_NAME, "jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.TASK_TYPE, ConfluentAdapter.MIDDLE);
+        labels.put(ConfluentAdapter.OPERATOR_NAME, "output_js_1[437]: Writer");
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
+                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.WRITER);
+        labels.put(ConfluentAdapter.OPERATOR_NAME, "output_js_1[437]: Committer");
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
+                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.COMMITTER);
 
         labels.put(ConfluentAdapter.OPERATOR_NAME, "Sink: jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
                 .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.SINK);
         labels.put(ConfluentAdapter.OPERATOR_NAME, "Source: jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
                 .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.SOURCE);
         labels.put(ConfluentAdapter.OPERATOR_NAME, "jollyFlower");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.MIDDLE);
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
+                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.UNKNOWN);
 
         labels.put(ConfluentAdapter.OPERATOR_NAME, "jollyFlower Sink: ");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.MIDDLE);
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
+                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.UNKNOWN);
         labels.put(ConfluentAdapter.OPERATOR_NAME, "jollySinkFlower:");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
-                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.MIDDLE);
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
+                .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.UNKNOWN);
         labels.put(ConfluentAdapter.OPERATOR_NAME, "Sink: ");
-        assertThat(ConfluentAdapter.adaptVariables("someTaskMetric", labels))
+        assertThat(ConfluentAdapter.adaptVariables("someOperatorMetric", labels))
                 .containsEntry(ConfluentAdapter.OPERATOR_TYPE, ConfluentAdapter.SINK);
     }
 }
