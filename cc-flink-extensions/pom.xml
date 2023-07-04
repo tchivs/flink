@@ -28,6 +28,7 @@ Copyright 2023 Confluent Inc.
 		<module>cc-flink-avro-registry</module>
 		<module>cc-flink-avro-converters</module>
 		<module>cc-flink-credentials</module>
-		<module>cc-flink-failure-enrichers</module>
+    	<module>cc-flink-failure-enrichers</module>
+		<module>cc-flink-common-metrics</module>
 	</modules>
 </project>
