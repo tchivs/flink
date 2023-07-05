@@ -186,6 +186,9 @@ public class ConfluentManagedTableOptions {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(KAFKA_CLEANUP_POLICY);
         options.add(KAFKA_PARTITIONS);
+        options.add(KAFKA_RETENTION_TIME);
+        options.add(KAFKA_RETENTION_SIZE);
+        options.add(KAFKA_MAX_MESSAGE_SIZE);
         return Collections.unmodifiableSet(options);
     }
 
