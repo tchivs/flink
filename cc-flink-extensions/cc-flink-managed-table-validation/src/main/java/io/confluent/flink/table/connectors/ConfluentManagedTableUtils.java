@@ -461,12 +461,17 @@ public class ConfluentManagedTableUtils {
             List<String> primaryKeys,
             @Nullable Format keyDecodingFormat,
             @Nullable List<String> partitionKeys) {
+        final CleanupPolicy cleanupPolicy = options.get(KAFKA_CLEANUP_POLICY);
+        final boolean isCompacted =
+                cleanupPolicy == CleanupPolicy.DELETE_COMPACT
+                        || cleanupPolicy == CleanupPolicy.COMPACT;
+        final boolean isUpsertLike = tableMode == ManagedChangelogMode.UPSERT || isCompacted;
         final boolean hasKeys = partitionKeys != null && partitionKeys.size() > 0;
         if (keyDecodingFormat == null) {
-            if (tableMode == ManagedChangelogMode.UPSERT) {
+            if (isUpsertLike) {
                 throw new ValidationException(
                         String.format(
-                                "A key format '%s' must be defined when performing upserts.",
+                                "A key format '%s' must be defined when performing upserts or compaction.",
                                 KEY_FORMAT.key()));
             }
             if (hasKeys) {
@@ -492,27 +497,26 @@ public class ConfluentManagedTableUtils {
                                 options.get(KEY_FORMAT), keyFormatMode));
             }
             final Set<String> primaryKeySet = new HashSet<>(primaryKeys);
-            if (!primaryKeySet.isEmpty() && !primaryKeySet.containsAll(partitionKeys)) {
-                throw new ValidationException(
-                        String.format(
-                                "Key fields in PARTITIONED BY must fully contain primary key columns %s "
-                                        + "if a primary key is defined.",
-                                primaryKeySet));
-            }
-            final CleanupPolicy cleanupPolicy = options.get(KAFKA_CLEANUP_POLICY);
-            final boolean isCompacted =
-                    cleanupPolicy == CleanupPolicy.DELETE_COMPACT
-                            || cleanupPolicy == CleanupPolicy.COMPACT;
-            final Set<String> partitionKeySet = new HashSet<>(partitionKeys);
-            if (isCompacted
-                    && tableMode == ManagedChangelogMode.UPSERT
-                    && !primaryKeySet.equals(partitionKeySet)) {
-                throw new ValidationException(
-                        String.format(
-                                "A custom PARTITIONED BY clause is not allowed if compaction is enabled in "
-                                        + "upsert mode. The compaction key must be equal to the primary "
-                                        + "key %s which is used for upserts.",
-                                primaryKeySet));
+            if (!primaryKeySet.isEmpty()) {
+                if (!primaryKeySet.containsAll(partitionKeys)) {
+                    throw new ValidationException(
+                            String.format(
+                                    "Key fields in PARTITIONED BY must fully contain primary key columns %s "
+                                            + "if a primary key is defined.",
+                                    primaryKeySet));
+                }
+                final Set<String> partitionKeySet = new HashSet<>(partitionKeys);
+                // Even if the table mode is not upsert, if compaction is enabled it behaves similar
+                // to upsert. Therefore, we must guard the changelog by not allowing custom
+                // partitioning in case upsert is enabled later.
+                if (isUpsertLike && !primaryKeySet.equals(partitionKeySet)) {
+                    throw new ValidationException(
+                            String.format(
+                                    "A custom PARTITIONED BY clause is not allowed if upserts or "
+                                            + "compaction are enabled. The partitioning key must "
+                                            + "be equal to the primary key %s.",
+                                    primaryKeySet));
+                }
             }
         }
     }

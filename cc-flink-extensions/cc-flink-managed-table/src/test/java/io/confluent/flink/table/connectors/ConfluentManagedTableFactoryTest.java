@@ -327,7 +327,7 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                         keys.add(KEY_K2);
                     },
-                    "A key format 'key.format' must be defined when performing upserts.");
+                    "A key format 'key.format' must be defined when performing upserts or compaction.");
         }
 
         @Test
@@ -368,9 +368,9 @@ public class ConfluentManagedTableFactoryTest {
                         options.put("kafka.cleanup-policy", "compact");
                         keys.add(KEY_K1);
                     },
-                    "A custom PARTITIONED BY clause is not allowed if compaction is enabled in "
-                            + "upsert mode. The compaction key must be equal to the primary key "
-                            + "[key_k1, key_k2] which is used for upserts.");
+                    "A custom PARTITIONED BY clause is not allowed if upserts or compaction "
+                            + "are enabled. The partitioning key must be equal to the primary "
+                            + "key [key_k1, key_k2].");
         }
     }
 
@@ -439,6 +439,20 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K2);
                     },
                     "PARTITIONED BY and PRIMARY KEY clauses require a key format 'key.format'.");
+        }
+
+        @Test
+        void testInvalidCustomPartitioningWithCompaction() {
+            testError(
+                    SCHEMA_WITH_PK,
+                    (options, keys) -> {
+                        options.put("changelog.mode", "append");
+                        options.put("kafka.cleanup-policy", "compact");
+                        keys.add(KEY_K1);
+                    },
+                    "A custom PARTITIONED BY clause is not allowed if upserts or compaction "
+                            + "are enabled. The partitioning key must be equal to the primary "
+                            + "key [key_k1, key_k2].");
         }
     }
 
