@@ -8,6 +8,9 @@ import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 
+import org.apache.kafka.common.errors.TopicAuthorizationException;
+import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
+
 import java.time.DateTimeException;
 import java.util.HashMap;
 import java.util.Map;
@@ -86,6 +89,15 @@ public class TypeFailureEnricher implements FailureEnricher {
                     else if (ExceptionUtils.findThrowable(cause, NumberFormatException.class)
                                     .isPresent()
                             || ExceptionUtils.findThrowable(cause, DateTimeException.class)
+                                    .isPresent()) {
+                        labels.put(typeKey, "USER");
+                    }
+                    // Catch Authorization exceptions coming from Kafka
+                    else if (ExceptionUtils.findThrowable(
+                                            cause, TransactionalIdAuthorizationException.class)
+                                    .isPresent()
+                            || ExceptionUtils.findThrowable(
+                                            cause, TopicAuthorizationException.class)
                                     .isPresent()) {
                         labels.put(typeKey, "USER");
                     } else if (ExceptionUtils.findThrowable(cause, FlinkException.class).isPresent()

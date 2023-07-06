@@ -17,6 +17,11 @@ Copyright 2023 Confluent Inc.
 	<artifactId>cc-flink-extensions</artifactId>
 	<name>Confluent Flink :</name>
 
+	<properties>
+		<!-- freeze SR dependencies on one particular version	-->
+		<kafka.clients.version>7.5.0-203-ccs</kafka.clients.version>
+	</properties>
+
 	<packaging>pom</packaging>
 
 	<modules>

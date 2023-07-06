@@ -33,9 +33,6 @@ under the License.
 
 	<properties>
 		<schema.registry.version>7.5.0-22</schema.registry.version>
-
-		<!-- freeze SR dependencies on one particular version	-->
-		<kafka.clients.version>7.5.0-203-ccs</kafka.clients.version>
 		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
 	</properties>
 

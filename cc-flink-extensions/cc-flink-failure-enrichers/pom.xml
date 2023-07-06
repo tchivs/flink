@@ -27,6 +27,11 @@ Copyright 2023 Confluent Inc.
 			<version>${project.version}</version>
 			<scope>provided</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+			<version>${kafka.clients.version}</version>
+		</dependency>
 
 		<!-- Test Utils -->
 		<dependency>
