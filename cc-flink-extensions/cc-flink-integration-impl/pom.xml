@@ -42,6 +42,20 @@ Copyright 2023 Confluent Inc.
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-runtime</artifactId>
       <version>${project.version}</version>
+		<exclusions>
+			<exclusion>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-rpc-core</artifactId>
+			</exclusion>
+			<exclusion>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-rpc-akka-loader</artifactId>
+			</exclusion>
+			<exclusion>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-shaded-zookeeper-3</artifactId>
+			</exclusion>
+		</exclusions>
     </dependency>
     <dependency>
       <!-- Required by the JobClientWrapperImpl -->
