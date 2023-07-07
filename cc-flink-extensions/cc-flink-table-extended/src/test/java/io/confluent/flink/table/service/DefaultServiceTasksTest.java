@@ -17,7 +17,6 @@ import org.apache.flink.table.operations.SinkModifyOperation;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
-import io.confluent.flink.table.service.ClassifiedException.ExceptionClass;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -26,7 +25,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.fail;
 
 /** Tests for {@link DefaultServiceTasks}. */
 @Confluent
@@ -126,80 +124,5 @@ public class DefaultServiceTasksTest {
                                         queryOperation,
                                         (identifier, execNodeId) -> Collections.emptyMap()))
                 .hasMessageContaining("can not satisfy the determinism requirement");
-    }
-
-    @Test
-    void testConfigurationHints() {
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(tableEnv);
-
-        tableEnv.executeSql("CREATE TABLE t (i INT) WITH ('connector' = 'datagen')");
-
-        try {
-            tableEnv.executeSql("SELECT * FROM t /*+ OPTIONS('rows-per-second' = '42') */");
-            fail("Exception should have occurred due to hint.");
-        } catch (Exception e) {
-            final ClassifiedException classified = INSTANCE.classifyException(e);
-            assertThat(classified.getMessage())
-                    .contains("Cannot accept 'OPTIONS' hint. Please remove it from the query.");
-            assertThat(classified.getExceptionClass()).isEqualTo(ExceptionClass.PLANNING_USER);
-        }
-    }
-
-    @Test
-    void testUnsupportedAnalyzeError() {
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-
-        try {
-            tableEnv.executeSql("ANALYZE TABLE x COMPUTE STATISTICS;");
-            fail("Exception should have occurred due to unsupported operation.");
-        } catch (Exception e) {
-            final ClassifiedException classified = INSTANCE.classifyException(e);
-            assertThat(classified.getMessage())
-                    .contains("The requested operation is not supported.");
-            assertThat(classified.getExceptionClass()).isEqualTo(ExceptionClass.PLANNING_USER);
-        }
-    }
-
-    @Test
-    void testGenericCauseChainError() {
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-
-        tableEnv.executeSql(
-                "CREATE TABLE t (i INT) WITH ('connector' = 'datagen', 'invalid' = 'option')");
-
-        try {
-            tableEnv.executeSql("SELECT * FROM t");
-            fail("Exception should have occurred due to invalid table definition.");
-        } catch (Exception e) {
-            final ClassifiedException classified = INSTANCE.classifyException(e);
-            assertThat(classified.getMessage())
-                    .contains(
-                            "Unable to create a source for reading table 'default_catalog.default_database.t'.\n"
-                                    + "\n"
-                                    + "Table options are:\n"
-                                    + "\n"
-                                    + "'connector'='datagen'\n"
-                                    + "'invalid'='option'\n"
-                                    + "\n"
-                                    + "Caused by: Unsupported options found for 'datagen'.\n"
-                                    + "\n"
-                                    + "Unsupported options:\n"
-                                    + "\n"
-                                    + "invalid\n"
-                                    + "\n"
-                                    + "Supported options:\n"
-                                    + "\n"
-                                    + "connector\n"
-                                    + "fields.i.kind\n"
-                                    + "fields.i.max\n"
-                                    + "fields.i.min\n"
-                                    + "number-of-rows\n"
-                                    + "rows-per-second");
-            assertThat(classified.getExceptionClass()).isEqualTo(ExceptionClass.PLANNING_USER);
-        }
     }
 }

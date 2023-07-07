@@ -28,11 +28,6 @@ public interface ServiceTasks {
     void configureEnvironment(TableEnvironment tableEnvironment);
 
     /**
-     * Classifies exceptions thrown by the planner with {@link ClassifiedException.ExceptionClass}.
-     */
-    ClassifiedException classifyException(Exception e);
-
-    /**
      * Compiles a {@link QueryOperation} (i.e. a SELECT statement) for foreground result serving.
      */
     ForegroundResultPlan compileForegroundQuery(

@@ -2,23 +2,25 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.table.service;
+package io.confluent.flink.table.utils;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.sql.parser.error.SqlValidateException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
 import org.apache.flink.table.planner.plan.schema.CatalogSourceTable;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /** Classified exception with a message that can be exposed to the user. */
@@ -26,20 +28,41 @@ import java.util.stream.Stream;
 public final class ClassifiedException {
 
     /** Identifies important exceptions and allows to rewrite their messages. */
-    private static final Map<CodeLocation, Handler> classifiedExceptions;
+    private static final Map<CodeLocation, List<Handler>> classifiedExceptions;
 
     static {
         classifiedExceptions = new HashMap<>();
 
         // Add more classifications here:
 
-        classifiedExceptions.put(
+        // Avoid duplicate causes for CREATE TABLE and ALTER TABLE
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute CreateTable", ExceptionClass.PLANNING_USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute CreateTable", ExceptionClass.PLANNING_USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute AlterTable", ExceptionClass.PLANNING_USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute AlterTable", ExceptionClass.PLANNING_USER));
+
+        // Don't delegate the user to options that can't be set.
+        putClassifiedException(
                 CodeLocation.inClass(CatalogSourceTable.class, ValidationException.class),
                 Handler.customMessage(
-                        "'OPTIONS' hint is allowed only when",
+                        "The 'OPTIONS' hint is allowed only when the config "
+                                + "option 'table.dynamic-table-options.enabled' is set to true.",
                         ExceptionClass.PLANNING_USER,
                         "Cannot accept 'OPTIONS' hint. Please remove it from the query."));
 
+        // Don't throw exceptions for operations we don't support
         final List<String> unsupportedOperations =
                 Arrays.asList(
                         "convertDropTable",
@@ -74,7 +97,7 @@ public final class ClassifiedException {
                         "convertUpdate");
         unsupportedOperations.forEach(
                 op -> {
-                    classifiedExceptions.put(
+                    putClassifiedException(
                             CodeLocation.inMethod(
                                     SqlNodeToOperationConversion.class,
                                     op,
@@ -82,14 +105,19 @@ public final class ClassifiedException {
                             Handler.customMessage(
                                     ExceptionClass.PLANNING_USER,
                                     "The requested operation is not supported."));
-
-                    classifiedExceptions.put(
+                    putClassifiedException(
                             CodeLocation.inMethod(
                                     SqlNodeToOperationConversion.class, op, TableException.class),
                             Handler.customMessage(
                                     ExceptionClass.PLANNING_USER,
                                     "The requested operation is not supported."));
                 });
+    }
+
+    static void putClassifiedException(CodeLocation codeLocation, Handler handler) {
+        final List<Handler> handlerList =
+                classifiedExceptions.computeIfAbsent(codeLocation, cl -> new ArrayList<>());
+        handlerList.add(handler);
     }
 
     /** Available categories that can be assigned to exceptions. */
@@ -105,37 +133,47 @@ public final class ClassifiedException {
     }
 
     /** Classifies the given exception into a {@link ExceptionClass} and message. */
-    public static ClassifiedException of(Exception e) {
+    public static ClassifiedException of(Exception e, Set<Class<? extends Exception>> validCauses) {
         final StackTraceElement[] stackTrace = e.getStackTrace();
         if (stackTrace.length > 0) {
-            final Handler handlerByClass =
+            final List<Handler> handlersByClass =
                     classifiedExceptions.get(
                             new CodeLocation(e.getClass(), stackTrace[0].getClassName(), null));
-            if (handlerByClass != null && handlerByClass.matches(e)) {
-                return new ClassifiedException(
-                        handlerByClass.exceptionClass, handlerByClass.messageProvider.apply(e));
+            if (handlersByClass != null) {
+                final Optional<Handler> matchingHandler =
+                        handlersByClass.stream().filter(h -> h.matches(e)).findFirst();
+                if (matchingHandler.isPresent()) {
+                    final Handler handler = matchingHandler.get();
+                    return new ClassifiedException(
+                            handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
+                }
             }
-            final Handler handlerByMethod =
+            final List<Handler> handlersByMethod =
                     classifiedExceptions.get(
                             new CodeLocation(
                                     e.getClass(),
                                     stackTrace[0].getClassName(),
                                     stackTrace[0].getMethodName()));
-            if (handlerByMethod != null && handlerByMethod.matches(e)) {
-                return new ClassifiedException(
-                        handlerByMethod.exceptionClass, handlerByMethod.messageProvider.apply(e));
+            if (handlersByMethod != null) {
+                final Optional<Handler> matchingHandler =
+                        handlersByMethod.stream().filter(h -> h.matches(e)).findFirst();
+                if (matchingHandler.isPresent()) {
+                    final Handler handler = matchingHandler.get();
+                    return new ClassifiedException(
+                            handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
+                }
             }
         }
 
-        // If not specified with a custom rule above, TableException, ValidationException,
-        // and SqlValidateException are always user exceptions for invalid statements.
-        if (e instanceof TableException
-                || e instanceof ValidationException
-                || e instanceof SqlValidateException) {
-            return new ClassifiedException(ExceptionClass.PLANNING_USER, buildMessageWithCauses(e));
+        // If not specified with a custom rule above,
+        // valid causes are always user exceptions for invalid statements.
+        if (validCauses.contains(e.getClass())) {
+            return new ClassifiedException(
+                    ExceptionClass.PLANNING_USER, buildMessageWithCauses(e, validCauses));
         }
 
-        return new ClassifiedException(ExceptionClass.PLANNING_SYSTEM, "");
+        return new ClassifiedException(
+                ExceptionClass.PLANNING_SYSTEM, buildMessageWithCauses(e, null));
     }
 
     // --------------------------------------------------------------------------------------------
@@ -213,12 +251,12 @@ public final class ClassifiedException {
         private final @Nullable String messagePart;
 
         private final ExceptionClass exceptionClass;
-        private final Function<Exception, String> messageProvider;
+        private final MessageProvider messageProvider;
 
         Handler(
                 @Nullable String messagePart,
                 ExceptionClass exceptionClass,
-                Function<Exception, String> messageProvider) {
+                MessageProvider messageProvider) {
             this.messagePart = messagePart;
             this.exceptionClass = exceptionClass;
             this.messageProvider = messageProvider;
@@ -239,7 +277,7 @@ public final class ClassifiedException {
         /** Classify and forward exception's message if message part matches. */
         static Handler forwardMessage(
                 @Nullable String onMessagePart, ExceptionClass exceptionClass) {
-            return new Handler(onMessagePart, exceptionClass, Throwable::getMessage);
+            return new Handler(onMessagePart, exceptionClass, (e, validCauses) -> e.getMessage());
         }
 
         /** Classify and forward exception's message and all messages of causes. */
@@ -265,18 +303,39 @@ public final class ClassifiedException {
         /** Classify exception and rewrite error message if message part matches. */
         static Handler customMessage(
                 @Nullable String onMessagePart, ExceptionClass exceptionClass, String message) {
-            return new Handler(onMessagePart, exceptionClass, e -> message);
+            return new Handler(onMessagePart, exceptionClass, (e, validCauses) -> message);
+        }
+
+        /** Classify exception and skip the top-level error message. */
+        static Handler forwardCauseOnly(
+                @Nullable String onMessagePart, ExceptionClass exceptionClass) {
+            return new Handler(
+                    onMessagePart,
+                    exceptionClass,
+                    (e, validCauses) -> {
+                        if (e.getCause() instanceof Exception) {
+                            return ClassifiedException.buildMessageWithCauses(
+                                    (Exception) e.getCause(), validCauses);
+                        }
+                        return ClassifiedException.buildMessageWithCauses(e, validCauses);
+                    });
         }
     }
 
-    private static String buildMessageWithCauses(Exception e) {
+    private interface MessageProvider {
+        String apply(Exception e, Set<Class<? extends Exception>> validCauses);
+    }
+
+    /** Utility method to pretty print a chain of causes. */
+    public static String buildMessageWithCauses(
+            Exception e, @Nullable Set<Class<? extends Exception>> validCauses) {
         final StringBuilder builder = new StringBuilder();
         Exception currentException = e;
         while (currentException != null) {
             builder.append(currentException.getMessage());
             final Throwable cause = currentException.getCause();
             // Those exceptions should be safe to expose as causes
-            if (cause instanceof TableException || cause instanceof ValidationException) {
+            if (cause != null && (validCauses == null || validCauses.contains(cause.getClass()))) {
                 builder.append("\n\nCaused by: ");
                 currentException = (Exception) cause;
             } else {
