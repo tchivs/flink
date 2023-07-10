@@ -5,7 +5,7 @@
 package io.confluent.flink.jobgraph;
 
 /** A part of input to Flink Autopilot to decide on Job parallelism. */
-class JobVertexContainer {
+public class JobVertexContainer {
     private final String vertexId;
 
     private final int maxParallelism;
