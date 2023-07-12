@@ -54,6 +54,15 @@ class OpenTelemetryMetricAdapter {
             Long previousCount,
             MetricMetadata metricMetadata) {
         long delta = count - previousCount;
+        if (delta < 0) {
+            LOG.warn(
+                    "Non-monotonic counter {}: current count {} is less than previous count {}",
+                    metricMetadata.getName(),
+                    count,
+                    previousCount);
+            return Optional.empty();
+        }
+        Boolean isMonotonic = true;
         return Optional.of(
                 ImmutableMetricData.createLongSum(
                         collectionMetadata.getOtelResource(),
@@ -62,7 +71,7 @@ class OpenTelemetryMetricAdapter {
                         "",
                         "",
                         ImmutableSumData.create(
-                                false,
+                                isMonotonic,
                                 AggregationTemporality.DELTA,
                                 ImmutableList.of(
                                         ImmutableLongPointData.create(

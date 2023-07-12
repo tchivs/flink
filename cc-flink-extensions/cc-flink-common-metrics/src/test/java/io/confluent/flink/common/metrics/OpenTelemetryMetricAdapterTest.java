@@ -51,6 +51,7 @@ public class OpenTelemetryMetricAdapterTest {
         assertThat(metricData.get().getName()).isEqualTo("foo.bar.count");
         assertThat(metricData.get().getLongSumData().getAggregationTemporality())
                 .isEqualTo(AggregationTemporality.DELTA);
+        assertThat(metricData.get().getLongSumData().isMonotonic()).isEqualTo(true);
         assertThat(metricData.get().getType()).isEqualTo(MetricDataType.LONG_SUM);
         assertThat(metricData.get().getLongSumData().getPoints().size()).isEqualTo(1);
         LongPointData data = metricData.get().getLongSumData().getPoints().iterator().next();
