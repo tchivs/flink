@@ -10,6 +10,8 @@ import org.apache.flink.util.FlinkException;
 
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.DateTimeException;
 import java.util.HashMap;
@@ -25,6 +27,8 @@ import java.util.stream.Stream;
  * based on the class of the failure.
  */
 public class TypeFailureEnricher implements FailureEnricher {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TypeFailureEnricher.class);
 
     private static final String typeKey = "TYPE";
     private static final String codeKey = "CODE";
@@ -47,6 +51,7 @@ public class TypeFailureEnricher implements FailureEnricher {
             final Throwable cause, final Context context) {
         return CompletableFuture.supplyAsync(
                 () -> {
+                    LOG.info("Processing failure: {}", cause);
                     final Map<String, String> labels = new HashMap();
                     if (cause == null) {
                         return labels;
@@ -106,6 +111,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                     } else {
                         labels.put(typeKey, "UNKNOWN");
                     }
+                    LOG.info("Processed failure labels: {}", labels);
                     return labels;
                 },
                 context.getIOExecutor());

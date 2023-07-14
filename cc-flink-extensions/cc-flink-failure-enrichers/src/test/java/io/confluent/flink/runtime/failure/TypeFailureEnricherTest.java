@@ -5,10 +5,15 @@
 package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.core.failure.FailureEnricher;
+import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.util.FileUtils;
+import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkUserCodeClassLoaders;
 import org.apache.flink.util.MutableURLClassLoader;
+import org.apache.flink.util.SerializedThrowable;
 
+import org.apache.kafka.common.errors.TopicAuthorizationException;
+import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,18 +29,21 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.time.DateTimeException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
 import static org.apache.flink.util.FlinkUserCodeClassLoader.NOOP_EXCEPTION_HANDLER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-class TypeFailureEnricherUtilsTest {
+class TypeFailureEnricherTest {
     @TempDir static File temporaryFile;
 
     public static final String USER_CLASS = "UserClass";
@@ -83,6 +91,20 @@ class TypeFailureEnricherUtilsTest {
 
         Class<?> userClass = Class.forName(USER_CLASS, false, classLoader);
         assertTrue(TypeFailureEnricherUtils.isUserCodeClassLoader(userClass.getClassLoader()));
+    }
+
+    @Test
+    void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
+        assertFailureEnricherLabelIsExpectedLabel(
+                new SerializedThrowable(new Exception("serialization error")), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(new ArithmeticException("test"), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(new NumberFormatException("test"), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(new DateTimeException("test"), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new TransactionalIdAuthorizationException("test"), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(new TopicAuthorizationException("test"), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(new FlinkException("test"), "SYSTEM");
+        assertFailureEnricherLabelIsExpectedLabel(new ExpectedTestException("test"), "UNKNOWN");
     }
 
     /** Pack the generated classes into a JAR and return the path of the JAR. */

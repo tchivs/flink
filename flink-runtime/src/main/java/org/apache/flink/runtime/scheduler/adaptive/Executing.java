@@ -90,6 +90,7 @@ class Executing extends StateWithExecutionGraph implements ResourceListener {
 
     @Override
     void onFailure(Throwable cause) {
+        getLogger().info("Handling failure {}", cause);
         FailureResultUtil.restartOrFail(context.howToHandleFailure(cause), context, this);
     }
 
