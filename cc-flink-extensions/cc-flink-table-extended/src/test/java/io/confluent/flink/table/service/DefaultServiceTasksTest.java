@@ -5,6 +5,7 @@
 package io.confluent.flink.table.service;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableEnvironment;
@@ -52,33 +53,23 @@ public class DefaultServiceTasksTest {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        final Catalog catalog =
-                tableEnv.getCatalog(tableEnv.getCurrentCatalog())
-                        .orElseThrow(IllegalArgumentException::new);
-
         final Schema schema = Schema.newBuilder().column("i", "INT").build();
         final Map<String, String> privateOptions =
                 Collections.singletonMap("confluent.specific", "option");
 
-        catalog.createTable(
-                new ObjectPath(tableEnv.getCurrentDatabase(), "source"),
-                new ConfluentCatalogTable(
-                        schema,
-                        null,
-                        Collections.emptyList(),
-                        Collections.singletonMap("connector", "datagen"),
-                        privateOptions),
-                false);
+        createConfluentCatalogTable(
+                tableEnv,
+                "source",
+                schema,
+                Collections.singletonMap("connector", "datagen"),
+                privateOptions);
 
-        catalog.createTable(
-                new ObjectPath(tableEnv.getCurrentDatabase(), "sink"),
-                new ConfluentCatalogTable(
-                        schema,
-                        null,
-                        Collections.emptyList(),
-                        Collections.singletonMap("connector", "blackhole"),
-                        privateOptions),
-                false);
+        createConfluentCatalogTable(
+                tableEnv,
+                "sink",
+                schema,
+                Collections.singletonMap("connector", "blackhole"),
+                privateOptions);
 
         final List<Operation> operations =
                 ((TableEnvironmentImpl) tableEnv)
@@ -124,5 +115,58 @@ public class DefaultServiceTasksTest {
                                         queryOperation,
                                         (identifier, execNodeId) -> Collections.emptyMap()))
                 .hasMessageContaining("can not satisfy the determinism requirement");
+    }
+
+    @Test
+    void testUnsupportedGroupWindowSyntax() throws Exception {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        createConfluentCatalogTable(
+                tableEnv,
+                "source",
+                Schema.newBuilder()
+                        .column("user", DataTypes.STRING())
+                        .column("amount", DataTypes.INT())
+                        .column("ts", DataTypes.TIMESTAMP_LTZ(3))
+                        .watermark("ts", "SOURCE_WATERMARK()")
+                        .build(),
+                Collections.singletonMap("connector", "datagen"),
+                Collections.emptyMap());
+
+        final QueryOperation queryOperation =
+                tableEnv.sqlQuery(
+                                "SELECT SUM(amount) "
+                                        + "FROM source "
+                                        + "GROUP BY user, TUMBLE(ts, INTERVAL '5' SECOND)")
+                        .getQueryOperation();
+
+        assertThatThrownBy(
+                        () ->
+                                INSTANCE.compileForegroundQuery(
+                                        tableEnv,
+                                        queryOperation,
+                                        (identifier, execNodeId) -> Collections.emptyMap()))
+                .hasMessageContaining(
+                        "SQL syntax that calls TUMBLE, HOP, and SESSION in the GROUP BY clause is "
+                                + "not supported. Use table-valued function (TVF) syntax instead "
+                                + "which is standard compliant.");
+    }
+
+    private static void createConfluentCatalogTable(
+            TableEnvironment tableEnv,
+            String name,
+            Schema schema,
+            Map<String, String> publicOptions,
+            Map<String, String> privateOptions)
+            throws Exception {
+        final Catalog catalog =
+                tableEnv.getCatalog(tableEnv.getCurrentCatalog())
+                        .orElseThrow(IllegalArgumentException::new);
+        catalog.createTable(
+                new ObjectPath(tableEnv.getCurrentDatabase(), name),
+                new ConfluentCatalogTable(
+                        schema, null, Collections.emptyList(), publicOptions, privateOptions),
+                false);
     }
 }

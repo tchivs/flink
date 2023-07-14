@@ -11,6 +11,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
@@ -26,6 +27,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.JsonSerdeUtil;
+import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecGroupWindowAggregate;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecLookupJoin;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecTableSourceScan;
@@ -197,6 +199,8 @@ class DefaultServiceTasks implements ServiceTasks {
 
         graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
 
+        graph.getRootNodes().forEach(DefaultServiceTasks::checkForUnsupportedExecNodes);
+
         final String compiledPlan;
         try {
             compiledPlan =
@@ -246,5 +250,16 @@ class DefaultServiceTasks implements ServiceTasks {
         final Map<String, String> morePrivateOptions =
                 connectorOptions.generateOptions(contextTable.getIdentifier(), node.getId());
         catalogTable.exposePrivateOptions(morePrivateOptions);
+    }
+
+    private static void checkForUnsupportedExecNodes(ExecNode<?> node) {
+        node.getInputEdges().forEach(edge -> checkForUnsupportedExecNodes(edge.getSource()));
+
+        if (node instanceof StreamExecGroupWindowAggregate) {
+            throw new TableException(
+                    "SQL syntax that calls TUMBLE, HOP, and SESSION in the GROUP BY clause is "
+                            + "not supported. Use table-valued function (TVF) syntax instead "
+                            + "which is standard compliant.");
+        }
     }
 }
