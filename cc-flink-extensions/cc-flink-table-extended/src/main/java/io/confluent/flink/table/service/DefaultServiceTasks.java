@@ -13,6 +13,7 @@ import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
+import org.apache.flink.table.api.config.ExecutionConfigOptions.RowtimeInserter;
 import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
@@ -46,6 +47,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SINK_ROWTIME_INSERTER;
 import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
 
@@ -68,6 +70,10 @@ class DefaultServiceTasks implements ServiceTasks {
 
         // Disable OPTION hints
         config.set(TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED, false);
+
+        // The limitation of having just a single rowtime attribute column in the query schema
+        // causes confusion. The Kafka sink does not use StreamRecord's timestamps anyway.
+        config.set(TABLE_EXEC_SINK_ROWTIME_INSERTER, RowtimeInserter.DISABLED);
     }
 
     // --------------------------------------------------------------------------------------------
