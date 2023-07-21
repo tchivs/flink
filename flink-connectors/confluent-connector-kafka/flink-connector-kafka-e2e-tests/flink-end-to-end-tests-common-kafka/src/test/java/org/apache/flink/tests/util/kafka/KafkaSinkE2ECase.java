@@ -74,6 +74,10 @@ public class KafkaSinkE2ECase extends SinkTestSuiteBase<String> {
                                     .toAbsolutePath()
                                     .toUri()
                                     .toURL(),
+                            ResourceTestUtils.getResource("kafka-telemetry.jar")
+                                    .toAbsolutePath()
+                                    .toUri()
+                                    .toURL(),
                             ResourceTestUtils.getResource("flink-connector-testing.jar")
                                     .toAbsolutePath()
                                     .toUri()

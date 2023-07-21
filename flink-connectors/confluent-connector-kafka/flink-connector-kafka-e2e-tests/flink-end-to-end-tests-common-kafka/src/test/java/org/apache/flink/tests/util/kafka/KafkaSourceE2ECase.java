@@ -67,7 +67,8 @@ public class KafkaSourceE2ECase extends SourceTestSuiteBase<String> {
                     kafka.getContainer(),
                     Arrays.asList(
                             ResourceTestUtils.getResource("kafka-connector.jar").toUri().toURL(),
-                            ResourceTestUtils.getResource("kafka-clients.jar").toUri().toURL()),
+                            ResourceTestUtils.getResource("kafka-clients.jar").toUri().toURL(),
+                            ResourceTestUtils.getResource("kafka-telemetry.jar").toUri().toURL()),
                     PARTITION);
 
     @SuppressWarnings("unused")
@@ -77,7 +78,8 @@ public class KafkaSourceE2ECase extends SourceTestSuiteBase<String> {
                     kafka.getContainer(),
                     Arrays.asList(
                             ResourceTestUtils.getResource("kafka-connector.jar").toUri().toURL(),
-                            ResourceTestUtils.getResource("kafka-clients.jar").toUri().toURL()),
+                            ResourceTestUtils.getResource("kafka-clients.jar").toUri().toURL(),
+                            ResourceTestUtils.getResource("kafka-telemetry.jar").toUri().toURL()),
                     TOPIC);
 
     public KafkaSourceE2ECase() throws Exception {}

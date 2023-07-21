@@ -35,6 +35,7 @@ under the License.
 
 	<properties>
 		<japicmp.skip>true</japicmp.skip>
+		<kafka.version>7.2.7-3-ce</kafka.version>
 	</properties>
 
 	<repositories>
@@ -43,6 +44,16 @@ under the License.
 			<url>https://packages.confluent.io/maven/</url>
 		</repository>
 	</repositories>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.apache.kafka</groupId>
+				<artifactId>kafka-clients</artifactId>
+				<version>${kafka.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 		<dependency>
@@ -109,6 +120,12 @@ under the License.
 											dependency graph, nor are any jersey files bundled. -->
 										<exclude>NOTICE</exclude>
 										<exclude>common/**</exclude>
+									</excludes>
+								</filter>
+								<filter>
+									<artifact>io.confluent:telemetry-events-api</artifact>
+									<excludes>
+										<exclude>NOTICE</exclude>
 									</excludes>
 								</filter>
 							</filters>

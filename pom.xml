@@ -207,6 +207,9 @@ under the License.
 		<test.randomization.seed/>
 		<test.unit.pattern>**/*Test.*</test.unit.pattern>
 		<animal-sniffer-annotations.version>1.18</animal-sniffer-annotations.version>
+
+		<!-- Align versions of Kafka dependency across the repository -->
+		<kafka.version>7.2.7-3-ce</kafka.version>
 	</properties>
 
 	<dependencies>

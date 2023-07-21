@@ -32,7 +32,6 @@ under the License.
 	<name>Flink : Formats : Avro confluent registry</name>
 
 	<properties>
-		<kafka.version>3.2.3</kafka.version>
 		<confluent.version>7.3.4-21</confluent.version>
 	</properties>
 
@@ -42,6 +41,16 @@ under the License.
 			<url>https://packages.confluent.io/maven/</url>
 		</repository>
 	</repositories>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.apache.kafka</groupId>
+				<artifactId>kafka-clients</artifactId>
+				<version>${kafka.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 		<dependency>

@@ -242,6 +242,14 @@ under the License.
                             <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
                         </artifactItem>
 						<artifactItem>
+							<groupId>io.confluent</groupId>
+							<artifactId>telemetry-events-api</artifactId>
+							<version>${kafka.version}</version>
+							<destFileName>kafka-telemetry.jar</destFileName>
+							<type>jar</type>
+							<outputDirectory>${project.build.directory}/dependencies</outputDirectory>
+						</artifactItem>
+						<artifactItem>
 							<groupId>com.google.guava</groupId>
 							<artifactId>guava</artifactId>
 							<version>30.1.1-jre</version>

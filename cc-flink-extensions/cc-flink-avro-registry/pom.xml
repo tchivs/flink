@@ -32,8 +32,11 @@ under the License.
 	<name>Confluent Flink : Formats : Avro confluent registry</name>
 
 	<properties>
+		<!-- All of these deps are shaded, so we allow them to differ from others we use -->
 		<schema.registry.version>7.5.0-22</schema.registry.version>
+		<avro.registry.kafka.clients.version>7.5.0-203-ccs</avro.registry.kafka.clients.version>
 		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
+		<shaded.prefix>io.confluent.flink.avro.registry.shaded</shaded.prefix>
 	</properties>
 
 	<dependencyManagement>
@@ -41,7 +44,7 @@ under the License.
 			<dependency>
 				<groupId>org.apache.kafka</groupId>
 				<artifactId>kafka-clients</artifactId>
-				<version>${kafka.clients.version}</version>
+				<version>${avro.registry.kafka.clients.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>io.confluent</groupId>
@@ -184,28 +187,35 @@ under the License.
 								</includes>
 								<excludes>
 									<exclude>com.google.code.findbugs:jsr305</exclude>
+									<exclude>org.slf4j:*</exclude>
+									<exclude>com.google.guava:*</exclude>
 								</excludes>
 							</artifactSet>
 							<relocations combine.children="append">
 								<relocation>
 									<pattern>org.apache.kafka</pattern>
-									<shadedPattern>io.confluent.flink.avro.registry.shaded.org.apache.kafka</shadedPattern>
+									<shadedPattern>${shaded.prefix}.org.apache.kafka</shadedPattern>
 								</relocation>
 								<relocation>
 									<pattern>io.confluent</pattern>
-									<shadedPattern>io.confluent.flink.avro.registry.shaded.io.confluent</shadedPattern>
+									<shadedPattern>${shaded.prefix}.io.confluent</shadedPattern>
 								</relocation>
 								<relocation>
 									<pattern>com.fasterxml.jackson</pattern>
-									<shadedPattern>io.confluent.flink.avro.registry.shaded.com.fasterxml.jackson</shadedPattern>
+									<shadedPattern>${shaded.prefix}.com.fasterxml.jackson</shadedPattern>
 								</relocation>
 								<relocation>
 									<pattern>org.apache.avro</pattern>
-									<shadedPattern>io.confluent.flink.avro.registry.shaded.org.apache.avro</shadedPattern>
+									<shadedPattern>${shaded.prefix}.shaded.org.apache.avro</shadedPattern>
 								</relocation>
 								<relocation>
 									<pattern>org.apache.commons.compress</pattern>
-									<shadedPattern>io.confluent.flink.avro.registry.shaded.org.apache.commons.compress</shadedPattern>
+									<shadedPattern>${shaded.prefix}.org.apache.commons.compress</shadedPattern>
+								</relocation>
+								<!-- Reuse Guava that comes with Flink -->
+								<relocation>
+									<pattern>com.google.common</pattern>
+									<shadedPattern>org.apache.flink.shaded.guava30.com.google.common</shadedPattern>
 								</relocation>
 							</relocations>
 							<filters>

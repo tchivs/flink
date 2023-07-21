@@ -36,6 +36,7 @@ under the License.
 
     <properties>
         <japicmp.skip>true</japicmp.skip>
+        <shaded.prefix>org.apache.flink.kafka.shaded</shaded.prefix>
     </properties>
 
     <dependencies>
@@ -76,6 +77,7 @@ under the License.
                                 <includes>
                                     <include>org.apache.flink:flink-connector-kafka</include>
                                     <include>org.apache.kafka:*</include>
+                                    <include>io.confluent:telemetry-events-api</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -89,9 +91,10 @@ under the License.
                                             dependency graph, nor are any jersey files bundled. -->
                                         <exclude>NOTICE</exclude>
                                         <exclude>common/**</exclude>
+                                        <!-- Confluent copyright file -->
+                                        <exclude>COPYRIGHT</exclude>
                                     </excludes>
                                 </filter>
-                                <!-- Do not include Confluent Token Provider -->
                                 <filter>
                                     <artifact>org.apache.flink:flink-connector-kafka</artifact>
                                     <excludes>
@@ -99,11 +102,28 @@ under the License.
                                         <exclude>META-INF/services/org.apache.flink.core.security.token.DelegationTokenReceiver</exclude>
                                     </excludes>
                                 </filter>
+                                <filter>
+                                    <artifact>io.confluent:telemetry-events-api</artifact>
+                                    <excludes>
+                                        <exclude>COPYRIGHT</exclude>
+                                        <exclude>NOTICE</exclude>
+                                    </excludes>
+                                </filter>
                             </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
-                                    <shadedPattern>org.apache.flink.kafka.shaded.org.apache.kafka</shadedPattern>
+                                    <shadedPattern>${shaded.prefix}.org.apache.kafka</shadedPattern>
+                                </relocation>
+                                <!-- Confluent kafka-clients have some classes with io.confluent prefix -->
+                                <relocation>
+                                    <pattern>io.confluent.kafka</pattern>
+                                    <shadedPattern>${shaded.prefix}.io.confluent.kafka</shadedPattern>
+                                </relocation>
+                                <!-- Confluent Telemetry API -->
+                                <relocation>
+                                    <pattern>io.confluent.telemetry</pattern>
+                                    <shadedPattern>${shaded.prefix}.io.confluent.telemetry</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
