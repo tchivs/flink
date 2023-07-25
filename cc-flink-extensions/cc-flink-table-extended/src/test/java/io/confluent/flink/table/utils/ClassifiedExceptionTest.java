@@ -84,7 +84,12 @@ public class ClassifiedExceptionTest {
                         .executeSql("SELECT * FROM t")
                         .allowAdditionalCause(IllegalArgumentException.class)
                         .expectUserError(
-                                "Could not parse value 'INVALID' for key 'number-of-rows'."));
+                                "Could not parse value 'INVALID' for key 'number-of-rows'."),
+                // ---
+                TestSpec.test("not showing catalogs")
+                        .executeSql("INSERT INTO t SELECT 1;")
+                        .expectExactUserError(
+                                "Cannot find table '`default_catalog`.`default_database`.`t`'."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -99,7 +104,14 @@ public class ClassifiedExceptionTest {
         } catch (Exception e) {
             final ClassifiedException classified =
                     ClassifiedException.of(e, testSpec.allowedCauses);
-            assertThat(classified.getMessage()).contains(testSpec.expectedError);
+            switch (testSpec.matchCondition) {
+                case EXACT:
+                    assertThat(classified.getMessage()).isEqualTo(testSpec.expectedError);
+                    break;
+                case CONTAIN:
+                    assertThat(classified.getMessage()).contains(testSpec.expectedError);
+                    break;
+            }
             if (testSpec.unexpectedError != null) {
                 assertThat(classified.getMessage()).doesNotContain(testSpec.unexpectedError);
             }
@@ -108,6 +120,7 @@ public class ClassifiedExceptionTest {
     }
 
     private static class TestSpec {
+
         final String description;
         final List<String> sqlStatements = new ArrayList<>();
         final Set<Class<? extends Exception>> allowedCauses = new HashSet<>();
@@ -115,6 +128,12 @@ public class ClassifiedExceptionTest {
         String expectedError;
         ExceptionClass expectedClass;
         @Nullable String unexpectedError;
+        MatchCondition matchCondition;
+
+        enum MatchCondition {
+            EXACT,
+            CONTAIN
+        }
 
         private TestSpec(String description) {
             this.description = description;
@@ -135,12 +154,21 @@ public class ClassifiedExceptionTest {
         TestSpec expectUserError(String expectedError) {
             this.expectedError = expectedError;
             this.expectedClass = ExceptionClass.PLANNING_USER;
+            this.matchCondition = MatchCondition.CONTAIN;
+            return this;
+        }
+
+        TestSpec expectExactUserError(String expectedError) {
+            this.expectedError = expectedError;
+            this.expectedClass = ExceptionClass.PLANNING_USER;
+            this.matchCondition = MatchCondition.EXACT;
             return this;
         }
 
         TestSpec expectSystemError(String expectedError) {
             this.expectedError = expectedError;
             this.expectedClass = ExceptionClass.PLANNING_SYSTEM;
+            this.matchCondition = MatchCondition.CONTAIN;
             return this;
         }
 

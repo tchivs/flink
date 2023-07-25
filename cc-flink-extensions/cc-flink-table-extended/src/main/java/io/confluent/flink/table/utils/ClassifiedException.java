@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /** Classified exception with a message that can be exposed to the user. */
@@ -52,6 +53,15 @@ public final class ClassifiedException {
                 CodeLocation.inClass(CatalogManager.class, TableException.class),
                 Handler.forwardCauseOnly(
                         "Could not execute AlterTable", ExceptionClass.PLANNING_USER));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.rewriteMessage(
+                        "in any of the catalogs",
+                        ExceptionClass.PLANNING_USER,
+                        message ->
+                                message.substring(0, message.indexOf(" in any of the catalogs"))
+                                        + "."));
 
         // Don't delegate the user to options that can't be set.
         putClassifiedException(
@@ -304,6 +314,19 @@ public final class ClassifiedException {
         static Handler customMessage(
                 @Nullable String onMessagePart, ExceptionClass exceptionClass, String message) {
             return new Handler(onMessagePart, exceptionClass, (e, validCauses) -> message);
+        }
+
+        static Handler rewriteMessage(
+                @Nullable String onMessagePart,
+                ExceptionClass exceptionClass,
+                Function<String, String> rewriteMessage) {
+            return new Handler(
+                    onMessagePart,
+                    exceptionClass,
+                    (e, validCauses) -> {
+                        final String originalMessage = e.getMessage();
+                        return rewriteMessage.apply(originalMessage);
+                    });
         }
 
         /** Classify exception and skip the top-level error message. */
