@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /** SHOW CREATE statement Util. */
@@ -212,15 +213,17 @@ public class ShowCreateUtil {
         if (Objects.isNull(table.getOptions()) || table.getOptions().isEmpty()) {
             return Optional.empty();
         }
+        TreeSet<String> treeSet = new TreeSet<>(table.getOptions().keySet());
         return Optional.of(
-                table.getOptions().entrySet().stream()
+                treeSet.stream()
                         .map(
                                 entry ->
                                         String.format(
                                                 "%s'%s' = '%s'",
                                                 printIndent,
-                                                EncodingUtils.escapeSingleQuotes(entry.getKey()),
-                                                EncodingUtils.escapeSingleQuotes(entry.getValue())))
+                                                EncodingUtils.escapeSingleQuotes(entry),
+                                                EncodingUtils.escapeSingleQuotes(
+                                                        table.getOptions().get(entry))))
                         .collect(Collectors.joining(",\n")));
     }
 
