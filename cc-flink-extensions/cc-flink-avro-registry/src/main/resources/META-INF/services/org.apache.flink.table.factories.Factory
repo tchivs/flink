@@ -1,3 +1,0 @@
-# Copyright 2023 Confluent Inc.
-
-io.confluent.flink.formats.avro.registry.AvroRegistryFormatFactory
