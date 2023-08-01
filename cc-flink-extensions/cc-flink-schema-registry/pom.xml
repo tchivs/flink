@@ -18,8 +18,8 @@ specific language governing permissions and limitations
 under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
 		<artifactId>cc-flink-extensions</artifactId>
 		<groupId>io.confluent.flink</groupId>
@@ -35,6 +35,7 @@ under the License.
 		<!-- All of these deps are shaded, so we allow them to differ from others we use -->
 		<schema.registry.version>7.5.0-22</schema.registry.version>
 		<avro.registry.kafka.clients.version>7.5.0-203-ccs</avro.registry.kafka.clients.version>
+		<registry.everit.version>1.14.2</registry.everit.version>
 		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
 		<shaded.prefix>io.confluent.flink.registry.shaded</shaded.prefix>
 	</properties>
@@ -50,6 +51,16 @@ under the License.
 				<groupId>io.confluent</groupId>
 				<artifactId>common-utils</artifactId>
 				<version>${confluent.common.utils.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.github.erosb</groupId>
+				<artifactId>everit-json-schema</artifactId>
+				<version>${registry.everit.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>32.0.1-jre</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
@@ -84,18 +95,6 @@ under the License.
 					<artifactId>swagger-core</artifactId>
 				</exclusion>
 				<exclusion>
-					<groupId>com.google.guava</groupId>
-					<artifactId>failureaccess</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.google.guava</groupId>
-					<artifactId>listenablefuture</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>io.swagger.core.v3</groupId>
-					<artifactId>swagger-annotations</artifactId>
-				</exclusion>
-				<exclusion>
 					<groupId>com.google.errorprone</groupId>
 					<artifactId>error_prone_annotations</artifactId>
 				</exclusion>
@@ -111,6 +110,14 @@ under the License.
 					<groupId>org.checkerframework</groupId>
 					<artifactId>checker-qual</artifactId>
 				</exclusion>
+				<exclusion>
+					<groupId>org.xerial.snappy</groupId>
+					<artifactId>snappy-java</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.github.luben</groupId>
+					<artifactId>zstd-jni</artifactId>
+				</exclusion>
 			</exclusions>
 		</dependency>
 		<dependency>
@@ -124,6 +131,33 @@ under the License.
 			<artifactId>avro</artifactId>
 			<version>1.11.1</version>
 			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-json-schema-provider</artifactId>
+			<version>${schema.registry.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.kjetland</groupId>
+					<artifactId>mbknor-jackson-jsonschema_2.13</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.jetbrains.kotlin</groupId>
+					<artifactId>kotlin-stdlib</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.jetbrains.kotlin</groupId>
+					<artifactId>kotlin-scripting-jvm</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.jetbrains.kotlin</groupId>
+					<artifactId>kotlin-scripting-compiler-embeddable</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
 		<!-- Table ecosystem -->
@@ -202,20 +236,45 @@ under the License.
 								</relocation>
 								<relocation>
 									<pattern>com.fasterxml.jackson</pattern>
-									<shadedPattern>${shaded.prefix}.com.fasterxml.jackson</shadedPattern>
+									<shadedPattern>${shaded.prefix}.com.fasterxml.jackson
+									</shadedPattern>
 								</relocation>
 								<relocation>
 									<pattern>org.apache.avro</pattern>
-									<shadedPattern>${shaded.prefix}.shaded.org.apache.avro</shadedPattern>
+									<shadedPattern>${shaded.prefix}.shaded.org.apache.avro
+									</shadedPattern>
 								</relocation>
 								<relocation>
-									<pattern>org.apache.commons.compress</pattern>
-									<shadedPattern>${shaded.prefix}.org.apache.commons.compress</shadedPattern>
+									<pattern>org.apache.commons</pattern>
+									<shadedPattern>${shaded.prefix}.org.apache.commons
+									</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>org.everit</pattern>
+									<shadedPattern>${shaded.prefix}.com.everit</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.damnhandy</pattern>
+									<shadedPattern>${shaded.prefix}.com.damnhandy</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.google.re2j</pattern>
+									<shadedPattern>${shaded.prefix}.com.google.re2j</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>org.json</pattern>
+									<shadedPattern>${shaded.prefix}.org.json</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>org.joda</pattern>
+									<shadedPattern>${shaded.prefix}.org.joda</shadedPattern>
 								</relocation>
 								<!-- Reuse Guava that comes with Flink -->
 								<relocation>
 									<pattern>com.google.common</pattern>
-									<shadedPattern>org.apache.flink.shaded.guava30.com.google.common</shadedPattern>
+									<shadedPattern>
+										org.apache.flink.shaded.guava30.com.google.common
+									</shadedPattern>
 								</relocation>
 							</relocations>
 							<filters>

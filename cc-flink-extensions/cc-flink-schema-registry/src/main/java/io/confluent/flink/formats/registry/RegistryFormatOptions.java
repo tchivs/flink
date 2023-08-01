@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.formats.registry.avro;
+package io.confluent.flink.formats.registry;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
@@ -10,7 +10,7 @@ import org.apache.flink.configuration.ConfigOptions;
 
 /** Options for Schema Registry Avro format. */
 @Confluent
-public class AvroRegistryFormatOptions {
+public class RegistryFormatOptions {
 
     // --------------------------------------------------------------------------------------------
     // PRIVATE
@@ -72,5 +72,5 @@ public class AvroRegistryFormatOptions {
         DPAT
     }
 
-    private AvroRegistryFormatOptions() {}
+    private RegistryFormatOptions() {}
 }

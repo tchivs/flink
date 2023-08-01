@@ -9,7 +9,6 @@ import org.apache.flink.annotation.Confluent;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-import org.apache.avro.Schema;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -31,7 +30,7 @@ public class SchemaRegistryCoder {
         this.schemaId = schemaId;
     }
 
-    public Schema readSchema(InputStream in) throws IOException {
+    public ParsedSchema readSchema(InputStream in) throws IOException {
         DataInputStream dataInputStream = new DataInputStream(in);
 
         if (dataInputStream.readByte() != 0) {
@@ -40,9 +39,8 @@ public class SchemaRegistryCoder {
             int schemaId = dataInputStream.readInt();
 
             try {
-                final ParsedSchema schema = schemaRegistryClient.getSchemaById(schemaId);
+                return schemaRegistryClient.getSchemaById(schemaId);
                 // we assume this is avro schema
-                return (Schema) schema.rawSchema();
             } catch (RestClientException e) {
                 throw new IOException(
                         format("Could not find schema with id %s in registry", schemaId), e);

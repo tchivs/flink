@@ -71,7 +71,7 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.VALUE_F
 public class JsonToFlinkSchemaConverter {
 
     /**
-     * Mostly copied over from <a
+     * Mostly adapted the logic from <a
      * href="https://github.com/confluentinc/schema-registry/blob/dd18837717ac3cc2ba8c4574cbff09d95ff17b66/json-schema-converter/src/main/java/io/confluent/connect/json/JsonSchemaData.java">JsonSchemaData</a>
      * Should be kept in sync to handle all connect data types.
      */

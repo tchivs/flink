@@ -6,6 +6,7 @@ package io.confluent.flink.formats.registry;
 
 import org.apache.flink.util.TestLoggerExtension;
 
+import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -40,9 +41,9 @@ class SchemaRegistryCoderTest {
         dataOutputStream.flush();
 
         ByteArrayInputStream byteInStream = new ByteArrayInputStream(byteOutStream.toByteArray());
-        Schema readSchema = registryCoder.readSchema(byteInStream);
+        ParsedSchema readSchema = registryCoder.readSchema(byteInStream);
 
-        assertThat(readSchema).isEqualTo(schema);
+        assertThat(readSchema.rawSchema()).isEqualTo(schema);
         assertThat(byteInStream).isEmpty();
     }
 

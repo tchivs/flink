@@ -2,95 +2,73 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.formats.registry.avro;
+package io.confluent.flink.formats.registry.json;
 
-import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import io.confluent.flink.formats.registry.SchemaRegistryCoder;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
-import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters;
-import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters.AvroToRowDataConverter;
 import io.confluent.flink.formats.registry.avro.utils.MutableByteArrayInputStream;
+import io.confluent.flink.formats.registry.json.JsonToRowDataConverters.JsonToRowDataConverter;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.Decoder;
-import org.apache.avro.io.DecoderFactory;
+import org.everit.json.schema.Schema;
 
 import java.io.IOException;
 import java.util.Objects;
 
 /**
- * A {@link DeserializationSchema} that deserializes {@link RowData} from Avro records using Schema
+ * A {@link DeserializationSchema} that deserializes {@link RowData} from JSON records using Schema
  * Registry protocol.
  */
-@Confluent
-public class AvroRegistryDeserializationSchema implements DeserializationSchema<RowData> {
+public class JsonRegistryDeserializationSchema implements DeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
 
     private final SchemaRegistryConfig schemaRegistryConfig;
-
     private final RowType rowType;
     private final TypeInformation<RowData> producedType;
-
-    //
-    // Initialized in open()
-    //
-    /** Runtime instance that performs the actual work. */
-    private transient AvroToRowDataConverter runtimeConverter;
-
-    /** Reader that reads the serialized record from {@link MutableByteArrayInputStream}. */
-    private transient GenericDatumReader<GenericRecord> datumReader;
 
     /** Input stream to read message from. */
     private transient MutableByteArrayInputStream inputStream;
 
-    /** Avro decoder that decodes binary data. */
-    private transient Decoder decoder;
-
     private transient SchemaRegistryCoder schemaCoder;
 
-    /**
-     * Creates an Avro deserialization schema for the given logical type.
-     *
-     * @param schemaRegistryConfig configuration how to access Schema Registry
-     * @param rowType the type of the row that is consumed
-     */
-    public AvroRegistryDeserializationSchema(
+    private transient ObjectMapper objectMapper;
+
+    private transient JsonToRowDataConverter runtimeConverter;
+
+    public JsonRegistryDeserializationSchema(
             SchemaRegistryConfig schemaRegistryConfig,
             RowType rowType,
-            TypeInformation<RowData> typeInformation) {
+            TypeInformation<RowData> producedType) {
         this.schemaRegistryConfig = schemaRegistryConfig;
         this.rowType = rowType;
-        this.producedType = typeInformation;
+        this.producedType = producedType;
     }
 
     @Override
     public void open(InitializationContext context) throws Exception {
         final SchemaRegistryClient schemaRegistryClient =
                 schemaRegistryConfig.createClient(context.getJobID().orElse(null));
-        final ParsedSchema schema =
-                schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
-        final Schema avroSchema = (Schema) schema.rawSchema();
-        this.runtimeConverter = AvroToRowDataConverters.createConverter(avroSchema, rowType);
-
-        this.datumReader =
-                new GenericDatumReader<>(
-                        avroSchema,
-                        avroSchema,
-                        new GenericData(Thread.currentThread().getContextClassLoader()));
-        this.inputStream = new MutableByteArrayInputStream();
-        this.decoder = DecoderFactory.get().binaryDecoder(inputStream, null);
         this.schemaCoder =
                 new SchemaRegistryCoder(schemaRegistryConfig.getSchemaId(), schemaRegistryClient);
+        final ParsedSchema schema =
+                schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
+        final Schema jsonSchema = (Schema) schema.rawSchema();
+        this.runtimeConverter = JsonToRowDataConverters.createConverter(jsonSchema, rowType);
+        this.inputStream = new MutableByteArrayInputStream();
+        this.objectMapper =
+                new ObjectMapper()
+                        .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                        .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true));
     }
 
     @Override
@@ -100,11 +78,10 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
         }
         try {
             inputStream.setBuffer(message);
-            Schema writerSchema = (Schema) schemaCoder.readSchema(inputStream).rawSchema();
+            schemaCoder.readSchema(inputStream);
 
-            datumReader.setSchema(writerSchema);
-            GenericRecord deserialize = datumReader.read(null, decoder);
-            return (RowData) runtimeConverter.convert(deserialize);
+            final JsonNode jsonNode = objectMapper.readTree(inputStream);
+            return (RowData) runtimeConverter.convert(jsonNode);
         } catch (Exception e) {
             throw new IOException("Failed to deserialize Avro record.", e);
         }
@@ -116,6 +93,11 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
     }
 
     @Override
+    public TypeInformation<RowData> getProducedType() {
+        return producedType;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -123,7 +105,7 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        AvroRegistryDeserializationSchema that = (AvroRegistryDeserializationSchema) o;
+        JsonRegistryDeserializationSchema that = (JsonRegistryDeserializationSchema) o;
         return Objects.equals(schemaRegistryConfig, that.schemaRegistryConfig)
                 && Objects.equals(rowType, that.rowType)
                 && Objects.equals(producedType, that.producedType);
@@ -132,10 +114,5 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
     @Override
     public int hashCode() {
         return Objects.hash(schemaRegistryConfig, rowType, producedType);
-    }
-
-    @Override
-    public TypeInformation<RowData> getProducedType() {
-        return producedType;
     }
 }
