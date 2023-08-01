@@ -136,6 +136,7 @@ under the License.
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-json-schema-provider</artifactId>
 			<version>${schema.registry.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
 				<exclusion>
 					<groupId>com.kjetland</groupId>
@@ -158,6 +159,7 @@ under the License.
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
+			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 
 		<!-- Table ecosystem -->
@@ -273,7 +275,7 @@ under the License.
 								<relocation>
 									<pattern>com.google.common</pattern>
 									<shadedPattern>
-										org.apache.flink.shaded.guava30.com.google.common
+										org.apache.flink.shaded.guava31.com.google.common
 									</shadedPattern>
 								</relocation>
 							</relocations>

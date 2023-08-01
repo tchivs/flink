@@ -11,17 +11,22 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.format.DecodingFormat;
+import org.apache.flink.table.connector.format.EncodingFormat;
+import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.DeserializationFormatFactory;
 import org.apache.flink.table.factories.DynamicTableFactory.Context;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.factories.SerializationFormatFactory;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.confluent.flink.formats.registry.RegistryClientConfigFactory;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
+import io.confluent.flink.formats.registry.json.JsonRegistrySerializationSchema.ValidateMode;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -29,7 +34,8 @@ import java.util.Set;
  * SerializationSchema} and {@link DeserializationSchema}.
  */
 @Confluent
-public class JsonRegistryFormatFactory implements DeserializationFormatFactory {
+public class JsonRegistryFormatFactory
+        implements DeserializationFormatFactory, SerializationFormatFactory {
 
     public static final String IDENTIFIER = "json-registry";
 
@@ -56,6 +62,29 @@ public class JsonRegistryFormatFactory implements DeserializationFormatFactory {
     }
 
     @Override
+    public EncodingFormat<SerializationSchema<RowData>> createEncodingFormat(
+            Context context, ReadableConfig formatOptions) {
+        final SchemaRegistryConfig registryConfig = RegistryClientConfigFactory.get(formatOptions);
+        final ValidateMode validateMode =
+                formatOptions.get(JsonFormatOptions.VALIDATE_WRITES)
+                        ? ValidateMode.VALIDATE_BEFORE_WRITE
+                        : ValidateMode.NONE;
+        return new EncodingFormat<SerializationSchema<RowData>>() {
+            @Override
+            public SerializationSchema<RowData> createRuntimeEncoder(
+                    DynamicTableSink.Context context, DataType physicalDataType) {
+                final RowType rowType = (RowType) physicalDataType.getLogicalType();
+                return new JsonRegistrySerializationSchema(registryConfig, rowType, validateMode);
+            }
+
+            @Override
+            public ChangelogMode getChangelogMode() {
+                return ChangelogMode.insertOnly();
+            }
+        };
+    }
+
+    @Override
     public String factoryIdentifier() {
         return IDENTIFIER;
     }
@@ -67,11 +96,17 @@ public class JsonRegistryFormatFactory implements DeserializationFormatFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return RegistryClientConfigFactory.getOptionalOptions();
+        final Set<ConfigOption<?>> set =
+                new HashSet<>(RegistryClientConfigFactory.getOptionalOptions());
+        set.add(JsonFormatOptions.VALIDATE_WRITES);
+        return set;
     }
 
     @Override
     public Set<ConfigOption<?>> forwardOptions() {
-        return RegistryClientConfigFactory.getForwardOptions();
+        final Set<ConfigOption<?>> set =
+                new HashSet<>(RegistryClientConfigFactory.getForwardOptions());
+        set.add(JsonFormatOptions.VALIDATE_WRITES);
+        return set;
     }
 }

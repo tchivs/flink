@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.confluent.flink.formats.converters.json.CombinedSchemaUtils;
 import org.everit.json.schema.ArraySchema;
 import org.everit.json.schema.CombinedSchema;
-import org.everit.json.schema.NullSchema;
 import org.everit.json.schema.ObjectSchema;
 import org.everit.json.schema.ReferenceSchema;
 import org.everit.json.schema.Schema;
@@ -75,7 +74,7 @@ public class JsonToRowDataConverters {
     public static JsonToRowDataConverter createConverter(
             Schema readSchema, LogicalType targetType) {
         if (targetType.isNullable()) {
-            final Schema nonNullableSchema = extractNonNullableSchema(readSchema);
+            final Schema nonNullableSchema = ConverterUtils.extractNonNullableSchema(readSchema);
             final JsonToRowDataConverter nonNullConverter =
                     createNonNullConverterWithReferenceSchema(nonNullableSchema, targetType);
             return new JsonToRowDataConverter() {
@@ -91,23 +90,6 @@ public class JsonToRowDataConverters {
         } else {
             return createNonNullConverterWithReferenceSchema(readSchema, targetType);
         }
-    }
-
-    private static Schema extractNonNullableSchema(Schema readSchema) {
-        final Schema nonNullableSchema;
-        if (readSchema instanceof CombinedSchema
-                && ((CombinedSchema) readSchema).getSubschemas().size() == 2) {
-            Schema notNullSchema = null;
-            for (Schema subSchema : ((CombinedSchema) readSchema).getSubschemas()) {
-                if (!subSchema.equals(NullSchema.INSTANCE)) {
-                    notNullSchema = subSchema;
-                }
-            }
-            nonNullableSchema = notNullSchema;
-        } else {
-            nonNullableSchema = readSchema;
-        }
-        return nonNullableSchema;
     }
 
     private static JsonToRowDataConverter createNonNullConverterWithReferenceSchema(
