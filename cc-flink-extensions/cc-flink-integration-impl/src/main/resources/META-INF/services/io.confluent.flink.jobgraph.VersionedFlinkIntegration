@@ -3,3 +3,4 @@
 #
 
 io.confluent.flink.jobgraph.v2.FlinkIntegrationImplV2
+io.confluent.flink.jobgraph.v3.FlinkIntegrationImplV3

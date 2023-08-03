@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
 /** {@link FlinkClientWrapperV2} implementation. */
+@Deprecated
 public class FlinkClientWrapperV2Impl implements FlinkClientWrapperV2, FlinkClientWrapper {
 
     @Override

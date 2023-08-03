@@ -9,6 +9,7 @@ import io.confluent.flink.jobgraph.VersionedFlinkIntegration;
 import java.io.IOException;
 
 /** Version 2 of {@link VersionedFlinkIntegration} implementation. */
+@Deprecated
 public class FlinkIntegrationImplV2 implements FlinkIntegrationV2 {
 
     @Override
