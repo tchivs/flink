@@ -67,7 +67,6 @@ import org.apache.flink.streaming.api.checkpoint.WithMasterCheckpointHook;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
-import org.apache.flink.streaming.api.operators.InputSelectable;
 import org.apache.flink.streaming.api.operators.SourceOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.UdfStreamOperatorFactory;
@@ -519,20 +518,6 @@ public class StreamingJobGraphGenerator {
                         "Unaligned checkpoints are currently not supported for custom partitioners, "
                                 + "as rescaling is not guaranteed to work correctly."
                                 + "\nThe user can force Unaligned Checkpoints by using 'execution.checkpointing.unaligned.forced'");
-            }
-
-            for (StreamNode node : streamGraph.getStreamNodes()) {
-                StreamOperatorFactory operatorFactory = node.getOperatorFactory();
-                if (operatorFactory != null) {
-                    Class<?> operatorClass =
-                            operatorFactory.getStreamOperatorClass(userClassloader);
-                    if (InputSelectable.class.isAssignableFrom(operatorClass)) {
-
-                        throw new UnsupportedOperationException(
-                                "Checkpointing is currently not supported for operators that implement InputSelectable:"
-                                        + operatorClass.getName());
-                    }
-                }
             }
         }
 

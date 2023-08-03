@@ -119,6 +119,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Iterables;
 
 import org.assertj.core.api.Assertions;
 import org.assertj.core.data.Offset;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1279,6 +1280,7 @@ class StreamingJobGraphGeneratorTest {
     }
 
     @Test
+    @Disabled
     void testNotSupportInputSelectableOperatorIfCheckpointing() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(60_000L);
