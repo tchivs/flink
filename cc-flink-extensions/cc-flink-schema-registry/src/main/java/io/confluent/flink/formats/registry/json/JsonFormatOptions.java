@@ -18,7 +18,7 @@ public class JsonFormatOptions {
                             "Whether to validate writes against the schema from Schema Registry before"
                                     + "writing a record to a topic. This ensures all records match the expected JSON schema."
                                     + "Disabling might improve performance, but some JSON schema validations might not be"
-                                    + " applied");
+                                    + " applied.");
 
     private JsonFormatOptions() {}
 }

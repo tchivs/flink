@@ -29,6 +29,7 @@ public class ConfluentManagedFormats {
         final Map<String, PublicFormat> formats = new HashMap<>();
         formats.put(PublicRawFormat.IDENTIFIER, PublicRawFormat.INSTANCE);
         formats.put(PublicAvroRegistryFormat.IDENTIFIER, PublicAvroRegistryFormat.INSTANCE);
+        formats.put(PublicJsonRegistryFormat.IDENTIFIER, PublicJsonRegistryFormat.INSTANCE);
         FORMATS = Collections.unmodifiableMap(formats);
     }
 
@@ -134,6 +135,49 @@ public class ConfluentManagedFormats {
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
             return Collections.emptySet();
+        }
+
+        @Override
+        public ChangelogMode getChangelogMode() {
+            return ChangelogMode.insertOnly();
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Format: json-registry
+    // --------------------------------------------------------------------------------------------
+
+    /** Publicly exposed format for {@code json-registry}. */
+    public static class PublicJsonRegistryFormat implements PublicFormat {
+
+        public static final PublicJsonRegistryFormat INSTANCE = new PublicJsonRegistryFormat();
+
+        public static final String IDENTIFIER = "json-registry";
+
+        public static final ConfigOption<Boolean> VALIDATE_WRITES =
+                ConfigOptions.key("validate-writes")
+                        .booleanType()
+                        .defaultValue(true)
+                        .withDescription(
+                                "Whether to validate writes against the schema from Schema Registry"
+                                        + " before writing a record to a topic. This ensures all"
+                                        + " records match the expected JSON schema. Disabling might"
+                                        + " improve performance, but some JSON schema validations"
+                                        + " might not be applied.");
+
+        @Override
+        public String factoryIdentifier() {
+            return IDENTIFIER;
+        }
+
+        @Override
+        public Set<ConfigOption<?>> requiredOptions() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public Set<ConfigOption<?>> optionalOptions() {
+            return Collections.singleton(VALIDATE_WRITES);
         }
 
         @Override
