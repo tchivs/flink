@@ -167,6 +167,7 @@ public class ConfluentManagedTableFactory
             @Nullable Format keyFormat,
             Format valueFormat) {
         return ConfluentManagedTableUtils.createDynamicTableParameters(
+                context.getConfiguration(),
                 context.getObjectIdentifier().asSummaryString(),
                 context.getCatalogTable()
                         .getResolvedSchema()

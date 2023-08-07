@@ -5,11 +5,13 @@
 package io.confluent.flink.table.service;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.CompiledPlan;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Provides abstractions that can be used by the SQL Service or Job Submission Service (JSS) without
@@ -24,8 +26,18 @@ public interface ServiceTasks {
 
     ServiceTasks INSTANCE = new DefaultServiceTasks();
 
-    /** Applies default configuration options to the given {@link TableEnvironment}. */
-    void configureEnvironment(TableEnvironment tableEnvironment);
+    /**
+     * Applies configuration options to the given {@link TableEnvironment}.
+     *
+     * <p>Since configuration is not part of the {@link CompiledPlan}, this method is called from
+     * both SQL Service and Job Submission Service. In the first case, the given options must adhere
+     * to {@link ServiceTasksOptions}. In the latter case, validation is not performed for enabling
+     * cases where customizing Flink with low-level options is necessary.
+     */
+    void configureEnvironment(
+            TableEnvironment tableEnvironment,
+            Map<String, String> options,
+            boolean performValidation);
 
     /**
      * Compiles a {@link QueryOperation} (i.e. a SELECT statement) for foreground result serving.

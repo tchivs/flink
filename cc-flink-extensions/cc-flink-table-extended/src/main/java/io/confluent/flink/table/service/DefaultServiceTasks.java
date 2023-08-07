@@ -5,6 +5,9 @@
 package io.confluent.flink.table.service;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.FallbackKey;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.table.api.Schema;
@@ -12,13 +15,16 @@ import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.ExecutionConfigOptions.RowtimeInserter;
 import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
+import org.apache.flink.table.api.internal.TableConfigValidation;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
@@ -44,11 +50,21 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import static org.apache.flink.configuration.ConfigurationUtils.canBePrefixMap;
+import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapKey;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.IDLE_STATE_RETENTION;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SINK_ROWTIME_INSERTER;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SOURCE_IDLE_TIMEOUT;
 import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
+import static org.apache.flink.table.api.config.TableConfigOptions.LOCAL_TIME_ZONE;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
 
 /** Default implementation of {@link ServiceTasks}. */
@@ -60,8 +76,38 @@ class DefaultServiceTasks implements ServiceTasks {
     // --------------------------------------------------------------------------------------------
 
     @Override
-    public void configureEnvironment(TableEnvironment tableEnvironment) {
+    public void configureEnvironment(
+            TableEnvironment tableEnvironment,
+            Map<String, String> options,
+            boolean performValidation) {
+        final Configuration providedOptions = Configuration.fromMap(options);
+        if (performValidation) {
+            validateConfiguration(providedOptions);
+        }
+
+        providedOptions
+                .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
+                .ifPresent(tableEnvironment::useCatalog);
+
+        providedOptions
+                .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
+                .ifPresent(tableEnvironment::useDatabase);
+
         final TableConfig config = tableEnvironment.getConfig();
+
+        providedOptions
+                .getOptional(ServiceTasksOptions.SQL_STATE_TTL)
+                .ifPresent(v -> config.set(IDLE_STATE_RETENTION, v));
+
+        // Compared to Flink, we use UTC as the default. The time zone should not depend
+        // on the local system's configuration.
+        config.set(
+                LOCAL_TIME_ZONE,
+                providedOptions.getOptional(ServiceTasksOptions.SQL_LOCAL_TIME_ZONE).orElse("UTC"));
+
+        providedOptions
+                .getOptional(ServiceTasksOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT)
+                .ifPresent(v -> config.set(TABLE_EXEC_SOURCE_IDLE_TIMEOUT, v));
 
         // Prevents invalid retractions e.g. through non-deterministic time functions like NOW()
         config.set(
@@ -74,6 +120,115 @@ class DefaultServiceTasks implements ServiceTasks {
         // The limitation of having just a single rowtime attribute column in the query schema
         // causes confusion. The Kafka sink does not use StreamRecord's timestamps anyway.
         config.set(TABLE_EXEC_SINK_ROWTIME_INSERTER, RowtimeInserter.DISABLED);
+
+        // Note: Make sure to set default properties before this line is applied in order to
+        // allow DevOps overwriting defaults via JSS if necessary.
+        config.addConfiguration(providedOptions);
+    }
+
+    private static void validateConfiguration(Configuration providedOptions) {
+        // FactoryUtil is actually intended for factories but has very convenient
+        // validation capabilities. We can replace this call with something custom
+        // if necessary.
+        FactoryUtil.validateFactoryOptions(
+                Collections.emptySet(), ServiceTasksOptions.PUBLIC_OPTIONS, providedOptions);
+
+        try {
+            TableConfigValidation.validateTimeZone(
+                    providedOptions.get(ServiceTasksOptions.SQL_LOCAL_TIME_ZONE));
+        } catch (ValidationException e) {
+            throw new ValidationException(
+                    String.format(
+                            "Invalid value for option '%s'.",
+                            ServiceTasksOptions.SQL_LOCAL_TIME_ZONE.key()),
+                    e);
+        }
+
+        // Also the validation of unconsumed keys is borrowed from FactoryUtil.
+        validateUnconsumedKeys(ServiceTasksOptions.PUBLIC_OPTIONS, providedOptions);
+    }
+
+    private static void validateUnconsumedKeys(
+            Set<ConfigOption<?>> optionalOptions, Configuration providedOptions) {
+        final Set<String> consumedOptionKeys =
+                optionalOptions.stream()
+                        .flatMap(
+                                option ->
+                                        allKeysExpanded(option, providedOptions.keySet()).stream())
+                        .collect(Collectors.toSet());
+
+        final Set<String> deprecatedOptionKeys =
+                optionalOptions.stream()
+                        .flatMap(DefaultServiceTasks::deprecatedKeys)
+                        .collect(Collectors.toSet());
+
+        final Set<String> remainingOptionKeys = new HashSet<>(providedOptions.keySet());
+
+        // Remove consumed keys
+        remainingOptionKeys.removeAll(consumedOptionKeys);
+
+        // Remove placeholder keys
+        optionalOptions.stream()
+                .map(ConfigOption::key)
+                .filter(k -> k.endsWith(FactoryUtil.PLACEHOLDER_SYMBOL))
+                .map(k -> k.substring(0, k.length() - 1))
+                .forEach(
+                        prefix ->
+                                providedOptions
+                                        .keySet()
+                                        .forEach(
+                                                k -> {
+                                                    if (k.startsWith(prefix)) {
+                                                        remainingOptionKeys.remove(k);
+                                                    }
+                                                }));
+
+        if (!remainingOptionKeys.isEmpty()) {
+            throw new ValidationException(
+                    String.format(
+                            "Unsupported configuration options found.\n\n"
+                                    + "Unsupported options:\n"
+                                    + "%s\n\n"
+                                    + "Supported options:\n"
+                                    + "%s",
+                            remainingOptionKeys.stream().sorted().collect(Collectors.joining("\n")),
+                            consumedOptionKeys.stream()
+                                    // Deprecated keys are not shown to not advertise them.
+                                    .filter(k -> !deprecatedOptionKeys.contains(k))
+                                    .sorted()
+                                    .collect(Collectors.joining("\n"))));
+        }
+    }
+
+    private static Set<String> allKeysExpanded(ConfigOption<?> option, Set<String> actualKeys) {
+        final Set<String> staticKeys = allKeys(option).collect(Collectors.toSet());
+        if (!canBePrefixMap(option)) {
+            return staticKeys;
+        }
+        // include all prefix keys of a map option by considering the actually provided keys
+        return Stream.concat(
+                        staticKeys.stream(),
+                        staticKeys.stream()
+                                .flatMap(
+                                        k ->
+                                                actualKeys.stream()
+                                                        .filter(c -> filterPrefixMapKey(k, c))))
+                .collect(Collectors.toSet());
+    }
+
+    private static Stream<String> allKeys(ConfigOption<?> option) {
+        return Stream.concat(Stream.of(option.key()), fallbackKeys(option));
+    }
+
+    private static Stream<String> fallbackKeys(ConfigOption<?> option) {
+        return StreamSupport.stream(option.fallbackKeys().spliterator(), false)
+                .map(FallbackKey::getKey);
+    }
+
+    private static Stream<String> deprecatedKeys(ConfigOption<?> option) {
+        return StreamSupport.stream(option.fallbackKeys().spliterator(), false)
+                .filter(FallbackKey::isDeprecated)
+                .map(FallbackKey::getKey);
     }
 
     // --------------------------------------------------------------------------------------------

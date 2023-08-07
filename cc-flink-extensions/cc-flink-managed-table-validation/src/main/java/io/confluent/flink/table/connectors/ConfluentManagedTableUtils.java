@@ -20,6 +20,8 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.FieldsIn
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
+import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanBoundedMode;
+import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanStartupMode;
 
 import javax.annotation.Nullable;
 
@@ -55,6 +57,11 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.S
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FIELDS_INCLUDE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FORMAT;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MODE;
+import static org.apache.flink.util.OptionalUtils.firstPresent;
 
 /** Utilities for Confluent-native tables. */
 @Confluent
@@ -70,6 +77,7 @@ public class ConfluentManagedTableUtils {
             Format valueFormat) {
         // If this call succeeds all parameters should be correct.
         createDynamicTableParameters(
+                null,
                 tableIdentifier,
                 primaryKeys,
                 partitionKeys,
@@ -81,6 +89,7 @@ public class ConfluentManagedTableUtils {
     }
 
     public static DynamicTableParameters createDynamicTableParameters(
+            @Nullable ReadableConfig sessionConfig,
             String tableIdentifier,
             List<String> primaryKeys,
             List<String> partitionKeys,
@@ -111,9 +120,9 @@ public class ConfluentManagedTableUtils {
 
         final Properties properties = getProperties(options);
 
-        final StartupOptions startupOptions = getStartupOptions(options);
+        final StartupOptions startupOptions = getStartupOptions(sessionConfig, options);
 
-        final BoundedOptions boundedOptions = getBoundedOptions(options);
+        final BoundedOptions boundedOptions = getBoundedOptions(sessionConfig, options);
 
         return new DynamicTableParameters(
                 physicalDataType,
@@ -311,10 +320,32 @@ public class ConfluentManagedTableUtils {
     // Supporting methods
     // --------------------------------------------------------------------------------------------
 
-    private static StartupOptions getStartupOptions(ReadableConfig options) {
+    private static <T> Optional<T> getSessionOption(
+            @Nullable ReadableConfig sessionConfig, ConfigOption<T> option) {
+        if (sessionConfig == null) {
+            return Optional.empty();
+        }
+        return sessionConfig.getOptional(option);
+    }
+
+    private static StartupOptions getStartupOptions(
+            @Nullable ReadableConfig sessionConfig, ReadableConfig options) {
         final Map<ScanTopicPartition, Long> specificOffsets = new HashMap<>();
-        final ScanStartupMode startupMode = options.get(SCAN_STARTUP_MODE);
-        if (startupMode == ScanStartupMode.SPECIFIC_OFFSETS) {
+        final ScanStartupMode tableStartupMode = options.get(SCAN_STARTUP_MODE);
+
+        final Optional<GlobalScanStartupMode> globalStartupMode =
+                getSessionOption(sessionConfig, SQL_TABLES_SCAN_STARTUP_MODE);
+        if (globalStartupMode.isPresent() && tableStartupMode == SCAN_STARTUP_MODE.defaultValue()) {
+            return new StartupOptions(
+                    globalStartupMode.map(m -> ScanStartupMode.valueOf(m.name())).get(),
+                    specificOffsets,
+                    firstPresent(
+                                    getSessionOption(sessionConfig, SQL_TABLES_SCAN_STARTUP_MILLIS),
+                                    getSessionOption(sessionConfig, SCAN_STARTUP_TIMESTAMP_MILLIS))
+                            .orElse(0L));
+        }
+
+        if (tableStartupMode == ScanStartupMode.SPECIFIC_OFFSETS) {
             buildSpecificOffsets(
                     options,
                     SCAN_STARTUP_SPECIFIC_OFFSETS,
@@ -323,15 +354,29 @@ public class ConfluentManagedTableUtils {
         }
 
         return new StartupOptions(
-                startupMode,
+                tableStartupMode,
                 specificOffsets,
                 options.getOptional(SCAN_STARTUP_TIMESTAMP_MILLIS).orElse(0L));
     }
 
-    private static BoundedOptions getBoundedOptions(ReadableConfig options) {
+    private static BoundedOptions getBoundedOptions(
+            @Nullable ReadableConfig sessionConfig, ReadableConfig options) {
         final Map<ScanTopicPartition, Long> specificOffsets = new HashMap<>();
-        final ScanBoundedMode boundedMode = options.get(SCAN_BOUNDED_MODE);
-        if (boundedMode == ScanBoundedMode.SPECIFIC_OFFSETS) {
+        final ScanBoundedMode tableBoundedMode = options.get(SCAN_BOUNDED_MODE);
+
+        final Optional<GlobalScanBoundedMode> globalBoundedMode =
+                getSessionOption(sessionConfig, SQL_TABLES_SCAN_BOUNDED_MODE);
+        if (globalBoundedMode.isPresent() && tableBoundedMode == SCAN_BOUNDED_MODE.defaultValue()) {
+            return new BoundedOptions(
+                    globalBoundedMode.map(m -> ScanBoundedMode.valueOf(m.name())).get(),
+                    specificOffsets,
+                    firstPresent(
+                                    getSessionOption(sessionConfig, SQL_TABLES_SCAN_BOUNDED_MILLIS),
+                                    getSessionOption(sessionConfig, SCAN_BOUNDED_TIMESTAMP_MILLIS))
+                            .orElse(0L));
+        }
+
+        if (tableBoundedMode == ScanBoundedMode.SPECIFIC_OFFSETS) {
             buildSpecificOffsets(
                     options,
                     SCAN_BOUNDED_SPECIFIC_OFFSETS,
@@ -340,7 +385,7 @@ public class ConfluentManagedTableUtils {
         }
 
         return new BoundedOptions(
-                boundedMode,
+                tableBoundedMode,
                 specificOffsets,
                 options.getOptional(SCAN_BOUNDED_TIMESTAMP_MILLIS).orElse(0L));
     }

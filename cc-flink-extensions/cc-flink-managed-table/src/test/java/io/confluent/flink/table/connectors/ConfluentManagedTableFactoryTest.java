@@ -28,6 +28,8 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoun
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.ScanTopicPartition;
+import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanBoundedMode;
+import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanStartupMode;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +42,10 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -259,6 +265,61 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                     },
                     "PARTITIONED BY clause must not contain duplicate columns. Found: [key_k1]");
+        }
+
+        @Test
+        void testSessionConfigurationWithDefaults() {
+            final Map<String, String> options = getComplexOptions();
+            options.put("scan.startup.mode", "earliest-offset");
+            options.put("scan.bounded.mode", "unbounded");
+
+            final Configuration sessionConfig = new Configuration();
+            sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MODE, GlobalScanStartupMode.TIMESTAMP);
+            sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MILLIS, 42L);
+            sessionConfig.set(SQL_TABLES_SCAN_BOUNDED_MODE, GlobalScanBoundedMode.TIMESTAMP);
+            sessionConfig.set(SQL_TABLES_SCAN_BOUNDED_MILLIS, 43L);
+
+            final ConfluentManagedTableFactory factory = new ConfluentManagedTableFactory();
+            final DynamicTableFactory.Context context =
+                    createFactoryContext(
+                            SCHEMA_WITHOUT_PK,
+                            Arrays.asList(KEY_K1, KEY_K2),
+                            options,
+                            sessionConfig);
+            final ConfluentManagedTableSource source =
+                    (ConfluentManagedTableSource) factory.createDynamicTableSource(context);
+            final DynamicTableParameters parameters = source.getParameters();
+            // The defaults for both startup and bounded mode are overwritten with specific
+            // timestamps.
+            assertThat(parameters.startupOptions.startupMode).isEqualTo(ScanStartupMode.TIMESTAMP);
+            assertThat(parameters.startupOptions.startupTimestampMillis).isEqualTo(42L);
+            assertThat(parameters.boundedOptions.boundedMode).isEqualTo(ScanBoundedMode.TIMESTAMP);
+            assertThat(parameters.boundedOptions.boundedTimestampMillis).isEqualTo(43L);
+        }
+
+        @Test
+        void testSessionConfigurationWithCustom() {
+            final Map<String, String> options = getComplexOptions();
+
+            final Configuration sessionConfig = new Configuration();
+            sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MODE, GlobalScanStartupMode.TIMESTAMP);
+            sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MILLIS, 42L);
+            sessionConfig.set(SQL_TABLES_SCAN_BOUNDED_MODE, GlobalScanBoundedMode.LATEST_OFFSET);
+
+            final ConfluentManagedTableFactory factory = new ConfluentManagedTableFactory();
+            final DynamicTableFactory.Context context =
+                    createFactoryContext(
+                            SCHEMA_WITHOUT_PK,
+                            Arrays.asList(KEY_K1, KEY_K2),
+                            options,
+                            sessionConfig);
+            final ConfluentManagedTableSource source =
+                    (ConfluentManagedTableSource) factory.createDynamicTableSource(context);
+            final DynamicTableParameters parameters = source.getParameters();
+            // No custom modes are overwritten.
+            assertThat(parameters.startupOptions.startupMode)
+                    .isEqualTo(ScanStartupMode.SPECIFIC_OFFSETS);
+            assertThat(parameters.boundedOptions.boundedMode).isEqualTo(ScanBoundedMode.TIMESTAMP);
         }
     }
 
@@ -501,6 +562,14 @@ public class ConfluentManagedTableFactoryTest {
 
     private static DynamicTableFactory.Context createFactoryContext(
             ResolvedSchema schema, List<String> partitionKeys, Map<String, String> options) {
+        return createFactoryContext(schema, partitionKeys, options, new Configuration());
+    }
+
+    private static DynamicTableFactory.Context createFactoryContext(
+            ResolvedSchema schema,
+            List<String> partitionKeys,
+            Map<String, String> options,
+            Configuration sessionConfig) {
         return new FactoryUtil.DefaultDynamicTableContext(
                 FactoryMocks.IDENTIFIER,
                 new ResolvedCatalogTable(
@@ -511,7 +580,7 @@ public class ConfluentManagedTableFactoryTest {
                                 options),
                         schema),
                 Collections.emptyMap(),
-                new Configuration(),
+                sessionConfig,
                 FactoryMocks.class.getClassLoader(),
                 false);
     }

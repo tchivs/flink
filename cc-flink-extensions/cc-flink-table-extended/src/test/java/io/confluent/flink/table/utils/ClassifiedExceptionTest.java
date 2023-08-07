@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -97,7 +98,7 @@ public class ClassifiedExceptionTest {
     void testClassifiedException(TestSpec testSpec) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(tableEnv);
+        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
         try {
             testSpec.sqlStatements.forEach(tableEnv::executeSql);
             fail("Exception should have occurred");
