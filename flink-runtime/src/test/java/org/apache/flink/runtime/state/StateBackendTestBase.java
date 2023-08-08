@@ -53,6 +53,7 @@ import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.core.testutils.OneShotLatch;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.queryablestate.KvStateID;
 import org.apache.flink.queryablestate.client.state.serialization.KvStateSerializer;
@@ -236,11 +237,17 @@ public abstract class StateBackendTestBase<B extends AbstractStateBackend> exten
                                         keyGroupRange,
                                         env.getTaskKvStateRegistry(),
                                         TtlTimeProvider.DEFAULT,
-                                        new UnregisteredMetricsGroup(),
+                                        getMetricGroup(),
+                                        getCustomInitializationMetrics(),
                                         Collections.emptyList(),
-                                        new CloseableRegistry()));
+                                        new CloseableRegistry(),
+                                        1.0d));
 
         return backend;
+    }
+
+    protected StateBackend.CustomInitializationMetrics getCustomInitializationMetrics() {
+        return (name, value) -> {};
     }
 
     protected <K> CheckpointableKeyedStateBackend<K> restoreKeyedBackend(
@@ -274,9 +281,15 @@ public abstract class StateBackendTestBase<B extends AbstractStateBackend> exten
                                 keyGroupRange,
                                 env.getTaskKvStateRegistry(),
                                 TtlTimeProvider.DEFAULT,
-                                new UnregisteredMetricsGroup(),
+                                getMetricGroup(),
+                                getCustomInitializationMetrics(),
                                 state,
-                                new CloseableRegistry()));
+                                new CloseableRegistry(),
+                                1.0d));
+    }
+
+    protected MetricGroup getMetricGroup() {
+        return new UnregisteredMetricsGroup();
     }
 
     @Test
@@ -302,9 +315,11 @@ public abstract class StateBackendTestBase<B extends AbstractStateBackend> exten
                                 groupRange,
                                 kvStateRegistry,
                                 TtlTimeProvider.DEFAULT,
-                                new UnregisteredMetricsGroup(),
+                                getMetricGroup(),
+                                getCustomInitializationMetrics(),
                                 Collections.emptyList(),
-                                cancelStreamRegistry));
+                                cancelStreamRegistry,
+                                1.0d));
         try {
             KeyedStateBackend<Integer> nested =
                     keyedStateBackend instanceof TestableKeyedStateBackend

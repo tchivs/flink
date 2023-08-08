@@ -122,4 +122,9 @@ public class ChangelogDelegateEmbeddedRocksDBStateBackendTest
         ChangelogStateBackendTestUtils.testMaterializedRestoreForPriorityQueue(
                 getStateBackend(), env, streamFactory);
     }
+
+    @Override
+    protected boolean checkMetrics() {
+        return false;
+    }
 }

@@ -24,21 +24,25 @@ import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
+import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.state.CheckpointStorage;
 import org.apache.flink.runtime.state.CheckpointableKeyedStateBackend;
 import org.apache.flink.runtime.state.ConfigurableStateBackend;
 import org.apache.flink.runtime.state.IncrementalKeyedStateHandle.HandleAndLocalPath;
 import org.apache.flink.runtime.state.IncrementalRemoteKeyedStateHandle;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.SharedStateRegistry;
 import org.apache.flink.runtime.state.SharedStateRegistryImpl;
 import org.apache.flink.runtime.state.SnapshotResult;
+import org.apache.flink.runtime.state.StateBackend;
 import org.apache.flink.runtime.state.StateBackendTestBase;
 import org.apache.flink.runtime.state.VoidNamespace;
 import org.apache.flink.runtime.state.VoidNamespaceSerializer;
@@ -46,6 +50,7 @@ import org.apache.flink.runtime.state.storage.FileSystemCheckpointStorage;
 import org.apache.flink.runtime.state.storage.JobManagerCheckpointStorage;
 import org.apache.flink.runtime.util.BlockerCheckpointStreamFactory;
 import org.apache.flink.runtime.util.BlockingCheckpointOutputStream;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.function.SupplierWithException;
@@ -77,6 +82,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -84,6 +90,8 @@ import java.util.concurrent.RunnableFuture;
 import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertNotNull;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -116,7 +124,14 @@ public class EmbeddedRocksDBStateBackendTest
                     {
                         true,
                         (SupplierWithException<CheckpointStorage, IOException>)
-                                JobManagerCheckpointStorage::new
+                                JobManagerCheckpointStorage::new,
+                        false
+                    },
+                    {
+                        true,
+                        (SupplierWithException<CheckpointStorage, IOException>)
+                                JobManagerCheckpointStorage::new,
+                        true
                     },
                     {
                         false,
@@ -126,7 +141,8 @@ public class EmbeddedRocksDBStateBackendTest
                                             TEMP_FOLDER.newFolder().toURI().toString();
                                     return new FileSystemCheckpointStorage(
                                             new Path(checkpointPath), 0, -1);
-                                }
+                                },
+                        false
                     }
                 });
     }
@@ -137,12 +153,16 @@ public class EmbeddedRocksDBStateBackendTest
     @Parameterized.Parameter(value = 1)
     public SupplierWithException<CheckpointStorage, IOException> storageSupplier;
 
+    @Parameterized.Parameter(value = 2)
+    public boolean useIngestDB;
+
     // Store it because we need it for the cleanup test.
     private String dbPath;
     private RocksDB db = null;
     private ColumnFamilyHandle defaultCFHandle = null;
     private RocksDBStateUploader rocksDBStateUploader = null;
     private final RocksDBResourceContainer optionsContainer = new RocksDBResourceContainer();
+    private final HashMap<String, Long> initMetricBackingMap = new HashMap<>();
 
     public void prepareRocksDB() throws Exception {
         String dbPath =
@@ -167,12 +187,21 @@ public class EmbeddedRocksDBStateBackendTest
         EmbeddedRocksDBStateBackend backend =
                 new EmbeddedRocksDBStateBackend(enableIncrementalCheckpointing);
         Configuration configuration = new Configuration();
+        configuration.set(USE_INGEST_DB_RESTORE_MODE, useIngestDB);
         configuration.set(
                 RocksDBOptions.TIMER_SERVICE_FACTORY,
                 EmbeddedRocksDBStateBackend.PriorityQueueStateType.ROCKSDB);
         backend = backend.configure(configuration, Thread.currentThread().getContextClassLoader());
         backend.setDbStoragePath(dbPath);
         return backend;
+    }
+
+    @Override
+    protected StateBackend.CustomInitializationMetrics getCustomInitializationMetrics() {
+        return (name, value) -> {
+            initMetricBackingMap.compute(
+                    name, (key, oldValue) -> oldValue == null ? value : value + oldValue);
+        };
     }
 
     @Override
@@ -233,7 +262,8 @@ public class EmbeddedRocksDBStateBackendTest
                                 spy(db),
                                 defaultCFHandle,
                                 optionsContainer.getColumnOptions())
-                        .setEnableIncrementalCheckpointing(enableIncrementalCheckpointing);
+                        .setEnableIncrementalCheckpointing(enableIncrementalCheckpointing)
+                        .setUseIngestDbRestoreMode(useIngestDB);
 
         if (enableIncrementalCheckpointing) {
             rocksDBStateUploader =
@@ -314,19 +344,18 @@ public class EmbeddedRocksDBStateBackendTest
     @Test
     public void testCorrectMergeOperatorSet() throws Exception {
         prepareRocksDB();
-        final ColumnFamilyOptions columnFamilyOptions = spy(new ColumnFamilyOptions());
-        RocksDBKeyedStateBackend<Integer> test = null;
 
-        try {
-            test =
-                    RocksDBTestUtils.builderForTestDB(
-                                    TEMP_FOLDER.newFolder(),
-                                    IntSerializer.INSTANCE,
-                                    db,
-                                    defaultCFHandle,
-                                    columnFamilyOptions)
-                            .setEnableIncrementalCheckpointing(enableIncrementalCheckpointing)
-                            .build();
+        try (ColumnFamilyOptions columnFamilyOptions = spy(new ColumnFamilyOptions());
+                RocksDBKeyedStateBackend<Integer> test =
+                        RocksDBTestUtils.builderForTestDB(
+                                        TEMP_FOLDER.newFolder(),
+                                        IntSerializer.INSTANCE,
+                                        db,
+                                        defaultCFHandle,
+                                        columnFamilyOptions)
+                                .setEnableIncrementalCheckpointing(enableIncrementalCheckpointing)
+                                .setUseIngestDbRestoreMode(useIngestDB)
+                                .build()) {
 
             ValueStateDescriptor<String> stubState1 =
                     new ValueStateDescriptor<>("StubState-1", StringSerializer.INSTANCE);
@@ -338,12 +367,6 @@ public class EmbeddedRocksDBStateBackendTest
             // The default CF is pre-created so sum up to 2 times (once for each stub state)
             verify(columnFamilyOptions, Mockito.times(2))
                     .setMergeOperatorName(RocksDBKeyedStateBackend.MERGE_OPERATOR_NAME);
-        } finally {
-            if (test != null) {
-                IOUtils.closeQuietly(test);
-                test.dispose();
-            }
-            columnFamilyOptions.close();
         }
     }
 
@@ -671,6 +694,29 @@ public class EmbeddedRocksDBStateBackendTest
         if (enableIncrementalCheckpointing) {
             verify(rocksDBStateUploader, times(1)).close();
         }
+    }
+
+    protected <K> CheckpointableKeyedStateBackend<K> restoreKeyedBackend(
+            TypeSerializer<K> keySerializer,
+            int numberOfKeyGroups,
+            KeyGroupRange keyGroupRange,
+            List<KeyedStateHandle> state,
+            Environment env)
+            throws Exception {
+        CheckpointableKeyedStateBackend<K> restoreResult =
+                super.restoreKeyedBackend(
+                        keySerializer, numberOfKeyGroups, keyGroupRange, state, env);
+
+        // If something was restored, check that all expected metrics are present.
+        if (checkMetrics() && !CollectionUtil.isEmptyOrAllElementsNull(state)) {
+            assertThat(initMetricBackingMap.keySet())
+                    .containsExactlyInAnyOrder("RestoreStateDurationMs", "DownloadStateDurationMs");
+        }
+        return restoreResult;
+    }
+
+    protected boolean checkMetrics() {
+        return true;
     }
 
     private static class AcceptAllFilter implements IOFileFilter {
