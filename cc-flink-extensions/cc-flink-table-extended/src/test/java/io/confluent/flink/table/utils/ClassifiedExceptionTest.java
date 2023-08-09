@@ -88,9 +88,27 @@ public class ClassifiedExceptionTest {
                                 "Could not parse value 'INVALID' for key 'number-of-rows'."),
                 // ---
                 TestSpec.test("not showing catalogs")
-                        .executeSql("INSERT INTO t SELECT 1;")
+                        .executeSql("INSERT INTO t SELECT 1")
                         .expectExactUserError(
-                                "Cannot find table '`default_catalog`.`default_database`.`t`'."));
+                                "Cannot find table '`default_catalog`.`default_database`.`t`'."),
+                // ---
+                TestSpec.test("unsupported scripts")
+                        .executeSql("SELECT 1; SELECT 1;")
+                        .expectExactUserError(
+                                "Only a single statement is supported at a time. "
+                                        + "Multiple INSERT INTO statements can be wrapped into a STATEMENT SET."),
+                // ---
+                TestSpec.test("unknown current database")
+                        .executeSql("USE bad_db")
+                        .expectExactUserError(
+                                "A database with name 'bad_db' does not exist, or you "
+                                        + "have no permissions to access it in catalog 'default_catalog'."),
+                // ---
+                TestSpec.test("unknown current catalog")
+                        .executeSql("USE CATALOG bad_cat")
+                        .expectExactUserError(
+                                "A catalog with name 'bad_cat' does not exist, or "
+                                        + "you have no permissions to access it."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")

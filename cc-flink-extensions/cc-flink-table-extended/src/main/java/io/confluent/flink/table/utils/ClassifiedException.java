@@ -8,8 +8,11 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
 import org.apache.flink.table.planner.plan.schema.CatalogSourceTable;
+import org.apache.flink.util.Preconditions;
 
 import javax.annotation.Nullable;
 
@@ -62,6 +65,54 @@ public final class ClassifiedException {
                         message ->
                                 message.substring(0, message.indexOf(" in any of the catalogs"))
                                         + "."));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, CatalogException.class),
+                Handler.forwardMessage(
+                        "Current catalog has not been set.", ExceptionClass.PLANNING_USER));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, CatalogException.class),
+                Handler.rewriteMessage(
+                        "database with name",
+                        ExceptionClass.PLANNING_USER,
+                        message ->
+                                // from:
+                                // "A database with name [%s] does not exist in the catalog: [%s]."
+                                // to:
+                                // "A database with name '%s' does not exist, or you have no
+                                // permissions to access it in catalog '%s'."
+                                message.replace(
+                                                " in the catalog:",
+                                                ", or you have no permissions to access it in catalog")
+                                        .replace('[', '\'')
+                                        .replace(']', '\'')));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, CatalogException.class),
+                Handler.rewriteMessage(
+                        "catalog with name",
+                        ExceptionClass.PLANNING_USER,
+                        message ->
+                                // from:
+                                // "A catalog with name [%s] does not exist."
+                                // to:
+                                // "A catalog with name '%s' does not exist, or you have no
+                                // permissions to access it."
+                                message.replace(
+                                                "does not exist",
+                                                "does not exist, or you have no permissions to access it")
+                                        .replace('[', '\'')
+                                        .replace(']', '\'')));
+
+        putClassifiedException(
+                CodeLocation.inClass(ParserImpl.class, IllegalArgumentException.class),
+                Handler.rewriteMessage(
+                        "only single statement supported",
+                        ExceptionClass.PLANNING_USER,
+                        message ->
+                                "Only a single statement is supported at a time. "
+                                        + "Multiple INSERT INTO statements can be wrapped into a STATEMENT SET."));
 
         // Don't delegate the user to options that can't be set.
         putClassifiedException(
@@ -144,34 +195,33 @@ public final class ClassifiedException {
 
     /** Classifies the given exception into a {@link ExceptionClass} and message. */
     public static ClassifiedException of(Exception e, Set<Class<? extends Exception>> validCauses) {
-        final StackTraceElement[] stackTrace = e.getStackTrace();
-        if (stackTrace.length > 0) {
-            final List<Handler> handlersByClass =
-                    classifiedExceptions.get(
-                            new CodeLocation(e.getClass(), stackTrace[0].getClassName(), null));
-            if (handlersByClass != null) {
-                final Optional<Handler> matchingHandler =
-                        handlersByClass.stream().filter(h -> h.matches(e)).findFirst();
-                if (matchingHandler.isPresent()) {
-                    final Handler handler = matchingHandler.get();
-                    return new ClassifiedException(
-                            handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
-                }
+        final StackTraceElement stackTrace = getCauseFromStackTrace(e.getStackTrace());
+
+        final List<Handler> handlersByClass =
+                classifiedExceptions.get(
+                        new CodeLocation(e.getClass(), stackTrace.getClassName(), null));
+        if (handlersByClass != null) {
+            final Optional<Handler> matchingHandler =
+                    handlersByClass.stream().filter(h -> h.matches(e)).findFirst();
+            if (matchingHandler.isPresent()) {
+                final Handler handler = matchingHandler.get();
+                return new ClassifiedException(
+                        handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
             }
-            final List<Handler> handlersByMethod =
-                    classifiedExceptions.get(
-                            new CodeLocation(
-                                    e.getClass(),
-                                    stackTrace[0].getClassName(),
-                                    stackTrace[0].getMethodName()));
-            if (handlersByMethod != null) {
-                final Optional<Handler> matchingHandler =
-                        handlersByMethod.stream().filter(h -> h.matches(e)).findFirst();
-                if (matchingHandler.isPresent()) {
-                    final Handler handler = matchingHandler.get();
-                    return new ClassifiedException(
-                            handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
-                }
+        }
+        final List<Handler> handlersByMethod =
+                classifiedExceptions.get(
+                        new CodeLocation(
+                                e.getClass(),
+                                stackTrace.getClassName(),
+                                stackTrace.getMethodName()));
+        if (handlersByMethod != null) {
+            final Optional<Handler> matchingHandler =
+                    handlersByMethod.stream().filter(h -> h.matches(e)).findFirst();
+            if (matchingHandler.isPresent()) {
+                final Handler handler = matchingHandler.get();
+                return new ClassifiedException(
+                        handler.exceptionClass, handler.messageProvider.apply(e, validCauses));
             }
         }
 
@@ -184,6 +234,13 @@ public final class ClassifiedException {
 
         return new ClassifiedException(
                 ExceptionClass.PLANNING_SYSTEM, buildMessageWithCauses(e, null));
+    }
+
+    private static StackTraceElement getCauseFromStackTrace(StackTraceElement[] stackTrace) {
+        if (stackTrace[0].getClassName().equals(Preconditions.class.getName())) {
+            return stackTrace[1];
+        }
+        return stackTrace[0];
     }
 
     // --------------------------------------------------------------------------------------------

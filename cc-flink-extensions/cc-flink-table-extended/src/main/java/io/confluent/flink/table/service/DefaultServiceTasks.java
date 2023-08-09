@@ -91,10 +91,12 @@ class DefaultServiceTasks implements ServiceTasks {
 
         providedOptions
                 .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
+                .filter(v -> !v.isEmpty())
                 .ifPresent(tableEnvironment::useCatalog);
 
         providedOptions
                 .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
+                .filter(v -> !v.isEmpty())
                 .ifPresent(tableEnvironment::useDatabase);
 
         final TableConfig config = tableEnvironment.getConfig();
