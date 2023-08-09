@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.table.service;
+package io.confluent.flink.table.configuration;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.CompiledPlan;

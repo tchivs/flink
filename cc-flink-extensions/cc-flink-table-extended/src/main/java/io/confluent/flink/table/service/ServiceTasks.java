@@ -10,6 +10,8 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 
+import io.confluent.flink.table.configuration.ConnectorOptionsProvider;
+
 import java.util.List;
 import java.util.Map;
 

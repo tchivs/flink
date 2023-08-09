@@ -44,8 +44,12 @@ import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
+import io.confluent.flink.table.configuration.ConnectorOptionsProvider;
+import io.confluent.flink.table.configuration.ServiceTaskOptions;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
+import io.confluent.flink.table.functions.scalar.ai.AIResponseGenerator;
+import io.confluent.flink.table.functions.scalar.ai.AISecret;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -124,6 +128,13 @@ class DefaultServiceTasks implements ServiceTasks {
         // Note: Make sure to set default properties before this line is applied in order to
         // allow DevOps overwriting defaults via JSS if necessary.
         config.addConfiguration(providedOptions);
+
+        // Confluent AI Functions loaded when flag is set
+        if (config.get(ServiceTaskOptions.USE_CONFLUENT_AI_FUNCTIONS)) {
+            tableEnvironment.createTemporarySystemFunction(
+                    "ai_generate", AIResponseGenerator.class);
+            tableEnvironment.createTemporarySystemFunction("secret", AISecret.class);
+        }
     }
 
     private static void validateConfiguration(Configuration providedOptions) {
