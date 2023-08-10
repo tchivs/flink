@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static io.confluent.flink.table.configuration.ServiceTaskOptions.USE_CONFLUENT_AI_FUNCTIONS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -54,7 +54,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         tableEnv.getConfig()
-                .set(USE_CONFLUENT_AI_FUNCTIONS.key(), String.valueOf(aiFunctionsEnabled));
+                .set(CONFLUENT_AI_FUNCTIONS_ENABLED.key(), String.valueOf(aiFunctionsEnabled));
         INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
         return tableEnv;
     }

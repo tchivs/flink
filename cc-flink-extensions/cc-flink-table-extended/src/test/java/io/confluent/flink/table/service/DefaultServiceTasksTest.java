@@ -20,7 +20,6 @@ import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
-import io.confluent.flink.table.configuration.ConnectorOptionsProvider;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import org.junit.jupiter.api.Test;
 

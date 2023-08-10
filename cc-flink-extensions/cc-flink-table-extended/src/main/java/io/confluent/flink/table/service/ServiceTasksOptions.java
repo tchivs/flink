@@ -18,7 +18,7 @@ import static org.apache.flink.table.factories.FactoryUtil.PLACEHOLDER_SYMBOL;
 /** Supported configuration options for {@link ServiceTasks}. */
 @Confluent
 public final class ServiceTasksOptions {
-
+    public static final String PRIVATE_PREFIX = "confluent.";
     public static final ConfigOption<String> CLIENT =
             ConfigOptions.key("client." + PLACEHOLDER_SYMBOL)
                     .stringType()
@@ -114,6 +114,11 @@ public final class ServiceTasksOptions {
                                     + "This option is not applied if the table has already set a value.");
 
     public static final Set<ConfigOption<?>> PUBLIC_OPTIONS = initPublicOptions();
+    public static final ConfigOption<Boolean> CONFLUENT_AI_FUNCTIONS_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "ai-functions.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("A flag to enable or disable Confluent AI functions.");
 
     private static Set<ConfigOption<?>> initPublicOptions() {
         final Set<ConfigOption<?>> options = new HashSet<>();
