@@ -77,6 +77,8 @@ class DefaultServiceTasks implements ServiceTasks {
     // configureEnvironment
     // --------------------------------------------------------------------------------------------
 
+    private static final String UNKNOWN = "<UNKNOWN>";
+
     @Override
     public void configureEnvironment(
             TableEnvironment tableEnvironment,
@@ -87,15 +89,30 @@ class DefaultServiceTasks implements ServiceTasks {
             validateConfiguration(providedOptions);
         }
 
+        // "<UNKNOWN>" is a reserved string in ObjectIdentifier and is used for creating an
+        // invalid built-in catalog that cannot be accessed.
         providedOptions
                 .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
                 .filter(v -> !v.isEmpty())
-                .ifPresent(tableEnvironment::useCatalog);
-
+                .ifPresent(
+                        v -> {
+                            if (v.equals(UNKNOWN)) {
+                                throw new ValidationException(
+                                        String.format("Catalog name '%s' is not allowed.", v));
+                            }
+                            tableEnvironment.useCatalog(v);
+                        });
         providedOptions
                 .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
                 .filter(v -> !v.isEmpty())
-                .ifPresent(tableEnvironment::useDatabase);
+                .ifPresent(
+                        v -> {
+                            if (v.equals(UNKNOWN)) {
+                                throw new ValidationException(
+                                        String.format("Database name '%s' is not allowed.", v));
+                            }
+                            tableEnvironment.useDatabase(v);
+                        });
 
         final TableConfig config = tableEnvironment.getConfig();
 

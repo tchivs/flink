@@ -230,6 +230,16 @@ public class DefaultServiceTasksTest {
                                 + "sql.tables.scan.idle-timeout\n"
                                 + "sql.tables.scan.startup.mode\n"
                                 + "sql.tables.scan.startup.timestamp-millis");
+
+        // Reserved catalog name
+        assertThatThrownBy(
+                        () ->
+                                ServiceTasks.INSTANCE.configureEnvironment(
+                                        tableEnv,
+                                        Collections.singletonMap(
+                                                "sql.current-catalog", "<UNKNOWN>"),
+                                        true))
+                .hasMessageContaining("Catalog name '<UNKNOWN>' is not allowed.");
     }
 
     @Test
