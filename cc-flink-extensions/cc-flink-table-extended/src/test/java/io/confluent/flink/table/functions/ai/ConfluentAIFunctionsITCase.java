@@ -53,9 +53,11 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
     private static TableEnvironment getTableEnvironment(boolean aiFunctionsEnabled) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        tableEnv.getConfig()
-                .set(CONFLUENT_AI_FUNCTIONS_ENABLED.key(), String.valueOf(aiFunctionsEnabled));
-        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.singletonMap(
+                        CONFLUENT_AI_FUNCTIONS_ENABLED.key(), String.valueOf(aiFunctionsEnabled)),
+                true);
         return tableEnv;
     }
 

@@ -175,6 +175,7 @@ public class DefaultServiceTasksTest {
         validOptions.put("sql.tables.scan.startup.timestamp-millis", "1001");
         validOptions.put("sql.tables.scan.bounded.mode", "latest-offset");
         validOptions.put("sql.tables.scan.bounded.timestamp-millis", "1002");
+        validOptions.put("confluent.ai-functions.enabled", "true");
 
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
@@ -220,6 +221,7 @@ public class DefaultServiceTasksTest {
                                 + "does-not-exist\n"
                                 + "\n"
                                 + "Supported options:\n"
+                                + "confluent.ai-functions.enabled\n"
                                 + "sql.current-catalog\n"
                                 + "sql.current-database\n"
                                 + "sql.local-time-zone\n"

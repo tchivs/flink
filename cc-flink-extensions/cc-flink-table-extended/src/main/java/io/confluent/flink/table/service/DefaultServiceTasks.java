@@ -149,7 +149,9 @@ class DefaultServiceTasks implements ServiceTasks {
         config.set(TABLE_EXEC_SINK_ROWTIME_INSERTER, RowtimeInserter.DISABLED);
 
         // Confluent AI Functions loaded when flag is set
-        if (config.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
+        if (providedOptions
+                .getOptional(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)
+                .orElse(false)) {
             tableEnvironment.createTemporarySystemFunction(
                     "ai_generate", AIResponseGenerator.class);
             tableEnvironment.createTemporarySystemFunction("secret", AISecret.class);

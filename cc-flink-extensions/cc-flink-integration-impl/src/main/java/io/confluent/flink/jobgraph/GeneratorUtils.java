@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static io.confluent.flink.jobgraph.v3.JobGraphGeneratorV3.CONFLUENT_USER_PREFIX;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
 
 /** Utils for {@link JobGraph} generation. Currently, only from a {@link CompiledPlan}. */
 public class GeneratorUtils {
@@ -61,6 +62,9 @@ public class GeneratorUtils {
                                 Collectors.toMap(
                                         e -> e.getKey().substring(CONFLUENT_USER_PREFIX.length()),
                                         Map.Entry::getValue));
+        // Always enable AI functions for JSS, SQL service will guard the CompiledPlan reference
+        publicOptions.put(CONFLUENT_AI_FUNCTIONS_ENABLED.key(), "true");
+
         ServiceTasks.INSTANCE.configureEnvironment(tableEnvironment, publicOptions, false);
 
         final PlannerBase planner = (PlannerBase) tableEnvironment.getPlanner();
