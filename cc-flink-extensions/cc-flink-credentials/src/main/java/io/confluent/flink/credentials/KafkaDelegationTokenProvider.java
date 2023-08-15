@@ -22,6 +22,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -29,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static io.confluent.flink.credentials.JobOptions.COMMA_SEPARATED_PRINCIPALS;
 import static io.confluent.flink.credentials.JobOptions.COMPUTE_POOL_ID;
 import static io.confluent.flink.credentials.JobOptions.IDENTITY_POOL_ID;
 import static io.confluent.flink.credentials.JobOptions.STATEMENT_ID_CRN;
@@ -160,12 +164,22 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
             if (jobConfiguration == null) {
                 continue;
             }
+
+            String commaSeparatedPrincipals =
+                    jobConfiguration.getString(COMMA_SEPARATED_PRINCIPALS);
+            List<String> principals =
+                    commaSeparatedPrincipals == null
+                            ? Collections.emptyList()
+                            : Arrays.stream(commaSeparatedPrincipals.split(","))
+                                    .collect(Collectors.toList());
+
             JobCredentialsMetadata jobCredentialsMetadata =
                     new JobCredentialsMetadata(
                             jobID,
                             jobConfiguration.getString(STATEMENT_ID_CRN),
                             jobConfiguration.getString(COMPUTE_POOL_ID),
                             jobConfiguration.getString(IDENTITY_POOL_ID),
+                            principals,
                             clock.absoluteTimeMillis(),
                             clock.absoluteTimeMillis());
             fetchToken(jobCredentialsMetadata);

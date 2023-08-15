@@ -12,7 +12,10 @@ import org.apache.flink.util.TestLoggerExtension;
 
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc.FlinkCredentialServiceBlockingStub;
+import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialV2;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentials;
+import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
+import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsRequest;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsResponse;
 import com.google.protobuf.ByteString;
@@ -31,6 +34,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,21 +73,37 @@ public class KafkaCredentialFetcherImplTest {
         flinkCredentialService = FlinkCredentialServiceGrpc.newBlockingStub(channel);
         jobCredentialsMetadata =
                 new JobCredentialsMetadata(
-                        JobID.generate(), "statementId", "computePoolId", "identityPoolId", 0, 10);
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "identityPoolId",
+                        new ArrayList<>(),
+                        0,
+                        10);
         decrypter = new MockCredentialDecrypter();
         fetcher =
                 new KafkaCredentialFetcherImpl(
                         flinkCredentialService, dpatTokenExchanger, decrypter);
         handler.withResponse(
-                GetCredentialsResponse.newBuilder()
-                        .setFlinkCredentials(
-                                FlinkCredentials.newBuilder()
-                                        .setApiKey("api_key")
-                                        .setEncryptedSecret(
-                                                ByteString.copyFrom(
-                                                        "secret", StandardCharsets.UTF_8))
-                                        .build())
-                        .build());
+                        GetCredentialsResponse.newBuilder()
+                                .setFlinkCredentials(
+                                        FlinkCredentials.newBuilder()
+                                                .setApiKey("api_key")
+                                                .setEncryptedSecret(
+                                                        ByteString.copyFrom(
+                                                                "secret", StandardCharsets.UTF_8))
+                                                .build())
+                                .build())
+                .withResponseV2(
+                        GetCredentialResponseV2.newBuilder()
+                                .setFlinkCredentials(
+                                        FlinkCredentialV2.newBuilder()
+                                                .setApiKey("api_key")
+                                                .setEncryptedSecret(
+                                                        ByteString.copyFrom(
+                                                                "secret", StandardCharsets.UTF_8))
+                                                .build())
+                                .build());
         decrypter.withDecryptedResult("decrypted_secret".getBytes());
         dpatTokenExchanger.withToken(new DPATToken("token"));
     }
@@ -101,9 +125,118 @@ public class KafkaCredentialFetcherImplTest {
     }
 
     @Test
+    public void testFetch_success_sa_principals() {
+        List<String> saPrincipals =
+                Arrays.stream(new String[] {"sa-123"}).collect(Collectors.toList());
+        JobCredentialsMetadata saJobCredentialsMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(), "statementId", "computePoolId", "", saPrincipals, 0, 10);
+        KafkaCredentials kafkaCredentials = fetcher.fetchToken(saJobCredentialsMetadata);
+        assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
+    }
+
+    @Test
+    public void testFetch_success_user_principals() {
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "",
+                        Collections.singletonList("u-123"),
+                        0,
+                        10);
+        KafkaCredentials kafkaCredentials = fetcher.fetchToken(userJobCredentialMetadata);
+        assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
+    }
+
+    @Test
+    public void testFetch_success_user_principals_pools() {
+        List<String> userAndIdentityPoolPrincipals =
+                Arrays.stream(new String[] {"u-123", "pool-123", "pool-234"})
+                        .collect(Collectors.toList());
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        KafkaCredentials kafkaCredentials = fetcher.fetchToken(userJobCredentialMetadata);
+        assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
+    }
+
+    @Test
     public void testFetch_failGetCredentials() {
         handler.withError();
         assertThatThrownBy(() -> fetcher.fetchToken(jobCredentialsMetadata))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Failed to do credential request");
+    }
+
+    @Test
+    public void testFetch_failGetCredentials_user_pools() {
+        List<String> userAndIdentityPoolPrincipals =
+                Arrays.stream(new String[] {"u-123", "pool-123", "pool-234"})
+                        .collect(Collectors.toList());
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadata))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Failed to do credential request");
+    }
+
+    @Test
+    public void testFetch_error_null_jobcredentialmetadatada() {
+        assertThatThrownBy(() -> fetcher.fetchToken(null))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Failed to do credential request");
+    }
+
+    @Test
+    public void testFetch_failGetCredentials_user() {
+        List<String> userPrincipals =
+                Arrays.stream(new String[] {"u-123"}).collect(Collectors.toList());
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "",
+                        userPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadata))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Failed to do credential request");
+    }
+
+    @Test
+    public void testFetch_failGetCredentials_sa() {
+        List<String> userPrincipals =
+                Arrays.stream(new String[] {"sa-123"}).collect(Collectors.toList());
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "statementId",
+                        "computePoolId",
+                        "",
+                        userPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadata))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Failed to do credential request");
     }
@@ -128,6 +261,7 @@ public class KafkaCredentialFetcherImplTest {
     public static class Handler extends FlinkCredentialServiceGrpc.FlinkCredentialServiceImplBase {
 
         private GetCredentialsResponse response;
+        private GetCredentialResponseV2 responseV2;
         private boolean error;
 
         public Handler() {}
@@ -142,6 +276,11 @@ public class KafkaCredentialFetcherImplTest {
             return this;
         }
 
+        public Handler withResponseV2(GetCredentialResponseV2 response) {
+            this.responseV2 = response;
+            return this;
+        }
+
         @Override
         public void getCredentials(
                 GetCredentialsRequest request,
@@ -151,6 +290,18 @@ public class KafkaCredentialFetcherImplTest {
                 return;
             }
             responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void getCredentialV2(
+                GetCredentialRequestV2 request,
+                StreamObserver<GetCredentialResponseV2> responseObserver) {
+            if (error) {
+                responseObserver.onError(new RuntimeException("Server Error!"));
+                return;
+            }
+            responseObserver.onNext(responseV2);
             responseObserver.onCompleted();
         }
     }

@@ -29,4 +29,10 @@ public class JobOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("The statement id of the job");
+
+    public static final ConfigOption<String> COMMA_SEPARATED_PRINCIPALS =
+            ConfigOptions.key("job.principal.ids")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The comma separated principals of the job");
 }

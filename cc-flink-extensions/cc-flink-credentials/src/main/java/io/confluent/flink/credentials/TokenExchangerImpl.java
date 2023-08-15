@@ -12,6 +12,7 @@ import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import okhttp3.Credentials;
@@ -21,10 +22,16 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Gets the static credentials and does a token exchange for a DPAT token from cc-flow-service and
@@ -32,6 +39,8 @@ import java.net.URL;
  */
 @Confluent
 public class TokenExchangerImpl implements TokenExchanger {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TokenExchangerImpl.class);
     private static final String PATH = "/flink/access_tokens";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     public static final MediaType JSON = MediaType.get("application/json");
@@ -65,11 +74,10 @@ public class TokenExchangerImpl implements TokenExchanger {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        ObjectNode node = mapper.createObjectNode();
-        node.put("statement_id", jobCredentialsMetadata.getStatementIdCRN());
-        node.put("compute_pool_id", jobCredentialsMetadata.getComputePoolId());
+        RequestBody body =
+                RequestBody.create(JSON, buildObjectNode(jobCredentialsMetadata).toString());
 
-        RequestBody body = RequestBody.create(JSON, node.toString());
+        LOG.info("Request body to token exchange service {}", body);
         String credential =
                 Credentials.basic(staticCredentials.getKey(), staticCredentials.getValue());
         Request request =
@@ -80,6 +88,9 @@ public class TokenExchangerImpl implements TokenExchanger {
                         .build();
         try (Response response = httpClient.newCall(request).execute()) {
             if (response.isSuccessful()) {
+                LOG.info(
+                        "Successfully exchange token for static credential {}",
+                        staticCredentials.getLeft());
                 return new DPATToken(getTokenFromResponse(mapper, response.body().string()));
             } else {
                 throw new FlinkRuntimeException(
@@ -114,5 +125,88 @@ public class TokenExchangerImpl implements TokenExchanger {
             throw new FlinkRuntimeException("Error fetching token: " + message);
         }
         return tokenNode.asText();
+    }
+
+    /**
+     * BuildRequestBody will create the body according the principals provided in the
+     * jobCredentialsMetadata.
+     *
+     * @param jobCredentialsMetadata the jobCredentialsMetadata
+     * @return the jackson ObjectNode
+     */
+    ObjectNode buildObjectNode(JobCredentialsMetadata jobCredentialsMetadata) {
+
+        if (isLegacyIdentityPoolFlow(jobCredentialsMetadata)) {
+            return legacyIdentityPoolRequestBody(
+                    jobCredentialsMetadata.getStatementIdCRN(),
+                    jobCredentialsMetadata.getComputePoolId());
+        }
+
+        Optional<String> serviceAccount =
+                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "sa-").findFirst();
+        Optional<String> user =
+                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "u-").findFirst();
+        List<String> identityPools =
+                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "pool-")
+                        .collect(Collectors.toList());
+
+        return serviceAccount
+                .map(
+                        s ->
+                                serviceAccountRequestBody(
+                                        jobCredentialsMetadata.getStatementIdCRN(),
+                                        s,
+                                        jobCredentialsMetadata.getComputePoolId()))
+                .orElseGet(
+                        () ->
+                                userRequestBody(
+                                        jobCredentialsMetadata.getStatementIdCRN(),
+                                        user.get(),
+                                        jobCredentialsMetadata.getComputePoolId(),
+                                        identityPools));
+    }
+
+    private ObjectNode legacyIdentityPoolRequestBody(String statementCrn, String computePoolId) {
+        final ObjectMapper mapper = new ObjectMapper();
+        final ObjectNode node = mapper.createObjectNode();
+        node.put("statement_id", statementCrn);
+        node.put("compute_pool_id", computePoolId);
+        return node;
+    }
+
+    private ObjectNode serviceAccountRequestBody(
+            String statementCrn, String serviceAccount, String computePoolId) {
+        final ObjectMapper mapper = new ObjectMapper();
+        final ObjectNode node = mapper.createObjectNode();
+        node.put("statement_crn", statementCrn);
+        node.put("compute_pool_id", computePoolId);
+        node.put("service_account_id", serviceAccount);
+        return node;
+    }
+
+    private ObjectNode userRequestBody(
+            String statementCrn, String userId, String computePoolId, List<String> identityPools) {
+        final ObjectMapper mapper = new ObjectMapper();
+        final ObjectNode node = mapper.createObjectNode();
+        node.put("statement_crn", statementCrn);
+        node.put("compute_pool_id", computePoolId);
+        node.put("user_id", userId);
+
+        if (!identityPools.isEmpty()) {
+            ArrayNode arrayNode = node.putArray("identity_pool_ids");
+            identityPools.forEach(arrayNode::add);
+        }
+
+        return node;
+    }
+
+    private Stream<String> filterByPrefix(List<String> principals, String prefix) {
+        return principals.stream().filter(principal -> principal.startsWith(prefix));
+    }
+
+    // if the list of principals is not specified is the old flow, using the identityPool
+    static boolean isLegacyIdentityPoolFlow(JobCredentialsMetadata jobCredentialsMetadata) {
+        return jobCredentialsMetadata.getIdentityPoolId() != null
+                && !jobCredentialsMetadata.getIdentityPoolId().isEmpty();
     }
 }
