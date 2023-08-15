@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 class CompiledPlanJobGraphGeneratorV3ImplTest {
 
     private static final String PRELOAD_PLAN =
@@ -43,5 +45,26 @@ class CompiledPlanJobGraphGeneratorV3ImplTest {
             compiledPlanJobGraphGeneratorV3.generateJobGraph(
                     Collections.singletonList(PRELOAD_PLAN), Collections.emptyMap());
         }
+    }
+
+    @Test
+    void testJobGraphGenerationForwardsUserOptions() {
+        CompiledPlanJobGraphGeneratorV3Impl compiledPlanJobGraphGeneratorV3 =
+                new CompiledPlanJobGraphGeneratorV3Impl();
+
+        // Passes because the Confluent option is not prefixed and unknown to Flink
+        compiledPlanJobGraphGeneratorV3.generateJobGraph(
+                Collections.singletonList(PRELOAD_PLAN),
+                Collections.singletonMap("sql.state-ttl", "INVALID"));
+
+        // Errors because the Confluent option is prefixed and is converted to a Flink option
+        // which fails
+        assertThatThrownBy(
+                        () ->
+                                compiledPlanJobGraphGeneratorV3.generateJobGraph(
+                                        Collections.singletonList(PRELOAD_PLAN),
+                                        Collections.singletonMap(
+                                                "confluent.user.sql.state-ttl", "INVALID")))
+                .hasMessageContaining("Could not parse value 'INVALID' for key 'sql.state-ttl'.");
     }
 }

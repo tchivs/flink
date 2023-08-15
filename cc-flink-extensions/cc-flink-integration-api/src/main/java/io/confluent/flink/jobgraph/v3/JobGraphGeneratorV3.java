@@ -12,6 +12,12 @@ import java.util.Map;
 /** Generate the JobGraph from the given arguments. */
 public interface JobGraphGeneratorV3 {
 
+    /** Prefix to mark options that have been introduced by Confluent. */
+    String CONFLUENT_PREFIX = "confluent.";
+
+    /** Prefix to mark options that have been introduced by Confluent and set by the user. */
+    String CONFLUENT_USER_PREFIX = CONFLUENT_PREFIX + "user.";
+
     /**
      * Preload resources required for the job graph generation. This method _may_ be called, exactly
      * once, some time before {@link #generateJobGraph}.
@@ -30,8 +36,11 @@ public interface JobGraphGeneratorV3 {
      * <p>This method may be called multiple times on the same generator instance.
      *
      * @param arguments the arguments passed from SQL service via FCP.
-     * @param generatorConfiguration flink configuration used during job graph generation
+     * @param allOptions includes Flink cluster configuration, Flink job configuration, and
+     *     Confluent-specific job options. It assumes that Confluent-specific options are prefixed
+     *     with {@link #CONFLUENT_PREFIX} or {@link #CONFLUENT_USER_PREFIX} to avoid any naming
+     *     conflicts with existing or future Flink options. {@link #CONFLUENT_USER_PREFIX} is
+     *     removed during generation after it was checked and validated that it's safe to do so.
      */
-    JobGraphWrapper generateJobGraph(
-            List<String> arguments, Map<String, String> generatorConfiguration);
+    JobGraphWrapper generateJobGraph(List<String> arguments, Map<String, String> allOptions);
 }

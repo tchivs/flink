@@ -10,7 +10,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/** CompiledPlan-based {@link JobGraphGenerator} implementation. */
+/**
+ * CompiledPlan-based {@link JobGraphGenerator} implementation.
+ *
+ * @deprecated Use the versioned one instead.
+ */
 @Deprecated
 public class CompiledPlanJobGraphGeneratorImpl implements JobGraphGenerator {
 

@@ -29,8 +29,8 @@ public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 
 
     @Override
     public JobGraphWrapper generateJobGraph(
-            List<String> arguments, Map<String, String> generatorConfiguration) {
-        return GeneratorUtils.generateJobGraph(arguments, generatorConfiguration);
+            List<String> arguments, Map<String, String> allOptions) {
+        return GeneratorUtils.generateJobGraph(arguments, allOptions);
     }
 
     @VisibleForTesting

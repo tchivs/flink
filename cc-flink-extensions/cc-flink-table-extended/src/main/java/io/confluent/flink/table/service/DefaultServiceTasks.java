@@ -83,36 +83,42 @@ class DefaultServiceTasks implements ServiceTasks {
     public void configureEnvironment(
             TableEnvironment tableEnvironment,
             Map<String, String> options,
-            boolean performValidation) {
-        final Configuration providedOptions = Configuration.fromMap(options);
-        if (performValidation) {
-            validateConfiguration(providedOptions);
-        }
+            boolean validateSession) {
+        final Configuration providedOptions = new Configuration();
 
-        // "<UNKNOWN>" is a reserved string in ObjectIdentifier and is used for creating an
-        // invalid built-in catalog that cannot be accessed.
-        providedOptions
-                .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
-                .filter(v -> !v.isEmpty())
-                .ifPresent(
-                        v -> {
-                            if (v.equals(UNKNOWN)) {
-                                throw new ValidationException(
-                                        String.format("Catalog name '%s' is not allowed.", v));
-                            }
-                            tableEnvironment.useCatalog(v);
-                        });
-        providedOptions
-                .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
-                .filter(v -> !v.isEmpty())
-                .ifPresent(
-                        v -> {
-                            if (v.equals(UNKNOWN)) {
-                                throw new ValidationException(
-                                        String.format("Database name '%s' is not allowed.", v));
-                            }
-                            tableEnvironment.useDatabase(v);
-                        });
+        // Ignored keys are removed to avoid conflicts with Flink options (e.g. for "client.")
+        options.entrySet().stream()
+                .filter(e -> !ServiceTasksOptions.isIgnored(e.getKey()))
+                .forEach(e -> providedOptions.setString(e.getKey(), e.getValue()));
+
+        if (validateSession) {
+            validateConfiguration(providedOptions);
+
+            // "<UNKNOWN>" is a reserved string in ObjectIdentifier and is used for creating an
+            // invalid built-in catalog that cannot be accessed.
+            providedOptions
+                    .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
+                    .filter(v -> !v.isEmpty())
+                    .ifPresent(
+                            v -> {
+                                if (v.equals(UNKNOWN)) {
+                                    throw new ValidationException(
+                                            String.format("Catalog name '%s' is not allowed.", v));
+                                }
+                                tableEnvironment.useCatalog(v);
+                            });
+            providedOptions
+                    .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
+                    .filter(v -> !v.isEmpty())
+                    .ifPresent(
+                            v -> {
+                                if (v.equals(UNKNOWN)) {
+                                    throw new ValidationException(
+                                            String.format("Database name '%s' is not allowed.", v));
+                                }
+                                tableEnvironment.useDatabase(v);
+                            });
+        }
 
         final TableConfig config = tableEnvironment.getConfig();
 
@@ -141,10 +147,6 @@ class DefaultServiceTasks implements ServiceTasks {
         // The limitation of having just a single rowtime attribute column in the query schema
         // causes confusion. The Kafka sink does not use StreamRecord's timestamps anyway.
         config.set(TABLE_EXEC_SINK_ROWTIME_INSERTER, RowtimeInserter.DISABLED);
-
-        // Note: Make sure to set default properties before this line is applied in order to
-        // allow DevOps overwriting defaults via JSS if necessary.
-        config.addConfiguration(providedOptions);
 
         // Confluent AI Functions loaded when flag is set
         if (config.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
@@ -194,22 +196,6 @@ class DefaultServiceTasks implements ServiceTasks {
 
         // Remove consumed keys
         remainingOptionKeys.removeAll(consumedOptionKeys);
-
-        // Remove placeholder keys
-        optionalOptions.stream()
-                .map(ConfigOption::key)
-                .filter(k -> k.endsWith(FactoryUtil.PLACEHOLDER_SYMBOL))
-                .map(k -> k.substring(0, k.length() - 1))
-                .forEach(
-                        prefix ->
-                                providedOptions
-                                        .keySet()
-                                        .forEach(
-                                                k -> {
-                                                    if (k.startsWith(prefix)) {
-                                                        remainingOptionKeys.remove(k);
-                                                    }
-                                                }));
 
         if (!remainingOptionKeys.isEmpty()) {
             throw new ValidationException(

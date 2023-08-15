@@ -10,7 +10,12 @@ import io.confluent.flink.jobgraph.v2.FlinkClientWrapperV2Impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Default {@link FlinkIntegration} implementation. */
+/**
+ * Default {@link FlinkIntegration} implementation.
+ *
+ * @deprecated Use the versioned one instead.
+ */
+@Deprecated
 public class FlinkIntegrationImpl implements FlinkIntegration {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkIntegrationImpl.class);

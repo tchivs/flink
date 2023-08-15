@@ -220,7 +220,6 @@ public class DefaultServiceTasksTest {
                                 + "does-not-exist\n"
                                 + "\n"
                                 + "Supported options:\n"
-                                + "client.#\n"
                                 + "sql.current-catalog\n"
                                 + "sql.current-database\n"
                                 + "sql.local-time-zone\n"
@@ -263,22 +262,6 @@ public class DefaultServiceTasksTest {
         assertThat(tableEnv.getConfig().getLocalTimeZone()).isEqualTo(ZoneId.of("Europe/Berlin"));
         assertThat(tableEnv.getConfig().get(TABLE_EXEC_SOURCE_IDLE_TIMEOUT))
                 .isEqualTo(Duration.ofMinutes(5));
-    }
-
-    @Test
-    void testCustomConfigurationUnvalidated() {
-        final Map<String, String> validOptions = new HashMap<>();
-        // Validation is disabled, thus any option can be set
-        validOptions.put("table.exec.state.ttl", "42");
-
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-
-        ServiceTasks.INSTANCE.configureEnvironment(tableEnv, validOptions, false);
-
-        assertThat(tableEnv.getConfig().getIdleStateRetention()).isEqualTo(Duration.ofMillis(42L));
-        // Defaults are still present
-        assertThat(tableEnv.getConfig().getLocalTimeZone()).isEqualTo(ZoneId.of("UTC"));
     }
 
     private static void createConfluentCatalogTable(
