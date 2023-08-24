@@ -165,13 +165,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
                 continue;
             }
 
-            String commaSeparatedPrincipals =
-                    jobConfiguration.getString(COMMA_SEPARATED_PRINCIPALS);
-            List<String> principals =
-                    commaSeparatedPrincipals == null
-                            ? Collections.emptyList()
-                            : Arrays.stream(commaSeparatedPrincipals.split(","))
-                                    .collect(Collectors.toList());
+            List<String> principals = parsePrincipals(jobConfiguration, jobID.toHexString());
 
             JobCredentialsMetadata jobCredentialsMetadata =
                     new JobCredentialsMetadata(
@@ -202,5 +196,17 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
         return new ObtainedDelegationTokens(
                 InstantiationUtil.serializeObject(credentials),
                 Optional.of(clock.absoluteTimeMillis() + checkPeriodMs));
+    }
+
+    private static List<String> parsePrincipals(Configuration jobConfiguration, String jobId) {
+        String commaSeparatedPrincipals = jobConfiguration.getString(COMMA_SEPARATED_PRINCIPALS);
+        List<String> principals =
+                commaSeparatedPrincipals == null
+                        ? Collections.emptyList()
+                        : Arrays.stream(commaSeparatedPrincipals.split(","))
+                                .collect(Collectors.toList());
+
+        LOG.info("Principals {} for jobId {}", principals, jobId);
+        return principals;
     }
 }

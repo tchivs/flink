@@ -254,7 +254,7 @@ public class KafkaCredentialFetcherImplTest {
         dpatTokenExchanger.withError();
         assertThatThrownBy(() -> fetcher.fetchToken(jobCredentialsMetadata))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Failed to do fetch DPAT Token for compute");
+                .hasMessageContaining("Failed to do fetch DPAT Token");
     }
 
     /** The handler for the fake RPC server. */

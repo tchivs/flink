@@ -203,7 +203,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(USER_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_id\":\"u-123\"}";
+                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\"}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }
@@ -214,7 +214,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(USER_POOL_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\"]}";
+                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\"]}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }

@@ -77,11 +77,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
             return tokenExchanger.fetch(ccAuthCredentials, jobCredentialsMetadata);
         } catch (Throwable t) {
             throw new FlinkRuntimeException(
-                    String.format(
-                            "Failed to do fetch DPAT Token for compute pool %s, identity pool %s",
-                            jobCredentialsMetadata.getComputePoolId(),
-                            jobCredentialsMetadata.getIdentityPoolId()),
-                    t);
+                    String.format("Failed to do fetch DPAT Token: %s", jobCredentialsMetadata), t);
         }
     }
 
@@ -93,6 +89,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                     "JobCredentialMetadata is empty, can't fetch credentials");
         }
 
+        LOG.info("Fetching credential for job metadata {}", jobCredentialsMetadata);
         if (isLegacyIdentityPoolFlow(jobCredentialsMetadata)) {
             return fetchCredential(jobCredentialsMetadata);
         } else {
@@ -103,6 +100,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
     // Fetch credential for the Pair<ComputePool, IdentityPool>, will be deprecated soon
     private Pair<String, ByteString> fetchCredential(
             JobCredentialsMetadata jobCredentialsMetadata) {
+        LOG.info("Fetching credential for v1 (identityPool). {}", jobCredentialsMetadata);
         ByteString encryptedSecret;
         String apiKey;
         GetCredentialsResponse response;
@@ -115,7 +113,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
         LOG.info(
-                "Successfully fetched v2 static credential {}, {}", apiKey, jobCredentialsMetadata);
+                "Successfully fetched v1 static credential {}, {}", apiKey, jobCredentialsMetadata);
         return Pair.of(apiKey, encryptedSecret);
     }
 
@@ -123,6 +121,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
     // for audit logging but there is only one single key for each compute pool.
     private Pair<String, ByteString> fetchCredentialV2(
             JobCredentialsMetadata jobCredentialsMetadata) {
+        LOG.info("Fetching credential for v2 (sa or user). {}", jobCredentialsMetadata);
         ByteString encryptedSecret;
         String apiKey;
         GetCredentialResponseV2 response;
@@ -135,7 +134,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
         LOG.info(
-                "Successfully fetched v1 static credential {}, {}", apiKey, jobCredentialsMetadata);
+                "Successfully fetched v2 static credential {}, {}", apiKey, jobCredentialsMetadata);
         return Pair.of(apiKey, encryptedSecret);
     }
 }

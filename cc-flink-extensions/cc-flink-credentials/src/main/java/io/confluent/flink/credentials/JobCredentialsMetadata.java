@@ -80,4 +80,27 @@ public class JobCredentialsMetadata implements Serializable {
                 startTimeMs,
                 tokenUpdateTimeMs);
     }
+
+    @Override
+    public String toString() {
+        return "JobCredentialsMetadata{"
+                + "jobID="
+                + jobID
+                + ", statementIdCRN='"
+                + statementIdCRN
+                + '\''
+                + ", computePoolId='"
+                + computePoolId
+                + '\''
+                + ", identityPoolId='"
+                + identityPoolId
+                + '\''
+                + ", principals="
+                + principals
+                + ", startTimeMs="
+                + startTimeMs
+                + ", tokenUpdateTimeMs="
+                + tokenUpdateTimeMs
+                + '}';
+    }
 }

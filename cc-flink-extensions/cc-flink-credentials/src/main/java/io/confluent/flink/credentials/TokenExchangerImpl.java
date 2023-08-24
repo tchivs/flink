@@ -74,10 +74,9 @@ public class TokenExchangerImpl implements TokenExchanger {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        RequestBody body =
-                RequestBody.create(JSON, buildObjectNode(jobCredentialsMetadata).toString());
-
-        LOG.info("Request body to token exchange service {}", body);
+        String requestJson = buildObjectNode(jobCredentialsMetadata).toString();
+        LOG.info("Request json for token exchange service {}", requestJson);
+        RequestBody body = RequestBody.create(JSON, requestJson);
         String credential =
                 Credentials.basic(staticCredentials.getKey(), staticCredentials.getValue());
         Request request =
@@ -87,12 +86,18 @@ public class TokenExchangerImpl implements TokenExchanger {
                         .header(AUTHORIZATION_HEADER, credential)
                         .build();
         try (Response response = httpClient.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "";
             if (response.isSuccessful()) {
                 LOG.info(
                         "Successfully exchange token for static credential {}",
                         staticCredentials.getLeft());
-                return new DPATToken(getTokenFromResponse(mapper, response.body().string()));
+                return new DPATToken(getTokenFromResponse(mapper, responseBody));
             } else {
+                LOG.info(
+                        "Unsuccessful response: {}, body {}, headers {}",
+                        response,
+                        responseBody,
+                        response.headers());
                 throw new FlinkRuntimeException(
                         String.format(
                                 "Received bad response code %d message %s",
@@ -190,7 +195,7 @@ public class TokenExchangerImpl implements TokenExchanger {
         final ObjectNode node = mapper.createObjectNode();
         node.put("statement_crn", statementCrn);
         node.put("compute_pool_id", computePoolId);
-        node.put("user_id", userId);
+        node.put("user_resource_id", userId);
 
         if (!identityPools.isEmpty()) {
             ArrayNode arrayNode = node.putArray("identity_pool_ids");
