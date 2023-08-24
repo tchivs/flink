@@ -67,4 +67,18 @@ class CompiledPlanJobGraphGeneratorV3ImplTest {
                                                 "confluent.user.sql.state-ttl", "INVALID")))
                 .hasMessageContaining("Could not parse value 'INVALID' for key 'sql.state-ttl'.");
     }
+
+    @Test
+    void testJobGraphGenerationClassifiesExceptions() {
+        CompiledPlanJobGraphGeneratorV3Impl compiledPlanJobGraphGeneratorV3 =
+                new CompiledPlanJobGraphGeneratorV3Impl();
+
+        // system planning error should be reported mostly as is:
+        assertThatThrownBy(
+                        () ->
+                                compiledPlanJobGraphGeneratorV3.generateJobGraph(
+                                        Collections.singletonList("invalid plan reference"),
+                                        Collections.emptyMap()))
+                .hasMessageContaining("invalid plan reference");
+    }
 }
