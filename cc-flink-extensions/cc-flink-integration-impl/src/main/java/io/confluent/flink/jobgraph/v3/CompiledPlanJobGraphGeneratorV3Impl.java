@@ -16,16 +16,16 @@ import io.confluent.flink.jobgraph.GeneratorUtils;
 import io.confluent.flink.jobgraph.JobGraphGenerator;
 import io.confluent.flink.jobgraph.JobGraphWrapper;
 import io.confluent.flink.table.utils.ClassifiedException;
+import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** CompiledPlan-based {@link JobGraphGenerator} implementation. */
 public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 {
@@ -64,11 +64,11 @@ public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 
     @VisibleForTesting
     static String loadPreloadPlanResource() {
         try {
-            String resource =
-                    CompiledPlanJobGraphGeneratorV3Impl.class
-                            .getResource("/preload_plan.json")
-                            .getPath();
-            return new String(Files.readAllBytes(Paths.get(resource)), StandardCharsets.UTF_8);
+            return IOUtils.toString(
+                    Objects.requireNonNull(
+                            CompiledPlanJobGraphGeneratorV3Impl.class.getResourceAsStream(
+                                    "/preload_plan.json")),
+                    StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
