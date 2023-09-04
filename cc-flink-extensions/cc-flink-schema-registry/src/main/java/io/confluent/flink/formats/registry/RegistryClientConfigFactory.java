@@ -10,11 +10,14 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.factories.FormatFactory;
 
 import io.confluent.flink.formats.registry.credentials.DPATCredentialProvider;
+import io.confluent.kafka.schemaregistry.avro.AvroSchemaProvider;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -118,7 +121,10 @@ public class RegistryClientConfigFactory {
                 properties.put(DPATCredentialProvider.JOB_ID_PROPERTY, jobID.toHexString());
             }
             return new CachedSchemaRegistryClient(
-                    schemaRegistryUrl, identityMapCapacity, properties);
+                    schemaRegistryUrl,
+                    identityMapCapacity,
+                    Arrays.asList(new AvroSchemaProvider(), new JsonSchemaProvider()),
+                    properties);
         }
 
         @Override
