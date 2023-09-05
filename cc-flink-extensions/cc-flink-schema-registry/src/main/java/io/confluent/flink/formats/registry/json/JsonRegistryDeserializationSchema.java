@@ -83,7 +83,7 @@ public class JsonRegistryDeserializationSchema implements DeserializationSchema<
             final JsonNode jsonNode = objectMapper.readTree(inputStream);
             return (RowData) runtimeConverter.convert(jsonNode);
         } catch (Exception e) {
-            throw new IOException("Failed to deserialize Avro record.", e);
+            throw new IOException("Failed to deserialize JSON record.", e);
         }
     }
 
