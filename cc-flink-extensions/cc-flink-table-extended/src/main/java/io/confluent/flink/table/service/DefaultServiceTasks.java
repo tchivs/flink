@@ -153,7 +153,7 @@ class DefaultServiceTasks implements ServiceTasks {
                 .getOptional(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)
                 .orElse(false)) {
             tableEnvironment.createTemporarySystemFunction(
-                    "ai_generate", AIResponseGenerator.class);
+                    "invoke_openai", AIResponseGenerator.class);
             tableEnvironment.createTemporarySystemFunction("secret", AISecret.class);
         }
     }

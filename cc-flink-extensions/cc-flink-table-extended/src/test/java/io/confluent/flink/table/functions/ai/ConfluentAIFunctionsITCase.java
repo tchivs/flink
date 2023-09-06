@@ -153,7 +153,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
         TableResult result =
                 tEnv.executeSql(
-                        "SELECT AI_GENERATE('"
+                        "SELECT INVOKE_OPENAI('"
                                 + baseUrl.toString()
                                 + "', 'Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down', 'someApiKey');");
         final List<Row> results = new ArrayList<>();
