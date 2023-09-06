@@ -125,6 +125,31 @@ public class DefaultServiceTasksTest {
     }
 
     @Test
+    void testConfigurationSystemColumns() throws Exception {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+
+        final Schema schema =
+                Schema.newBuilder()
+                        .column("i", DataTypes.INT())
+                        .columnByMetadata("m_virtual", DataTypes.STRING(), true)
+                        .columnByMetadata("m_persisted", DataTypes.STRING())
+                        .build();
+        final Map<String, String> options = new HashMap<>();
+        options.put("connector", "values");
+        options.put("readable-metadata", "m_virtual:STRING,m_persisted:STRING");
+
+        createConfluentCatalogTable(tableEnv, "source", schema, options, Collections.emptyMap());
+
+        final QueryOperation queryOperation =
+                tableEnv.sqlQuery("SELECT * FROM source").getQueryOperation();
+
+        assertThat(queryOperation.getResolvedSchema().getColumnNames())
+                .containsExactly("i", "m_persisted");
+    }
+
+    @Test
     void testUnsupportedGroupWindowSyntax() throws Exception {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());

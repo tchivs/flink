@@ -19,6 +19,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.ExecutionConfigOptions.RowtimeInserter;
 import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
+import org.apache.flink.table.api.config.TableConfigOptions.ColumnExpansionStrategy;
 import org.apache.flink.table.api.internal.TableConfigValidation;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
@@ -51,6 +52,7 @@ import io.confluent.flink.table.functions.scalar.ai.AISecret;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -67,6 +69,7 @@ import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXE
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SOURCE_IDLE_TIMEOUT;
 import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.LOCAL_TIME_ZONE;
+import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_COLUMN_EXPANSION_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
 
 /** Default implementation of {@link ServiceTasks}. */
@@ -147,6 +150,16 @@ class DefaultServiceTasks implements ServiceTasks {
         // The limitation of having just a single rowtime attribute column in the query schema
         // causes confusion. The Kafka sink does not use StreamRecord's timestamps anyway.
         config.set(TABLE_EXEC_SINK_ROWTIME_INSERTER, RowtimeInserter.DISABLED);
+
+        // Metadata virtual columns act as a kind of "system column" in Confluent's SQL dialect.
+        // In order to add new system columns at any time, column expansions using `SELECT *` will
+        // not select those columns. It avoids downstream schema changes such as
+        // `INSERT INTO sink SELECT * FROM source`.
+        config.set(
+                TABLE_COLUMN_EXPANSION_STRATEGY,
+                Arrays.asList(
+                        ColumnExpansionStrategy.EXCLUDE_DEFAULT_VIRTUAL_METADATA_COLUMNS,
+                        ColumnExpansionStrategy.EXCLUDE_ALIASED_VIRTUAL_METADATA_COLUMNS));
 
         // Confluent AI Functions loaded when flag is set
         if (providedOptions
