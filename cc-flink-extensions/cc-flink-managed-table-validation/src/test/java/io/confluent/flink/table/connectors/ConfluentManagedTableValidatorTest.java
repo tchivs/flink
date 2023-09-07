@@ -116,7 +116,7 @@ public class ConfluentManagedTableValidatorTest {
     void testDefaultOptions() {
         assertThat(testCreateTableOptions("CREATE TABLE t (i INT, s STRING)"))
                 .containsEntry("connector", "confluent")
-                .containsEntry("changelog.mode", "retract")
+                .containsEntry("changelog.mode", "append")
                 .containsEntry("kafka.cleanup-policy", "delete")
                 .containsEntry("kafka.max-message-size", "2097164 bytes")
                 .containsEntry("kafka.partitions", "6")

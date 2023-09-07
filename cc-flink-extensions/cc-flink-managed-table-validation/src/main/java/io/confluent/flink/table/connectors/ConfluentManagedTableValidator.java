@@ -45,7 +45,7 @@ import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapK
 /**
  * Validation and enrichment utility for public options coming directly from the user.
  *
- * <p>The utility provides an additional layer before going to {@link ConfluentManagedTableFactory}
+ * <p>The utility provides an additional layer before going to {@code ConfluentManagedTableFactory}
  * and internal {@link Format}s. It assumes public {@link ConfluentManagedTableOptions} used with
  * {@link ConfluentManagedFormats.PublicFormat}.
  */
@@ -200,7 +200,7 @@ public class ConfluentManagedTableValidator {
                 || validatedOptions.get(KAFKA_CLEANUP_POLICY) == CleanupPolicy.DELETE_COMPACT) {
             validatedOptions.set(CHANGELOG_MODE, ManagedChangelogMode.UPSERT);
         } else {
-            validatedOptions.set(CHANGELOG_MODE, ManagedChangelogMode.RETRACT);
+            validatedOptions.set(CHANGELOG_MODE, ManagedChangelogMode.APPEND);
         }
     }
 
