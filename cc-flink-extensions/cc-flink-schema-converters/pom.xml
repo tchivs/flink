@@ -31,6 +31,20 @@ under the License.
 
 	<name>Confluent Flink : Formats : Confluent schema converters</name>
 
+	<properties>
+		<protobuf.java.version>3.24.0</protobuf.java.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.google.protobuf</groupId>
+				<artifactId>protobuf-java</artifactId>
+				<version>${protobuf.java.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.flink</groupId>
@@ -47,11 +61,26 @@ under the License.
 			<artifactId>everit-json-schema</artifactId>
 			<version>1.14.2</version>
 		</dependency>
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-protobuf-types</artifactId>
+			<version>${schema.registry.version}</version>
+		</dependency>
 
 		<!-- test dependencies -->
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-test-utils-junit</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-protobuf-provider</artifactId>
+			<version>${schema.registry.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>

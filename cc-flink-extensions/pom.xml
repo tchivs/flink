@@ -19,6 +19,10 @@ Copyright 2023 Confluent Inc.
 
 	<packaging>pom</packaging>
 
+	<properties>
+		<schema.registry.version>7.5.0-22</schema.registry.version>
+	</properties>
+
 	<modules>
 		<module>cc-flink-table-extended</module>
 		<module>cc-flink-managed-table-validation</module>

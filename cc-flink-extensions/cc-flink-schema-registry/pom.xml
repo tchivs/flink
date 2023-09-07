@@ -33,9 +33,9 @@ under the License.
 
 	<properties>
 		<!-- All of these deps are shaded, so we allow them to differ from others we use -->
-		<schema.registry.version>7.5.0-22</schema.registry.version>
 		<avro.registry.kafka.clients.version>7.5.0-203-ccs</avro.registry.kafka.clients.version>
 		<registry.everit.version>1.14.2</registry.everit.version>
+		<protobuf.java.version>3.24.0</protobuf.java.version>
 		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
 		<shaded.prefix>io.confluent.flink.registry.shaded</shaded.prefix>
 	</properties>
@@ -61,6 +61,11 @@ under the License.
 				<groupId>com.google.guava</groupId>
 				<artifactId>guava</artifactId>
 				<version>32.0.1-jre</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.protobuf</groupId>
+				<artifactId>protobuf-java</artifactId>
+				<version>${protobuf.java.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
@@ -270,6 +275,22 @@ under the License.
 								<relocation>
 									<pattern>org.joda</pattern>
 									<shadedPattern>${shaded.prefix}.org.joda</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.google.protobuf</pattern>
+									<shadedPattern>${shaded.prefix}.com.google.protobuf</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.google.gson</pattern>
+									<shadedPattern>${shaded.prefix}.com.google.gson</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.google.errorprone</pattern>
+									<shadedPattern>${shaded.prefix}.com.google.errorprone</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.google.j2objc</pattern>
+									<shadedPattern>${shaded.prefix}.com.google.j2objc</shadedPattern>
 								</relocation>
 								<!-- Reuse Guava that comes with Flink -->
 								<relocation>
