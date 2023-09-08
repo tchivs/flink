@@ -14,6 +14,7 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
+import io.confluent.flink.table.functions.scalar.ai.AIFunctionsModule;
 import io.confluent.flink.table.functions.scalar.ai.AIResponseGenerator;
 import io.confluent.flink.table.functions.scalar.ai.AISecret;
 import io.confluent.flink.table.service.ForegroundResultPlan;
@@ -59,6 +60,14 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                         CONFLUENT_AI_FUNCTIONS_ENABLED.key(), String.valueOf(aiFunctionsEnabled)),
                 true);
         return tableEnv;
+    }
+
+    @Test
+    public void testNumberOfBuiltinFunctions() {
+        AIFunctionsModule aiFunctionsModule = new AIFunctionsModule();
+        assertThat(aiFunctionsModule.listFunctions().size()).isEqualTo(2);
+        assertThat(aiFunctionsModule.getFunctionDefinition("INVOKE_OPENAI")).isPresent();
+        assertThat(aiFunctionsModule.getFunctionDefinition("SECRET")).isPresent();
     }
 
     @Test

@@ -47,8 +47,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessin
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
-import io.confluent.flink.table.functions.scalar.ai.AIResponseGenerator;
-import io.confluent.flink.table.functions.scalar.ai.AISecret;
+import io.confluent.flink.table.functions.scalar.ai.AIFunctionsModule;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -165,9 +164,7 @@ class DefaultServiceTasks implements ServiceTasks {
         if (providedOptions
                 .getOptional(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)
                 .orElse(false)) {
-            tableEnvironment.createTemporarySystemFunction(
-                    "invoke_openai", AIResponseGenerator.class);
-            tableEnvironment.createTemporarySystemFunction("secret", AISecret.class);
+            tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
         }
     }
 
