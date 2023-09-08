@@ -405,6 +405,24 @@ public class ConfluentManagedTableSource
     // --------------------------------------------------------------------------------------------
 
     enum ReadableMetadata {
+        /**
+         * Intended to be used as read-only system column that is provided by default.
+         *
+         * <p>Currently, this column is semantically equal to the 'timestamp' metadata key. But this
+         * might change at some point.
+         */
+        SYSTEM_TIMESTAMP(
+                "$rowtime",
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
+                new MetadataConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object read(ConsumerRecord<?, ?> record, boolean isRetract) {
+                        return TimestampData.fromEpochMillis(record.timestamp());
+                    }
+                }),
+
         TOPIC(
                 "topic",
                 DataTypes.STRING().notNull(),

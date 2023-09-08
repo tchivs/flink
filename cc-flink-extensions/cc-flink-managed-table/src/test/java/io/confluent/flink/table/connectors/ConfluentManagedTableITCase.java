@@ -44,7 +44,8 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                             + "  physical_price INT,\n"
                             + "  physical_name STRING,\n"
                             + "  metadata_header MAP<STRING, BYTES> METADATA FROM 'headers',\n"
-                            + "  physical_currency STRING NOT NULL\n"
+                            + "  physical_currency STRING NOT NULL,\n"
+                            + "  $rowtime TIMESTAMP_LTZ(3) NOT NULL METADATA VIRTUAL\n"
                             + ")";
             final String sourceTopic = createTopic("source");
             createTable(sourceTopic, "source", tableSchema, entry("changelog.mode", "retract"));
@@ -63,7 +64,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
 
             tableEnv.executeSql(
                             "INSERT INTO sink \n"
-                                    + "SELECT metadata_ts, physical_price, physical_name, metadata_header, physical_currency\n"
+                                    + "SELECT $rowtime, physical_price, physical_name, metadata_header, physical_currency\n"
                                     + "FROM source")
                     .await();
 
