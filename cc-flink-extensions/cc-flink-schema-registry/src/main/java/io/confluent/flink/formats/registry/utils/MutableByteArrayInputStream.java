@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.confluent.flink.formats.registry.avro.utils;
+package io.confluent.flink.formats.registry.utils;
 
 import java.io.ByteArrayInputStream;
 

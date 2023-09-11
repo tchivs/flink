@@ -14,7 +14,7 @@ import io.confluent.flink.formats.registry.SchemaRegistryCoder;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
 import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters;
 import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters.AvroToRowDataConverter;
-import io.confluent.flink.formats.registry.avro.utils.MutableByteArrayInputStream;
+import io.confluent.flink.formats.registry.utils.MutableByteArrayInputStream;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;

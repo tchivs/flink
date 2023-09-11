@@ -30,6 +30,7 @@ public class ConfluentManagedFormats {
         formats.put(PublicRawFormat.IDENTIFIER, PublicRawFormat.INSTANCE);
         formats.put(PublicAvroRegistryFormat.IDENTIFIER, PublicAvroRegistryFormat.INSTANCE);
         formats.put(PublicJsonRegistryFormat.IDENTIFIER, PublicJsonRegistryFormat.INSTANCE);
+        formats.put(PublicProtoRegistryFormat.IDENTIFIER, PublicProtoRegistryFormat.INSTANCE);
         FORMATS = Collections.unmodifiableMap(formats);
     }
 
@@ -178,6 +179,38 @@ public class ConfluentManagedFormats {
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
             return Collections.singleton(VALIDATE_WRITES);
+        }
+
+        @Override
+        public ChangelogMode getChangelogMode() {
+            return ChangelogMode.insertOnly();
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Format: proto-registry
+    // --------------------------------------------------------------------------------------------
+
+    /** Publicly exposed format for {@code proto-registry}. */
+    public static class PublicProtoRegistryFormat implements PublicFormat {
+
+        public static final PublicProtoRegistryFormat INSTANCE = new PublicProtoRegistryFormat();
+
+        public static final String IDENTIFIER = "proto-registry";
+
+        @Override
+        public String factoryIdentifier() {
+            return IDENTIFIER;
+        }
+
+        @Override
+        public Set<ConfigOption<?>> requiredOptions() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public Set<ConfigOption<?>> optionalOptions() {
+            return Collections.emptySet();
         }
 
         @Override

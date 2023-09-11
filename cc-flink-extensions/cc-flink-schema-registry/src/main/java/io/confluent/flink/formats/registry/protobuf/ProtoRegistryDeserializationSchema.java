@@ -2,33 +2,33 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.formats.registry.json;
+package io.confluent.flink.formats.registry.protobuf;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.DynamicMessage;
 import io.confluent.flink.formats.registry.SchemaRegistryCoder;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
-import io.confluent.flink.formats.registry.json.JsonToRowDataConverters.JsonToRowDataConverter;
+import io.confluent.flink.formats.registry.protobuf.ProtoToRowDataConverters.ProtoToRowDataConverter;
 import io.confluent.flink.formats.registry.utils.MutableByteArrayInputStream;
-import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import org.everit.json.schema.Schema;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 
 import java.io.IOException;
 import java.util.Objects;
 
 /**
- * A {@link DeserializationSchema} that deserializes {@link RowData} from JSON records using Schema
- * Registry protocol.
+ * A {@link DeserializationSchema} that deserializes {@link RowData} from Protobuf messages using
+ * Schema Registry protocol.
  */
-public class JsonRegistryDeserializationSchema implements DeserializationSchema<RowData> {
+@Confluent
+public class ProtoRegistryDeserializationSchema implements DeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
 
@@ -41,17 +41,16 @@ public class JsonRegistryDeserializationSchema implements DeserializationSchema<
 
     private transient SchemaRegistryCoder schemaCoder;
 
-    private transient ObjectMapper objectMapper;
+    private transient ProtoToRowDataConverter runtimeConverter;
+    private transient Descriptor descriptor;
 
-    private transient JsonToRowDataConverter runtimeConverter;
-
-    public JsonRegistryDeserializationSchema(
+    public ProtoRegistryDeserializationSchema(
             SchemaRegistryConfig schemaRegistryConfig,
             RowType rowType,
             TypeInformation<RowData> producedType) {
-        this.schemaRegistryConfig = schemaRegistryConfig;
-        this.rowType = rowType;
-        this.producedType = producedType;
+        this.schemaRegistryConfig = Preconditions.checkNotNull(schemaRegistryConfig);
+        this.rowType = Preconditions.checkNotNull(rowType);
+        this.producedType = Preconditions.checkNotNull(producedType);
     }
 
     @Override
@@ -60,15 +59,12 @@ public class JsonRegistryDeserializationSchema implements DeserializationSchema<
                 schemaRegistryConfig.createClient(context.getJobID().orElse(null));
         this.schemaCoder =
                 new SchemaRegistryCoder(schemaRegistryConfig.getSchemaId(), schemaRegistryClient);
-        final ParsedSchema schema =
-                schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
-        final Schema jsonSchema = (Schema) schema.rawSchema();
-        this.runtimeConverter = JsonToRowDataConverters.createConverter(jsonSchema, rowType);
+        final ProtobufSchema schema =
+                (ProtobufSchema)
+                        schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
+        this.descriptor = schema.toDescriptor();
+        this.runtimeConverter = ProtoToRowDataConverters.createConverter(descriptor, rowType);
         this.inputStream = new MutableByteArrayInputStream();
-        this.objectMapper =
-                new ObjectMapper()
-                        .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-                        .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true));
     }
 
     @Override
@@ -80,10 +76,10 @@ public class JsonRegistryDeserializationSchema implements DeserializationSchema<
             inputStream.setBuffer(message);
             schemaCoder.readSchema(inputStream);
 
-            final JsonNode jsonNode = objectMapper.readTree(inputStream);
-            return (RowData) runtimeConverter.convert(jsonNode);
+            final DynamicMessage dynamicMessage = DynamicMessage.parseFrom(descriptor, inputStream);
+            return (RowData) runtimeConverter.convert(dynamicMessage);
         } catch (Exception e) {
-            throw new IOException("Failed to deserialize JSON record.", e);
+            throw new IOException("Failed to deserialize Protobuf message.", e);
         }
     }
 
@@ -105,7 +101,7 @@ public class JsonRegistryDeserializationSchema implements DeserializationSchema<
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        JsonRegistryDeserializationSchema that = (JsonRegistryDeserializationSchema) o;
+        ProtoRegistryDeserializationSchema that = (ProtoRegistryDeserializationSchema) o;
         return Objects.equals(schemaRegistryConfig, that.schemaRegistryConfig)
                 && Objects.equals(rowType, that.rowType)
                 && Objects.equals(producedType, that.producedType);

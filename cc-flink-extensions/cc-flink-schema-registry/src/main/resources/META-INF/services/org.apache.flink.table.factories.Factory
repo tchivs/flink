@@ -2,3 +2,4 @@
 
 io.confluent.flink.formats.registry.avro.AvroRegistryFormatFactory
 io.confluent.flink.formats.registry.json.JsonRegistryFormatFactory
+io.confluent.flink.formats.registry.protobuf.ProtoRegistryFormatFactory
