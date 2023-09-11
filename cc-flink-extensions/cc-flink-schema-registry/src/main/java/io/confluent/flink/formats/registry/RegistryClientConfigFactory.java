@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.registry;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Shared across formats factory class for creating a {@link SchemaRegistryConfig}. */
+@Confluent
 public class RegistryClientConfigFactory {
 
     /** Creates a {@link SchemaRegistryConfig} from the given format options. */

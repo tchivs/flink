@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.registry.protobuf;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
@@ -44,6 +45,7 @@ import java.util.stream.Collectors;
  * Runtime converters between {@link com.google.protobuf.Message} and {@link
  * org.apache.flink.table.data.RowData}.
  */
+@Confluent
 public class ProtoToRowDataConverters {
 
     private static final String KEY_FIELD = "key";
