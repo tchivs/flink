@@ -14,6 +14,8 @@ import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
 import org.apache.flink.table.planner.plan.schema.CatalogSourceTable;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.calcite.plan.volcano.VolcanoRuleCall;
+
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -113,6 +115,16 @@ public final class ClassifiedException {
                         message ->
                                 "Only a single statement is supported at a time. "
                                         + "Multiple INSERT INTO statements can be wrapped into a STATEMENT SET."));
+
+        // expose all exceptions from applying rules
+        putClassifiedException(
+                CodeLocation.inClass(VolcanoRuleCall.class, RuntimeException.class),
+                Handler.forwardCauseOnly(
+                        "Error occurred while applying rule", ExceptionClass.PLANNING_USER));
+        putClassifiedException(
+                CodeLocation.inClass(VolcanoRuleCall.class, RuntimeException.class),
+                Handler.forwardCauseOnly(
+                        "Error while applying rule", ExceptionClass.PLANNING_USER));
 
         // Don't delegate the user to options that can't be set.
         putClassifiedException(

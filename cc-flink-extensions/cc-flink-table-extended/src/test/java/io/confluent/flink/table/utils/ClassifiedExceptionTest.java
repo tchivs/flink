@@ -108,7 +108,21 @@ public class ClassifiedExceptionTest {
                         .executeSql("USE CATALOG bad_cat")
                         .expectExactUserError(
                                 "A catalog with name 'bad_cat' does not exist, or "
-                                        + "you have no permissions to access it."));
+                                        + "you have no permissions to access it."),
+                // ---
+                TestSpec.test("window group by on non rowtime column")
+                        .executeSql(
+                                "CREATE TABLE orders(productId BIGINT, amount INT,"
+                                        + " orderDate TIMESTAMP_LTZ(3)) WITH ('connector' = 'datagen');")
+                        .executeSql(
+                                "SELECT productId, SUM(amount), CAST(window_start AS DATE) FROM"
+                                        + " TABLE(TUMBLE( TABLE orders, DESCRIPTOR(orderDate),"
+                                        + " INTERVAL '24' HOURS))"
+                                        + " GROUP BY productId,  window_start, window_end;")
+                        .expectUserError(
+                                "The window function requires the timecol is"
+                                        + " a time attribute type, but is"
+                                        + " TIMESTAMP_WITH_LOCAL_TIME_ZONE(3)."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
