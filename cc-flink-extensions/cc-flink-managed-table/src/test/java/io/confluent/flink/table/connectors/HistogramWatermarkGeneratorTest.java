@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.api.common.eventtime.WatermarkOutput;
 
+import io.confluent.flink.table.connectors.HistogramWatermarkGenerator.EmitMode;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -32,7 +33,7 @@ public class HistogramWatermarkGeneratorTest {
         final double percentile = 1.0;
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile);
+                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
 
         // Initial state
         assertThat(g.bucketIntervals).containsExactly(63, 125, 251, 501, 1000);
@@ -71,7 +72,7 @@ public class HistogramWatermarkGeneratorTest {
         final double percentile = 1.0;
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile);
+                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
 
         // Initial state
         assertThat(g.bucketIntervals).containsExactly(63, 125, 251, 501, 1000);
@@ -118,7 +119,8 @@ public class HistogramWatermarkGeneratorTest {
                         DEFAULT_BUCKET_TARGET,
                         DEFAULT_MIN_DELAY,
                         DEFAULT_MAX_DELAY,
-                        percentile);
+                        percentile,
+                        EmitMode.PERIODIC);
 
         final ThreadLocalRandom r = ThreadLocalRandom.current();
         long clock = 0;
@@ -139,7 +141,8 @@ public class HistogramWatermarkGeneratorTest {
                         DEFAULT_BUCKET_TARGET,
                         DEFAULT_MIN_DELAY,
                         DEFAULT_MAX_DELAY,
-                        percentile);
+                        percentile,
+                        EmitMode.PERIODIC);
 
         long clock = 0;
         for (int i = 0; i < DEFAULT_MAX_CAPACITY * 2; i++) {
@@ -176,7 +179,7 @@ public class HistogramWatermarkGeneratorTest {
         final double percentile = 1.0;
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile);
+                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
 
         // Completely fills the buffer
         g.onEvent(null, 1, null);

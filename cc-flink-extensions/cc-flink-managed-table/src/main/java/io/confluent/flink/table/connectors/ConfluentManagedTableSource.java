@@ -26,6 +26,7 @@ import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
+import org.apache.flink.table.connector.source.abilities.SupportsSourceWatermark;
 import org.apache.flink.table.connector.source.abilities.SupportsWatermarkPushDown;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.RowData;
@@ -64,7 +65,10 @@ import static io.confluent.flink.table.connectors.ConfluentManagedKafkaSerializa
 /** {@link DynamicTableSource} for Confluent-native tables. */
 @Confluent
 public class ConfluentManagedTableSource
-        implements ScanTableSource, SupportsReadingMetadata, SupportsWatermarkPushDown {
+        implements ScanTableSource,
+                SupportsReadingMetadata,
+                SupportsWatermarkPushDown,
+                SupportsSourceWatermark {
 
     private static final String KAFKA_TRANSFORMATION = "kafka";
 
@@ -172,6 +176,25 @@ public class ConfluentManagedTableSource
     }
 
     @Override
+    public DynamicTableSource copy() {
+        final ConfluentManagedTableSource copy =
+                new ConfluentManagedTableSource(parameters, keyDecodingFormat, valueDecodingFormat);
+        copy.producedDataType = producedDataType;
+        copy.metadataKeys = metadataKeys;
+        copy.watermarkStrategy = watermarkStrategy;
+        return copy;
+    }
+
+    @Override
+    public String asSummaryString() {
+        return "Confluent table source";
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // SupportsReadingMetadata
+    // --------------------------------------------------------------------------------------------
+
+    @Override
     public Map<String, DataType> listReadableMetadata() {
         final Map<String, DataType> metadataMap = new LinkedHashMap<>();
 
@@ -220,26 +243,34 @@ public class ConfluentManagedTableSource
         return false;
     }
 
+    // --------------------------------------------------------------------------------------------
+    // SupportsWatermarkPushDown
+    // --------------------------------------------------------------------------------------------
+
     @Override
     public void applyWatermark(WatermarkStrategy<RowData> watermarkStrategy) {
         this.watermarkStrategy = watermarkStrategy;
     }
 
-    @Override
-    public DynamicTableSource copy() {
-        final ConfluentManagedTableSource copy =
-                new ConfluentManagedTableSource(parameters, keyDecodingFormat, valueDecodingFormat);
-        copy.producedDataType = producedDataType;
-        copy.metadataKeys = metadataKeys;
-        copy.watermarkStrategy = watermarkStrategy;
-        return copy;
-    }
+    // --------------------------------------------------------------------------------------------
+    // SupportsSourceWatermark
+    // --------------------------------------------------------------------------------------------
 
     @Override
-    public String asSummaryString() {
-        return "Confluent table source";
+    public void applySourceWatermark() {
+        if (parameters.watermarkOptions == null) {
+            throw new IllegalArgumentException("Options for SOURCE_WATERMARK() are not provided.");
+        }
+        // Note: Currently, it is not possible to use SOURCE_WATERMARK() for any other column than
+        // the built-in $rowtime system column coming directly from the Kafka message timestamp. If
+        // we want to support other physical or metadata columns, we would need to pass information
+        // about the position of the time attribute column. If we want to support other computed
+        // columns, we would need a generated watermark strategy for evaluating the expressions.
+        this.watermarkStrategy = VersionedWatermarkStrategy.forOptions(parameters.watermarkOptions);
     }
 
+    // --------------------------------------------------------------------------------------------
+    // Private helper methods
     // --------------------------------------------------------------------------------------------
 
     private KafkaSource<RowData> createKafkaSource(

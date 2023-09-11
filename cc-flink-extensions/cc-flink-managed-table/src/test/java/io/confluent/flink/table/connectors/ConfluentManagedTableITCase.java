@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 
@@ -444,6 +445,68 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
 
             deleteTopic(tableTopic);
         }
+
+        @Test
+        void testSourceWatermark() throws Exception {
+            final String tableTopic = createTopic("t");
+
+            final String sinkSchema =
+                    "(\n"
+                            + "metadata_ts TIMESTAMP_LTZ(3) METADATA FROM 'timestamp',\n"
+                            + "physical_name STRING,\n"
+                            + "physical_sum INT\n"
+                            + ")\n"
+                            + "PARTITIONED BY (physical_name)";
+            createTable(
+                    tableTopic,
+                    "sink",
+                    sinkSchema,
+                    entry("changelog.mode", "append"),
+                    entry("key.format", "csv"));
+
+            insertRows(
+                    "sink",
+                    ChangelogMode.insertOnly(),
+                    Row.ofKind(RowKind.INSERT, Instant.ofEpochMilli(1), "EUR", 1),
+                    Row.ofKind(RowKind.INSERT, Instant.ofEpochMilli(10), "EUR", 2),
+                    Row.ofKind(RowKind.INSERT, Instant.ofEpochMilli(50), "EUR", 3),
+                    Row.ofKind(RowKind.INSERT, Instant.ofEpochMilli(100), "EOS", -1));
+
+            final String sourceSchema =
+                    "(\n"
+                            + "physical_name STRING,\n"
+                            + "physical_sum INT\n,"
+                            + "$rowtime TIMESTAMP_LTZ(3) NOT NULL METADATA VIRTUAL,\n"
+                            + "WATERMARK FOR $rowtime AS SOURCE_WATERMARK()\n"
+                            + ")\n"
+                            + "PARTITIONED BY (physical_name)";
+            createTable(
+                    tableTopic,
+                    "source",
+                    sourceSchema,
+                    entry("changelog.mode", "append"),
+                    entry("key.format", "csv"),
+                    entry("confluent.source-watermark.version", "V1"),
+                    entry("confluent.source-watermark.emit-per-row", "true"));
+
+            final List<String> materializedRows = new ArrayList<>();
+            tableEnv.executeSql(
+                            "SELECT CURRENT_WATERMARK($rowtime), $rowtime, physical_name, physical_sum "
+                                    + "FROM source")
+                    .collect()
+                    .forEachRemaining(row -> materializedRows.add(row.toString()));
+
+            assertThat(materializedRows)
+                    .containsExactly(
+                            // First watermark is not generated for maxTimestamp calculation
+                            "+I[null, 1970-01-01T00:00:00.001Z, EUR, 1]",
+                            // Second watermark is generated but arrives after row
+                            "+I[null, 1970-01-01T00:00:00.010Z, EUR, 2]",
+                            // Second watermark is displayed
+                            "+I[1969-12-24T23:59:59.953Z, 1970-01-01T00:00:00.050Z, EUR, 3]");
+
+            deleteTopic(tableTopic);
+        }
     }
 
     // --------------------------------------------------------------------------------------------
@@ -506,6 +569,11 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
     }
 
     private void insertRows(String table, Row... rows) throws Exception {
+        insertRows(table, ChangelogMode.all(), rows);
+    }
+
+    private void insertRows(String table, ChangelogMode changelogMode, Row... rows)
+            throws Exception {
         final DataStream<Row> elements =
                 env.fromCollection(
                         Arrays.asList(rows),
@@ -521,7 +589,8 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                                 .column("metadata_ts", "TIMESTAMP_LTZ(3)")
                                 .column("physical_name", "STRING")
                                 .column("physical_sum", "INT")
-                                .build())
+                                .build(),
+                        changelogMode)
                 .insertInto(table)
                 .execute()
                 .await();

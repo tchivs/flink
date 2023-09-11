@@ -255,6 +255,22 @@ public class ConfluentManagedTableOptions {
                     .noDefaultValue()
                     .withDescription("Prefix for 'transactional.id' for CC.");
 
+    public static final ConfigOption<SourceWatermarkVersion> CONFLUENT_SOURCE_WATERMARK_VERSION =
+            ConfigOptions.key(PRIVATE_PREFIX + "source-watermark.version")
+                    .enumType(SourceWatermarkVersion.class)
+                    .noDefaultValue()
+                    .withDescription(
+                            "Version of the watermark generator if the SOURCE_WATERMARK() strategy "
+                                    + "is applied.");
+
+    public static final ConfigOption<Boolean> CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW =
+            ConfigOptions.key(PRIVATE_PREFIX + "source-watermark.emit-per-row")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether or not to emit a watermark for every incoming row. "
+                                    + "Mostly intended for testing purposes.");
+
     // --------------------------------------------------------------------------------------------
     // Enums
     // --------------------------------------------------------------------------------------------
@@ -396,6 +412,23 @@ public class ConfluentManagedTableOptions {
         public String toString() {
             return value;
         }
+    }
+
+    /**
+     * Enum for {@link #CONFLUENT_SOURCE_WATERMARK_VERSION}.
+     *
+     * <p>For implementation details check {@code VersionedWatermarkStrategy}.
+     */
+    public enum SourceWatermarkVersion implements Serializable {
+
+        /**
+         * Fallback strategy to 10s out-of-order in case there is a bug in the default
+         * implementation.
+         */
+        V0,
+
+        /** Initial moving histogram of observed delays from the maximum seen timestamp. */
+        V1
     }
 
     private ConfluentManagedTableOptions() {

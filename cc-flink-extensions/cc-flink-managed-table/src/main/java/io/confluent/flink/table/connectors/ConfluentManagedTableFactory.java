@@ -42,6 +42,8 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_REPLICATION_FACTOR;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TOPIC;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_VERSION;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.PUBLIC_CREATION_OPTIONS;
@@ -113,6 +115,8 @@ public class ConfluentManagedTableFactory
         options.add(CONFLUENT_KAFKA_PROPERTIES);
         options.add(CONFLUENT_KAFKA_CONSUMER_GROUP_ID);
         options.add(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX);
+        options.add(CONFLUENT_SOURCE_WATERMARK_VERSION);
+        options.add(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW);
         return options;
     }
 

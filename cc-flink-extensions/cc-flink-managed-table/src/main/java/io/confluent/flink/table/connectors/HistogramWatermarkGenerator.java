@@ -29,6 +29,12 @@ import java.util.Set;
 @Confluent
 public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> {
 
+    /** Mode when to emit watermarks. */
+    public enum EmitMode {
+        PER_ROW,
+        PERIODIC;
+    }
+
     public static final double DEFAULT_PERCENTILE = 0.95;
 
     public static final int DEFAULT_MAX_CAPACITY = 5000;
@@ -38,6 +44,9 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
     public static final int DEFAULT_MAX_DELAY = (int) Duration.ofDays(7).toMillis();
 
     public static final int DEFAULT_BUCKET_TARGET = 100;
+
+    /** Mode when to emit watermarks. */
+    private final EmitMode emitMode;
 
     /** Fraction of elements to be included during watermark calculation. */
     private final double percentile;
@@ -73,14 +82,21 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
      *     7 days)
      * @param percentile percentage of elements that should be included during watermark calculation
      *     (e.g. 0.95 declares ~5% of the data as late)
+     * @param emitMode mode when to emit watermarks, mostly intended for testing purposes.
      */
     public HistogramWatermarkGenerator(
-            int capacity, int bucketTarget, int minDelay, int maxDelay, double percentile) {
+            int capacity,
+            int bucketTarget,
+            int minDelay,
+            int maxDelay,
+            double percentile,
+            EmitMode emitMode) {
         Preconditions.checkArgument(capacity > 0);
         Preconditions.checkArgument(bucketTarget > 0);
         Preconditions.checkArgument(minDelay > 0);
         Preconditions.checkArgument(maxDelay > 0 && maxDelay < Integer.MAX_VALUE / 2);
 
+        this.emitMode = emitMode;
         this.percentile = percentile;
         delays = new int[capacity];
         Arrays.fill(delays, -1);
@@ -95,7 +111,8 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
                 DEFAULT_BUCKET_TARGET,
                 DEFAULT_MIN_DELAY,
                 DEFAULT_MAX_DELAY,
-                DEFAULT_PERCENTILE);
+                DEFAULT_PERCENTILE,
+                EmitMode.PERIODIC);
     }
 
     @Override
@@ -149,6 +166,11 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
 
         // 4. Calculate percentile with safety buffer
         percentileDelay = findPercentile(totalCount) + safetyMargin;
+
+        // 5. Emit watermark immediately if necessary
+        if (emitMode == EmitMode.PER_ROW) {
+            onPeriodicEmit(output);
+        }
     }
 
     /**

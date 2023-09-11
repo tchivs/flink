@@ -20,11 +20,13 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.FieldsIn
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SourceWatermarkVersion;
 import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanBoundedMode;
 import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanStartupMode;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,6 +48,8 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_PROPERTIES;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TOPIC;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_VERSION;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
@@ -124,6 +128,8 @@ public class ConfluentManagedTableUtils {
 
         final BoundedOptions boundedOptions = getBoundedOptions(sessionConfig, options);
 
+        final WatermarkOptions watermarkOptions = getWatermarkOptions(options);
+
         return new DynamicTableParameters(
                 physicalDataType,
                 keyProjection,
@@ -135,7 +141,8 @@ public class ConfluentManagedTableUtils {
                 boundedOptions,
                 options.getOptional(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
                 tableMode,
-                tableIdentifier);
+                tableIdentifier,
+                watermarkOptions);
     }
 
     /** Set of parameters for the dynamic table. */
@@ -151,6 +158,7 @@ public class ConfluentManagedTableUtils {
         final @Nullable String transactionalIdPrefix;
         final ManagedChangelogMode tableMode;
         final String tableIdentifier;
+        final @Nullable WatermarkOptions watermarkOptions;
 
         DynamicTableParameters(
                 DataType physicalDataType,
@@ -163,7 +171,8 @@ public class ConfluentManagedTableUtils {
                 BoundedOptions boundedOptions,
                 @Nullable String transactionalIdPrefix,
                 ManagedChangelogMode tableMode,
-                String tableIdentifier) {
+                String tableIdentifier,
+                @Nullable WatermarkOptions watermarkOptions) {
             this.physicalDataType = physicalDataType;
             this.keyProjection = keyProjection;
             this.valueProjection = valueProjection;
@@ -175,6 +184,7 @@ public class ConfluentManagedTableUtils {
             this.transactionalIdPrefix = transactionalIdPrefix;
             this.tableMode = tableMode;
             this.tableIdentifier = tableIdentifier;
+            this.watermarkOptions = watermarkOptions;
         }
 
         @Override
@@ -185,7 +195,7 @@ public class ConfluentManagedTableUtils {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            DynamicTableParameters that = (DynamicTableParameters) o;
+            final DynamicTableParameters that = (DynamicTableParameters) o;
             return physicalDataType.equals(that.physicalDataType)
                     && Arrays.equals(keyProjection, that.keyProjection)
                     && Arrays.equals(valueProjection, that.valueProjection)
@@ -196,7 +206,8 @@ public class ConfluentManagedTableUtils {
                     && boundedOptions.equals(that.boundedOptions)
                     && Objects.equals(transactionalIdPrefix, that.transactionalIdPrefix)
                     && tableMode == that.tableMode
-                    && tableIdentifier.equals(that.tableIdentifier);
+                    && tableIdentifier.equals(that.tableIdentifier)
+                    && Objects.equals(watermarkOptions, that.watermarkOptions);
         }
 
         @Override
@@ -211,7 +222,8 @@ public class ConfluentManagedTableUtils {
                             boundedOptions,
                             transactionalIdPrefix,
                             tableMode,
-                            tableIdentifier);
+                            tableIdentifier,
+                            watermarkOptions);
             result = 31 * result + Arrays.hashCode(keyProjection);
             result = 31 * result + Arrays.hashCode(valueProjection);
             return result;
@@ -236,7 +248,7 @@ public class ConfluentManagedTableUtils {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            ScanTopicPartition that = (ScanTopicPartition) o;
+            final ScanTopicPartition that = (ScanTopicPartition) o;
             return partition == that.partition && topic.equals(that.topic);
         }
 
@@ -269,7 +281,7 @@ public class ConfluentManagedTableUtils {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            StartupOptions that = (StartupOptions) o;
+            final StartupOptions that = (StartupOptions) o;
             return startupTimestampMillis == that.startupTimestampMillis
                     && startupMode == that.startupMode
                     && specificOffsets.equals(that.specificOffsets);
@@ -304,7 +316,7 @@ public class ConfluentManagedTableUtils {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            BoundedOptions that = (BoundedOptions) o;
+            final BoundedOptions that = (BoundedOptions) o;
             return boundedTimestampMillis == that.boundedTimestampMillis
                     && boundedMode == that.boundedMode
                     && specificOffsets.equals(that.specificOffsets);
@@ -313,6 +325,34 @@ public class ConfluentManagedTableUtils {
         @Override
         public int hashCode() {
             return Objects.hash(boundedMode, specificOffsets, boundedTimestampMillis);
+        }
+    }
+
+    /** Watermark options for the source watermark. */
+    public static final class WatermarkOptions implements Serializable {
+        public final SourceWatermarkVersion version;
+        public final boolean emitPerRow;
+
+        public WatermarkOptions(SourceWatermarkVersion version, boolean emitPerRow) {
+            this.version = version;
+            this.emitPerRow = emitPerRow;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            final WatermarkOptions that = (WatermarkOptions) o;
+            return emitPerRow == that.emitPerRow && version == that.version;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(version, emitPerRow);
         }
     }
 
@@ -402,6 +442,16 @@ public class ConfluentManagedTableUtils {
                             new ScanTopicPartition(topic, partition);
                     specificOffsets.put(topicPartition, offset);
                 });
+    }
+
+    private static @Nullable WatermarkOptions getWatermarkOptions(ReadableConfig options) {
+        return options.getOptional(CONFLUENT_SOURCE_WATERMARK_VERSION)
+                .map(
+                        version ->
+                                new WatermarkOptions(
+                                        version,
+                                        options.get(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW)))
+                .orElse(null);
     }
 
     private static int[] createValueFormatProjection(
