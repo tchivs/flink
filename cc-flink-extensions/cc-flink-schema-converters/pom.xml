@@ -37,6 +37,7 @@ under the License.
 
 	<dependencyManagement>
 		<dependencies>
+			<!-- Pulled by kafka-protobuf-types and used explicitly. Enforce a common version. -->
 			<dependency>
 				<groupId>com.google.protobuf</groupId>
 				<artifactId>protobuf-java</artifactId>

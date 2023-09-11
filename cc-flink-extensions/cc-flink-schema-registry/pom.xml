@@ -38,6 +38,9 @@ under the License.
 		<protobuf.java.version>3.24.0</protobuf.java.version>
 		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
 		<shaded.prefix>io.confluent.flink.registry.shaded</shaded.prefix>
+		<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
+			 version. -->
+		<kotlin.version>1.7.0</kotlin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -66,6 +69,27 @@ under the License.
 				<groupId>com.google.protobuf</groupId>
 				<artifactId>protobuf-java</artifactId>
 				<version>${protobuf.java.version}</version>
+			</dependency>
+			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
+			 version. -->
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib-jdk8</artifactId>
+				<version>${kotlin.version}</version>
+			</dependency>
+			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
+			 version. -->
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib-common</artifactId>
+				<version>${kotlin.version}</version>
+			</dependency>
+			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
+			 version. -->
+			<dependency>
+				<groupId>org.jetbrains.kotlin</groupId>
+				<artifactId>kotlin-stdlib</artifactId>
+				<version>${kotlin.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
@@ -160,6 +184,12 @@ under the License.
 					<artifactId>kotlin-scripting-compiler-embeddable</artifactId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-protobuf-provider</artifactId>
+			<version>${schema.registry.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -291,6 +321,14 @@ under the License.
 								<relocation>
 									<pattern>com.google.j2objc</pattern>
 									<shadedPattern>${shaded.prefix}.com.google.j2objc</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>org.jetbrains</pattern>
+									<shadedPattern>${shaded.prefix}.org.jetbrains</shadedPattern>
+								</relocation>
+								<relocation>
+									<pattern>com.squareup</pattern>
+									<shadedPattern>${shaded.prefix}.com.squareup</shadedPattern>
 								</relocation>
 								<!-- Reuse Guava that comes with Flink -->
 								<relocation>
