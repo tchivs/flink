@@ -20,15 +20,17 @@ import org.apache.flink.table.planner.delegation.DefaultExecutor;
 import org.apache.flink.table.planner.delegation.PlannerBase;
 
 import io.confluent.flink.table.service.ServiceTasks;
+import io.confluent.flink.table.service.ServiceTasks.Service;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static io.confluent.flink.jobgraph.v3.JobGraphGeneratorV3.CONFLUENT_USER_PREFIX;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
+import static io.confluent.flink.table.service.ServiceTasksOptions.PRIVATE_USER_PREFIX;
 
 /** Utils for {@link JobGraph} generation. Currently, only from a {@link CompiledPlan}. */
 public class GeneratorUtils {
@@ -54,18 +56,24 @@ public class GeneratorUtils {
                                 .build());
 
         // Public user options are only passed here to ensure they don't conflict with Flink
-        // options. Flink options are used to configure the TableEnvironment.
+        // options. Private options and Flink options are used to configure the TableEnvironment.
         final Map<String, String> publicOptions =
                 allOptions.entrySet().stream()
-                        .filter(e -> e.getKey().startsWith(CONFLUENT_USER_PREFIX))
+                        .filter(e -> e.getKey().startsWith(PRIVATE_USER_PREFIX))
                         .collect(
                                 Collectors.toMap(
-                                        e -> e.getKey().substring(CONFLUENT_USER_PREFIX.length()),
+                                        e -> e.getKey().substring(PRIVATE_USER_PREFIX.length()),
                                         Map.Entry::getValue));
+
+        // TODO remove this and let configureEnvironment() do its job
         // Always enable AI functions for JSS, SQL service will guard the CompiledPlan reference
         publicOptions.put(CONFLUENT_AI_FUNCTIONS_ENABLED.key(), "true");
 
-        ServiceTasks.INSTANCE.configureEnvironment(tableEnvironment, publicOptions, false);
+        ServiceTasks.INSTANCE.configureEnvironment(
+                tableEnvironment,
+                publicOptions,
+                Collections.emptyMap(),
+                Service.JOB_SUBMISSION_SERVICE);
 
         final PlannerBase planner = (PlannerBase) tableEnvironment.getPlanner();
 

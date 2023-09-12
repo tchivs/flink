@@ -12,6 +12,7 @@ import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.confluent.flink.table.service.ServiceTasks.Service;
 import io.confluent.flink.table.utils.ClassifiedException.ExceptionClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -152,7 +153,8 @@ public class ClassifiedExceptionTest {
     void testClassifiedException(TestSpec testSpec) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+        INSTANCE.configureEnvironment(
+                tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
         testSpec.tableEnvSetup.forEach(consumer -> consumer.accept(tableEnv));
         try {
             testSpec.sqlStatements.forEach(tableEnv::executeSql);

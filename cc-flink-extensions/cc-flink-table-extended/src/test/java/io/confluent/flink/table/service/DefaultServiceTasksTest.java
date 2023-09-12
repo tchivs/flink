@@ -21,6 +21,7 @@ import org.apache.flink.table.operations.SinkModifyOperation;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
+import io.confluent.flink.table.service.ServiceTasks.Service;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -109,7 +110,8 @@ public class DefaultServiceTasksTest {
     void testConfigurationNonDeterminism() {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+        INSTANCE.configureEnvironment(
+                tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery("SELECT NOW(), COUNT(*) FROM (VALUES (1), (2), (3))")
@@ -128,7 +130,8 @@ public class DefaultServiceTasksTest {
     void testConfigurationSystemColumns() throws Exception {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+        INSTANCE.configureEnvironment(
+                tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
 
         final Schema schema =
                 Schema.newBuilder()
@@ -186,34 +189,66 @@ public class DefaultServiceTasksTest {
     }
 
     @Test
-    void testCustomConfigurationValidation() {
-        final Map<String, String> validOptions = new HashMap<>();
-        validOptions.put("client.what-ever", "ANY_VALUE");
-        validOptions.put(
-                "sql.current-catalog", TableConfigOptions.TABLE_CATALOG_NAME.defaultValue());
-        validOptions.put(
-                "sql.current-database", TableConfigOptions.TABLE_DATABASE_NAME.defaultValue());
-        validOptions.put("sql.state-ttl", "7 days");
-        validOptions.put("sql.local-time-zone", "Europe/Berlin");
-        validOptions.put("sql.tables.scan.idle-timeout", "5 min");
-        validOptions.put("sql.tables.scan.startup.mode", "latest-offset");
-        validOptions.put("sql.tables.scan.startup.timestamp-millis", "1001");
-        validOptions.put("sql.tables.scan.bounded.mode", "latest-offset");
-        validOptions.put("sql.tables.scan.bounded.timestamp-millis", "1002");
-        validOptions.put("confluent.ai-functions.enabled", "true");
+    void testConfiguration() {
+        final Map<String, String> validPublicOptions = new HashMap<>();
+        validPublicOptions.put("client.what-ever", "ANY_VALUE");
+        validPublicOptions.put("sql.current-catalog", "my_cat");
+        validPublicOptions.put("sql.current-database", "my_db");
+        validPublicOptions.put("sql.state-ttl", "7 days");
+        validPublicOptions.put("sql.local-time-zone", "Europe/Berlin");
+        validPublicOptions.put("sql.tables.scan.idle-timeout", "5 min");
+        validPublicOptions.put("sql.tables.scan.startup.mode", "latest-offset");
+        validPublicOptions.put("sql.tables.scan.startup.timestamp-millis", "1001");
+        validPublicOptions.put("sql.tables.scan.bounded.mode", "latest-offset");
+        validPublicOptions.put("sql.tables.scan.bounded.timestamp-millis", "1002");
+
+        final Map<String, String> validPrivateOptions = new HashMap<>();
+        validPrivateOptions.put("confluent.ai-functions.enabled", "true");
 
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tableEnv.registerCatalog("my_cat", new GenericInMemoryCatalog("my_cat", "my_db"));
 
-        // Should succeed
-        ServiceTasks.INSTANCE.configureEnvironment(tableEnv, validOptions, true);
+        final Map<String, String> resourceOptions =
+                ServiceTasks.INSTANCE.configureEnvironment(
+                        tableEnv, validPublicOptions, validPrivateOptions, Service.SQL_SERVICE);
+
+        final Map<String, String> expectedResourceOptions = new HashMap<>();
+        expectedResourceOptions.put("confluent.user.sql.current-catalog", "my_cat");
+        expectedResourceOptions.put("confluent.user.sql.current-database", "my_db");
+        expectedResourceOptions.put("confluent.user.sql.state-ttl", "7 days");
+        expectedResourceOptions.put("confluent.user.sql.tables.scan.idle-timeout", "5 min");
+        expectedResourceOptions.put("confluent.user.sql.local-time-zone", "Europe/Berlin");
+        expectedResourceOptions.put("confluent.user.sql.tables.scan.startup.mode", "latest-offset");
+        expectedResourceOptions.put(
+                "confluent.user.sql.tables.scan.startup.timestamp-millis", "1001");
+        expectedResourceOptions.put("confluent.user.sql.tables.scan.bounded.mode", "latest-offset");
+        expectedResourceOptions.put(
+                "confluent.user.sql.tables.scan.bounded.timestamp-millis", "1002");
+        expectedResourceOptions.put("confluent.ai-functions.enabled", "true");
+
+        assertThat(resourceOptions).isEqualTo(expectedResourceOptions);
+
+        assertThat(tableEnv.getCurrentCatalog()).isEqualTo("my_cat");
+        assertThat(tableEnv.getCurrentDatabase()).isEqualTo("my_db");
+        assertThat(tableEnv.getConfig().getIdleStateRetention()).isEqualTo(Duration.ofDays(7));
+        assertThat(tableEnv.getConfig().getLocalTimeZone()).isEqualTo(ZoneId.of("Europe/Berlin"));
+        assertThat(tableEnv.getConfig().get(TABLE_EXEC_SOURCE_IDLE_TIMEOUT))
+                .isEqualTo(Duration.ofMinutes(5));
+    }
+
+    @Test
+    void testConfigurationValidation() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
         // Deprecated keys
         ServiceTasks.INSTANCE.configureEnvironment(
                 tableEnv,
                 Collections.singletonMap(
                         "catalog", TableConfigOptions.TABLE_CATALOG_NAME.defaultValue()),
-                true);
+                Collections.emptyMap(),
+                Service.SQL_SERVICE);
 
         // Invalid values
         assertThatThrownBy(
@@ -221,7 +256,8 @@ public class DefaultServiceTasksTest {
                                 ServiceTasks.INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap("sql.state-ttl", "INVALID"),
-                                        true))
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
                 .hasMessageContaining("Invalid value for option 'sql.state-ttl'.");
         assertThatThrownBy(
                         () ->
@@ -229,7 +265,8 @@ public class DefaultServiceTasksTest {
                                         tableEnv,
                                         Collections.singletonMap(
                                                 "sql.local-time-zone", "UTC-01:00"),
-                                        true))
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
                 .hasMessageContaining("Invalid value for option 'sql.local-time-zone'.");
 
         // Invalid key space
@@ -238,7 +275,8 @@ public class DefaultServiceTasksTest {
                                 ServiceTasks.INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap("does-not-exist", "42"),
-                                        true))
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
                 .hasMessageContaining(
                         "Unsupported configuration options found.\n"
                                 + "\n"
@@ -264,31 +302,9 @@ public class DefaultServiceTasksTest {
                                         tableEnv,
                                         Collections.singletonMap(
                                                 "sql.current-catalog", "<UNKNOWN>"),
-                                        true))
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
                 .hasMessageContaining("Catalog name '<UNKNOWN>' is not allowed.");
-    }
-
-    @Test
-    void testCustomConfiguration() {
-        final Map<String, String> validOptions = new HashMap<>();
-        validOptions.put("sql.current-catalog", "my_cat");
-        validOptions.put("sql.current-database", "my_db");
-        validOptions.put("sql.state-ttl", "7 days");
-        validOptions.put("sql.local-time-zone", "Europe/Berlin");
-        validOptions.put("sql.tables.scan.idle-timeout", "5 min");
-
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        tableEnv.registerCatalog("my_cat", new GenericInMemoryCatalog("my_cat", "my_db"));
-
-        ServiceTasks.INSTANCE.configureEnvironment(tableEnv, validOptions, true);
-
-        assertThat(tableEnv.getCurrentCatalog()).isEqualTo("my_cat");
-        assertThat(tableEnv.getCurrentDatabase()).isEqualTo("my_db");
-        assertThat(tableEnv.getConfig().getIdleStateRetention()).isEqualTo(Duration.ofDays(7));
-        assertThat(tableEnv.getConfig().getLocalTimeZone()).isEqualTo(ZoneId.of("Europe/Berlin"));
-        assertThat(tableEnv.getConfig().get(TABLE_EXEC_SOURCE_IDLE_TIMEOUT))
-                .isEqualTo(Duration.ofMinutes(5));
     }
 
     private static void createConfluentCatalogTable(

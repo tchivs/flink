@@ -53,6 +53,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -82,23 +83,48 @@ class DefaultServiceTasks implements ServiceTasks {
     private static final String UNKNOWN = "<UNKNOWN>";
 
     @Override
-    public void configureEnvironment(
+    public Map<String, String> configureEnvironment(
             TableEnvironment tableEnvironment,
-            Map<String, String> options,
-            boolean validateSession) {
-        final Configuration providedOptions = new Configuration();
+            Map<String, String> publicOptions,
+            Map<String, String> privateOptions,
+            Service service) {
+        final Configuration publicConfig = new Configuration();
 
         // Ignored keys are removed to avoid conflicts with Flink options (e.g. for "client.")
-        options.entrySet().stream()
+        publicOptions.entrySet().stream()
                 .filter(e -> !ServiceTasksOptions.isIgnored(e.getKey()))
-                .forEach(e -> providedOptions.setString(e.getKey(), e.getValue()));
+                .forEach(e -> publicConfig.setString(e.getKey(), e.getValue()));
 
-        if (validateSession) {
-            validateConfiguration(providedOptions);
+        // Validate options
+        if (service == Service.SQL_SERVICE) {
+            validateConfiguration(publicConfig);
+        }
+        applyPublicConfig(tableEnvironment, publicConfig, service);
 
+        final Configuration privateConfig = Configuration.fromMap(privateOptions);
+        applyPrivateConfig(tableEnvironment, privateConfig);
+
+        // Prepare options for persisting in resources
+        final Map<String, String> resourceOptions = new HashMap<>(privateConfig.toMap());
+        publicConfig
+                .toMap()
+                .forEach(
+                        (k, v) ->
+                                resourceOptions.put(
+                                        ServiceTasksOptions.PRIVATE_USER_PREFIX + k, v));
+        return resourceOptions;
+    }
+
+    private void applyPublicConfig(
+            TableEnvironment tableEnvironment, Configuration publicConfig, Service service) {
+        final TableConfig config = tableEnvironment.getConfig();
+
+        // Handle catalog and database
+        if (service == Service.SQL_SERVICE) {
+            // Metastore is available
             // "<UNKNOWN>" is a reserved string in ObjectIdentifier and is used for creating an
             // invalid built-in catalog that cannot be accessed.
-            providedOptions
+            publicConfig
                     .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
                     .filter(v -> !v.isEmpty())
                     .ifPresent(
@@ -109,7 +135,7 @@ class DefaultServiceTasks implements ServiceTasks {
                                 }
                                 tableEnvironment.useCatalog(v);
                             });
-            providedOptions
+            publicConfig
                     .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
                     .filter(v -> !v.isEmpty())
                     .ifPresent(
@@ -122,9 +148,7 @@ class DefaultServiceTasks implements ServiceTasks {
                             });
         }
 
-        final TableConfig config = tableEnvironment.getConfig();
-
-        providedOptions
+        publicConfig
                 .getOptional(ServiceTasksOptions.SQL_STATE_TTL)
                 .ifPresent(v -> config.set(IDLE_STATE_RETENTION, v));
 
@@ -132,9 +156,9 @@ class DefaultServiceTasks implements ServiceTasks {
         // on the local system's configuration.
         config.set(
                 LOCAL_TIME_ZONE,
-                providedOptions.getOptional(ServiceTasksOptions.SQL_LOCAL_TIME_ZONE).orElse("UTC"));
+                publicConfig.getOptional(ServiceTasksOptions.SQL_LOCAL_TIME_ZONE).orElse("UTC"));
 
-        providedOptions
+        publicConfig
                 .getOptional(ServiceTasksOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT)
                 .ifPresent(v -> config.set(TABLE_EXEC_SOURCE_IDLE_TIMEOUT, v));
 
@@ -160,10 +184,15 @@ class DefaultServiceTasks implements ServiceTasks {
                         ColumnExpansionStrategy.EXCLUDE_DEFAULT_VIRTUAL_METADATA_COLUMNS,
                         ColumnExpansionStrategy.EXCLUDE_ALIASED_VIRTUAL_METADATA_COLUMNS));
 
-        // Confluent AI Functions loaded when flag is set
-        if (providedOptions
-                .getOptional(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)
-                .orElse(false)) {
+        // TODO remove confluent.ai-functions.enabled from public options
+        if (publicConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
+            tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
+        }
+    }
+
+    private void applyPrivateConfig(
+            TableEnvironment tableEnvironment, Configuration privateConfig) {
+        if (privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
         }
     }

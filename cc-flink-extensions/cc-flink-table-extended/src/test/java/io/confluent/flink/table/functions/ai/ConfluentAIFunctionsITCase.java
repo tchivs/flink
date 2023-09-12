@@ -19,6 +19,7 @@ import io.confluent.flink.table.functions.scalar.ai.AIResponseGenerator;
 import io.confluent.flink.table.functions.scalar.ai.AISecret;
 import io.confluent.flink.table.service.ForegroundResultPlan;
 import io.confluent.flink.table.service.ServiceTasks;
+import io.confluent.flink.table.service.ServiceTasks.Service;
 import okhttp3.HttpUrl;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -58,7 +59,9 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                 tableEnv,
                 Collections.singletonMap(
                         CONFLUENT_AI_FUNCTIONS_ENABLED.key(), String.valueOf(aiFunctionsEnabled)),
-                true);
+                // TODO pass the option here instead
+                Collections.emptyMap(),
+                Service.SQL_SERVICE);
         return tableEnv;
     }
 

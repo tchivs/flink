@@ -27,6 +27,15 @@ public interface ServiceTasks {
     ServiceTasks INSTANCE = new DefaultServiceTasks();
 
     /**
+     * Specifies the caller side for methods that have slightly different behavior depending on the
+     * service.
+     */
+    enum Service {
+        SQL_SERVICE,
+        JOB_SUBMISSION_SERVICE
+    }
+
+    /**
      * Applies configuration options to the given {@link TableEnvironment}.
      *
      * <p>Since configuration is not part of the {@link CompiledPlan}, this method is called from
@@ -38,11 +47,20 @@ public interface ServiceTasks {
      * <p>For Job Submission Service, validation is not performed for enabling cases where
      * customizing Flink with low-level options is necessary. Also, metastore cannot be accessed in
      * JSS.
+     *
+     * @param publicOptions map of {@link ServiceTasksOptions#PUBLIC_OPTIONS} to be validated and
+     *     applied
+     * @param privateOptions map of {@link ServiceTasksOptions} with {@link
+     *     ServiceTasksOptions#PRIVATE_PREFIX} to be applied
+     * @return prepared {@link ServiceTasksOptions} to be persisted in resources (i.e. private
+     *     options stay as they are and public options get prefixed with {@link
+     *     ServiceTasksOptions#PRIVATE_USER_PREFIX})
      */
-    void configureEnvironment(
+    Map<String, String> configureEnvironment(
             TableEnvironment tableEnvironment,
-            Map<String, String> options,
-            boolean validateSession);
+            Map<String, String> publicOptions,
+            Map<String, String> privateOptions,
+            Service service);
 
     /**
      * Compiles a {@link QueryOperation} (i.e. a SELECT statement) for foreground result serving.

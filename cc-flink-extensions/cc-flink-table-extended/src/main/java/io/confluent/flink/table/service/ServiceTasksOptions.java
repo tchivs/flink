@@ -135,6 +135,12 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent AI functions.");
 
+    /**
+     * Prefix to mark options that have been introduced by Confluent and set by the user. It is used
+     * in resources to avoid namespace collision with current or future Flink options.
+     */
+    public static final String PRIVATE_USER_PREFIX = PRIVATE_PREFIX + "user.";
+
     // --------------------------------------------------------------------------------------------
     // Public Options
     // --------------------------------------------------------------------------------------------
