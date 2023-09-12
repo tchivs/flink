@@ -5,11 +5,12 @@
 package io.confluent.flink.table.utils;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.sql.parser.error.SqlValidateException;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
-import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.GenericInMemoryCatalog;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import io.confluent.flink.table.utils.ClassifiedException.ExceptionClass;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
@@ -122,7 +124,27 @@ public class ClassifiedExceptionTest {
                         .expectUserError(
                                 "The window function requires the timecol is"
                                         + " a time attribute type, but is"
-                                        + " TIMESTAMP_WITH_LOCAL_TIME_ZONE(3)."));
+                                        + " TIMESTAMP_WITH_LOCAL_TIME_ZONE(3)."),
+                // ---
+                TestSpec.test("hide internal errors during SQL validation phase")
+                        .setupTableEnvironment(
+                                tableEnv -> tableEnv.registerCatalog("c", new InvalidCatalog("c")))
+                        .executeSql("SELECT * FROM c.db.t")
+                        .expectSystemError("SQL validation failed. Internal error!"),
+                // ---
+                TestSpec.test("show helpful error during SQL validation in range")
+                        .executeSql("SELECT notExisting()")
+                        .expectExactUserError(
+                                "SQL validation failed. Error from line 1, column 8 to line 1, column 20.\n"
+                                        + "\n"
+                                        + "Caused by: No match found for function signature notExisting()"),
+                // ---
+                TestSpec.test("show helpful error during SQL validation at point")
+                        .executeSql("SELECT n")
+                        .expectExactUserError(
+                                "SQL validation failed. Error at or near line 1, column 8.\n"
+                                        + "\n"
+                                        + "Caused by: Column 'n' not found in any table"));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -131,12 +153,14 @@ public class ClassifiedExceptionTest {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         INSTANCE.configureEnvironment(tableEnv, Collections.emptyMap(), true);
+        testSpec.tableEnvSetup.forEach(consumer -> consumer.accept(tableEnv));
         try {
             testSpec.sqlStatements.forEach(tableEnv::executeSql);
-            fail("Exception should have occurred");
-        } catch (Exception e) {
+            fail("Throwable should have occurred");
+        } catch (Throwable t) {
+            assertThat(t).isInstanceOf(Exception.class);
             final ClassifiedException classified =
-                    ClassifiedException.of(e, testSpec.allowedCauses);
+                    ClassifiedException.of((Exception) t, testSpec.allowedCauses);
             switch (testSpec.matchCondition) {
                 case EXACT:
                     assertThat(classified.getMessage()).isEqualTo(testSpec.expectedError);
@@ -155,6 +179,7 @@ public class ClassifiedExceptionTest {
     private static class TestSpec {
 
         final String description;
+        final List<Consumer<TableEnvironment>> tableEnvSetup = new ArrayList<>();
         final List<String> sqlStatements = new ArrayList<>();
         final Set<Class<? extends Exception>> allowedCauses = new HashSet<>();
 
@@ -170,9 +195,7 @@ public class ClassifiedExceptionTest {
 
         private TestSpec(String description) {
             this.description = description;
-            allowedCauses.add(TableException.class);
-            allowedCauses.add(ValidationException.class);
-            allowedCauses.add(SqlValidateException.class);
+            allowedCauses.addAll(ClassifiedException.VALID_CAUSES);
         }
 
         static TestSpec test(String description) {
@@ -181,6 +204,11 @@ public class ClassifiedExceptionTest {
 
         TestSpec executeSql(String sql) {
             this.sqlStatements.add(sql);
+            return this;
+        }
+
+        TestSpec setupTableEnvironment(Consumer<TableEnvironment> consumer) {
+            this.tableEnvSetup.add(consumer);
             return this;
         }
 
@@ -218,6 +246,23 @@ public class ClassifiedExceptionTest {
         @Override
         public String toString() {
             return description;
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Supporting classes for creating exceptions
+    // --------------------------------------------------------------------------------------------
+
+    /** Exception throwing {@link Catalog}. */
+    public static class InvalidCatalog extends GenericInMemoryCatalog {
+
+        public InvalidCatalog(String name) {
+            super(name, "db");
+        }
+
+        @Override
+        public CatalogBaseTable getTable(ObjectPath tablePath) {
+            throw new RuntimeException("Internal error!");
         }
     }
 }
