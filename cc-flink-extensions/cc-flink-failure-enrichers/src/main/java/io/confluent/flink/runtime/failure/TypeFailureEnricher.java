@@ -5,6 +5,7 @@
 package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.core.failure.FailureEnricher;
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 
@@ -56,21 +57,18 @@ public class TypeFailureEnricher implements FailureEnricher {
                     if (cause == null) {
                         return labels;
                     }
+                    // FRT-173: ReEnable Code classification when add support for UDFs
                     // Base of exception is User/UDF code or Flink platform
-                    if (context.getUserClassLoader() != null) {
-                        // Class in the top of the stack, from which an exception is thrown, is
-                        // loaded from user artifacts in a submitted JAR
-                        Optional<Class> classOnStackTop =
-                                TypeFailureEnricherUtils.findClassFromStackTraceTop(
-                                        cause, context.getUserClassLoader());
-                        if (classOnStackTop.isPresent()
-                                && TypeFailureEnricherUtils.isUserCodeClassLoader(
-                                        classOnStackTop.get().getClassLoader())) {
-                            labels.put(codeKey, "USER");
-                        } else {
-                            labels.put(codeKey, "SYSTEM");
-                        }
-                    }
+                    /*
+                     * if (context.getUserClassLoader() != null) { // Class in the top of the stack,
+                     * from which an exception is thrown, is // loaded from user artifacts in a
+                     * submitted JAR Optional<Class> classOnStackTop =
+                     * TypeFailureEnricherUtils.findClassFromStackTraceTop( cause,
+                     * context.getUserClassLoader()); if (classOnStackTop.isPresent() &&
+                     * TypeFailureEnricherUtils.isUserCodeClassLoader(
+                     * classOnStackTop.get().getClassLoader())) { labels.put(codeKey, "USER"); }
+                     * else { labels.put(codeKey, "SYSTEM"); } }
+                     */
 
                     // This is meant to capture any exception that has "serializ" in the error
                     // message, such as "(de)serialize", "(de)serialization", or "(de)serializable"
@@ -86,6 +84,9 @@ public class TypeFailureEnricher implements FailureEnricher {
                         } else {
                             labels.put(typeKey, "USER");
                         }
+                    } else if (ExceptionUtils.findThrowable(cause, TableException.class)
+                            .isPresent()) {
+                        labels.put(typeKey, "USER");
                     } else if (ExceptionUtils.findThrowable(cause, ArithmeticException.class)
                             .isPresent()) {
                         labels.put(typeKey, "USER");

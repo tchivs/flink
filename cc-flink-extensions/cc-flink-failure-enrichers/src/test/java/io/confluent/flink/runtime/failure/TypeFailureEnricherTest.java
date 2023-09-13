@@ -6,6 +6,7 @@ package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkUserCodeClassLoaders;
@@ -105,6 +106,15 @@ class TypeFailureEnricherTest {
         assertFailureEnricherLabelIsExpectedLabel(new TopicAuthorizationException("test"), "USER");
         assertFailureEnricherLabelIsExpectedLabel(new FlinkException("test"), "SYSTEM");
         assertFailureEnricherLabelIsExpectedLabel(new ExpectedTestException("test"), "UNKNOWN");
+    }
+
+    @Test
+    void testTableExceptionClassification() throws ExecutionException, InterruptedException {
+        final String errorMsg =
+                "Column 'b' is NOT NULL, however, a null value is being written into it. "
+                        + "You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' "
+                        + "to suppress this exception and drop such records silently.";
+        assertFailureEnricherLabelIsExpectedLabel(new TableException(errorMsg), "USER");
     }
 
     /** Pack the generated classes into a JAR and return the path of the JAR. */
