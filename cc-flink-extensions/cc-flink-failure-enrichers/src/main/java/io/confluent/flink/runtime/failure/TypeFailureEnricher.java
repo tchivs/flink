@@ -51,7 +51,7 @@ public class TypeFailureEnricher implements FailureEnricher {
             final Throwable cause, final Context context) {
         return CompletableFuture.supplyAsync(
                 () -> {
-                    LOG.info("Processing failure: {}", cause);
+                    LOG.info("Processing failure:", cause);
                     final Map<String, String> labels = new HashMap();
                     if (cause == null) {
                         return labels;
