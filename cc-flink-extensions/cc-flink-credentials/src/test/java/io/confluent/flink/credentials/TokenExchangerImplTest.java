@@ -72,7 +72,7 @@ public class TokenExchangerImplTest {
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     "",
-                    Arrays.stream(new String[] {"u-123", "pool-123", "pool-234"})
+                    Arrays.stream(new String[] {"u-123", "pool-123", "pool-234", "group-123"})
                             .collect(Collectors.toList()),
                     0,
                     0);
@@ -214,7 +214,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(USER_POOL_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\"]}";
+                "{\"statement_crn\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\",\"group-123\"]}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }

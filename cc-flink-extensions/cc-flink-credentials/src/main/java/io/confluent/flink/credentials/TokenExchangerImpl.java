@@ -154,6 +154,14 @@ public class TokenExchangerImpl implements TokenExchanger {
         List<String> identityPools =
                 filterByPrefix(jobCredentialsMetadata.getPrincipals(), "pool-")
                         .collect(Collectors.toList());
+        // Required for users, who will pass in a list containing user resource id + group mappings
+        // Group mappings are a special type of identity pool that are prefixed instead by `group-`
+        // See
+        // https://confluentinc.atlassian.net/wiki/spaces/SECENG/pages/3168567337/Instances+of+manual+pool-+prefix+checking#Dependencies
+        List<String> groupMappings =
+                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "group-")
+                        .collect(Collectors.toList());
+        identityPools.addAll(groupMappings);
 
         return serviceAccount
                 .map(
