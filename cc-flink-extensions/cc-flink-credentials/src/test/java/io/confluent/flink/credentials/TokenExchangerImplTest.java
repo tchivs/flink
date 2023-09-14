@@ -39,7 +39,7 @@ public class TokenExchangerImplTest {
     private static final JobCredentialsMetadata METADATA =
             new JobCredentialsMetadata(
                     JobID.generate(),
-                    "crn://",
+                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     "identity",
                     Collections.emptyList(),
@@ -49,7 +49,7 @@ public class TokenExchangerImplTest {
     private static final JobCredentialsMetadata SA_PRINCIPAL_METADATA =
             new JobCredentialsMetadata(
                     JobID.generate(),
-                    "crn://",
+                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     "",
                     Collections.singletonList("sa-123"),
@@ -59,7 +59,7 @@ public class TokenExchangerImplTest {
     private static final JobCredentialsMetadata USER_PRINCIPAL_METADATA =
             new JobCredentialsMetadata(
                     JobID.generate(),
-                    "crn://",
+                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     "",
                     Collections.singletonList("u-123"),
@@ -69,7 +69,7 @@ public class TokenExchangerImplTest {
     private static final JobCredentialsMetadata USER_POOL_PRINCIPAL_METADATA =
             new JobCredentialsMetadata(
                     JobID.generate(),
-                    "crn://",
+                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     "",
                     Arrays.stream(new String[] {"u-123", "pool-123", "pool-234"})
@@ -192,7 +192,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(SA_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"service_account_id\":\"sa-123\"}";
+                "{\"statement_crn\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\",\"service_account_id\":\"sa-123\"}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }
@@ -203,7 +203,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(USER_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\"}";
+                "{\"statement_crn\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\"}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }
@@ -214,7 +214,7 @@ public class TokenExchangerImplTest {
         ObjectNode saNode = exchanger.buildObjectNode(USER_POOL_PRINCIPAL_METADATA);
 
         String json =
-                "{\"statement_crn\":\"crn://\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\"]}";
+                "{\"statement_crn\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\",\"user_resource_id\":\"u-123\",\"identity_pool_ids\":[\"pool-123\",\"pool-234\"]}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }
@@ -225,7 +225,7 @@ public class TokenExchangerImplTest {
         JobCredentialsMetadata identityAndPrincipalsMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "crn://",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computepool",
                         "identityPool",
                         Collections.singletonList("sa-123"),
@@ -234,7 +234,8 @@ public class TokenExchangerImplTest {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode saNode = exchanger.buildObjectNode(identityAndPrincipalsMetadata);
 
-        String json = "{\"statement_id\":\"crn://\",\"compute_pool_id\":\"computepool\"}";
+        String json =
+                "{\"statement_id\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\"}";
         ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
         assertThat(saNode).isEqualTo(actualNode);
     }

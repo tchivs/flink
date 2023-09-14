@@ -74,7 +74,7 @@ public class KafkaCredentialFetcherImplTest {
         jobCredentialsMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "identityPoolId",
                         new ArrayList<>(),
@@ -130,7 +130,13 @@ public class KafkaCredentialFetcherImplTest {
                 Arrays.stream(new String[] {"sa-123"}).collect(Collectors.toList());
         JobCredentialsMetadata saJobCredentialsMetadata =
                 new JobCredentialsMetadata(
-                        JobID.generate(), "statementId", "computePoolId", "", saPrincipals, 0, 10);
+                        JobID.generate(),
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
+                        "computePoolId",
+                        "",
+                        saPrincipals,
+                        0,
+                        10);
         KafkaCredentials kafkaCredentials = fetcher.fetchToken(saJobCredentialsMetadata);
         assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
     }
@@ -140,7 +146,7 @@ public class KafkaCredentialFetcherImplTest {
         JobCredentialsMetadata userJobCredentialMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "",
                         Collections.singletonList("u-123"),
@@ -158,7 +164,7 @@ public class KafkaCredentialFetcherImplTest {
         JobCredentialsMetadata userJobCredentialMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "",
                         userAndIdentityPoolPrincipals,
@@ -184,7 +190,7 @@ public class KafkaCredentialFetcherImplTest {
         JobCredentialsMetadata userJobCredentialMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "",
                         userAndIdentityPoolPrincipals,
@@ -194,6 +200,95 @@ public class KafkaCredentialFetcherImplTest {
         assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadata))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Failed to do credential request");
+    }
+
+    @Test
+    public void testFetch_failGetCredentials_bad_crn() {
+        List<String> userAndIdentityPoolPrincipals =
+                Arrays.stream(new String[] {"u-123", "pool-123", "pool-234"})
+                        .collect(Collectors.toList());
+        // missing statement
+        JobCredentialsMetadata userJobCredentialMetadataNoStatementId =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadataNoStatementId))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .cause()
+                .hasMessageContaining("Failed to extract org and env from CRN")
+                .hasMessageContaining(
+                        "one of 'organization', 'environment', 'statement' missing in ");
+
+        JobCredentialsMetadata userJobCredentialMetadataNoEnv =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadataNoEnv))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .cause()
+                .hasMessageContaining("Failed to extract org and env from CRN")
+                .hasMessageContaining(
+                        "one of 'organization', 'environment', 'statement' missing in ");
+
+        JobCredentialsMetadata userJobCredentialMetadataNoOrg =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadataNoOrg))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .cause()
+                .hasMessageContaining("Failed to extract org and env from CRN")
+                .hasMessageContaining(
+                        "one of 'organization', 'environment', 'statement' missing in ");
+
+        JobCredentialsMetadata userJobCredentialMetadataNonsenseCrn =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialMetadataNonsenseCrn))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .cause()
+                .hasMessageContaining("Failed to extract org and env from CRN");
+
+        JobCredentialsMetadata userJobCredentialRepeatedKey =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/organization=org-123/organization=234",
+                        "computePoolId",
+                        "",
+                        userAndIdentityPoolPrincipals,
+                        0,
+                        10);
+        handler.withError();
+        assertThatThrownBy(() -> fetcher.fetchToken(userJobCredentialRepeatedKey))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .cause()
+                .hasMessageContaining("Failed to extract org and env from CRN")
+                .hasMessageContaining("found multiple values for: organization");
     }
 
     @Test
@@ -210,7 +305,7 @@ public class KafkaCredentialFetcherImplTest {
         JobCredentialsMetadata userJobCredentialMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "",
                         userPrincipals,
@@ -229,7 +324,7 @@ public class KafkaCredentialFetcherImplTest {
         JobCredentialsMetadata userJobCredentialMetadata =
                 new JobCredentialsMetadata(
                         JobID.generate(),
-                        "statementId",
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         "",
                         userPrincipals,
