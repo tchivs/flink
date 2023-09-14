@@ -102,7 +102,7 @@ class DefaultServiceTasks implements ServiceTasks {
         applyPublicConfig(tableEnvironment, publicConfig, service);
 
         final Configuration privateConfig = Configuration.fromMap(privateOptions);
-        applyPrivateConfig(tableEnvironment, privateConfig);
+        applyPrivateConfig(tableEnvironment, privateConfig, service);
 
         // Prepare options for persisting in resources
         final Map<String, String> resourceOptions = new HashMap<>(privateConfig.toMap());
@@ -186,8 +186,9 @@ class DefaultServiceTasks implements ServiceTasks {
     }
 
     private void applyPrivateConfig(
-            TableEnvironment tableEnvironment, Configuration privateConfig) {
-        if (privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
+            TableEnvironment tableEnvironment, Configuration privateConfig, Service service) {
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
         }
     }

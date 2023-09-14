@@ -52,7 +52,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         this.env.setParallelism(PARALLELISM);
     }
 
-    private static TableEnvironment getTableEnvironment(boolean aiFunctionsEnabled) {
+    private static TableEnvironment getSqlServiceTableEnvironment(boolean aiFunctionsEnabled) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         INSTANCE.configureEnvironment(
@@ -64,17 +64,45 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         return tableEnv;
     }
 
+    private static TableEnvironment getJssTableEnvironment() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Service.JOB_SUBMISSION_SERVICE);
+        return tableEnv;
+    }
+
     @Test
     public void testNumberOfBuiltinFunctions() {
-        AIFunctionsModule aiFunctionsModule = new AIFunctionsModule();
+        final AIFunctionsModule aiFunctionsModule = new AIFunctionsModule();
         assertThat(aiFunctionsModule.listFunctions().size()).isEqualTo(2);
         assertThat(aiFunctionsModule.getFunctionDefinition("INVOKE_OPENAI")).isPresent();
         assertThat(aiFunctionsModule.getFunctionDefinition("SECRET")).isPresent();
     }
 
     @Test
+    public void testJssAIFunctionEnabled() throws Exception {
+        // should be enabled by default for JSS service
+        final TableEnvironment tableEnv = getJssTableEnvironment();
+
+        final QueryOperation queryOperation =
+                tableEnv.sqlQuery("SELECT SECRET(\'something\');").getQueryOperation();
+
+        final ForegroundResultPlan plan =
+                INSTANCE.compileForegroundQuery(
+                        tableEnv,
+                        queryOperation,
+                        (identifier, execNodeId) -> Collections.emptyMap());
+        assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
+    }
+
+    @Test
     public void testAIFunctionEnabled() throws Exception {
-        TableEnvironment tableEnv = getTableEnvironment(true);
+        // SQL service controls AI functions using config params
+        final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true);
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery("SELECT SECRET(\'something\');").getQueryOperation();
@@ -89,7 +117,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
     @Test
     public void testAIFunctionDisabled() {
-        TableEnvironment tableEnv = getTableEnvironment(false);
+        final TableEnvironment tableEnv = getSqlServiceTableEnvironment(false);
 
         assertThatThrownBy(() -> tableEnv.executeSql("SELECT SECRET(\'a\', \'b\');"))
                 .satisfies(
@@ -107,7 +135,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                 .execute(
                         () -> {
                             // in here the environment is temporarily set
-                            TableEnvironment tEnv = getTableEnvironment(true);
+                            TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
                             TableResult result = tEnv.executeSql("SELECT SECRET(\'a\', \'b\');");
                             final List<Row> results = new ArrayList<>();
                             result.collect().forEachRemaining(results::add);
@@ -117,7 +145,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
     @Test
     public void testSecretUDFNoApiKeySet() {
-        TableEnvironment tEnv = getTableEnvironment(true);
+        final TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
 
         assertThatThrownBy(
                         () -> {
@@ -131,7 +159,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
     @Test
     public void testAIFunctionAiGenerateUDF() throws Exception {
         this.mockWebServer.start();
-        HttpUrl baseUrl = mockWebServer.url("/v1/chat/completions");
+        final HttpUrl baseUrl = mockWebServer.url("/v1/chat/completions");
         // value parse from JSON message.content
         final List<Row> expectedRows = Arrays.asList(Row.of("4"));
         // mock openAI completions JSON response
@@ -160,9 +188,9 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                                         + "    \"total_tokens\": 48\n"
                                         + "  }\n"
                                         + "}"));
-        TableEnvironment tEnv = getTableEnvironment(true);
+        final TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
 
-        TableResult result =
+        final TableResult result =
                 tEnv.executeSql(
                         "SELECT INVOKE_OPENAI('"
                                 + baseUrl.toString()
