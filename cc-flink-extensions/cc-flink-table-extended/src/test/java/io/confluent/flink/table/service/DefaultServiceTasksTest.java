@@ -284,7 +284,6 @@ public class DefaultServiceTasksTest {
                                 + "does-not-exist\n"
                                 + "\n"
                                 + "Supported options:\n"
-                                + "confluent.ai-functions.enabled\n"
                                 + "sql.current-catalog\n"
                                 + "sql.current-database\n"
                                 + "sql.local-time-zone\n"

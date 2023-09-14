@@ -158,8 +158,6 @@ public final class ServiceTasksOptions {
         options.add(SQL_TABLES_SCAN_STARTUP_MILLIS);
         options.add(SQL_TABLES_SCAN_BOUNDED_MODE);
         options.add(SQL_TABLES_SCAN_BOUNDED_MILLIS);
-        // Temporary workaround until SQLJob map
-        options.add(CONFLUENT_AI_FUNCTIONS_ENABLED);
         return Collections.unmodifiableSet(options);
     }
 

@@ -24,12 +24,10 @@ import io.confluent.flink.table.service.ServiceTasks.Service;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
 import static io.confluent.flink.table.service.ServiceTasksOptions.PRIVATE_USER_PREFIX;
 
 /** Utils for {@link JobGraph} generation. Currently, only from a {@link CompiledPlan}. */
@@ -45,18 +43,17 @@ public class GeneratorUtils {
             List<String> arguments, Map<String, String> allOptions) {
         final String compiledPlan = arguments.get(0);
 
-        final Configuration flinkConfiguration = Configuration.fromMap(allOptions);
+        final Configuration allConfig = Configuration.fromMap(allOptions);
         final ClassLoader loader = GeneratorUtils.class.getClassLoader();
 
         final TableEnvironmentImpl tableEnvironment =
                 TableEnvironmentImpl.create(
                         EnvironmentSettings.newInstance()
-                                .withConfiguration(flinkConfiguration)
+                                .withConfiguration(allConfig)
                                 .withClassLoader(loader)
                                 .build());
 
-        // Public user options are only passed here to ensure they don't conflict with Flink
-        // options. Private options and Flink options are used to configure the TableEnvironment.
+        // Public user options are extracted here to not conflict with Flink options.
         final Map<String, String> publicOptions =
                 allOptions.entrySet().stream()
                         .filter(e -> e.getKey().startsWith(PRIVATE_USER_PREFIX))
@@ -65,15 +62,8 @@ public class GeneratorUtils {
                                         e -> e.getKey().substring(PRIVATE_USER_PREFIX.length()),
                                         Map.Entry::getValue));
 
-        // TODO remove this and let configureEnvironment() do its job
-        // Always enable AI functions for JSS, SQL service will guard the CompiledPlan reference
-        publicOptions.put(CONFLUENT_AI_FUNCTIONS_ENABLED.key(), "true");
-
         ServiceTasks.INSTANCE.configureEnvironment(
-                tableEnvironment,
-                publicOptions,
-                Collections.emptyMap(),
-                Service.JOB_SUBMISSION_SERVICE);
+                tableEnvironment, publicOptions, allOptions, Service.JOB_SUBMISSION_SERVICE);
 
         final PlannerBase planner = (PlannerBase) tableEnvironment.getPlanner();
 
@@ -93,10 +83,10 @@ public class GeneratorUtils {
         }
 
         final List<Transformation<?>> transformations = planner.translatePlan(plan);
-        final Pipeline pipeline = execEnv.createPipeline(transformations, flinkConfiguration, null);
+        final Pipeline pipeline = execEnv.createPipeline(transformations, allConfig, null);
         try {
             return new JobGraphWrapperImpl(
-                    PipelineExecutorUtils.getJobGraph(pipeline, flinkConfiguration, loader));
+                    PipelineExecutorUtils.getJobGraph(pipeline, allConfig, loader));
         } catch (MalformedURLException e) {
             throw new RuntimeException(e);
         }

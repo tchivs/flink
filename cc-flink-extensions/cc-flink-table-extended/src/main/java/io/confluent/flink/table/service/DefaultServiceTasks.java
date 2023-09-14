@@ -183,11 +183,6 @@ class DefaultServiceTasks implements ServiceTasks {
                 Arrays.asList(
                         ColumnExpansionStrategy.EXCLUDE_DEFAULT_VIRTUAL_METADATA_COLUMNS,
                         ColumnExpansionStrategy.EXCLUDE_ALIASED_VIRTUAL_METADATA_COLUMNS));
-
-        // TODO remove confluent.ai-functions.enabled from public options
-        if (publicConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
-            tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
-        }
     }
 
     private void applyPrivateConfig(
