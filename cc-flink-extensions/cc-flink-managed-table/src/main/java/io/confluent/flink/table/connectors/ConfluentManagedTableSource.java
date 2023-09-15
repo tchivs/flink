@@ -106,6 +106,9 @@ public class ConfluentManagedTableSource
     /** Watermark strategy that is used to generate per-partition watermark. */
     private @Nullable WatermarkStrategy<RowData> watermarkStrategy;
 
+    /** Whether {@code SOURCE_WATERMARK} is declared and should be applied. */
+    private boolean applySourceWatermark;
+
     public ConfluentManagedTableSource(
             DynamicTableParameters parameters,
             @Nullable DecodingFormat<DeserializationSchema<RowData>> keyDecodingFormat,
@@ -156,13 +159,10 @@ public class ConfluentManagedTableSource
             @Override
             public DataStream<RowData> produceDataStream(
                     ProviderContext providerContext, StreamExecutionEnvironment execEnv) {
-                if (watermarkStrategy == null) {
-                    watermarkStrategy = WatermarkStrategy.noWatermarks();
-                }
                 DataStreamSource<RowData> sourceStream =
                         execEnv.fromSource(
                                 kafkaSource,
-                                watermarkStrategy,
+                                getWatermarkStrategy(),
                                 "KafkaSource-" + parameters.tableIdentifier);
                 providerContext.generateUid(KAFKA_TRANSFORMATION).ifPresent(sourceStream::uid);
                 return sourceStream;
@@ -258,15 +258,7 @@ public class ConfluentManagedTableSource
 
     @Override
     public void applySourceWatermark() {
-        if (parameters.watermarkOptions == null) {
-            throw new IllegalArgumentException("Options for SOURCE_WATERMARK() are not provided.");
-        }
-        // Note: Currently, it is not possible to use SOURCE_WATERMARK() for any other column than
-        // the built-in $rowtime system column coming directly from the Kafka message timestamp. If
-        // we want to support other physical or metadata columns, we would need to pass information
-        // about the position of the time attribute column. If we want to support other computed
-        // columns, we would need a generated watermark strategy for evaluating the expressions.
-        this.watermarkStrategy = VersionedWatermarkStrategy.forOptions(parameters.watermarkOptions);
+        this.applySourceWatermark = true;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -429,6 +421,24 @@ public class ConfluentManagedTableSource
             physicalFormatDataType = DataTypeUtils.stripRowPrefix(physicalFormatDataType, prefix);
         }
         return format.createRuntimeDecoder(context, physicalFormatDataType);
+    }
+
+    private WatermarkStrategy<RowData> getWatermarkStrategy() {
+        if (watermarkStrategy != null) {
+            return watermarkStrategy;
+        } else if (!applySourceWatermark) {
+            return WatermarkStrategy.noWatermarks();
+        }
+
+        if (parameters.watermarkOptions == null) {
+            throw new IllegalArgumentException("Options for SOURCE_WATERMARK() are not provided.");
+        }
+        // Note: Currently, it is not possible to use SOURCE_WATERMARK() for any other column than
+        // the built-in $rowtime system column coming directly from the Kafka message timestamp. If
+        // we want to support other physical or metadata columns, we would need to pass information
+        // about the position of the time attribute column. If we want to support other computed
+        // columns, we would need a generated watermark strategy for evaluating the expressions.
+        return VersionedWatermarkStrategy.forOptions(parameters.watermarkOptions);
     }
 
     // --------------------------------------------------------------------------------------------
