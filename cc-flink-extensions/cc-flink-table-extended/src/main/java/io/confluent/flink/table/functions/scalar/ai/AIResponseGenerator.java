@@ -5,10 +5,8 @@
 package io.confluent.flink.table.functions.scalar.ai;
 
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.functions.FunctionContext;
-import org.apache.flink.table.functions.SpecializedFunction.SpecializedContext;
-import org.apache.flink.table.runtime.functions.scalar.BuiltInScalarFunction;
+import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
@@ -33,7 +31,9 @@ import java.net.URL;
 import java.util.List;
 
 /** Class implementing aiGenerate function by calling OpenAI API. */
-public class AIResponseGenerator extends BuiltInScalarFunction {
+public class AIResponseGenerator extends ScalarFunction {
+
+    public static final String NAME = "INVOKE_OPENAI";
 
     private static final String openAICompletionsURL = "https://api.openai.com/v1/chat/completions";
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -42,8 +42,7 @@ public class AIResponseGenerator extends BuiltInScalarFunction {
     private transient OkHttpClient httpClient;
     private transient ObjectMapper mapper;
 
-    public AIResponseGenerator(SpecializedContext context) {
-        super(AIFunctionsModule.INVOKE_OPENAI, context);
+    public AIResponseGenerator() {
         setBaseUrl(openAICompletionsURL);
     }
 
@@ -61,17 +60,13 @@ public class AIResponseGenerator extends BuiltInScalarFunction {
         }
     }
 
-    public @Nullable StringData eval(
-            StringData baseUrl,
-            @Nullable StringData prompt,
-            @Nullable StringData input,
-            StringData apiKey) {
+    public @Nullable String eval(
+            String baseUrl, @Nullable String prompt, @Nullable String input, String apiKey) {
         setBaseUrl(baseUrl.toString());
         return eval(prompt, input, apiKey);
     }
 
-    public @Nullable StringData eval(
-            @Nullable StringData prompt, @Nullable StringData input, StringData apiKey) {
+    public @Nullable String eval(@Nullable String prompt, @Nullable String input, String apiKey) {
         if (prompt == null || input == null) {
             return null;
         }
@@ -95,8 +90,7 @@ public class AIResponseGenerator extends BuiltInScalarFunction {
                         .build();
         try (Response response = httpClient.newCall(request).execute()) {
             if (response.isSuccessful()) {
-                return StringData.fromString(
-                        getContentFromResponse(mapper, response.body().string()));
+                return getContentFromResponse(mapper, response.body().string());
             } else {
                 throw new FlinkRuntimeException(
                         String.format(
