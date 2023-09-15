@@ -13,6 +13,8 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.confluent.flink.table.utils.RowDataJsonFormatter;
 
 import java.io.IOException;
@@ -36,6 +38,8 @@ public final class ForegroundResultJsonSerializer extends TypeSerializer<RowData
 
     private transient RowDataJsonFormatter jsonFormatter;
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     public ForegroundResultJsonSerializer(
             LogicalType consumedType, ZoneId zoneId, boolean isInsertOnly) {
         this.consumedType = Preconditions.checkNotNull(consumedType);
@@ -46,6 +50,7 @@ public final class ForegroundResultJsonSerializer extends TypeSerializer<RowData
     private void initFormatter() {
         jsonFormatter =
                 new RowDataJsonFormatter(
+                        objectMapper.getNodeFactory(),
                         consumedType,
                         zoneId,
                         Thread.currentThread().getContextClassLoader(),

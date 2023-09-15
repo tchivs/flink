@@ -15,6 +15,8 @@ import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -36,6 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Tests for {@link RowDataJsonFormatter}. */
 @Confluent
 public class RowDataJsonFormatterTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static Stream<Arguments> params() {
         DataType rowType1 =
@@ -177,6 +181,7 @@ public class RowDataJsonFormatterTest {
     void test(DataType type, RowData data, String expected) {
         RowDataJsonFormatter formatter =
                 new RowDataJsonFormatter(
+                        OBJECT_MAPPER.getNodeFactory(),
                         type.getLogicalType(),
                         ZoneId.of("UTC"),
                         this.getClass().getClassLoader(),
@@ -190,6 +195,7 @@ public class RowDataJsonFormatterTest {
     void testRowKind(RowKind rowKind) {
         RowDataJsonFormatter formatter =
                 new RowDataJsonFormatter(
+                        OBJECT_MAPPER.getNodeFactory(),
                         DataTypes.ROW(DataTypes.FIELD("f0", DataTypes.BIGINT())).getLogicalType(),
                         ZoneId.of("UTC"),
                         this.getClass().getClassLoader(),

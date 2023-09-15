@@ -18,8 +18,8 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.VarCharType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.JsonNodeCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.ZoneId;
@@ -44,38 +44,37 @@ public final class RowDataJsonFormatter {
     private final Context castRuleContext;
     private final Converter rowConverter;
 
-    private final ObjectMapper objectMapper;
+    private final JsonNodeCreator nodeCreator;
 
     private final ObjectNode topNode;
 
     private final boolean isInsertOnly;
 
     public RowDataJsonFormatter(
+            JsonNodeCreator nodeCreator,
             LogicalType consumedType,
             ZoneId zoneId,
             ClassLoader classLoader,
             boolean isInsertOnly) {
         this.castRuleContext = Context.create(true, false, zoneId, classLoader);
         this.rowConverter = createConverter(consumedType);
-        this.objectMapper = new ObjectMapper();
-        this.topNode = objectMapper.getNodeFactory().objectNode();
+        this.nodeCreator = nodeCreator;
+        this.topNode = nodeCreator.objectNode();
         this.isInsertOnly = isInsertOnly;
     }
 
     /** Converts the incoming data into a JSON-y format. */
     public String convert(RowData rowData) {
-        final JsonNode row = rowConverter.apply(rowData, objectMapper);
+        final JsonNode row = rowConverter.apply(rowData, nodeCreator);
         if (!isInsertOnly) {
-            topNode.set(
-                    "op",
-                    objectMapper.getNodeFactory().numberNode(rowData.getRowKind().toByteValue()));
+            topNode.set("op", nodeCreator.numberNode(rowData.getRowKind().toByteValue()));
         }
         topNode.set("row", row);
         return topNode.toString();
     }
 
     private interface Converter {
-        JsonNode apply(Object rowData, ObjectMapper objectMapper);
+        JsonNode apply(Object rowData, JsonNodeCreator objectCreator);
     }
 
     private Converter createConverter(LogicalType fieldType) {
@@ -100,15 +99,15 @@ public final class RowDataJsonFormatter {
         final Converter elementConverter = createConverter(elementType);
         final ElementGetter elementGetter = ArrayData.createElementGetter(elementType);
 
-        return (obj, mapper) -> {
+        return (obj, nodeCreator) -> {
             final ArrayData row = (ArrayData) obj;
-            final ArrayNode arrayNode = mapper.createArrayNode();
+            final ArrayNode arrayNode = nodeCreator.arrayNode(row.size());
 
             IntStream.range(0, row.size())
                     .mapToObj(
                             idx ->
                                     convertArrayEntry(
-                                            elementConverter, elementGetter, row, idx, mapper))
+                                            elementConverter, elementGetter, row, idx, nodeCreator))
                     .forEach(arrayNode::add);
 
             return arrayNode;
@@ -126,7 +125,7 @@ public final class RowDataJsonFormatter {
             final ArrayData keyArray = row.keyArray();
             final ArrayData valueArray = row.valueArray();
 
-            final ArrayNode arrayNode = mapper.createArrayNode();
+            final ArrayNode arrayNode = mapper.arrayNode();
 
             IntStream.range(0, row.size())
                     .mapToObj(
@@ -141,7 +140,7 @@ public final class RowDataJsonFormatter {
                                 final JsonNode key =
                                         convertArrayEntry(
                                                 keyConverter, keyGetter, keyArray, idx, mapper);
-                                final ArrayNode mapEntry = mapper.createArrayNode();
+                                final ArrayNode mapEntry = mapper.arrayNode();
                                 mapEntry.add(key);
                                 mapEntry.add(value);
                                 return mapEntry;
@@ -157,12 +156,12 @@ public final class RowDataJsonFormatter {
             ElementGetter valueGetter,
             ArrayData valueArray,
             int idx,
-            ObjectMapper mapper) {
+            JsonNodeCreator nodeCreator) {
         if (valueArray.isNullAt(idx)) {
-            return mapper.nullNode();
+            return nodeCreator.nullNode();
         } else {
             Object field = valueGetter.getElementOrNull(valueArray, idx);
-            return valueConverter.apply(field, mapper);
+            return valueConverter.apply(field, nodeCreator);
         }
     }
 
@@ -176,17 +175,17 @@ public final class RowDataJsonFormatter {
             fieldGetters[i] = RowData.createFieldGetter(fieldTypes.get(i), i);
         }
 
-        return (obj, mapper) -> {
+        return (obj, nodeCreator) -> {
             final RowData row = (RowData) obj;
-            final ArrayNode arrayNode = mapper.createArrayNode();
+            final ArrayNode arrayNode = nodeCreator.arrayNode();
             IntStream.range(0, fieldCount)
                     .mapToObj(
                             idx -> {
                                 if (row.isNullAt(idx)) {
-                                    return mapper.nullNode();
+                                    return nodeCreator.nullNode();
                                 } else {
                                     Object field = fieldGetters[idx].getFieldOrNull(row);
-                                    return fieldConverters[idx].apply(field, mapper);
+                                    return fieldConverters[idx].apply(field, nodeCreator);
                                 }
                             })
                     .forEach(arrayNode::add);
@@ -207,6 +206,6 @@ public final class RowDataJsonFormatter {
                             + " to string. This is a bug, please open an issue.");
         }
 
-        return (obj, mapper) -> mapper.getNodeFactory().textNode(castExecutor.cast(obj).toString());
+        return (obj, mapper) -> mapper.textNode(castExecutor.cast(obj).toString());
     }
 }
