@@ -44,9 +44,13 @@ import org.apache.flink.runtime.webmonitor.RestfulGateway;
 import org.apache.flink.runtime.webmonitor.history.ArchivedJson;
 import org.apache.flink.runtime.webmonitor.history.JsonArchivist;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
+import org.apache.flink.util.IterableUtils;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.curator5.com.google.common.collect.Iterables;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -67,6 +71,7 @@ public class JobExceptionsHandler
                 JobExceptionsInfoWithHistory, JobExceptionsMessageParameters>
         implements JsonArchivist {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JobExceptionsHandler.class);
     static final int MAX_NUMBER_EXCEPTION_TO_REPORT = 20;
     static final List<FailureLabelFilterParameter.FailureLabel> EMPTY_FAILURE_LABEL_FILTER =
             Collections.emptyList();
@@ -219,10 +224,24 @@ public class JobExceptionsHandler
 
     private static JobExceptionsInfoWithHistory.RootExceptionInfo createRootExceptionInfo(
             RootExceptionHistoryEntry historyEntry) {
-        final List<JobExceptionsInfoWithHistory.ExceptionInfo> concurrentExceptions =
-                StreamSupport.stream(historyEntry.getConcurrentExceptions().spliterator(), false)
-                        .map(JobExceptionsHandler::createExceptionInfo)
-                        .collect(Collectors.toList());
+        List<JobExceptionsInfoWithHistory.ExceptionInfo> concurrentExceptions =
+                Collections.emptyList();
+        // FLINKCC-336: Currently LOG the error until we find the root cause of the issue.
+        try {
+            concurrentExceptions =
+                    StreamSupport.stream(
+                                    historyEntry.getConcurrentExceptions().spliterator(), false)
+                            .map(JobExceptionsHandler::createExceptionInfo)
+                            .collect(Collectors.toList());
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to get concurrent exceptions: {} for root: {}",
+                    IterableUtils.toStream(historyEntry.getConcurrentExceptions())
+                            .map(ErrorInfo::getExceptionAsString)
+                            .collect(Collectors.toList()),
+                    historyEntry.getExceptionAsString(),
+                    e);
+        }
 
         if (historyEntry.isGlobal()) {
             return new JobExceptionsInfoWithHistory.RootExceptionInfo(
