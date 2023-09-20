@@ -49,7 +49,45 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
 
-/** A converter from {@link LogicalType} to {@link Schema}. */
+/**
+ * A converter from {@link LogicalType} to {@link Schema}.
+ *
+ * <pre>
+ * +-------------------+---------------------------+-------------------------+-----------------------------------------+
+ * |    Flink type     |         Json type         | Connect type annotation |             Json type title             |
+ * +-------------------+---------------------------+-------------------------+-----------------------------------------+
+ * | BOOLEAN           | BooleanSchema             |                         |                                         |
+ * | TINYINT           | NumberSchema              | int8                    |                                         |
+ * | SMALLINT          | NumberSchema              | int16                   |                                         |
+ * | INT               | NumberSchema              | int32                   |                                         |
+ * | BIGINT            | NumberSchema              | int64                   |                                         |
+ * | FLOAT             | NumberSchema              | float32                 |                                         |
+ * | DOUBLE            | NumberSchema              | float64                 |                                         |
+ * | CHAR              | StringSchema              |                         |                                         |
+ * | VARCHAR           | StringSchema              |                         |                                         |
+ * | BINARY            | StringSchema              | bytes                   |                                         |
+ * | VARBINARY         | StringSchema              | bytes                   |                                         |
+ * | TIMESTAMP         | NumberSchema              | int64                   | org.apache.kafka.connect.data.Timestamp |
+ * | DATE              | NumberSchema              | int32                   | org.apache.kafka.connect.data.Date      |
+ * | TIME              | NumberSchema              | int32                   | org.apache.kafka.connect.data.Time      |
+ * | DECIMAL           | NumberSchema              | bytes                   | org.apache.kafka.connect.data.Decimal   |
+ * | ROW               | ObjectSchema              |                         |                                         |
+ * | MAP[VARCHAR, V]   | ObjectSchema              | map                     |                                         |
+ * | MAP[K, V]         | ArraySchema[ObjectSchema] | map                     |                                         |
+ * | MULTISET[VARCHAR] | ObjectSchema              | map                     |                                         |
+ * | MULTISET[K]       | ArraySchema[ObjectSchema] | map                     |                                         |
+ * | ARRAY             | ArraySchema               |                         |                                         |
+ * +-------------------+---------------------------+-------------------------+-----------------------------------------+
+ * </pre>
+ *
+ * <p>Notes:
+ *
+ * <ul>
+ *   <li>nullable types are expressed as oneOf(NullSchema, T)
+ *   <li>ObjectSchema for a MAP and MULTISET must have two fields [key, value]
+ *   <li>MULTISET is equivalent to MAP[K, INT] and is serialised accordingly
+ * </ul>
+ */
 @Confluent
 public class FlinkToJsonSchemaConverter {
 

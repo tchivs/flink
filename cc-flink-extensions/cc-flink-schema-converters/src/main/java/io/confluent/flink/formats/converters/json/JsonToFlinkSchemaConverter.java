@@ -66,7 +66,48 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.KEY_FIELD;
 import static io.confluent.flink.formats.converters.json.CommonConstants.VALUE_FIELD;
 
-/** A converter from {@link Schema} to {@link LogicalType}. */
+/**
+ * A converter from {@link Schema} to {@link LogicalType}.
+ *
+ * <p>The mapping is represented by the following table:
+ *
+ * <pre>
+ * +-------------------------------------+-------------------------+-----------------------------------------+-----------------+
+ * |              Json type              | Connect type annotation |               Type title                |   Flink type    |
+ * +-------------------------------------+-------------------------+-----------------------------------------+-----------------+
+ * | BooleanSchema                       |                         |                                         | BOOLEAN         |
+ * | NumberSchema(requiresInteger=true)  |                         |                                         | BIGINT          |
+ * | NumberSchema(requiresInteger=false) |                         |                                         | DOUBLE          |
+ * | NumberSchema                        | int8                    |                                         | TINYINT         |
+ * | NumberSchema                        | int16                   |                                         | SMALLINT        |
+ * | NumberSchema                        | int32                   |                                         | INT             |
+ * | NumberSchema                        | int32                   | org.apache.kafka.connect.data.Time      | TIME(3)         |
+ * | NumberSchema                        | int32                   | org.apache.kafka.connect.data.Date      | DATE            |
+ * | NumberSchema                        | int64                   |                                         | BIGINT          |
+ * | NumberSchema                        | int64                   | org.apache.kafka.connect.data.Timestamp | TIMESTAMP(3)    |
+ * | NumberSchema                        | float32                 |                                         | FLOAT           |
+ * | NumberSchema                        | float64                 |                                         | DOUBLE          |
+ * | NumberSchema                        | bytes                   | org.apache.kafka.connect.data.Decimal   | DECIMAL         |
+ * | StringSchema                        | bytes                   |                                         | VARBINARY       |
+ * | StringSchema                        |                         |                                         | VARCHAR         |
+ * | EnumSchema                          |                         |                                         | VARCHAR         |
+ * | CombinedSchema                      |                         |                                         | ROW             |
+ * | ArraySchema                         | map                     |                                         | MAP[K, V]       |
+ * | ArraySchema                         |                         |                                         | ARRAY           |
+ * | ObjectSchema                        | map                     |                                         | MAP[VARCHAR, V] |
+ * | ObjectSchema                        |                         |                                         | ROW             |
+ * +-------------------------------------+-------------------------+-----------------------------------------+-----------------+
+ * </pre>
+ *
+ * <p>Notes:
+ *
+ * <ul>
+ *   <li>nullable types are expressed as oneOf(NullSchema, T)
+ *   <li>ObjectSchema for a MAP and MULTISET must have two fields [key, value]
+ *   <li>CombinedSchema (oneOf, allOf, anyOf) is expressed as a ROW, unless it can be simplified
+ *       (e.g. StringSchema and ConstantSchema)
+ * </ul>
+ */
 @Confluent
 public class JsonToFlinkSchemaConverter {
 
