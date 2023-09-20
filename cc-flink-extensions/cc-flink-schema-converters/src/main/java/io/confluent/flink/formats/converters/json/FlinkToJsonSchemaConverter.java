@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
@@ -15,7 +16,6 @@ import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
-import org.apache.flink.table.types.logical.TimestampType;
 
 import org.everit.json.schema.ArraySchema;
 import org.everit.json.schema.BooleanSchema;
@@ -67,7 +67,7 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
  * | VARCHAR           | StringSchema              |                         |                                         |
  * | BINARY            | StringSchema              | bytes                   |                                         |
  * | VARBINARY         | StringSchema              | bytes                   |                                         |
- * | TIMESTAMP         | NumberSchema              | int64                   | org.apache.kafka.connect.data.Timestamp |
+ * | TIMESTAMP_LTZ     | NumberSchema              | int64                   | org.apache.kafka.connect.data.Timestamp |
  * | DATE              | NumberSchema              | int32                   | org.apache.kafka.connect.data.Date      |
  * | TIME              | NumberSchema              | int32                   | org.apache.kafka.connect.data.Time      |
  * | DECIMAL           | NumberSchema              | bytes                   | org.apache.kafka.connect.data.Decimal   |
@@ -149,8 +149,8 @@ public class FlinkToJsonSchemaConverter {
                 return StringSchema.builder()
                         .unprocessedProperties(
                                 Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES));
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return convertTimestamp((TimestampType) logicalType);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return convertTimestamp((LocalZonedTimestampType) logicalType);
             case DATE:
                 // use int to represents Date
                 return NumberSchema.builder()
@@ -197,7 +197,7 @@ public class FlinkToJsonSchemaConverter {
                         .addItemSchema(fromFlinkSchema(arrayType.getElementType(), rowName));
             case MULTISET:
                 return convertMultiset((MultisetType) logicalType, rowName);
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
             case INTERVAL_DAY_TIME:
@@ -270,7 +270,7 @@ public class FlinkToJsonSchemaConverter {
         }
     }
 
-    private static Schema.Builder<?> convertTimestamp(TimestampType logicalType) {
+    private static Schema.Builder<?> convertTimestamp(LocalZonedTimestampType logicalType) {
         final int precision = logicalType.getPrecision();
         if (precision <= 6) {
             return NumberSchema.builder()

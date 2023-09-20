@@ -13,13 +13,13 @@ import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
-import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -84,7 +84,7 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.VALUE_F
  * | NumberSchema                        | int32                   | org.apache.kafka.connect.data.Time      | TIME(3)         |
  * | NumberSchema                        | int32                   | org.apache.kafka.connect.data.Date      | DATE            |
  * | NumberSchema                        | int64                   |                                         | BIGINT          |
- * | NumberSchema                        | int64                   | org.apache.kafka.connect.data.Timestamp | TIMESTAMP(3)    |
+ * | NumberSchema                        | int64                   | org.apache.kafka.connect.data.Timestamp | TIMESTAMP_LTZ(3)|
  * | NumberSchema                        | float32                 |                                         | FLOAT           |
  * | NumberSchema                        | float64                 |                                         | DOUBLE          |
  * | NumberSchema                        | bytes                   | org.apache.kafka.connect.data.Decimal   | DECIMAL         |
@@ -314,7 +314,7 @@ public class JsonToFlinkSchemaConverter {
 
     private static LogicalType fromInt64Type(boolean isOptional, String title) {
         if (Objects.equals(title, CONNECT_TYPE_TIMESTAMP)) {
-            return new TimestampType(isOptional, 3);
+            return new LocalZonedTimestampType(isOptional, 3);
         }
         return new BigIntType(isOptional);
     }

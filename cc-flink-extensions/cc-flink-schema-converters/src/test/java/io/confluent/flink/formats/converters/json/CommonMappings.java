@@ -9,6 +9,7 @@ import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT8;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
 
 /** Common data to use in schema mapping tests. */
 public final class CommonMappings {
@@ -78,6 +80,14 @@ public final class CommonMappings {
                                             Collections.singletonMap("connect.type", "int8"))
                                     .build())
                     .unprocessedProperties(Collections.singletonMap("connect.type", "map"))
+                    .build();
+
+    public static final NumberSchema TIMESTAMP_SCHEMA =
+            NumberSchema.builder()
+                    .title(CONNECT_TYPE_TIMESTAMP)
+                    .unprocessedProperties(
+                            Collections.singletonMap(
+                                    CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64))
                     .build();
     public static final ArraySchema MAP_TINYINT_SMALLINT =
             ArraySchema.builder()
@@ -159,6 +169,7 @@ public final class CommonMappings {
                                 true,
                                 new VarCharType(false, VarCharType.MAX_LENGTH),
                                 new TinyIntType(false))),
+                new TypeMapping(TIMESTAMP_SCHEMA, new LocalZonedTimestampType(false, 3)),
                 new TypeMapping(
                         MAP_TINYINT_SMALLINT,
                         new MapType(false, new TinyIntType(false), new SmallIntType(false))),

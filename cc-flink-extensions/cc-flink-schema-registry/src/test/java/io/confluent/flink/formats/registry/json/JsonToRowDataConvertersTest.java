@@ -9,11 +9,13 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.MapData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ShortNode;
@@ -186,6 +188,30 @@ class JsonToRowDataConvertersTest {
         final RowData row = (RowData) converter.convert(obj);
         final GenericRowData expected = new GenericRowData(2);
         expected.setField(0, (byte) 12);
+        assertThat(row).isEqualTo(expected);
+    }
+
+    @Test
+    void testTimestamp() throws Exception {
+        NumberSchema timestmapSchema =
+                NumberSchema.builder()
+                        .title("org.apache.kafka.connect.data.Timestamp")
+                        .unprocessedProperties(mapOf("connect.index", 0, "connect.type", "int64"))
+                        .build();
+        ObjectSchema schema =
+                ObjectSchema.builder()
+                        .addPropertySchema("tmstmp", timestmapSchema)
+                        .title("Record")
+                        .build();
+        ObjectNode obj = JsonNodeFactory.instance.objectNode();
+        obj.set("tmstmp", LongNode.valueOf(123456789L));
+
+        final LogicalType flinkSchema = JsonToFlinkSchemaConverter.toFlinkSchema(schema);
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(schema, flinkSchema);
+        final RowData row = (RowData) converter.convert(obj);
+        final GenericRowData expected = new GenericRowData(1);
+        expected.setField(0, TimestampData.fromEpochMillis(123456789L));
         assertThat(row).isEqualTo(expected);
     }
 
