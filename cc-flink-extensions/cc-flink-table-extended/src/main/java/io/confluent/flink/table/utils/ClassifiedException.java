@@ -15,6 +15,7 @@ import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
 import org.apache.flink.table.planner.delegation.ParserImpl;
+import org.apache.flink.table.planner.operations.AlterSchemaConverter;
 import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
 import org.apache.flink.table.planner.plan.schema.CatalogSourceTable;
 import org.apache.flink.util.Preconditions;
@@ -25,6 +26,7 @@ import org.apache.calcite.sql.validate.SqlValidatorException;
 
 import javax.annotation.Nullable;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -155,6 +157,15 @@ public final class ClassifiedException {
                                 + "option 'table.dynamic-table-options.enabled' is set to true.",
                         ExceptionClass.PLANNING_USER,
                         "Cannot accept 'OPTIONS' hint. Please remove it from the query."));
+
+        // ADD WATERMARK is not supported
+        putClassifiedException(
+                CodeLocation.inClass(AlterSchemaConverter.class, ValidationException.class),
+                Handler.rewriteMessage(
+                        "The base table has already defined the watermark strategy",
+                        ExceptionClass.PLANNING_USER,
+                        "All tables declare a system-provided watermark by default. "
+                                + "Use ALTER TABLE MODIFY for custom watermarks."));
 
         // Don't expose internal errors during failed validation
         putClassifiedException(
@@ -320,9 +331,22 @@ public final class ClassifiedException {
     }
 
     private static StackTraceElement getCauseFromStackTrace(StackTraceElement[] stackTrace) {
-        if (stackTrace[0].getClassName().equals(Preconditions.class.getName())) {
-            return stackTrace[1];
+        // Best effort to find the first public and useful stack trace element
+        for (final StackTraceElement current : stackTrace) {
+            try {
+                if (current.getClassName().equals(Preconditions.class.getName())) {
+                    continue;
+                }
+
+                final Class<?> c = Class.forName(current.getClassName());
+                if (Modifier.isPublic(c.getModifiers())) {
+                    return current;
+                }
+            } catch (Throwable t) {
+                return stackTrace[0];
+            }
         }
+
         return stackTrace[0];
     }
 

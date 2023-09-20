@@ -116,12 +116,12 @@ public class ClassifiedExceptionTest {
                 TestSpec.test("window group by on non rowtime column")
                         .executeSql(
                                 "CREATE TABLE orders(productId BIGINT, amount INT,"
-                                        + " orderDate TIMESTAMP_LTZ(3)) WITH ('connector' = 'datagen');")
+                                        + " orderDate TIMESTAMP_LTZ(3)) WITH ('connector' = 'datagen')")
                         .executeSql(
                                 "SELECT productId, SUM(amount), CAST(window_start AS DATE) FROM"
                                         + " TABLE(TUMBLE( TABLE orders, DESCRIPTOR(orderDate),"
                                         + " INTERVAL '24' HOURS))"
-                                        + " GROUP BY productId,  window_start, window_end;")
+                                        + " GROUP BY productId,  window_start, window_end")
                         .expectUserError(
                                 "The window function requires the timecol is"
                                         + " a time attribute type, but is"
@@ -145,7 +145,16 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error at or near line 1, column 8.\n"
                                         + "\n"
-                                        + "Caused by: Column 'n' not found in any table"));
+                                        + "Caused by: Column 'n' not found in any table"),
+                // ---
+                TestSpec.test("adding watermark is always modify due to system defaults")
+                        .executeSql(
+                                "CREATE TABLE t (t TIMESTAMP(3), WATERMARK FOR t AS t) "
+                                        + "WITH ('connector' = 'datagen')")
+                        .executeSql("ALTER TABLE t ADD WATERMARK FOR t AS t - INTERVAL '1' SECOND")
+                        .expectExactUserError(
+                                "All tables declare a system-provided watermark by default. "
+                                        + "Use ALTER TABLE MODIFY for custom watermarks."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
