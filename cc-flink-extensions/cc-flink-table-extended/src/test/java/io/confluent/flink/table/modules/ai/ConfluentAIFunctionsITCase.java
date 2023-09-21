@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.table.functions.ai;
+package io.confluent.flink.table.modules.ai;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -14,9 +14,6 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
-import io.confluent.flink.table.functions.scalar.ai.AIFunctionsModule;
-import io.confluent.flink.table.functions.scalar.ai.AIResponseGenerator;
-import io.confluent.flink.table.functions.scalar.ai.AISecret;
 import io.confluent.flink.table.service.ForegroundResultPlan;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.service.ServiceTasks.Service;

@@ -19,6 +19,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.ExecutionConfigOptions.RowtimeInserter;
 import org.apache.flink.table.api.config.OptimizerConfigOptions.NonDeterministicUpdateStrategy;
+import org.apache.flink.table.api.config.TableConfigOptions.CatalogPlanRestore;
 import org.apache.flink.table.api.config.TableConfigOptions.ColumnExpansionStrategy;
 import org.apache.flink.table.api.internal.TableConfigValidation;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
@@ -47,7 +48,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessin
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
-import io.confluent.flink.table.functions.scalar.ai.AIFunctionsModule;
+import io.confluent.flink.table.modules.ai.AIFunctionsModule;
+import io.confluent.flink.table.modules.core.CoreProxyModule;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -69,6 +71,7 @@ import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXE
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SOURCE_IDLE_TIMEOUT;
 import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.LOCAL_TIME_ZONE;
+import static org.apache.flink.table.api.config.TableConfigOptions.PLAN_RESTORE_CATALOG_OBJECTS;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_COLUMN_EXPANSION_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
 
@@ -161,6 +164,11 @@ class DefaultServiceTasks implements ServiceTasks {
         publicConfig
                 .getOptional(ServiceTasksOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT)
                 .ifPresent(v -> config.set(TABLE_EXEC_SOURCE_IDLE_TIMEOUT, v));
+    }
+
+    private void applyPrivateConfig(
+            TableEnvironment tableEnvironment, Configuration privateConfig, Service service) {
+        final TableConfig config = tableEnvironment.getConfig();
 
         // Prevents invalid retractions e.g. through non-deterministic time functions like NOW()
         config.set(
@@ -183,10 +191,16 @@ class DefaultServiceTasks implements ServiceTasks {
                 Arrays.asList(
                         ColumnExpansionStrategy.EXCLUDE_DEFAULT_VIRTUAL_METADATA_COLUMNS,
                         ColumnExpansionStrategy.EXCLUDE_ALIASED_VIRTUAL_METADATA_COLUMNS));
-    }
 
-    private void applyPrivateConfig(
-            TableEnvironment tableEnvironment, Configuration privateConfig, Service service) {
+        // Job submission service doesn't need to attempt a plan enrichment from catalog.
+        // We fully rely on what has been serialized into the compiled plan.
+        config.set(PLAN_RESTORE_CATALOG_OBJECTS, CatalogPlanRestore.ALL_ENFORCED);
+
+        // Insert a proxy core module to control which functions get exposed and which ones are
+        // forbidden.
+        tableEnvironment.unloadModule("core");
+        tableEnvironment.loadModule("core", CoreProxyModule.INSTANCE);
+
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);

@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.table.functions.scalar.ai;
+package io.confluent.flink.table.modules.ai;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.functions.FunctionContext;

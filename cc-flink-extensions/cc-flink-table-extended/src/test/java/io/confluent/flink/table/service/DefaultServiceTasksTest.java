@@ -21,6 +21,7 @@ import org.apache.flink.table.operations.SinkModifyOperation;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
+import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import org.junit.jupiter.api.Test;
 
@@ -150,6 +151,30 @@ public class DefaultServiceTasksTest {
 
         assertThat(queryOperation.getResolvedSchema().getColumnNames())
                 .containsExactly("i", "m_persisted");
+    }
+
+    @Test
+    void testConfigurationCoreProxyModule() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        INSTANCE.configureEnvironment(
+                tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
+
+        assertThat(tableEnv.listFunctions()).hasSameElementsAs(CoreProxyModule.PUBLIC_LIST);
+    }
+
+    @Test
+    void testConfigurationAiFunctionsModule() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap("confluent.ai-functions.enabled", "true"),
+                Service.SQL_SERVICE);
+
+        assertThat(tableEnv.listFunctions().length)
+                .isGreaterThan(CoreProxyModule.PUBLIC_LIST.size());
     }
 
     @Test
