@@ -903,7 +903,9 @@ public class AdaptiveScheduler
                 new WaitingForResources.Factory(
                         this,
                         LOG,
-                        this.initialResourceAllocationTimeout,
+                        previousExecutionGraph == null
+                                ? this.initialResourceAllocationTimeout
+                                : Duration.ofMillis(-1L),
                         this.resourceStabilizationTimeout,
                         previousExecutionGraph));
     }

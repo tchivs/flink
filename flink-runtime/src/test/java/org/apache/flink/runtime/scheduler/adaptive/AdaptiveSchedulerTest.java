@@ -2398,4 +2398,81 @@ public class AdaptiveSchedulerTest {
             return scheduler.requestJob().getExceptionHistory();
         }
     }
+
+    @Test
+    public void testResourceTimeoutIgnoredOnRestart() throws Exception {
+        final Configuration configuration =
+                new Configuration()
+                        .set(JobManagerOptions.RESOURCE_WAIT_TIMEOUT, Duration.ofMillis(1))
+                        .set(JobManagerOptions.RESOURCE_STABILIZATION_TIMEOUT, Duration.ofDays(1));
+
+        final JobGraph jobGraph = createJobGraph();
+
+        final DefaultDeclarativeSlotPool declarativeSlotPool =
+                new DefaultDeclarativeSlotPool(
+                        jobGraph.getJobID(),
+                        new DefaultAllocatedSlotPool(),
+                        ignored -> {},
+                        Time.minutes(10),
+                        Time.minutes(10));
+
+        final AdaptiveScheduler scheduler =
+                new AdaptiveSchedulerBuilder(
+                                jobGraph,
+                                singleThreadMainThreadExecutor,
+                                EXECUTOR_RESOURCE.getExecutor())
+                        .setRestartBackoffTimeStrategy(
+                                new FixedDelayRestartBackoffTimeStrategy
+                                                .FixedDelayRestartBackoffTimeStrategyFactory(1, 1)
+                                        .create())
+                        .setDeclarativeSlotPool(declarativeSlotPool)
+                        .setJobMasterConfiguration(configuration)
+                        .build();
+
+        final SubmissionBufferingTaskManagerGateway taskManagerGateway =
+                new SubmissionBufferingTaskManagerGateway(PARALLELISM);
+        final LocalTaskManagerLocation taskManagerLocation = new LocalTaskManagerLocation();
+
+        taskManagerGateway.setCancelConsumer(createCancelConsumer(scheduler));
+
+        singleThreadMainThreadExecutor.execute(
+                () -> {
+                    scheduler.startScheduling();
+
+                    declarativeSlotPool.offerSlots(
+                            createSlotOffersForResourceRequirements(
+                                    ResourceCounter.withResource(
+                                            ResourceProfile.UNKNOWN, PARALLELISM)),
+                            taskManagerLocation,
+                            taskManagerGateway,
+                            System.currentTimeMillis());
+                });
+
+        // wait for task submissions
+        taskManagerGateway.waitForSubmissions(PARALLELISM);
+
+        singleThreadMainThreadExecutor.execute(
+                () ->
+                        declarativeSlotPool.releaseSlots(
+                                taskManagerLocation.getResourceID(), new Exception("TM failure")));
+
+        // wait until we started waiting for resources
+        while (CompletableFuture.supplyAsync(scheduler::getState, singleThreadMainThreadExecutor)
+                        .join()
+                        .getClass()
+                != WaitingForResources.class) {
+            Thread.sleep(50L);
+        }
+
+        // wait some time
+        Thread.sleep(50L);
+
+        // check that we're still waiting for resources and didn't fail the job
+        CompletableFuture.runAsync(
+                        () ->
+                                assertThat(scheduler.getState().getClass())
+                                        .isEqualTo(WaitingForResources.class),
+                        singleThreadMainThreadExecutor)
+                .join();
+    }
 }
