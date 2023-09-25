@@ -745,6 +745,10 @@ public class ConfluentManagedTableUtils {
         // Maximum transaction timeout (15 min) as allowed by CCloud
         properties.setProperty("transaction.timeout.ms", "900000");
 
+        // Maximum delivery.timeout - cap by checkpoint timeout (10 min)
+        // minus some time to not hide a potential timeout
+        properties.setProperty("delivery.timeout.ms", "300000");
+
         // Note: Make sure to set default properties before this line is applied in order to
         // allow DevOps overwriting defaults via the CompiledPlan if necessary.
         options.getOptional(CONFLUENT_KAFKA_PROPERTIES).ifPresent(properties::putAll);
