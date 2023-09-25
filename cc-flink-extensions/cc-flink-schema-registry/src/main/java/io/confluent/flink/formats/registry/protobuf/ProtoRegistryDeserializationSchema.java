@@ -19,7 +19,9 @@ import io.confluent.flink.formats.registry.protobuf.ProtoToRowDataConverters.Pro
 import io.confluent.flink.formats.registry.utils.MutableByteArrayInputStream;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import org.apache.kafka.common.utils.ByteUtils;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Objects;
 
@@ -75,11 +77,26 @@ public class ProtoRegistryDeserializationSchema implements DeserializationSchema
         try {
             inputStream.setBuffer(message);
             schemaCoder.readSchema(inputStream);
+            // Not sure what the message indexes are, it is some Confluent Schema Registry Protobuf
+            // magic. Until we figure out what that is, let's skip it
+            skipMessageIndexes(inputStream);
 
             final DynamicMessage dynamicMessage = DynamicMessage.parseFrom(descriptor, inputStream);
             return (RowData) runtimeConverter.convert(dynamicMessage);
         } catch (Exception e) {
             throw new IOException("Failed to deserialize Protobuf message.", e);
+        }
+    }
+
+    private void skipMessageIndexes(MutableByteArrayInputStream inputStream) throws IOException {
+        final DataInputStream dataInputStream = new DataInputStream(inputStream);
+        int size = ByteUtils.readVarint(dataInputStream);
+        if (size == 0) {
+            // optimization
+            return;
+        }
+        for (int i = 0; i < size; i++) {
+            ByteUtils.readVarint(dataInputStream);
         }
     }
 

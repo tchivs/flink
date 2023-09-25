@@ -16,8 +16,10 @@ import io.confluent.flink.formats.registry.SchemaRegistryCoder;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import org.apache.kafka.common.utils.ByteUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
@@ -70,11 +72,21 @@ public class ProtoRegistrySerializationSchema implements SerializationSchema<Row
 
             arrayOutputStream.reset();
             schemaCoder.writeSchema(arrayOutputStream);
+            final ByteBuffer buffer = writeMessageIndexes();
+            arrayOutputStream.write(buffer.array());
             converted.writeTo(arrayOutputStream);
             return arrayOutputStream.toByteArray();
         } catch (Throwable t) {
             throw new FlinkRuntimeException(String.format("Could not serialize row '%s'.", row), t);
         }
+    }
+
+    private static ByteBuffer writeMessageIndexes() {
+        // Not sure what the message indexes are, it is some Confluent Schema Registry Protobuf
+        // magic. Until we figure out what that is, let's skip it and write empty indices
+        ByteBuffer buffer = ByteBuffer.allocate(ByteUtils.sizeOfVarint(0));
+        ByteUtils.writeVarint(0, buffer);
+        return buffer;
     }
 
     @Override
