@@ -27,6 +27,8 @@ import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.testutils.TestingUtils;
 import org.apache.flink.testutils.executor.TestExecutorResource;
+import org.apache.flink.traces.Span;
+import org.apache.flink.traces.SpanBuilder;
 
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -36,8 +38,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
@@ -276,6 +280,42 @@ public class CheckpointStatsTrackerTest {
         CheckpointStatsSnapshot snapshot4 = tracker.createSnapshot();
         assertNotEquals(snapshot3, snapshot4);
         assertEquals(snapshot4, tracker.createSnapshot());
+    }
+
+    @Test
+    public void testSpanCreation() throws Exception {
+        JobVertexID jobVertexID = new JobVertexID();
+        final List<Span> reportedSpans = new ArrayList<>();
+
+        MetricGroup metricGroup =
+                new UnregisteredMetricsGroup() {
+                    @Override
+                    public void addSpan(SpanBuilder spanBuilder) {
+                        reportedSpans.add(spanBuilder.build());
+                    }
+                };
+
+        CheckpointStatsTracker tracker = new CheckpointStatsTracker(10, metricGroup);
+
+        PendingCheckpointStats pending =
+                tracker.reportPendingCheckpoint(
+                        42,
+                        1,
+                        CheckpointProperties.forCheckpoint(
+                                CheckpointRetentionPolicy.NEVER_RETAIN_AFTER_TERMINATION),
+                        singletonMap(jobVertexID, 1));
+
+        pending.reportSubtaskStats(jobVertexID, createSubtaskStats(0));
+
+        // Complete checkpoint => new snapshot
+        tracker.reportCompletedCheckpoint(pending.toCompletedCheckpointStats(null));
+
+        assertThat(reportedSpans.size()).isEqualTo(1);
+        assertThat(
+                        reportedSpans.stream()
+                                .map(span -> span.getAttributes().get("checkpointId"))
+                                .collect(Collectors.toList()))
+                .containsExactly(42L);
     }
 
     /** Tests the registration of the checkpoint metrics. */
