@@ -22,6 +22,8 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -117,6 +119,36 @@ public class KafkaCredentialsCacheImplTest {
         result = credentialsCache.getCredentials(jobId2);
         assertThat(result.isPresent()).isTrue();
         assertThat(result.get()).isEqualTo(creds2);
+    }
+
+    @Test
+    public void testReceive_interrupted() throws Throwable {
+        credentialsCache.init(configuration);
+        AtomicReference<Thread> thread = new AtomicReference<>();
+        AtomicBoolean isInterrupted = new AtomicBoolean(false);
+        AtomicBoolean isDone = new AtomicBoolean(false);
+        executor.submit(
+                () -> {
+                    try {
+                        thread.set(Thread.currentThread());
+                        credentialsCache.getCredentials(new ManualClock(), jobId1);
+                    } catch (Exception e) {
+                        isInterrupted.set(Thread.currentThread().isInterrupted());
+                        return;
+                    } finally {
+                        isDone.set(true);
+                    }
+                    fail("Shouldn't get to here");
+                });
+
+        while (thread.get() == null) {
+            Thread.sleep(10);
+        }
+        thread.get().interrupt();
+        while (!isDone.get()) {
+            Thread.sleep(10);
+        }
+        assertThat(isInterrupted.get()).isTrue();
     }
 
     @Test

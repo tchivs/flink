@@ -77,8 +77,9 @@ public class KafkaCredentialsCacheImpl implements KafkaCredentialsCache {
                 && (remaining = timeUpMs - clock.absoluteTimeMillis()) > 0) {
             try {
                 wait(remaining);
-            } catch (Throwable t) {
-                throw new FlinkRuntimeException("Error retrieving credentials", t);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new FlinkRuntimeException("Error retrieving credentials", e);
             }
         }
         if (kafkaCredentials != null) {
