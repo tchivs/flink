@@ -10,13 +10,16 @@ import org.apache.flink.util.TimeUtils;
 
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporterBuilder;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporterBuilder;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** A factory for creating a {@link OtlpGrpcMetricExporter}. */
 @Confluent
-public class OtlpGrpcMetricExporterFactory implements MetricExporterFactory {
+public class OtlpGrpcMetricExporterFactory implements MetricExporterFactory, SpanExporterFactory {
     private static final Logger LOG = LoggerFactory.getLogger(OtlpGrpcMetricExporterFactory.class);
 
     public static final String ARG_EXPORTER_ENDPOINT = "exporter.endpoint";
@@ -27,24 +30,37 @@ public class OtlpGrpcMetricExporterFactory implements MetricExporterFactory {
 
     @Override
     public MetricExporter createMetricExporter(MetricConfig metricConfig) {
-        OtlpGrpcMetricExporterBuilder builder = OtlpGrpcMetricExporter.builder();
-        if (metricConfig.containsKey(ARG_EXPORTER_ENDPOINT)) {
-            builder.setEndpoint(metricConfig.getProperty(ARG_EXPORTER_ENDPOINT));
-        } else {
-            if (System.getenv(OTEL_EXPORTER_ENDPOINT_ENV) != null) {
-                LOG.info(
-                        "exporter.endpoint was not set, defaulting to env OTEL_EXPORTER_OTLP_ENDPOINT");
-                builder.setEndpoint(System.getenv(OTEL_EXPORTER_ENDPOINT_ENV));
-            } else {
-                throw new IllegalArgumentException(
-                        "Must set exporter.endpoint or"
-                                + " OTEL_EXPORTER_OTLP_ENDPOINT env for OtlpGrpcMetricExporter");
-            }
-        }
+        OtlpGrpcMetricExporterBuilder builder =
+                OtlpGrpcMetricExporter.builder().setEndpoint(tryGetEndpoint(metricConfig));
         if (metricConfig.containsKey(ARG_EXPORTER_TIMEOUT)) {
             builder.setTimeout(
                     TimeUtils.parseDuration(metricConfig.getProperty(ARG_EXPORTER_TIMEOUT)));
         }
         return builder.build();
+    }
+
+    @Override
+    public SpanExporter createSpanExporter(MetricConfig metricConfig) {
+        OtlpGrpcSpanExporterBuilder builder =
+                OtlpGrpcSpanExporter.builder().setEndpoint(tryGetEndpoint(metricConfig));
+        if (metricConfig.containsKey(ARG_EXPORTER_TIMEOUT)) {
+            builder.setTimeout(
+                    TimeUtils.parseDuration(metricConfig.getProperty(ARG_EXPORTER_TIMEOUT)));
+        }
+        return builder.build();
+    }
+
+    private String tryGetEndpoint(MetricConfig metricConfig) {
+        if (metricConfig.containsKey(ARG_EXPORTER_ENDPOINT)) {
+            return metricConfig.getProperty(ARG_EXPORTER_ENDPOINT);
+        }
+        if (System.getenv(OTEL_EXPORTER_ENDPOINT_ENV) != null) {
+            LOG.info(
+                    "exporter.endpoint was not set, defaulting to env OTEL_EXPORTER_OTLP_ENDPOINT");
+            return System.getenv(OTEL_EXPORTER_ENDPOINT_ENV);
+        }
+        throw new IllegalArgumentException(
+                "Must set exporter.endpoint or"
+                        + " OTEL_EXPORTER_OTLP_ENDPOINT env for OtlpGrpcMetricExporter");
     }
 }

@@ -80,7 +80,14 @@ Copyright 2023 Confluent Inc.
 			<scope>test</scope>
 		</dependency>
 
-	</dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-test-utils-junit</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+        </dependency>
+
+    </dependencies>
 	<build>
 		<plugins>
 			<!-- Used to package the code into an uber jar to pick up the open telemetry and other

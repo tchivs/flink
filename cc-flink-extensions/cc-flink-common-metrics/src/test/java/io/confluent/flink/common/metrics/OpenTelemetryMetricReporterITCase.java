@@ -367,8 +367,7 @@ public class OpenTelemetryMetricReporterITCase {
         public NotReallyAnExporterFactory() {}
     }
 
-    private static class TestMetricGroup extends UnregisteredMetricsGroup
-            implements LogicalScopeProvider {
+    static class TestMetricGroup extends UnregisteredMetricsGroup implements LogicalScopeProvider {
 
         @Override
         public String getLogicalScope(CharacterFilter characterFilter) {
@@ -409,7 +408,7 @@ public class OpenTelemetryMetricReporterITCase {
         assertThat(exporter.isShutdownCalled()).isTrue();
     }
 
-    private static class TestExporter implements MetricExporter {
+    static class TestExporter implements MetricExporter {
 
         private static final Supplier<CompletableResultCode> DEFAULT_EXPORT_RESULT_SUPPLIER =
                 CompletableResultCode::ofSuccess;
