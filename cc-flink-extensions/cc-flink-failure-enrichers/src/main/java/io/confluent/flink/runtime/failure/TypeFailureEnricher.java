@@ -9,6 +9,7 @@ import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 
+import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
 import org.slf4j.Logger;
@@ -33,8 +34,9 @@ public class TypeFailureEnricher implements FailureEnricher {
 
     private static final String typeKey = "TYPE";
     private static final String codeKey = "CODE";
+    private static final String msgKey = "USER_ERROR_MSG";
     private static final Set<String> labelKeys =
-            Stream.of(typeKey, codeKey).collect(Collectors.toSet());
+            Stream.of(typeKey, codeKey, msgKey).collect(Collectors.toSet());
     private static final String SERIALIZE_MESSAGE = "serializ";
     // Copy of org.apache.flink.runtime.io.network.api.serialization.NonSpanningWrapper;
     private static final String BROKEN_SERIALIZATION_ERROR_MESSAGE =
@@ -112,6 +114,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                     } else {
                         labels.put(typeKey, "UNKNOWN");
                     }
+                    labels.put(msgKey, FailureMessageUtil.buildMessage(cause));
                     LOG.info("Processed failure labels: {}", labels);
                     return labels;
                 },
