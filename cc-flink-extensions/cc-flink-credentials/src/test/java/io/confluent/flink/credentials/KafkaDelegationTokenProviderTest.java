@@ -15,6 +15,7 @@ import org.apache.flink.util.clock.ManualClock;
 
 import io.confluent.flink.credentials.utils.MockCredentialDecrypter;
 import io.confluent.flink.credentials.utils.MockKafkaCredentialFetcher;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,11 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.confluent.flink.credentials.JobOptions.COMPUTE_POOL_ID;
 import static io.confluent.flink.credentials.JobOptions.IDENTITY_POOL_ID;
@@ -47,6 +53,7 @@ public class KafkaDelegationTokenProviderTest {
     private Configuration configuration1;
     private Configuration configuration2;
     private ManualClock clock = new ManualClock();
+    private ExecutorService executorService;
 
     @BeforeEach
     public void setUp() {
@@ -73,6 +80,13 @@ public class KafkaDelegationTokenProviderTest {
         configuration2.setString(STATEMENT_ID_CRN, "statementId2");
         configuration2.setString(COMPUTE_POOL_ID, "computePoolId2");
         configuration2.setString(IDENTITY_POOL_ID, "identityPoolId2");
+    }
+
+    @AfterEach
+    public void tearDown() {
+        if (executorService != null) {
+            executorService.shutdownNow();
+        }
     }
 
     private Map<JobID, KafkaCredentials> obtainCredentials() throws Exception {
@@ -133,5 +147,96 @@ public class KafkaDelegationTokenProviderTest {
                 new KafkaDelegationTokenProvider(
                         kafkaDPATCredentialFetcher, credentialDecrypter, 100, 5, clock, false);
         assertThat(provider.delegationTokensRequired()).isEqualTo(false);
+    }
+
+    @Test
+    public void testFetch_unregisterBeforeDone() throws Exception {
+        executorService = Executors.newFixedThreadPool(1);
+        AtomicBoolean doneFetching = new AtomicBoolean(false);
+        AtomicBoolean isFetching = new AtomicBoolean(false);
+        AtomicReference<Map<JobID, KafkaCredentials>> result = new AtomicReference<>();
+        kafkaDPATCredentialFetcher.withResponse(
+                jcm -> {
+                    while (!doneFetching.get()) {
+                        try {
+                            isFetching.set(true);
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                    return creds1;
+                });
+        assertThat(provider.registerJob(jobId1, configuration1)).isTrue();
+        executorService.submit(
+                () -> {
+                    try {
+                        Map<JobID, KafkaCredentials> credentials = obtainCredentials();
+                        result.set(credentials);
+                    } catch (Exception e) {
+                    }
+                });
+
+        while (!isFetching.get()) {
+            Thread.sleep(10);
+        }
+        provider.unregisterJob(jobId1);
+        doneFetching.set(true);
+
+        while (result.get() == null) {
+            Thread.sleep(10);
+        }
+        Map<JobID, KafkaCredentials> credentials = result.get();
+        assertThat(credentials.size()).isEqualTo(0);
+    }
+
+    @Test
+    public void testFetch_registerNewBeforeDone() throws Exception {
+        executorService = Executors.newFixedThreadPool(1);
+        AtomicBoolean doneFetching = new AtomicBoolean(false);
+        AtomicBoolean isFetching = new AtomicBoolean(false);
+        AtomicReference<Map<JobID, KafkaCredentials>> result = new AtomicReference<>();
+        ConcurrentHashMap<JobID, KafkaCredentials> credsMap = new ConcurrentHashMap<>();
+        credsMap.put(jobId1, creds1);
+        credsMap.put(jobId2, creds2);
+        kafkaDPATCredentialFetcher.withResponse(
+                jcm -> {
+                    while (!doneFetching.get()) {
+                        try {
+                            isFetching.set(true);
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                    return credsMap.get(jcm.getJobID());
+                });
+        assertThat(provider.registerJob(jobId1, configuration1)).isTrue();
+        executorService.submit(
+                () -> {
+                    try {
+                        Map<JobID, KafkaCredentials> credentials = obtainCredentials();
+                        result.set(credentials);
+                    } catch (Exception e) {
+                    }
+                });
+
+        while (!isFetching.get()) {
+            Thread.sleep(10);
+        }
+        assertThat(provider.registerJob(jobId2, configuration2)).isTrue();
+        doneFetching.set(true);
+
+        while (result.get() == null) {
+            Thread.sleep(10);
+        }
+        // We expect to get just the first job the first time.
+        Map<JobID, KafkaCredentials> credentials = result.get();
+        assertThat(credentials.size()).isEqualTo(1);
+        assertThat(credentials).containsKey(jobId1);
+
+        // We get the second next time we call obtainCredentials.
+        credentials = obtainCredentials();
+        assertThat(credentials.size()).isEqualTo(2);
+        assertThat(credentials).containsKey(jobId1);
+        assertThat(credentials).containsKey(jobId2);
     }
 }

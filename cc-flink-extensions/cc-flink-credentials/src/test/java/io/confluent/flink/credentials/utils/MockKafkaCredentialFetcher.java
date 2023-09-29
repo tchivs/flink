@@ -13,6 +13,7 @@ import io.confluent.flink.credentials.KafkaCredentialFetcher;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /** Mocks {@link KafkaCredentialFetcher}. */
 @Confluent
@@ -20,10 +21,17 @@ public class MockKafkaCredentialFetcher implements KafkaCredentialFetcher {
 
     private List<KafkaCredentials> kafkaCredentials = new ArrayList<>();
     private List<JobCredentialsMetadata> fetchParameters = new ArrayList<>();
+    private Function<JobCredentialsMetadata, KafkaCredentials> responseCallback;
     private boolean errorThrown;
 
     public MockKafkaCredentialFetcher withResponse(KafkaCredentials kafkaCredentials) {
         this.kafkaCredentials.add(kafkaCredentials);
+        return this;
+    }
+
+    public MockKafkaCredentialFetcher withResponse(
+            Function<JobCredentialsMetadata, KafkaCredentials> responseCallback) {
+        this.responseCallback = responseCallback;
         return this;
     }
 
@@ -34,6 +42,9 @@ public class MockKafkaCredentialFetcher implements KafkaCredentialFetcher {
 
     @Override
     public KafkaCredentials fetchToken(JobCredentialsMetadata jobCredentialsMetadata) {
+        if (responseCallback != null) {
+            return responseCallback.apply(jobCredentialsMetadata);
+        }
         fetchParameters.add(jobCredentialsMetadata);
         if (errorThrown) {
             throw new RuntimeException("Error!");
