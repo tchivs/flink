@@ -48,6 +48,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ExtendWith(TestLoggerExtension.class)
 public class KafkaCredentialFetcherImplTest {
 
+    private static final long DEFAULT_DEADLINE_MS = 1000;
+
     private FlinkCredentialServiceBlockingStub flinkCredentialService;
     private MockTokenExchanger dpatTokenExchanger;
     private MockCredentialDecrypter decrypter;
@@ -83,7 +85,7 @@ public class KafkaCredentialFetcherImplTest {
         decrypter = new MockCredentialDecrypter();
         fetcher =
                 new KafkaCredentialFetcherImpl(
-                        flinkCredentialService, dpatTokenExchanger, decrypter);
+                        flinkCredentialService, dpatTokenExchanger, decrypter, DEFAULT_DEADLINE_MS);
         handler.withResponse(
                         GetCredentialsResponse.newBuilder()
                                 .setFlinkCredentials(
@@ -352,17 +354,36 @@ public class KafkaCredentialFetcherImplTest {
                 .hasMessageContaining("Failed to do fetch DPAT Token");
     }
 
+    @Test
+    public void testFetch_deadline() {
+        fetcher =
+                new KafkaCredentialFetcherImpl(
+                        flinkCredentialService, dpatTokenExchanger, decrypter, 10);
+        handler.withDelayedResponse(50);
+        assertThatThrownBy(() -> fetcher.fetchToken(jobCredentialsMetadata))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Failed to do credential request for JobCredentials")
+                .cause()
+                .hasMessageContaining("DEADLINE_EXCEEDED");
+    }
+
     /** The handler for the fake RPC server. */
     public static class Handler extends FlinkCredentialServiceGrpc.FlinkCredentialServiceImplBase {
 
         private GetCredentialsResponse response;
         private GetCredentialResponseV2 responseV2;
         private boolean error;
+        private long delayMs = -1;
 
         public Handler() {}
 
         public Handler withError() {
             this.error = true;
+            return this;
+        }
+
+        public Handler withDelayedResponse(long delayMs) {
+            this.delayMs = delayMs;
             return this;
         }
 
@@ -384,6 +405,12 @@ public class KafkaCredentialFetcherImplTest {
                 responseObserver.onError(new RuntimeException("Server Error!"));
                 return;
             }
+            if (delayMs >= 0) {
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException e) {
+                }
+            }
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         }
@@ -395,6 +422,12 @@ public class KafkaCredentialFetcherImplTest {
             if (error) {
                 responseObserver.onError(new RuntimeException("Server Error!"));
                 return;
+            }
+            if (delayMs >= 0) {
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException e) {
+                }
             }
             responseObserver.onNext(responseV2);
             responseObserver.onCompleted();

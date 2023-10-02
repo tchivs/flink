@@ -139,6 +139,13 @@ under the License.
 			<artifactId>flink-test-utils-junit</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>mockwebserver</artifactId>
+			<version>3.12.12</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 </project>

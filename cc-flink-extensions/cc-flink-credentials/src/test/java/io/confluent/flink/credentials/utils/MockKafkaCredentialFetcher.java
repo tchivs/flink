@@ -26,12 +26,14 @@ public class MockKafkaCredentialFetcher implements KafkaCredentialFetcher {
 
     public MockKafkaCredentialFetcher withResponse(KafkaCredentials kafkaCredentials) {
         this.kafkaCredentials.add(kafkaCredentials);
+        this.errorThrown = false;
         return this;
     }
 
     public MockKafkaCredentialFetcher withResponse(
             Function<JobCredentialsMetadata, KafkaCredentials> responseCallback) {
         this.responseCallback = responseCallback;
+        this.errorThrown = false;
         return this;
     }
 
@@ -42,10 +44,10 @@ public class MockKafkaCredentialFetcher implements KafkaCredentialFetcher {
 
     @Override
     public KafkaCredentials fetchToken(JobCredentialsMetadata jobCredentialsMetadata) {
+        fetchParameters.add(jobCredentialsMetadata);
         if (responseCallback != null) {
             return responseCallback.apply(jobCredentialsMetadata);
         }
-        fetchParameters.add(jobCredentialsMetadata);
         if (errorThrown) {
             throw new RuntimeException("Error!");
         }

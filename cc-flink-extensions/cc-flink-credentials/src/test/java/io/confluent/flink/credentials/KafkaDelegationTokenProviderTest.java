@@ -150,6 +150,31 @@ public class KafkaDelegationTokenProviderTest {
     }
 
     @Test
+    public void testFetch_error_retry() throws Exception {
+        kafkaDPATCredentialFetcher.withErrorThrown();
+        assertThat(provider.registerJob(jobId1, configuration1)).isTrue();
+
+        Map<JobID, KafkaCredentials> credentials = obtainCredentials();
+        assertThat(credentials.size()).isEqualTo(0);
+
+        // Retry with a valid response this time
+        kafkaDPATCredentialFetcher.withResponse(creds1);
+        credentials = obtainCredentials();
+        assertThat(credentials.size()).isEqualTo(1);
+        assertThat(credentials).containsKey(jobId1);
+
+        // Call again and make sure we don't immediately fetch again
+        credentials = obtainCredentials();
+        assertThat(credentials.size()).isEqualTo(1);
+        assertThat(credentials).containsKey(jobId1);
+        List<JobCredentialsMetadata> calls =
+                kafkaDPATCredentialFetcher.getFetchParametersForAllCalls();
+        assertThat(calls.size()).isEqualTo(2);
+        assertThat(calls.get(0).getJobID()).isEqualTo(jobId1);
+        assertThat(calls.get(1).getJobID()).isEqualTo(jobId1);
+    }
+
+    @Test
     public void testFetch_unregisterBeforeDone() throws Exception {
         executorService = Executors.newFixedThreadPool(1);
         AtomicBoolean doneFetching = new AtomicBoolean(false);

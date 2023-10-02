@@ -32,11 +32,23 @@ public class KafkaCredentialsOptions {
                     .noDefaultValue()
                     .withDescription("The port of the Flink credential service");
 
+    public static final ConfigOption<Long> CREDENTIAL_SERVICE_DEADLINE_MS =
+            ConfigOptions.key("confluent.credential.service.deadline.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(3).toMillis())
+                    .withDescription("The deadline when calling to Flink credential service");
+
     public static final ConfigOption<String> AUTH_SERVICE_SERVER =
             ConfigOptions.key("confluent.cc.gateway.service.server")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("The auth service server, e.g. http://host:port");
+
+    public static final ConfigOption<Long> TOKEN_EXCHANGE_TIMEOUT_MS =
+            ConfigOptions.key("confluent.cc.token.exchange.timeout.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(3).toMillis())
+                    .withDescription("How long to allow a token exchange before it is timed out");
 
     public static final ConfigOption<Boolean> DPAT_ENABLED =
             ConfigOptions.key("confluent.kafka.credential.dpat.enabled")

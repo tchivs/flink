@@ -30,6 +30,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -53,9 +54,12 @@ public class TokenExchangerImpl implements TokenExchanger {
      *
      * @param gatewayServiceServer The server, e.g. http://hostname:port
      */
-    public TokenExchangerImpl(String gatewayServiceServer) {
+    public TokenExchangerImpl(String gatewayServiceServer, long tokenExchangeTimeoutMs) {
         this.gatewayServiceServer = gatewayServiceServer;
-        this.httpClient = new OkHttpClient.Builder().build();
+        this.httpClient =
+                new OkHttpClient.Builder()
+                        .callTimeout(tokenExchangeTimeoutMs, TimeUnit.MILLISECONDS)
+                        .build();
     }
 
     @VisibleForTesting

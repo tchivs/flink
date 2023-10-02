@@ -14,17 +14,22 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.Obje
 
 import io.confluent.flink.credentials.utils.MockOkHttpClient;
 import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.confluent.flink.credentials.TokenExchangerImpl.getTokenFromResponse;
@@ -264,5 +269,45 @@ public class TokenExchangerImplTest {
         httpClientMock.withErrorOnCall();
         assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), METADATA))
                 .hasMessageContaining("Error!");
+    }
+
+    @Test
+    public void test_fetch_mockserver() throws IOException {
+        MockWebServer mockWebServer = new MockWebServer();
+        try {
+            mockWebServer.start();
+            exchanger =
+                    new TokenExchangerImpl(mockWebServer.url("").toString(), new OkHttpClient());
+            MockResponse response =
+                    new MockResponse()
+                            .setResponseCode(200)
+                            .setBody("{\"token\":\"abc\", \"error\":null}");
+            mockWebServer.enqueue(response);
+            DPATToken dpatToken = exchanger.fetch(Pair.of("key", "secret"), METADATA);
+            assertThat(dpatToken.getToken()).isEqualTo("abc");
+        } finally {
+            mockWebServer.close();
+        }
+    }
+
+    @Test
+    public void test_fetch_timeout() throws IOException {
+        MockWebServer mockWebServer = new MockWebServer();
+        try {
+            mockWebServer.start();
+            exchanger = new TokenExchangerImpl(mockWebServer.url("").toString(), 10);
+            MockResponse response =
+                    new MockResponse()
+                            .setBodyDelay(50, TimeUnit.MILLISECONDS)
+                            .setResponseCode(200)
+                            .setBody("{\"token\":\"abc\", \"error\":null}");
+            mockWebServer.enqueue(response);
+            assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), METADATA))
+                    .hasMessageContaining("Failed to fetch token")
+                    .cause()
+                    .hasMessageContaining("timeout");
+        } finally {
+            mockWebServer.close();
+        }
     }
 }

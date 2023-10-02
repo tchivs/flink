@@ -39,9 +39,11 @@ import static io.confluent.flink.credentials.JobOptions.STATEMENT_ID_CRN;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_SERVICE_SERVER;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_CHECK_PERIOD_MS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_EXPIRATION_MS;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_DEADLINE_MS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_HOST;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.DPAT_ENABLED;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.TOKEN_EXCHANGE_TIMEOUT_MS;
 
 /**
  * This class fetches Kafka tokens for a cluster.
@@ -110,10 +112,15 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
         FlinkCredentialServiceBlockingStub credentialService =
                 FlinkCredentialServiceGrpc.newBlockingStub(channel);
         TokenExchangerImpl tokenExchanger =
-                new TokenExchangerImpl(configuration.getString(AUTH_SERVICE_SERVER));
+                new TokenExchangerImpl(
+                        configuration.getString(AUTH_SERVICE_SERVER),
+                        configuration.getLong(TOKEN_EXCHANGE_TIMEOUT_MS));
         kafkaCredentialFetcher =
                 new KafkaCredentialFetcherImpl(
-                        credentialService, tokenExchanger, credentialDecrypter);
+                        credentialService,
+                        tokenExchanger,
+                        credentialDecrypter,
+                        configuration.getLong(CREDENTIAL_SERVICE_DEADLINE_MS));
         expirationMs = configuration.getLong(CREDENTIAL_EXPIRATION_MS);
         checkPeriodMs = configuration.getLong(CREDENTIAL_CHECK_PERIOD_MS);
         LOG.info(

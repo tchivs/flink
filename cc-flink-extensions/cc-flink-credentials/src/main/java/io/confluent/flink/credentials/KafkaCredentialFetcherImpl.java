@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.confluent.flink.credentials.TokenExchangerImpl.isLegacyIdentityPoolFlow;
@@ -38,14 +39,17 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
     private final FlinkCredentialServiceBlockingStub credentialService;
     private final TokenExchanger tokenExchanger;
     private final CredentialDecrypter decrypter;
+    private final long deadlineMs;
 
     public KafkaCredentialFetcherImpl(
             FlinkCredentialServiceBlockingStub credentialService,
             TokenExchanger tokenExchanger,
-            CredentialDecrypter decrypter) {
+            CredentialDecrypter decrypter,
+            long deadlineMs) {
         this.credentialService = credentialService;
         this.tokenExchanger = tokenExchanger;
         this.decrypter = decrypter;
+        this.deadlineMs = deadlineMs;
     }
 
     @Override
@@ -115,7 +119,10 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                         .setIdentityPoolId(jobCredentialsMetadata.getIdentityPoolId())
                         .build();
 
-        response = credentialService.getCredentials(request);
+        response =
+                credentialService
+                        .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+                        .getCredentials(request);
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
         LOG.info(
@@ -190,6 +197,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
 
         response =
                 credentialService
+                        .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
                         .withOption(orgIdKey, orgIdAndEnv.getLeft())
                         .withOption(envIdKey, orgIdAndEnv.getMiddle())
                         .withOption(statementIdKey, orgIdAndEnv.getRight())
