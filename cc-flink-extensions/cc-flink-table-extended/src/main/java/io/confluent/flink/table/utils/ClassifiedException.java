@@ -174,32 +174,34 @@ public final class ClassifiedException {
                         "SQL validation failed.",
                         ExceptionClass.PLANNING_USER,
                         (e, validCauses) -> {
-                            if (!(e.getCause() instanceof CalciteContextException)) {
-                                return Optional.empty();
+                            final Throwable cause = e.getCause();
+                            if (cause instanceof CalciteContextException) {
+                                final StringBuilder topLevelMessage = new StringBuilder();
+                                topLevelMessage.append("SQL validation failed. ");
+                                final CalciteContextException context =
+                                        (CalciteContextException) cause;
+                                if (context.getPosLine() == context.getEndPosLine()
+                                        && context.getPosColumn() == context.getEndPosColumn()) {
+                                    topLevelMessage.append(
+                                            String.format(
+                                                    "Error at or near line %s, column %s.",
+                                                    context.getPosLine(), context.getPosColumn()));
+                                } else {
+                                    topLevelMessage.append(
+                                            String.format(
+                                                    "Error from line %s, column %s to line %s, column %s.",
+                                                    context.getPosLine(),
+                                                    context.getPosColumn(),
+                                                    context.getEndPosLine(),
+                                                    context.getEndPosColumn()));
+                                }
+                                final List<String> causes =
+                                        collectCauses(IncludeTopLevel.ALWAYS, context, validCauses);
+                                causes.set(0, topLevelMessage.toString());
+                                return buildMessageWithCauses(causes);
                             }
-                            final CalciteContextException context =
-                                    (CalciteContextException) e.getCause();
-                            final StringBuilder topLevelMessage = new StringBuilder();
-                            topLevelMessage.append("SQL validation failed. ");
-                            if (context.getPosLine() == context.getEndPosLine()
-                                    && context.getPosColumn() == context.getEndPosColumn()) {
-                                topLevelMessage.append(
-                                        String.format(
-                                                "Error at or near line %s, column %s.",
-                                                context.getPosLine(), context.getPosColumn()));
-                            } else {
-                                topLevelMessage.append(
-                                        String.format(
-                                                "Error from line %s, column %s to line %s, column %s.",
-                                                context.getPosLine(),
-                                                context.getPosColumn(),
-                                                context.getEndPosLine(),
-                                                context.getEndPosColumn()));
-                            }
-                            final List<String> causes =
-                                    collectCauses(IncludeTopLevel.ALWAYS, context, validCauses);
-                            causes.set(0, topLevelMessage.toString());
-                            return buildMessageWithCauses(causes);
+                            return buildMessageWithCauses(
+                                    IncludeTopLevel.IF_VALID_CAUSE, cause, validCauses);
                         }));
 
         // Don't throw exceptions for operations we don't support
@@ -371,6 +373,7 @@ public final class ClassifiedException {
 
     /** Defines which kind of exception needs to happen at which location (class and/or method). */
     private static class CodeLocation {
+
         private final Class<?> exceptionClass;
         private final String declaringClass;
         private final @Nullable String method;
@@ -421,6 +424,7 @@ public final class ClassifiedException {
 
     /** Handling logic for a matched exception. */
     private static class Handler {
+
         // handler only fires if message part matches
         private final @Nullable String messagePart;
 
@@ -501,6 +505,7 @@ public final class ClassifiedException {
     }
 
     private interface MessageProvider {
+
         Optional<String> apply(Exception e, Set<Class<? extends Exception>> validCauses);
     }
 
@@ -514,10 +519,14 @@ public final class ClassifiedException {
         Exception e = (Exception) t;
 
         final List<String> messages = new ArrayList<>();
-        if (includeTopLevel == IncludeTopLevel.ALWAYS
-                || validCauses == null
-                || validCauses.contains(e.getClass())) {
+        if (includeTopLevel == IncludeTopLevel.ALWAYS) {
             messages.add(e.getMessage());
+        } else if (includeTopLevel == IncludeTopLevel.IF_VALID_CAUSE) {
+            if (validCauses == null || validCauses.contains(e.getClass())) {
+                messages.add(e.getMessage());
+            } else {
+                return Collections.emptyList();
+            }
         }
         while (e != null) {
             final Throwable cause = e.getCause();
@@ -547,16 +556,31 @@ public final class ClassifiedException {
 
     /** Parameters for the cause collection. */
     public enum IncludeTopLevel {
+
+        /**
+         * We ignore the top level exception, we do not use its message nor check it against valid
+         * causes, but proceed with its causes.
+         */
+        IGNORE,
+
+        /**
+         * If the top level exception is on the valid cause list its message is included, and we
+         * proceed with its causes, otherwise we stop processing the exception.
+         */
         IF_VALID_CAUSE,
+
+        /**
+         * We always include the top level exception message and proceed with checking its causes.
+         */
         ALWAYS,
     }
 
     /** Utility method to pretty print a chain of causes. */
     public static Optional<String> buildMessageWithCauses(
             IncludeTopLevel includeTopLevel,
-            Exception e,
+            Throwable t,
             @Nullable Set<Class<? extends Exception>> validCauses) {
-        final List<String> messages = collectCauses(includeTopLevel, e, validCauses);
+        final List<String> messages = collectCauses(includeTopLevel, t, validCauses);
         return buildMessageWithCauses(messages);
     }
 }

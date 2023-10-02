@@ -7,13 +7,17 @@ package io.confluent.flink.table.utils;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import io.confluent.flink.table.utils.ClassifiedException.ExceptionClass;
+import io.confluent.flink.table.utils.ClassifiedExceptionTest.InvalidCatalog.ExceptionType;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -132,6 +136,42 @@ public class ClassifiedExceptionTest {
                                 tableEnv -> tableEnv.registerCatalog("c", new InvalidCatalog("c")))
                         .executeSql("SELECT * FROM c.db.t")
                         .expectSystemError("SQL validation failed. Internal error!"),
+
+                // ---
+                TestSpec.test("Validation exceptions from ConfluentFlinkCatalog are exposed")
+                        .setupTableEnvironment(
+                                tableEnv ->
+                                        tableEnv.registerCatalog(
+                                                "c",
+                                                new InvalidCatalog("c", ExceptionType.VALIDATION)))
+                        .executeSql(
+                                String.format(
+                                        "SELECT * FROM c.`%s`.`%s`", InvalidCatalog.DB_NAME, "t"))
+                        .expectUserError("Validation exception"),
+
+                // ---
+                TestSpec.test("Table exceptions from ConfluentFlinkCatalog are exposed")
+                        .setupTableEnvironment(
+                                tableEnv ->
+                                        tableEnv.registerCatalog(
+                                                "c", new InvalidCatalog("c", ExceptionType.TABLE)))
+                        .executeSql(
+                                String.format(
+                                        "SELECT * FROM c.`%s`.`%s`", InvalidCatalog.DB_NAME, "t"))
+                        .expectUserError("Table exception"),
+
+                // ---
+                TestSpec.test("Catalog exceptions from ConfluentFlinkCatalog are NOT exposed")
+                        .setupTableEnvironment(
+                                tableEnv ->
+                                        tableEnv.registerCatalog(
+                                                "c",
+                                                new InvalidCatalog("c", ExceptionType.CATALOG)))
+                        .executeSql(
+                                String.format(
+                                        "SELECT * FROM c.`%s`.`%s`", InvalidCatalog.DB_NAME, "t"))
+                        .expectSystemError("Internal error!"),
+
                 // ---
                 TestSpec.test("show helpful error during SQL validation in range")
                         .executeSql("SELECT notExisting()")
@@ -267,13 +307,41 @@ public class ClassifiedExceptionTest {
     /** Exception throwing {@link Catalog}. */
     public static class InvalidCatalog extends GenericInMemoryCatalog {
 
+        public static final String DB_NAME = "db";
+        private final ExceptionType exceptionType;
+
+        /** Defines what kind of exception should be thrown by the catalog. */
+        public enum ExceptionType {
+            VALIDATION,
+            TABLE,
+            CATALOG
+        }
+
         public InvalidCatalog(String name) {
-            super(name, "db");
+            this(name, ExceptionType.CATALOG);
+        }
+
+        public InvalidCatalog(String name, ExceptionType exceptionType) {
+            super(name, DB_NAME);
+            this.exceptionType = exceptionType;
         }
 
         @Override
         public CatalogBaseTable getTable(ObjectPath tablePath) {
-            throw new RuntimeException("Internal error!");
+            throw getException();
+        }
+
+        private RuntimeException getException() {
+            switch (exceptionType) {
+                case VALIDATION:
+                    return new ValidationException("Validation exception");
+                case TABLE:
+                    return new TableException("Table exception");
+                case CATALOG:
+                    return new CatalogException("Internal error!");
+                default:
+                    throw new IllegalStateException("Unknown exception type.");
+            }
         }
     }
 }
