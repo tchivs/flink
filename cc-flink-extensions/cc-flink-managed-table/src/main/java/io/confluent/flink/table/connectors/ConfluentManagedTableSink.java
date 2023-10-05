@@ -97,12 +97,16 @@ public class ConfluentManagedTableSink
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
         final KafkaSinkBuilder<RowData> sinkBuilder = KafkaSink.builder();
 
-        if (parameters.transactionalIdPrefix != null) {
+        // For upsert mode, regardless whether Kafka or the format performs the upsert, upsert
+        // mode is lenient for duplicates. Other modes need exactly once.
+        if (parameters.tableMode != ManagedChangelogMode.UPSERT
+                && parameters.transactionalIdPrefix != null) {
             sinkBuilder.setTransactionalIdPrefix(parameters.transactionalIdPrefix);
             sinkBuilder.setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE);
         } else {
             sinkBuilder.setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE);
         }
+
         final KafkaSink<RowData> kafkaSink =
                 sinkBuilder
                         .setKafkaProducerConfig(parameters.properties)
