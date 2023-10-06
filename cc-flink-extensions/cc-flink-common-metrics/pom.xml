@@ -13,21 +13,7 @@ Copyright 2023 Confluent Inc.
 	</parent>
 
 	<artifactId>cc-flink-common-metrics</artifactId>
-	<properties>
-		<opentelemetry.version>1.20.0</opentelemetry.version>
-	</properties>
 
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>io.opentelemetry</groupId>
-				<artifactId>opentelemetry-bom</artifactId>
-				<version>${opentelemetry.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.flink</groupId>

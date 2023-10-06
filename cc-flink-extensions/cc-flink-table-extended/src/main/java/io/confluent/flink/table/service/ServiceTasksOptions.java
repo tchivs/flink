@@ -147,6 +147,12 @@ public final class ServiceTasksOptions {
                     .defaultValue("")
                     .withDescription("The target for the remote Udf endpoint.");
 
+    public static final ConfigOption<Boolean> CONFLUENT_OTLP_FUNCTIONS_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "otlp.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("A flag to enable or disable Confluent OTLP functions.");
+
     /**
      * Prefix to mark options that have been introduced by Confluent and set by the user. It is used
      * in resources to avoid namespace collision with current or future Flink options.

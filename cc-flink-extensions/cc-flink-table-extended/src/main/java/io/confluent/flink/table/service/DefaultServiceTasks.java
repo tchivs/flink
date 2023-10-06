@@ -50,6 +50,7 @@ import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import org.apache.commons.lang3.StringUtils;
 
@@ -205,6 +206,10 @@ class DefaultServiceTasks implements ServiceTasks {
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
+        }
+
+        if (privateConfig.get(ServiceTasksOptions.CONFLUENT_OTLP_FUNCTIONS_ENABLED)) {
+            tableEnvironment.loadModule("otlp", OtlpFunctionsModule.INSTANCE);
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE
