@@ -145,12 +145,6 @@ public class TokenExchangerImpl implements TokenExchanger {
      */
     ObjectNode buildObjectNode(JobCredentialsMetadata jobCredentialsMetadata) {
 
-        if (isLegacyIdentityPoolFlow(jobCredentialsMetadata)) {
-            return legacyIdentityPoolRequestBody(
-                    jobCredentialsMetadata.getStatementIdCRN(),
-                    jobCredentialsMetadata.getComputePoolId());
-        }
-
         Optional<String> serviceAccount =
                 filterByPrefix(jobCredentialsMetadata.getPrincipals(), "sa-").findFirst();
         Optional<String> user =
@@ -183,14 +177,6 @@ public class TokenExchangerImpl implements TokenExchanger {
                                         identityPools));
     }
 
-    private ObjectNode legacyIdentityPoolRequestBody(String statementCrn, String computePoolId) {
-        final ObjectMapper mapper = new ObjectMapper();
-        final ObjectNode node = mapper.createObjectNode();
-        node.put("statement_id", statementCrn);
-        node.put("compute_pool_id", computePoolId);
-        return node;
-    }
-
     private ObjectNode serviceAccountRequestBody(
             String statementCrn, String serviceAccount, String computePoolId) {
         final ObjectMapper mapper = new ObjectMapper();
@@ -219,11 +205,5 @@ public class TokenExchangerImpl implements TokenExchanger {
 
     private Stream<String> filterByPrefix(List<String> principals, String prefix) {
         return principals.stream().filter(principal -> principal.startsWith(prefix));
-    }
-
-    // if the list of principals is not specified is the old flow, using the identityPool
-    static boolean isLegacyIdentityPoolFlow(JobCredentialsMetadata jobCredentialsMetadata) {
-        return jobCredentialsMetadata.getIdentityPoolId() != null
-                && !jobCredentialsMetadata.getIdentityPoolId().isEmpty();
     }
 }

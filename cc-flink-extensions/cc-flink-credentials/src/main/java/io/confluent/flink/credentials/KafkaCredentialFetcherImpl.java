@@ -11,8 +11,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc.FlinkCredentialServiceBlockingStub;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
-import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsRequest;
-import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsResponse;
 import com.google.protobuf.ByteString;
 import io.grpc.CallOptions;
 import org.apache.commons.lang3.tuple.Pair;
@@ -25,8 +23,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import static io.confluent.flink.credentials.TokenExchangerImpl.isLegacyIdentityPoolFlow;
 
 /**
  * This class does the token exchange process to fetch a DPAT token used when accessing Kafka,
@@ -99,35 +95,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         }
 
         LOG.info("Fetching credential for job metadata {}", jobCredentialsMetadata);
-        if (isLegacyIdentityPoolFlow(jobCredentialsMetadata)) {
-            return fetchCredential(jobCredentialsMetadata);
-        } else {
-            return fetchCredentialV2(jobCredentialsMetadata);
-        }
-    }
-
-    // Fetch credential for the Pair<ComputePool, IdentityPool>, will be deprecated soon
-    private Pair<String, ByteString> fetchCredential(
-            JobCredentialsMetadata jobCredentialsMetadata) {
-        LOG.info("Fetching credential for v1 (identityPool). {}", jobCredentialsMetadata);
-        ByteString encryptedSecret;
-        String apiKey;
-        GetCredentialsResponse response;
-        GetCredentialsRequest request =
-                GetCredentialsRequest.newBuilder()
-                        .setComputePoolId(jobCredentialsMetadata.getComputePoolId())
-                        .setIdentityPoolId(jobCredentialsMetadata.getIdentityPoolId())
-                        .build();
-
-        response =
-                credentialService
-                        .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
-                        .getCredentials(request);
-        apiKey = response.getFlinkCredentials().getApiKey();
-        encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
-        LOG.info(
-                "Successfully fetched v1 static credential {}, {}", apiKey, jobCredentialsMetadata);
-        return Pair.of(apiKey, encryptedSecret);
+        return fetchCredentialV2(jobCredentialsMetadata);
     }
 
     private Triple<String, String, String> extractOrgAndEnvFromCRN(String crn) {

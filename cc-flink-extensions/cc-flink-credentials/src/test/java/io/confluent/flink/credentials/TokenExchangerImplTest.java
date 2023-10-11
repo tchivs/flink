@@ -41,22 +41,11 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 @ExtendWith(TestLoggerExtension.class)
 public class TokenExchangerImplTest {
 
-    private static final JobCredentialsMetadata METADATA =
-            new JobCredentialsMetadata(
-                    JobID.generate(),
-                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
-                    "computepool",
-                    "identity",
-                    Collections.emptyList(),
-                    0,
-                    0);
-
     private static final JobCredentialsMetadata SA_PRINCIPAL_METADATA =
             new JobCredentialsMetadata(
                     JobID.generate(),
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
-                    "",
                     Collections.singletonList("sa-123"),
                     0,
                     0);
@@ -66,7 +55,6 @@ public class TokenExchangerImplTest {
                     JobID.generate(),
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
-                    "",
                     Collections.singletonList("u-123"),
                     0,
                     0);
@@ -76,7 +64,6 @@ public class TokenExchangerImplTest {
                     JobID.generate(),
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
-                    "",
                     Arrays.stream(new String[] {"u-123", "pool-123", "pool-234", "group-123"})
                             .collect(Collectors.toList()),
                     0,
@@ -113,25 +100,6 @@ public class TokenExchangerImplTest {
                 .hasMessage("Error fetching token: Error!!!");
         assertThatThrownBy(() -> getTokenFromResponse(objectMapper, "{\"token\":{}, \"error\":{}}"))
                 .hasMessage("Error fetching token: <no message>");
-    }
-
-    @Test
-    public void test_fetch() {
-        Request request = new Request.Builder().url("http://example.com").build();
-        Response response =
-                new Response.Builder()
-                        .request(request)
-                        .protocol(Protocol.HTTP_1_1)
-                        .code(200)
-                        .message("Success")
-                        .body(
-                                ResponseBody.create(
-                                        MediaType.get("application/json"),
-                                        "{\"token\":\"abc\", \"error\":null}"))
-                        .build();
-        httpClientMock.withResponse(response);
-        DPATToken token = exchanger.fetch(Pair.of("key", "secret"), METADATA);
-        assertThat(token.getToken()).isEqualTo("abc");
     }
 
     @Test
@@ -225,27 +193,6 @@ public class TokenExchangerImplTest {
     }
 
     @Test
-    public void test_build_request_body_identity_pool_precedence() throws JsonProcessingException {
-
-        JobCredentialsMetadata identityAndPrincipalsMetadata =
-                new JobCredentialsMetadata(
-                        JobID.generate(),
-                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
-                        "computepool",
-                        "identityPool",
-                        Collections.singletonList("sa-123"),
-                        0,
-                        0);
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectNode saNode = exchanger.buildObjectNode(identityAndPrincipalsMetadata);
-
-        String json =
-                "{\"statement_id\":\"crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0\",\"compute_pool_id\":\"computepool\"}";
-        ObjectNode actualNode = mapper.readValue(json, ObjectNode.class);
-        assertThat(saNode).isEqualTo(actualNode);
-    }
-
-    @Test
     public void test_fetch_internalError() {
         Request request = new Request.Builder().url("http://example.com").build();
         Response response =
@@ -260,14 +207,14 @@ public class TokenExchangerImplTest {
                                         "{\"token\":null, \"error\":null}"))
                         .build();
         httpClientMock.withResponse(response);
-        assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), METADATA))
+        assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA))
                 .hasMessageContaining("Received bad response code 500");
     }
 
     @Test
     public void test_fetch_clientError() {
         httpClientMock.withErrorOnCall();
-        assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), METADATA))
+        assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA))
                 .hasMessageContaining("Error!");
     }
 
@@ -283,7 +230,8 @@ public class TokenExchangerImplTest {
                             .setResponseCode(200)
                             .setBody("{\"token\":\"abc\", \"error\":null}");
             mockWebServer.enqueue(response);
-            DPATToken dpatToken = exchanger.fetch(Pair.of("key", "secret"), METADATA);
+            DPATToken dpatToken =
+                    exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA);
             assertThat(dpatToken.getToken()).isEqualTo("abc");
         } finally {
             mockWebServer.close();
@@ -302,7 +250,10 @@ public class TokenExchangerImplTest {
                             .setResponseCode(200)
                             .setBody("{\"token\":\"abc\", \"error\":null}");
             mockWebServer.enqueue(response);
-            assertThatThrownBy(() -> exchanger.fetch(Pair.of("key", "secret"), METADATA))
+            assertThatThrownBy(
+                            () ->
+                                    exchanger.fetch(
+                                            Pair.of("key", "secret"), USER_PRINCIPAL_METADATA))
                     .hasMessageContaining("Failed to fetch token")
                     .cause()
                     .hasMessageContaining("timeout");

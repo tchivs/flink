@@ -20,7 +20,6 @@ public class JobCredentialsMetadata implements Serializable {
     private final JobID jobID;
     private final String statementIdCRN;
     private final String computePoolId;
-    private final String identityPoolId;
     private final List<String> principals;
     private final long startTimeMs;
     private final long tokenUpdateTimeMs;
@@ -29,14 +28,12 @@ public class JobCredentialsMetadata implements Serializable {
             JobID jobID,
             String statementIdCRN,
             String computePoolId,
-            String identityPoolId,
             List<String> principals,
             long startTimeMs,
             long tokenUpdateTimeMs) {
         this.jobID = jobID;
         this.statementIdCRN = statementIdCRN;
         this.computePoolId = computePoolId;
-        this.identityPoolId = identityPoolId;
         this.startTimeMs = startTimeMs;
         this.tokenUpdateTimeMs = tokenUpdateTimeMs;
         this.principals = principals != null ? principals : Collections.emptyList();
@@ -44,10 +41,6 @@ public class JobCredentialsMetadata implements Serializable {
 
     public String getStatementIdCRN() {
         return statementIdCRN;
-    }
-
-    public String getIdentityPoolId() {
-        return identityPoolId;
     }
 
     public String getComputePoolId() {
@@ -72,13 +65,7 @@ public class JobCredentialsMetadata implements Serializable {
 
     public JobCredentialsMetadata withNewTokenUpdateTime(long tokenUpdateTimeMs) {
         return new JobCredentialsMetadata(
-                jobID,
-                statementIdCRN,
-                computePoolId,
-                identityPoolId,
-                principals,
-                startTimeMs,
-                tokenUpdateTimeMs);
+                jobID, statementIdCRN, computePoolId, principals, startTimeMs, tokenUpdateTimeMs);
     }
 
     @Override
@@ -91,9 +78,6 @@ public class JobCredentialsMetadata implements Serializable {
                 + '\''
                 + ", computePoolId='"
                 + computePoolId
-                + '\''
-                + ", identityPoolId='"
-                + identityPoolId
                 + '\''
                 + ", principals="
                 + principals

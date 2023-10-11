@@ -78,7 +78,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "identityPoolId",
                         new ArrayList<>(),
                         0,
                         10);
@@ -135,7 +134,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         saPrincipals,
                         0,
                         10);
@@ -150,7 +148,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         Collections.singletonList("u-123"),
                         0,
                         10);
@@ -168,7 +165,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -194,7 +190,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -215,7 +210,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -232,7 +226,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -249,7 +242,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -266,7 +258,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -281,7 +272,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=org-123/organization=234",
                         "computePoolId",
-                        "",
                         userAndIdentityPoolPrincipals,
                         0,
                         10);
@@ -309,7 +299,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userPrincipals,
                         0,
                         10);
@@ -328,7 +317,6 @@ public class KafkaCredentialFetcherImplTest {
                         JobID.generate(),
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
-                        "",
                         userPrincipals,
                         0,
                         10);
