@@ -30,6 +30,7 @@ import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
@@ -94,8 +95,8 @@ public class AvroToRowDataConverters {
                     }
                 };
             case BYTES:
-                return createDecimalConverter(
-                        (DecimalType) targetType,
+                return createBinaryConverter(
+                        targetType,
                         new Function<Object, byte[]>() {
                             @Override
                             public byte[] apply(Object o) {
@@ -106,8 +107,8 @@ public class AvroToRowDataConverters {
                             }
                         });
             case FIXED:
-                return createDecimalConverter(
-                        (DecimalType) targetType,
+                return createBinaryConverter(
+                        targetType,
                         new Function<Object, byte[]>() {
                             @Override
                             public byte[] apply(Object o) {
@@ -155,6 +156,20 @@ public class AvroToRowDataConverters {
                         "Couldn't translate unsupported schema type "
                                 + readSchema.getType().getName()
                                 + ".");
+        }
+    }
+
+    private static AvroToRowDataConverter createBinaryConverter(
+            LogicalType targetType, final Function<Object, byte[]> toUnscaledBytes) {
+        if (targetType.is(LogicalTypeFamily.BINARY_STRING)) {
+            return new AvroToRowDataConverter() {
+                @Override
+                public Object convert(Object o) {
+                    return toUnscaledBytes.apply(o);
+                }
+            };
+        } else {
+            return createDecimalConverter((DecimalType) targetType, toUnscaledBytes);
         }
     }
 

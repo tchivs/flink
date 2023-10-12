@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -274,6 +275,61 @@ class AvroToRowDataConvertersTest {
 
         final Object actual =
                 converter.convert(new GenericRecordBuilder(schema).set("null_field", null).build());
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    void testBytes() {
+        final Schema fixed = SchemaBuilder.fixed("fixed").size(3);
+        final Schema fixedDecimal =
+                LogicalTypes.decimal(5, 3).addToSchema(SchemaBuilder.fixed("fixedDecimal").size(5));
+        final Schema decimal =
+                LogicalTypes.decimal(5, 3).addToSchema(SchemaBuilder.builder().bytesType());
+        final Schema schema =
+                SchemaBuilder.builder()
+                        .record("top")
+                        .namespace("io.confluent.test")
+                        .fields()
+                        .name("binary")
+                        .type()
+                        .bytesType()
+                        .noDefault()
+                        .name("fixed_binary")
+                        .type(fixed)
+                        .noDefault()
+                        .name("fixed_decimal")
+                        .type(fixedDecimal)
+                        .noDefault()
+                        .name("decimal")
+                        .type(decimal)
+                        .noDefault()
+                        .endRecord();
+
+        final LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(schema);
+        final AvroToRowDataConverter converter =
+                AvroToRowDataConverters.createConverter(schema, flinkSchema);
+
+        final byte[] expectedBytes = {1, 2, 3};
+        final BigDecimal bigDecimal = new BigDecimal("12.123");
+        final GenericRowData expected = new GenericRowData(4);
+        expected.setField(0, expectedBytes);
+        expected.setField(1, expectedBytes);
+        expected.setField(2, DecimalData.fromBigDecimal(bigDecimal, 5, 3));
+        expected.setField(3, DecimalData.fromBigDecimal(bigDecimal, 5, 3));
+
+        final Object actual =
+                converter.convert(
+                        new GenericRecordBuilder(schema)
+                                .set("binary", ByteBuffer.wrap(expectedBytes))
+                                .set("fixed_binary", new GenericData.Fixed(fixed, expectedBytes))
+                                .set(
+                                        "fixed_decimal",
+                                        new GenericData.Fixed(
+                                                fixed, bigDecimal.unscaledValue().toByteArray()))
+                                .set(
+                                        "decimal",
+                                        ByteBuffer.wrap(bigDecimal.unscaledValue().toByteArray()))
+                                .build());
         assertThat(actual).isEqualTo(expected);
     }
 }
