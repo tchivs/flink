@@ -135,6 +135,18 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent AI functions.");
 
+    public static final ConfigOption<Boolean> CONFLUENT_REMOTE_UDF_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("A flag to enable or disable Confluent remote UDFs.");
+
+    public static final ConfigOption<String> CONFLUENT_REMOTE_UDF_TARGET =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.target")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription("The target for the remote Udf endpoint.");
+
     /**
      * Prefix to mark options that have been introduced by Confluent and set by the user. It is used
      * in resources to avoid namespace collision with current or future Flink options.

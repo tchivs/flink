@@ -1,0 +1,22 @@
+/*
+ * Copyright 2023 Confluent Inc.
+ */
+
+syntax = "proto3";
+
+option java_package = "io.confluent.flink.table.modules.remoteudf";
+
+package udf.gateway;
+
+service UdfGateway {
+  rpc Invoke(InvokeRequest) returns (InvokeResponse) {}
+}
+
+message InvokeRequest {
+  string func_name = 1;
+  string payload = 2;
+}
+
+message InvokeResponse {
+  string payload = 1;
+}

@@ -33,6 +33,12 @@ Copyright 2023 Confluent Inc.
 				<artifactId>animal-sniffer-annotations</artifactId>
 				<version>${animal-sniffer-annotations.version}</version>
 			</dependency>
+
+			<dependency>
+				<groupId>com.google.errorprone</groupId>
+				<artifactId>error_prone_annotations</artifactId>
+				<version>${error_prone.version}</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 

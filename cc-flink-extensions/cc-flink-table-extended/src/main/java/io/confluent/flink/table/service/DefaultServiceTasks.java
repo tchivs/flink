@@ -50,6 +50,7 @@ import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -204,6 +205,16 @@ class DefaultServiceTasks implements ServiceTasks {
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
+        }
+
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)) {
+            // Forward the target address of the remote gateway (or proxy) to the udf.
+            Map<String, String> remoteUdfConfig = new HashMap<>();
+            remoteUdfConfig.put(
+                    ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key(),
+                    privateConfig.getString(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET));
+            tableEnvironment.loadModule("remote_udf", new RemoteUdfModule(remoteUdfConfig));
         }
     }
 
