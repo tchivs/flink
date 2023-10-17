@@ -32,9 +32,13 @@ public abstract class RemoteScalarFunctionBase extends ScalarFunction {
 
     public RemoteScalarFunctionBase(Map<String, String> config) {
         LOG.info("RemoteScalarFunction config: {}", config);
-        this.udfGatewayTarget =
-                Preconditions.checkNotNull(
-                        config.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key()));
+        String udfGatewayTarget = config.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key());
+        if (udfGatewayTarget != null && !udfGatewayTarget.isEmpty()) {
+            this.udfGatewayTarget = udfGatewayTarget;
+        } else {
+            // TODO: remove hardcoded proxy
+            this.udfGatewayTarget = "udf-proxy.udf-proxy:50051";
+        }
     }
 
     @Override

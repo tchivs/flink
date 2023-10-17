@@ -208,7 +208,9 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)) {
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)
+                // TODO: remove this demo hack...
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
             // Forward the target address of the remote gateway (or proxy) to the udf.
             Map<String, String> remoteUdfConfig = new HashMap<>();
             remoteUdfConfig.put(

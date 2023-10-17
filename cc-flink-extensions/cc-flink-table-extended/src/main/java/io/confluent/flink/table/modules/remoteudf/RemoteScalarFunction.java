@@ -39,28 +39,35 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase {
      * Calls the given remote function of given return type with the given payload and returns the
      * return value.
      *
-     * @param function name of the remote function to call.
+     * @param handler name of the remote function to call.
+     * @param functionClass the name of the function class to call.
      * @param rtype return type of the remote function to call (INT, DOUBLE, STRING).
      * @param args arguments for the remote function call.
      * @return the return value of the remote UDF execution.
      */
-    public @Nullable Object eval(String function, String rtype, Object... args) throws Exception {
+    public @Nullable Object eval(String handler, String functionClass, String rtype, Object... args)
+            throws Exception {
 
         LOG.debug(
-                "Invoking remote scalar function. Function: {}, Rtype: {}, Args: {}",
-                function,
+                "Invoking remote scalar function. Handler: {}, Function: {}, Rtype: {}, Args: {}",
+                handler,
+                functionClass,
                 rtype,
                 args);
 
-        String encodedPayload = Base64SerializationUtil.serialize((oos) -> oos.writeObject(args));
+        String encodedArgs = Base64SerializationUtil.serialize((oos) -> oos.writeObject(args));
+
+        String payload = '"' + functionClass + " " + encodedArgs + '"';
+
         UdfGatewayOuterClass.InvokeRequest request =
                 UdfGatewayOuterClass.InvokeRequest.newBuilder()
-                        .setFuncName(function)
-                        .setPayload(encodedPayload)
+                        .setFuncName(handler)
+                        .setPayload(payload)
                         .build();
         UdfGatewayOuterClass.InvokeResponse response = getUdfGateway().invoke(request);
-        return Base64SerializationUtil.deserialize(
-                response.getPayload(), ObjectInputStream::readObject);
+        String result = response.getPayload();
+        result = result.substring(1, result.length() - 1);
+        return Base64SerializationUtil.deserialize(result, ObjectInputStream::readObject);
     }
 
     @Override
@@ -71,17 +78,18 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase {
                         varyingSequence(
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
+                                logical(LogicalTypeFamily.CHARACTER_STRING),
                                 ANY))
                 .outputTypeStrategy(
                         callContext -> {
-                            if (!callContext.isArgumentLiteral(1)
-                                    || callContext.isArgumentNull(1)) {
+                            if (!callContext.isArgumentLiteral(2)
+                                    || callContext.isArgumentNull(2)) {
                                 throw callContext.newValidationError(
                                         "Literal expected for second argument.");
                             }
                             // return a data type based on a literal
                             final String literal =
-                                    callContext.getArgumentValue(1, String.class).orElse("STRING");
+                                    callContext.getArgumentValue(2, String.class).orElse("STRING");
                             switch (literal) {
                                 case "INT":
                                     return Optional.of(DataTypes.INT());

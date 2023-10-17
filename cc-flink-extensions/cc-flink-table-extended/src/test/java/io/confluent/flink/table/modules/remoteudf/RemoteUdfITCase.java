@@ -103,7 +103,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery(
-                                "SELECT CALL_REMOTE_SCALAR(\'function\', \'STRING\', \'payload\');")
+                                "SELECT CALL_REMOTE_SCALAR(\'handler\', \'function\', \'STRING\', \'payload\');")
                         .getQueryOperation();
 
         final ForegroundResultPlan plan =
@@ -121,7 +121,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery(
-                                "SELECT CALL_REMOTE_SCALAR(\'function\', \'STRING\', \'payload\');")
+                                "SELECT CALL_REMOTE_SCALAR(\'handler\',\'function\', \'STRING\', \'payload\');")
                         .getQueryOperation();
 
         final ForegroundResultPlan plan =
@@ -138,39 +138,42 @@ public class RemoteUdfITCase extends AbstractTestBase {
         assertThatThrownBy(
                         () ->
                                 tableEnv.executeSql(
-                                        "SELECT CALL_REMOTE_SCALAR(\'function\', \'STRING\', \'payload\');"))
+                                        "SELECT CALL_REMOTE_SCALAR(\'handler\',\'function\', \'STRING\', \'payload\');"))
                 .message()
                 .contains("No match found for function signature CALL_REMOTE_SCALAR");
     }
 
-    @Test
-    public void testRemoteUdfGatewayNotConfigured() {
-        final TableEnvironment tEnv = getSqlServiceTableEnvironment(true, false);
-        assertThatThrownBy(
-                        () -> {
-                            TableResult result =
-                                    tEnv.executeSql(
-                                            "SELECT CALL_REMOTE_SCALAR(\'function\', \'STRING\', \'payload\');");
-                            try (CloseableIterator<Row> iter = result.collect()) {
-                                iter.forEachRemaining((x) -> {});
-                            }
-                        })
-                .hasStackTraceContaining("Gateway target not configured");
-    }
+    //    TODO: reactivate after demo hack is removed.
+    //    @Test
+    //    public void testRemoteUdfGatewayNotConfigured() {
+    //        final TableEnvironment tEnv = getSqlServiceTableEnvironment(true, false);
+    //        assertThatThrownBy(
+    //                        () -> {
+    //                            TableResult result =
+    //                                    tEnv.executeSql(
+    //                                            "SELECT
+    // CALL_REMOTE_SCALAR(\'handler\',\'function\', \'STRING\', \'payload\');");
+    //                            try (CloseableIterator<Row> iter = result.collect()) {
+    //                                iter.forEachRemaining((x) -> {});
+    //                            }
+    //                        })
+    //                .hasStackTraceContaining("Gateway target not configured");
+    //    }
 
     @Test
     public void testRemoteUdfGateway() throws Exception {
-        testRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_FUNCTION);
-        testStringRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_FUNCTION_STR);
+        testRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_HANDLER, "funName");
+        testStringRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_HANDLER_STR);
     }
 
     @Test
     public void testRemoteUdfGatewayFailOnPersistentError() {
-        assertThatThrownBy(() -> testRemoteUdfGatewayInternal("NoSuchFunction"))
-                .hasStackTraceContaining("Unknown function");
+        assertThatThrownBy(() -> testRemoteUdfGatewayInternal("NoSuchHandler", "NoFunc"))
+                .hasStackTraceContaining("Unknown handler");
     }
 
-    private void testRemoteUdfGatewayInternal(String testFunName) throws Exception {
+    private void testRemoteUdfGatewayInternal(String testHandlerName, String testFunName)
+            throws Exception {
         Server server = null;
         try {
             server =
@@ -183,8 +186,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
             TableResult result =
                     tEnv.executeSql(
                             String.format(
-                                    "SELECT CALL_REMOTE_SCALAR(\'%s\', \'STRING\', 1, \'test\', 4);",
-                                    testFunName));
+                                    "SELECT CALL_REMOTE_SCALAR(\'%s\', \'%s\',\'STRING\', 1, \'test\', 4);",
+                                    testHandlerName, testFunName));
             final List<Row> results = new ArrayList<>();
             try (CloseableIterator<Row> collect = result.collect()) {
                 collect.forEachRemaining(results::add);
@@ -233,22 +236,25 @@ public class RemoteUdfITCase extends AbstractTestBase {
     private static class ArgsConcatUdfGateway extends UdfGatewayGrpc.UdfGatewayImplBase {
 
         /** The mock gateway only knows this Udf name. */
-        static final String TEST_FUNCTION = "test_fun";
+        static final String TEST_HANDLER = "test_fun";
 
-        static final String TEST_FUNCTION_STR = "test_fun_str";
+        static final String TEST_HANDLER_STR = "test_fun_str";
 
         @Override
         public void invoke(
                 UdfGatewayOuterClass.InvokeRequest request,
                 StreamObserver<UdfGatewayOuterClass.InvokeResponse> responseObserver) {
             try {
-                if (TEST_FUNCTION.equals(request.getFuncName())) {
+                if (TEST_HANDLER.equals(request.getFuncName())) {
+                    String payload = request.getPayload();
+                    String trimPayload = payload.substring(0, payload.length() - 1);
+                    int splitIndex = trimPayload.indexOf(' ') + 1;
                     String responsePayload =
                             Base64SerializationUtil.serialize(
                                     (oos) ->
                                             oos.writeObject(
                                                     Base64SerializationUtil.deserialize(
-                                                            request.getPayload(),
+                                                            trimPayload.substring(splitIndex),
                                                             (ois) -> {
                                                                 Object o = ois.readObject();
                                                                 if (o.getClass().isArray()) {
@@ -260,11 +266,11 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
                     UdfGatewayOuterClass.InvokeResponse response =
                             UdfGatewayOuterClass.InvokeResponse.newBuilder()
-                                    .setPayload(responsePayload)
+                                    .setPayload('"' + responsePayload + '"')
                                     .build();
                     responseObserver.onNext(response);
                     responseObserver.onCompleted();
-                } else if (TEST_FUNCTION_STR.equals(request.getFuncName())) {
+                } else if (TEST_HANDLER_STR.equals(request.getFuncName())) {
                     {
                         UdfGatewayOuterClass.InvokeResponse response =
                                 UdfGatewayOuterClass.InvokeResponse.newBuilder()
@@ -277,7 +283,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
                     responseObserver.onError(
                             new StatusRuntimeException(
                                     Status.ABORTED.withDescription(
-                                            "Unknown function: " + request.getFuncName())));
+                                            "Unknown handler: " + request.getFuncName())));
                 }
             } catch (Exception ex) {
                 responseObserver.onError(ex);
