@@ -58,7 +58,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
         this.env.setParallelism(PARALLELISM);
     }
 
-    private static TableEnvironment getSqlServiceTableEnvironment(
+    static TableEnvironment getSqlServiceTableEnvironment(
             boolean udfsEnabled, boolean gatewayConfigured) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
@@ -70,7 +70,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
         return tableEnv;
     }
 
-    private static TableEnvironment getJssTableEnvironment() {
+    static TableEnvironment getJssTableEnvironment() {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
@@ -247,14 +247,13 @@ public class RemoteUdfITCase extends AbstractTestBase {
             try {
                 if (TEST_HANDLER.equals(request.getFuncName())) {
                     String payload = request.getPayload();
-                    String trimPayload = payload.substring(0, payload.length() - 1);
-                    int splitIndex = trimPayload.indexOf(' ') + 1;
+                    String[] payloadParts = payload.substring(0, payload.length() - 1).split(" ");
                     String responsePayload =
                             Base64SerializationUtil.serialize(
                                     (oos) ->
                                             oos.writeObject(
                                                     Base64SerializationUtil.deserialize(
-                                                            trimPayload.substring(splitIndex),
+                                                            payloadParts[1],
                                                             (ois) -> {
                                                                 Object o = ois.readObject();
                                                                 if (o.getClass().isArray()) {

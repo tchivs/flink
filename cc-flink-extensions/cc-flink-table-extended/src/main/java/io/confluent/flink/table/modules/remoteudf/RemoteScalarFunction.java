@@ -4,8 +4,10 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
-import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.DataTypeFactory;
+import org.apache.flink.table.functions.SpecializedFunction;
+import org.apache.flink.table.functions.UserDefinedFunction;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 
@@ -16,23 +18,36 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.ObjectInputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.table.types.inference.InputTypeStrategies.ANY;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.logical;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.varyingSequence;
 
 /** Proof-of-concept implementation for remote scalar UDF. */
-public class RemoteScalarFunction extends RemoteScalarFunctionBase {
+public class RemoteScalarFunction extends RemoteScalarFunctionBase implements SpecializedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(RemoteScalarFunction.class);
 
     /** The name of this function, by which it can be called from SQL. */
     public static final String NAME = "CALL_REMOTE_SCALAR";
 
+    private final List<DataType> argumentTypes;
+    private final List<Class<?>> argumentClasses;
+    private final String callerUUID;
+
+    private String serializedArgumentClasses;
+
     public RemoteScalarFunction(Map<String, String> config) {
         super(config);
+        this.argumentTypes = new ArrayList<>();
+        this.argumentClasses = new ArrayList<>();
+        this.callerUUID = UUID.randomUUID().toString();
     }
 
     /**
@@ -57,7 +72,16 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase {
 
         String encodedArgs = Base64SerializationUtil.serialize((oos) -> oos.writeObject(args));
 
-        String payload = '"' + functionClass + " " + encodedArgs + '"';
+        String payload =
+                '"'
+                        + callerUUID
+                        + " "
+                        + encodedArgs
+                        + " "
+                        + functionClass
+                        + " "
+                        + serializedArgumentClasses
+                        + '"';
 
         UdfGatewayOuterClass.InvokeRequest request =
                 UdfGatewayOuterClass.InvokeRequest.newBuilder()
@@ -90,16 +114,27 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase {
                             // return a data type based on a literal
                             final String literal =
                                     callContext.getArgumentValue(2, String.class).orElse("STRING");
-                            switch (literal) {
-                                case "INT":
-                                    return Optional.of(DataTypes.INT());
-                                case "DOUBLE":
-                                    return Optional.of(DataTypes.DOUBLE());
-                                case "STRING":
-                                default:
-                                    return Optional.of(DataTypes.STRING());
-                            }
+                            return Optional.of(typeFactory.createDataType(literal));
                         })
                 .build();
+    }
+
+    @Override
+    public UserDefinedFunction specialize(SpecializedContext context) {
+        this.argumentTypes.clear();
+        this.argumentClasses.clear();
+        this.argumentTypes.addAll(context.getCallContext().getArgumentDataTypes());
+        this.argumentTypes.stream()
+                .map(DataType::getConversionClass)
+                .collect(Collectors.toCollection(() -> this.argumentClasses));
+        try {
+            this.serializedArgumentClasses =
+                    Base64SerializationUtil.serialize((oos) -> oos.writeObject(argumentClasses));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // TODO: With this information we can also setup proper SQL type serialization instead of
+        //  using Java serialization.
+        return this;
     }
 }
