@@ -18,9 +18,11 @@
 
 package org.apache.flink.util;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.Internal;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /** Utilities for working with {@link Optional}. */
@@ -43,6 +45,28 @@ public class OptionalUtils {
         for (Optional<T> opt : opts) {
             if (opt.isPresent()) {
                 return opt;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the first {@link Optional} which is present. This is available as {@code Optional#or}
+     * in JDK9+
+     */
+    @SafeVarargs
+    @Confluent
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    public static <T> Optional<T> firstPresent(
+            Optional<T> optional, Supplier<Optional<T>>... alts) {
+        if (optional.isPresent()) {
+            return optional;
+        }
+        for (Supplier<Optional<T>> alt : alts) {
+            final Optional<T> altOpt = alt.get();
+            if (altOpt.isPresent()) {
+                return altOpt;
             }
         }
 

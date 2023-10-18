@@ -180,6 +180,14 @@ public class ClassifiedExceptionTest {
                                         + "\n"
                                         + "Caused by: No match found for function signature notExisting()"),
                 // ---
+                TestSpec.test("type inference failed during validation")
+                        .executeSql("CREATE TABLE t (a BIGINT) " + "WITH ('connector' = 'datagen')")
+                        .executeSql("SELECT ARRAY_JOIN() FROM t")
+                        .expectExactUserError(
+                                "SQL validation failed. Error from line 1, column 8 to line 1, column 19.\n"
+                                        + "\n"
+                                        + "Caused by: No match found for function signature ARRAY_JOIN()"),
+                // ---
                 TestSpec.test("show helpful error during SQL validation at point")
                         .executeSql("SELECT n")
                         .expectExactUserError(
@@ -194,7 +202,14 @@ public class ClassifiedExceptionTest {
                         .executeSql("ALTER TABLE t ADD WATERMARK FOR t AS t - INTERVAL '1' SECOND")
                         .expectExactUserError(
                                 "All tables declare a system-provided watermark by default. "
-                                        + "Use ALTER TABLE MODIFY for custom watermarks."));
+                                        + "Use ALTER TABLE MODIFY for custom watermarks."),
+                // ---
+                TestSpec.test("select a table that does not exist")
+                        .executeSql("SELECT * FROM `not_exist`")
+                        .expectExactUserError(
+                                "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
+                                        + "\n"
+                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
