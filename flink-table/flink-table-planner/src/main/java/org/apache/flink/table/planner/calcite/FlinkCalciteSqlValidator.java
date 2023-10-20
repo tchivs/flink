@@ -55,6 +55,7 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSnapshot;
+import org.apache.calcite.sql.SqlTableFunction;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.validate.DelegatingScope;
@@ -440,7 +441,7 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
         }
         final SqlFunction function = (SqlFunction) call.getOperator();
 
-        if (function.getFunctionType() != SqlFunctionCategory.USER_DEFINED_TABLE_FUNCTION) {
+        if (!isTableFunction(function)) {
             return null;
         }
 
@@ -457,5 +458,10 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
                             return null;
                         })
                 .collect(Collectors.toList());
+    }
+
+    private static boolean isTableFunction(SqlFunction function) {
+        return function instanceof SqlTableFunction
+                || function.getFunctionType() == SqlFunctionCategory.USER_DEFINED_TABLE_FUNCTION;
     }
 }
