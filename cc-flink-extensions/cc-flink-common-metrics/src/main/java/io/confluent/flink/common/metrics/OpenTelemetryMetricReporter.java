@@ -23,13 +23,10 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import io.confluent.flink.common.metrics.OpenTelemetryMetricAdapter.CollectionMetadata;
-import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.metrics.data.MetricData;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.internal.export.MetricProducer;
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.semconv.resource.attributes.ResourceAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,21 +46,18 @@ import java.util.concurrent.TimeUnit;
  * using Open Telemetry's {@link MetricExporter}.
  */
 @Confluent
-public class OpenTelemetryMetricReporter implements MetricReporter, MetricProducer, Scheduled {
+public class OpenTelemetryMetricReporter extends OpenTelemetryReporterBase
+        implements MetricReporter, MetricProducer, Scheduled {
     private static final Logger LOG = LoggerFactory.getLogger(OpenTelemetryMetricReporter.class);
 
-    public static final String ARG_EXPORTER_FACTORY_CLASS = "exporter.factory.class";
-    static final String LOGICAL_SCOPE_PREFIX = "flink.";
-    static final String OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME";
-    static final String OTEL_SERVICE_VERSION = "OTEL_SERVICE_VERSION";
+    private static final String LOGICAL_SCOPE_PREFIX = "flink.";
 
     private final Map<Gauge<?>, MetricMetadata> gauges = new HashMap<>();
     private final Map<Counter, MetricMetadata> counters = new HashMap<>();
     private final Map<Histogram, MetricMetadata> histograms = new HashMap<>();
     private final Map<Meter, MetricMetadata> meters = new HashMap<>();
-    private final Resource resource;
     private final Clock clock;
-    private MetricExporter exporter;
+
     // In order to produce deltas, we keep a snapshot of the previous counter collection.
     private Map<Metric, Long> lastValueSnapshots = Collections.emptyMap();
     private long lastCollectTimeNanos = 0;
@@ -74,18 +68,7 @@ public class OpenTelemetryMetricReporter implements MetricReporter, MetricProduc
 
     @VisibleForTesting
     OpenTelemetryMetricReporter(Clock clock) {
-        resource =
-                Resource.getDefault()
-                        .merge(
-                                Resource.create(
-                                        Attributes.of(
-                                                ResourceAttributes.SERVICE_NAME,
-                                                System.getenv(OTEL_SERVICE_NAME))))
-                        .merge(
-                                Resource.create(
-                                        Attributes.of(
-                                                ResourceAttributes.SERVICE_VERSION,
-                                                System.getenv(OTEL_SERVICE_VERSION))));
+        super();
         this.clock = clock;
     }
 
@@ -101,6 +84,43 @@ public class OpenTelemetryMetricReporter implements MetricReporter, MetricProduc
     public void close() {
         exporter.flush();
         exporter.close();
+    }
+
+    private static MetricExporter createExporter(
+            String exporterFactoryClassName, MetricConfig metricConfig) {
+        if (exporterFactoryClassName == null) {
+            throw new IllegalArgumentException("Must set exporter property");
+        }
+        // Use the same class loader as the one used for this class, assuming they've been
+        // loaded together.
+        Class<?> clazz;
+        try {
+            clazz =
+                    Class.forName(
+                            exporterFactoryClassName,
+                            true,
+                            OpenTelemetryMetricReporter.class.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException(
+                    "Couldn't find exporter factory: " + exporterFactoryClassName, e);
+        }
+        if (!MetricExporterFactory.class.isAssignableFrom(clazz)) {
+            throw new IllegalArgumentException(
+                    "Exporter factory must implement MetricExporterFactory: "
+                            + exporterFactoryClassName);
+        }
+        MetricExporterFactory exporterFactory;
+        try {
+            exporterFactory = (MetricExporterFactory) clazz.getDeclaredConstructor().newInstance();
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException(
+                    "Must have no arg constructor: " + exporterFactoryClassName, e);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Error instantiating " + exporterFactoryClassName, e);
+        }
+        LOG.info("Loaded exporter: " + exporterFactoryClassName);
+        return exporterFactory.createMetricExporter(metricConfig);
     }
 
     @Override
@@ -234,43 +254,6 @@ public class OpenTelemetryMetricReporter implements MetricReporter, MetricProduc
             map.put(meter, meter.getCount());
         }
         return map;
-    }
-
-    private static MetricExporter createExporter(
-            String exporterFactoryClassName, MetricConfig metricConfig) {
-        if (exporterFactoryClassName == null) {
-            throw new IllegalArgumentException("Must set exporter property");
-        }
-        // Use the same class loader as the one used for this class, assuming they've been
-        // loaded together.
-        Class<?> clazz;
-        try {
-            clazz =
-                    Class.forName(
-                            exporterFactoryClassName,
-                            true,
-                            OpenTelemetryMetricReporter.class.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException(
-                    "Couldn't find exporter factory: " + exporterFactoryClassName, e);
-        }
-        if (!MetricExporterFactory.class.isAssignableFrom(clazz)) {
-            throw new IllegalArgumentException(
-                    "Exporter factory must implement MetricExporterFactory: "
-                            + exporterFactoryClassName);
-        }
-        MetricExporterFactory exporterFactory;
-        try {
-            exporterFactory = (MetricExporterFactory) clazz.getDeclaredConstructor().newInstance();
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException(
-                    "Must have no arg constructor: " + exporterFactoryClassName, e);
-        } catch (Exception e) {
-            throw new IllegalArgumentException(
-                    "Error instantiating " + exporterFactoryClassName, e);
-        }
-        LOG.info("Loaded exporter: " + exporterFactoryClassName);
-        return exporterFactory.createMetricExporter(metricConfig);
     }
 
     @Override
