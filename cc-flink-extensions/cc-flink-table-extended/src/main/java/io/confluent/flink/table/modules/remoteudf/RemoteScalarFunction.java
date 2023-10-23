@@ -37,6 +37,9 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
     /** The name of this function, by which it can be called from SQL. */
     public static final String NAME = "CALL_REMOTE_SCALAR";
 
+    /** Number of metadata arguments to this function. */
+    private static final int NUM_META_ARGS = 3;
+
     private final List<DataType> argumentTypes;
     private final List<Class<?>> argumentClasses;
     private final String callerUUID;
@@ -100,6 +103,7 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
                 // specify a strategy for the result data type of the function
                 .inputTypeStrategy(
                         varyingSequence(
+                                // 3 meta args for from the call
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
@@ -123,7 +127,13 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
     public UserDefinedFunction specialize(SpecializedContext context) {
         this.argumentTypes.clear();
         this.argumentClasses.clear();
-        this.argumentTypes.addAll(context.getCallContext().getArgumentDataTypes());
+        List<DataType> argumentDataTypes = context.getCallContext().getArgumentDataTypes();
+        // Skip the meta arguments, they are not part of the payload and their data types don't
+        // matter.
+        for (int i = NUM_META_ARGS; i < argumentDataTypes.size(); ++i) {
+            argumentTypes.add(argumentDataTypes.get(i));
+        }
+
         this.argumentTypes.stream()
                 .map(DataType::getConversionClass)
                 .collect(Collectors.toCollection(() -> this.argumentClasses));
