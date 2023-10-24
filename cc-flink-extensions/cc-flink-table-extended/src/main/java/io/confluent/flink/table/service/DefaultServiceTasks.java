@@ -208,7 +208,8 @@ class DefaultServiceTasks implements ServiceTasks {
             tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
         }
 
-        if (privateConfig.get(ServiceTasksOptions.CONFLUENT_OTLP_FUNCTIONS_ENABLED)) {
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_OTLP_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("otlp", OtlpFunctionsModule.INSTANCE);
         }
 
