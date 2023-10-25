@@ -1766,7 +1766,8 @@ public class CheckpointCoordinator {
                             latest.getCheckpointID(),
                             latest.getProperties(),
                             restoreTimestamp,
-                            latest.getExternalPointer());
+                            latest.getExternalPointer(),
+                            latest.getStateSize());
 
             statsTracker.reportRestoredCheckpoint(restored);
 
