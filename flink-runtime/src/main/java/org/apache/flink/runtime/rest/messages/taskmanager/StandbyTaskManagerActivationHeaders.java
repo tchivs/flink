@@ -51,6 +51,11 @@ public class StandbyTaskManagerActivationHeaders
     }
 
     @Override
+    public String operationId() {
+        return "activateStandbyTaskManager";
+    }
+
+    @Override
     public Class<StandbyTaskManagerActivationRequestBody> getRequestClass() {
         return StandbyTaskManagerActivationRequestBody.class;
     }
