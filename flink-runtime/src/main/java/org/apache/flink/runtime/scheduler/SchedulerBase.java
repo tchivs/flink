@@ -43,6 +43,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointStatsSnapshot;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
+import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetrics;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
@@ -983,6 +984,12 @@ public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling
     public void reportCheckpointMetrics(
             JobID jobID, ExecutionAttemptID attemptId, long id, CheckpointMetrics metrics) {
         executionGraphHandler.reportCheckpointMetrics(attemptId, id, metrics);
+    }
+
+    @Override
+    public void reportInitializationMetrics(
+            JobID jobId, SubTaskInitializationMetrics initializationMetrics) {
+        executionGraphHandler.reportInitializationMetrics(initializationMetrics);
     }
 
     @Override

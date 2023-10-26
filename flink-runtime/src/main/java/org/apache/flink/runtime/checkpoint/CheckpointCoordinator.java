@@ -1244,7 +1244,7 @@ public class CheckpointCoordinator {
                         "Received message for discarded but non-removed checkpoint "
                                 + checkpointId);
             } else {
-                reportStats(
+                reportCheckpointMetrics(
                         message.getCheckpointId(),
                         message.getTaskExecutionId(),
                         message.getCheckpointMetrics());
@@ -2070,8 +2070,14 @@ public class CheckpointCoordinator {
         }
     }
 
-    public void reportStats(long id, ExecutionAttemptID attemptId, CheckpointMetrics metrics) {
+    public void reportCheckpointMetrics(long id, ExecutionAttemptID attemptId, CheckpointMetrics metrics) {
         statsTracker.reportIncompleteStats(id, attemptId, metrics);
+    }
+
+    public void reportInitializationMetrics(
+            ExecutionAttemptID executionAttemptID,
+            SubTaskInitializationMetrics initializationMetrics) {
+        // TODO: report to statsTracker
     }
 
     // ------------------------------------------------------------------------
