@@ -1697,6 +1697,8 @@ public class CheckpointCoordinator {
             if (shutdown) {
                 throw new IllegalStateException("CheckpointCoordinator is shut down");
             }
+            long restoreTimestamp = SystemClock.getInstance().absoluteTimeMillis();
+            statsTracker.reportInitializationStartTs(restoreTimestamp);
 
             // Restore from the latest checkpoint
             CompletedCheckpoint latest = completedCheckpointStore.getLatestCheckpoint();
@@ -1722,6 +1724,12 @@ public class CheckpointCoordinator {
 
                 return OptionalLong.empty();
             }
+
+            statsTracker.reportRestoredCheckpoint(
+                    latest.getCheckpointID(),
+                    latest.getProperties(),
+                    latest.getExternalPointer(),
+                    latest.getStateSize());
 
             LOG.info("Restoring job {} from {}.", job, latest);
 
@@ -1757,19 +1765,6 @@ public class CheckpointCoordinator {
             if (operatorCoordinatorRestoreBehavior != OperatorCoordinatorRestoreBehavior.SKIP) {
                 restoreStateToCoordinators(latest.getCheckpointID(), operatorStates);
             }
-
-            // update metrics
-
-            long restoreTimestamp = System.currentTimeMillis();
-            RestoredCheckpointStats restored =
-                    new RestoredCheckpointStats(
-                            latest.getCheckpointID(),
-                            latest.getProperties(),
-                            restoreTimestamp,
-                            latest.getExternalPointer(),
-                            latest.getStateSize());
-
-            statsTracker.reportRestoredCheckpoint(restored);
 
             return OptionalLong.of(latest.getCheckpointID());
         }
@@ -2070,14 +2065,15 @@ public class CheckpointCoordinator {
         }
     }
 
-    public void reportCheckpointMetrics(long id, ExecutionAttemptID attemptId, CheckpointMetrics metrics) {
+    public void reportCheckpointMetrics(
+            long id, ExecutionAttemptID attemptId, CheckpointMetrics metrics) {
         statsTracker.reportIncompleteStats(id, attemptId, metrics);
     }
 
     public void reportInitializationMetrics(
             ExecutionAttemptID executionAttemptID,
             SubTaskInitializationMetrics initializationMetrics) {
-        // TODO: report to statsTracker
+        statsTracker.reportInitializationMetrics(initializationMetrics);
     }
 
     // ------------------------------------------------------------------------
