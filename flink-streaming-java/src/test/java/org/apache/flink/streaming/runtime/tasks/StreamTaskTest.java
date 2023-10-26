@@ -1778,6 +1778,23 @@ public class StreamTaskTest {
     }
 
     @Test
+    void testSubTaskInitializationMetrics() throws Exception {
+        StreamTaskMailboxTestHarnessBuilder<Integer> builder =
+                new StreamTaskMailboxTestHarnessBuilder<>(
+                                OneInputStreamTask::new, BasicTypeInfo.INT_TYPE_INFO)
+                        .addInput(BasicTypeInfo.INT_TYPE_INFO)
+                        .setupOutputForSingletonOperatorChain(
+                                new TestBoundedOneInputStreamOperator());
+
+        try (StreamTaskMailboxTestHarness<Integer> harness = builder.buildUnrestored()) {
+            harness.streamTask.restore();
+
+            assertThat(harness.getTaskStateManager().getReportedInitializationMetrics())
+                    .isPresent();
+        }
+    }
+
+    @Test
     void testMailboxMetricsMeasurement() throws Exception {
         final int numMails = 10, sleepTime = 5;
         StreamTaskMailboxTestHarnessBuilder<Integer> builder =
