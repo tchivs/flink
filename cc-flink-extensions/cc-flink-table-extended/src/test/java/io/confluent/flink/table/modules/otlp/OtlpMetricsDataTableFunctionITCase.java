@@ -12,30 +12,61 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-
 import io.confluent.flink.table.service.ServiceTasks;
+import io.opentelemetry.proto.common.v1.AnyValue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_OTLP_FUNCTIONS_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OtlpMetricsDataTableFunctionITCase extends AbstractTestBase {
+
+    private static final Map<String, String> IMPLICIT_RESOURCE_ATTRIBUTES =
+            Collections.unmodifiableMap(
+                    OtlpExampleMetrics.RESOURCE_ATTRIBUTES.entrySet().stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            e -> String.format("resource.%s", e.getKey()),
+                                            e -> asString(e.getValue()))));
+
     private static final int PARALLELISM = 4;
     private static final ServiceTasks INSTANCE = ServiceTasks.INSTANCE;
 
-    private StreamExecutionEnvironment env;
+    private static String asString(AnyValue any) {
+        switch (any.getValueCase()) {
+            case INT_VALUE:
+                return String.valueOf(any.getIntValue());
+            case DOUBLE_VALUE:
+                return String.valueOf(any.getDoubleValue());
+            case BOOL_VALUE:
+                return String.valueOf(any.getBoolValue());
+            case STRING_VALUE:
+                return any.getStringValue();
+            default:
+                throw new UnsupportedOperationException(
+                        String.format("Unsupported value type [%s].", any.getValueCase()));
+        }
+    }
+
+    private static Map<String, String> withAdditionalAttribute(String key, String value) {
+        final Map<String, String> copy = new HashMap<>(IMPLICIT_RESOURCE_ATTRIBUTES);
+        copy.put(key, value);
+        return Collections.unmodifiableMap(copy);
+    }
 
     @BeforeEach
     public void before() {
-        this.env = StreamExecutionEnvironment.getExecutionEnvironment();
-        this.env.setParallelism(PARALLELISM);
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(PARALLELISM);
     }
 
     private static TableEnvironment getSqlServiceTableEnvironment() {
@@ -89,14 +120,14 @@ class OtlpMetricsDataTableFunctionITCase extends AbstractTestBase {
                                 RowKind.INSERT,
                                 t,
                                 "test_counter",
-                                ImmutableMap.of("resource.k8s.pod.name", "flink-0", "tag", "a"),
+                                withAdditionalAttribute("tag", "a"),
                                 100L,
                                 null),
                         Row.ofKind(
                                 RowKind.INSERT,
                                 t,
                                 "test_counter",
-                                ImmutableMap.of("resource.k8s.pod.name", "flink-0", "tag", "b"),
+                                withAdditionalAttribute("tag", "b"),
                                 200L,
                                 null));
     }
