@@ -11,9 +11,11 @@ import org.apache.flink.table.planner.factories.utils.TestCollectionTableFactory
 import org.apache.flink.table.planner.runtime.utils.StreamingTestBase;
 import org.apache.flink.types.Row;
 
+import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -61,6 +63,16 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
         Table tableQuery = tEnv().sqlQuery(query);
         assertThatThrownBy(() -> tableQuery.executeInsert("t2").await())
                 .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+    }
+
+    @Test
+    public void testNestedIOSerializationError() throws ExecutionException, InterruptedException {
+        Exception userIOException =
+                new IOException(
+                        "Failed to deserialize consumer record due to",
+                        new RuntimeException("test"));
+        final String expectedUserMessage = FailureMessageUtil.buildMessage(userIOException);
+        assertFailureEnricherLabelIsExpectedLabel(userIOException, "USER", expectedUserMessage);
     }
 
     @Test
@@ -119,8 +131,8 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                 .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
     }
 
-    public static void assertFailureEnricherLabelIsExpectedLabel(Exception e, String expectedLabel)
-            throws ExecutionException, InterruptedException {
+    public static void assertFailureEnricherLabelIsExpectedLabel(
+            Exception e, String... expectedLabels) throws ExecutionException, InterruptedException {
         final Context taskFailureCtx =
                 DefaultFailureEnricherContext.forTaskFailure(
                         null, null, null, newSingleThreadExecutor(), null);
@@ -130,6 +142,7 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         taskFailureCtx,
                         newSingleThreadExecutor(),
                         Collections.singleton(new TypeFailureEnricher()));
-        assertThat(resultFuture.get()).containsValue(expectedLabel);
+        final Map<String, String> failureLabels = resultFuture.get();
+        assertThat(failureLabels).containsValues(expectedLabels);
     }
 }
