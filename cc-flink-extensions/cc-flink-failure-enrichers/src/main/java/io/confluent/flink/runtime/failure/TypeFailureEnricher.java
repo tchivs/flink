@@ -16,11 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.DateTimeException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -32,11 +34,10 @@ public class TypeFailureEnricher implements FailureEnricher {
 
     private static final Logger LOG = LoggerFactory.getLogger(TypeFailureEnricher.class);
 
-    private static final String typeKey = "TYPE";
-    private static final String codeKey = "CODE";
-    private static final String msgKey = "USER_ERROR_MSG";
-    private static final Set<String> labelKeys =
-            Stream.of(typeKey, codeKey, msgKey).collect(Collectors.toSet());
+    private static final String KEY_TYPE = "TYPE";
+    private static final String KEY_MSG = "USER_ERROR_MSG";
+    private static final Set<String> ALLOWED_KEYS =
+            Stream.of(KEY_TYPE, KEY_MSG).collect(Collectors.toSet());
     private static final String SERIALIZE_MESSAGE = "serializ";
     // Copy of org.apache.flink.runtime.io.network.api.serialization.NonSpanningWrapper;
     private static final String BROKEN_SERIALIZATION_ERROR_MESSAGE =
@@ -44,80 +45,84 @@ public class TypeFailureEnricher implements FailureEnricher {
                     + "This indicates broken serialization. If you are using custom serialization types "
                     + "(Value or Writable), check their serialization methods. If you are using a ";
 
+    /* Enum to map a Throwable into a Type. */
+    private enum Type {
+        USER,
+        SYSTEM,
+        UNKNOWN
+    }
+
+    /* Functional interface to classify a Throwable into a Type. */
+    private interface TypeClassifier {
+        Optional<Type> classify(Throwable throwable);
+    }
+
+    /**
+     * Chain of classifiers. We stop on the first match, so the ordering matters. The last one is a
+     * catch-all classifier.
+     */
+    private static final TypeClassifier[] TYPE_CLASSIFIERS = {
+        throwable -> {
+            // This is meant to capture any exception that has "serializ" in the error message, such
+            // as "(de)serialize", "(de)serialization", or "(de)serializable"
+            return ExceptionUtils.findThrowableWithMessage(throwable, SERIALIZE_MESSAGE)
+                    .map(Throwable::getMessage)
+                    .map(
+                            msg ->
+                                    msg.contains(BROKEN_SERIALIZATION_ERROR_MESSAGE)
+                                            ? Type.SYSTEM
+                                            : Type.USER);
+        },
+        forThrowable(TableException.class, Type.USER),
+        forThrowable(ArithmeticException.class, Type.USER),
+        // Cast exceptions.
+        forThrowable(NumberFormatException.class, Type.USER),
+        forThrowable(DateTimeException.class, Type.USER),
+        // Authorization exceptions coming from Kafka.
+        forThrowable(TransactionalIdAuthorizationException.class, Type.USER),
+        forThrowable(TopicAuthorizationException.class, Type.USER),
+        // System exceptions.
+        forThrowable(FlinkException.class, Type.SYSTEM),
+        forPredicate(ExceptionUtils::isJvmFatalOrOutOfMemoryError, Type.SYSTEM),
+        // Catch all.
+        throwable -> Optional.of(Type.UNKNOWN)
+    };
+
+    private static TypeClassifier forThrowable(Class<? extends Throwable> clazz, Type type) {
+        return throwable -> ExceptionUtils.findThrowable(throwable, clazz).map(ignored -> type);
+    }
+
+    private static TypeClassifier forPredicate(Predicate<Throwable> predicate, Type type) {
+        return throwable -> {
+            if (predicate.test(throwable)) {
+                return Optional.of(type);
+            }
+            return Optional.empty();
+        };
+    }
+
     @Override
     public Set<String> getOutputKeys() {
-        return labelKeys;
+        return ALLOWED_KEYS;
     }
 
     @Override
     public CompletableFuture<Map<String, String>> processFailure(
             final Throwable cause, final Context context) {
-        return CompletableFuture.supplyAsync(
-                () -> {
-                    LOG.info("Processing failure:", cause);
-                    final Map<String, String> labels = new HashMap();
-                    if (cause == null) {
-                        return labels;
-                    }
-                    // FRT-173: ReEnable Code classification when add support for UDFs
-                    // Base of exception is User/UDF code or Flink platform
-                    /*
-                     * if (context.getUserClassLoader() != null) { // Class in the top of the stack,
-                     * from which an exception is thrown, is // loaded from user artifacts in a
-                     * submitted JAR Optional<Class> classOnStackTop =
-                     * TypeFailureEnricherUtils.findClassFromStackTraceTop( cause,
-                     * context.getUserClassLoader()); if (classOnStackTop.isPresent() &&
-                     * TypeFailureEnricherUtils.isUserCodeClassLoader(
-                     * classOnStackTop.get().getClassLoader())) { labels.put(codeKey, "USER"); }
-                     * else { labels.put(codeKey, "SYSTEM"); } }
-                     */
-
-                    // This is meant to capture any exception that has "serializ" in the error
-                    // message, such as "(de)serialize", "(de)serialization", or "(de)serializable"
-                    Optional<Throwable> serializationException =
-                            ExceptionUtils.findThrowableWithMessage(cause, SERIALIZE_MESSAGE);
-                    if (serializationException.isPresent()) {
-                        // check if system error, otherwise it is user error
-                        if (serializationException
-                                .get()
-                                .getMessage()
-                                .contains(BROKEN_SERIALIZATION_ERROR_MESSAGE)) {
-                            labels.put(typeKey, "SYSTEM");
-                        } else {
-                            labels.put(typeKey, "USER");
-                        }
-                    } else if (ExceptionUtils.findThrowable(cause, TableException.class)
-                            .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    } else if (ExceptionUtils.findThrowable(cause, ArithmeticException.class)
-                            .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    }
-                    // Catch cast exceptions
-                    else if (ExceptionUtils.findThrowable(cause, NumberFormatException.class)
-                                    .isPresent()
-                            || ExceptionUtils.findThrowable(cause, DateTimeException.class)
-                                    .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    }
-                    // Catch Authorization exceptions coming from Kafka
-                    else if (ExceptionUtils.findThrowable(
-                                            cause, TransactionalIdAuthorizationException.class)
-                                    .isPresent()
-                            || ExceptionUtils.findThrowable(
-                                            cause, TopicAuthorizationException.class)
-                                    .isPresent()) {
-                        labels.put(typeKey, "USER");
-                    } else if (ExceptionUtils.findThrowable(cause, FlinkException.class).isPresent()
-                            || ExceptionUtils.isJvmFatalOrOutOfMemoryError(cause)) {
-                        labels.put(typeKey, "SYSTEM");
-                    } else {
-                        labels.put(typeKey, "UNKNOWN");
-                    }
-                    labels.put(msgKey, FailureMessageUtil.buildMessage(cause));
-                    LOG.info("Processed failure labels: {}", labels);
-                    return labels;
-                },
-                context.getIOExecutor());
+        LOG.info("Processing failure:", cause);
+        if (cause == null) {
+            return CompletableFuture.completedFuture(Collections.emptyMap());
+        }
+        final Map<String, String> labels = new HashMap<>();
+        for (TypeClassifier classifier : TYPE_CLASSIFIERS) {
+            final Optional<String> maybeType = classifier.classify(cause).map(Type::name);
+            if (maybeType.isPresent()) {
+                labels.put(KEY_TYPE, maybeType.get());
+                break;
+            }
+        }
+        labels.put(KEY_MSG, FailureMessageUtil.buildMessage(cause));
+        LOG.info("Processed failure labels: {}", labels);
+        return CompletableFuture.completedFuture(Collections.unmodifiableMap(labels));
     }
 }
