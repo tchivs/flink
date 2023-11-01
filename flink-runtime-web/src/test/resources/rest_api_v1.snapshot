@@ -1099,6 +1099,13 @@
       "type" : "object",
       "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:metrics:AutopilotMetricsResponseBody",
       "properties" : {
+        "taskManagerTimestamps" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
         "taskManagerMetrics" : {
           "type" : "object",
           "additionalProperties" : {

@@ -122,7 +122,7 @@ public class AutopilotMetricsHandler
                             CompletionException exception = null;
                             for (MetricDump metricDump : deserializer.deserialize(result)) {
                                 try {
-                                    response.addMetric(metricDump);
+                                    response.addMetric(metricDump, result.timestamp);
                                 } catch (ParseException pe) {
                                     exception =
                                             ExceptionUtils.firstOrSuppressed(

@@ -37,6 +37,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +83,9 @@ public class MetricDumpSerialization {
         public final int numGauges;
         public final int numMeters;
         public final int numHistograms;
+
+        // should the TS be created before serialization (== evaluation of metrics)?
+        public final Instant timestamp = Clock.systemUTC().instant();
 
         public MetricSerializationResult(
                 byte[] serializedCounters,

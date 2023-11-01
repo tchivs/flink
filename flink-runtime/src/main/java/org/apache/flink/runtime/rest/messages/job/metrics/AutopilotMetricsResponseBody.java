@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +42,8 @@ import java.util.Objects;
 @Confluent
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public final class AutopilotMetricsResponseBody implements ResponseBody {
+
+    private static final String FIELD_TASK_MANAGER_TIMESTAMPS = "taskManagerTimestamps";
 
     private static final String FIELD_TASK_MANAGER_METRICS = "taskManagerMetrics";
     private static final String FIELD_TASK_METRICS = "taskMetrics";
@@ -63,6 +66,9 @@ public final class AutopilotMetricsResponseBody implements ResponseBody {
         return combined;
     }
 
+    @JsonProperty(FIELD_TASK_MANAGER_TIMESTAMPS)
+    private final Map<String, Instant> taskManagerTimestamps;
+
     @JsonProperty(FIELD_TASK_MANAGER_METRICS)
     private final Map<String, Map<String, Number>> taskManagerMetrics;
 
@@ -75,22 +81,26 @@ public final class AutopilotMetricsResponseBody implements ResponseBody {
     @JsonCreator
     @VisibleForTesting
     AutopilotMetricsResponseBody(
+            @Nullable @JsonProperty(FIELD_TASK_MANAGER_TIMESTAMPS)
+                    Map<String, Instant> taskManagerTimestamps,
             @JsonProperty(FIELD_TASK_MANAGER_METRICS) @Nullable
                     Map<String, Map<String, Number>> taskManagerMetrics,
             @Nullable @JsonProperty(FIELD_TASK_METRICS)
                     Map<String, Map<String, Number>> taskMetrics,
             @Nullable @JsonProperty(FIELD_OPERATOR_METRICS)
                     Map<String, Map<String, Number>> operatorMetrics) {
+        this.taskManagerTimestamps =
+                taskManagerTimestamps != null ? taskManagerTimestamps : new HashMap<>();
         this.taskManagerMetrics = taskManagerMetrics != null ? taskManagerMetrics : new HashMap<>();
         this.taskMetrics = taskMetrics != null ? taskMetrics : new HashMap<>();
         this.operatorMetrics = operatorMetrics != null ? operatorMetrics : new HashMap<>();
     }
 
     public AutopilotMetricsResponseBody() {
-        this(new HashMap<>(), new HashMap<>(), new HashMap<>());
+        this(new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
     }
 
-    public void addMetric(MetricDump metricDump) throws ParseException {
+    public void addMetric(MetricDump metricDump, Instant timestamp) throws ParseException {
         switch (metricDump.scopeInfo.getCategory()) {
             case QueryScopeInfo.INFO_CATEGORY_TM:
                 {
@@ -100,6 +110,7 @@ public final class AutopilotMetricsResponseBody implements ResponseBody {
                             taskManagerMetrics.computeIfAbsent(
                                     cast.taskManagerID, ignored -> new HashMap<>()),
                             metricDump);
+                    taskManagerTimestamps.put(cast.taskManagerID, timestamp);
                     break;
                 }
             case QueryScopeInfo.INFO_CATEGORY_TASK:
@@ -166,6 +177,10 @@ public final class AutopilotMetricsResponseBody implements ResponseBody {
                 }
                 break;
         }
+    }
+
+    public Map<String, Instant> getTaskManagerTimestamps() {
+        return taskManagerTimestamps;
     }
 
     public Map<String, Map<String, Number>> getTaskManagerMetrics() {

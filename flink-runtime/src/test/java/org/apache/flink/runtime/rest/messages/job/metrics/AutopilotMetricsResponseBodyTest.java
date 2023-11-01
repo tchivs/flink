@@ -25,6 +25,7 @@ import org.apache.flink.runtime.rest.messages.RestResponseMarshallingTestBase;
 import org.junit.Test;
 
 import java.text.ParseException;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,13 +46,18 @@ public class AutopilotMetricsResponseBodyTest
 
     @Override
     protected AutopilotMetricsResponseBody getTestResponseInstance() throws Exception {
+        final Map<String, Instant> taskManagerTimestamps = new HashMap<>();
         final Map<String, Map<String, Number>> taskManagerMetrics = new HashMap<>();
         final Map<String, Number> taskManagerCounters = new HashMap<>();
+        taskManagerTimestamps.put("counters", Instant.now());
         taskManagerCounters.put("foo", 1);
         taskManagerCounters.put("bar", 2);
         taskManagerMetrics.putIfAbsent("counters", taskManagerCounters);
         return new AutopilotMetricsResponseBody(
-                taskManagerMetrics, Collections.emptyMap(), Collections.emptyMap());
+                taskManagerTimestamps,
+                taskManagerMetrics,
+                Collections.emptyMap(),
+                Collections.emptyMap());
     }
 
     @Test
@@ -62,15 +68,18 @@ public class AutopilotMetricsResponseBodyTest
                 new MetricDump.GaugeDump(
                         queryScopeInfo,
                         "infinity-positive",
-                        Double.toString(Double.POSITIVE_INFINITY)));
+                        Double.toString(Double.POSITIVE_INFINITY)),
+                Instant.now());
         response.addMetric(
                 new MetricDump.GaugeDump(
                         queryScopeInfo,
                         "infinity-negative",
-                        Double.toString(Double.NEGATIVE_INFINITY)));
+                        Double.toString(Double.NEGATIVE_INFINITY)),
+                Instant.now());
 
         response.addMetric(
-                new MetricDump.GaugeDump(queryScopeInfo, "NaN", Double.toString(Double.NaN)));
+                new MetricDump.GaugeDump(queryScopeInfo, "NaN", Double.toString(Double.NaN)),
+                Instant.now());
 
         assertThat(response.getTaskManagerMetrics())
                 .hasEntrySatisfying(
@@ -83,15 +92,39 @@ public class AutopilotMetricsResponseBodyTest
 
         response.addMetric(
                 new MetricDump.MeterDump(
-                        queryScopeInfo, "infinity-positive", Double.POSITIVE_INFINITY));
+                        queryScopeInfo, "infinity-positive", Double.POSITIVE_INFINITY),
+                Instant.now());
         response.addMetric(
                 new MetricDump.MeterDump(
-                        queryScopeInfo, "infinity-negative", Double.NEGATIVE_INFINITY));
+                        queryScopeInfo, "infinity-negative", Double.NEGATIVE_INFINITY),
+                Instant.now());
 
-        response.addMetric(new MetricDump.MeterDump(queryScopeInfo, "NaN", Double.NaN));
+        response.addMetric(
+                new MetricDump.MeterDump(queryScopeInfo, "NaN", Double.NaN), Instant.now());
 
         assertThat(response.getTaskManagerMetrics())
                 .hasEntrySatisfying(
                         queryScopeInfo.taskManagerID, metrics -> assertThat(metrics).isEmpty());
+    }
+
+    @Test
+    public void testTimestampSetForTaskManagerMetrics() throws ParseException {
+        final AutopilotMetricsResponseBody response = new AutopilotMetricsResponseBody();
+
+        final Instant timestamp = Instant.now();
+        final QueryScopeInfo.JobQueryScopeInfo jobScopeInfo =
+                new QueryScopeInfo.JobQueryScopeInfo("jobid");
+        final QueryScopeInfo.TaskManagerQueryScopeInfo taskManagerQueryScopeInfo = queryScopeInfo;
+
+        response.addMetric(new MetricDump.MeterDump(jobScopeInfo, "jobMetric", 0), timestamp);
+
+        assertThat(response.getTaskManagerTimestamps()).isEmpty();
+
+        response.addMetric(
+                new MetricDump.MeterDump(taskManagerQueryScopeInfo, "taskManagerMetric", 0),
+                timestamp);
+
+        assertThat(response.getTaskManagerTimestamps())
+                .containsEntry(taskManagerQueryScopeInfo.taskManagerID, timestamp);
     }
 }
