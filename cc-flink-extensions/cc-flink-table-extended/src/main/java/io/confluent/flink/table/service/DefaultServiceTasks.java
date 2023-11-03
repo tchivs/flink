@@ -31,7 +31,6 @@ import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 import org.apache.flink.table.planner.delegation.StreamPlanner;
-import org.apache.flink.table.planner.plan.ExecNodeGraphInternalPlan;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
@@ -40,6 +39,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecGroupWind
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecLookupJoin;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecTableSourceScan;
+import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
 
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hasher;
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
@@ -52,6 +52,7 @@ import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
+import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -76,6 +77,8 @@ import static org.apache.flink.table.api.config.TableConfigOptions.LOCAL_TIME_ZO
 import static org.apache.flink.table.api.config.TableConfigOptions.PLAN_RESTORE_CATALOG_OBJECTS;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_COLUMN_EXPANSION_STRATEGY;
 import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DYNAMIC_TABLE_OPTIONS_ENABLED;
+import static org.apache.flink.table.planner.utils.JavaScalaConversionUtil.toJava;
+import static org.apache.flink.table.planner.utils.JavaScalaConversionUtil.toScala;
 
 /** Default implementation of {@link ServiceTasks}. */
 @Confluent
@@ -327,7 +330,7 @@ class DefaultServiceTasks implements ServiceTasks {
         final SinkModifyOperation modifyOperation = convertToModifyOperation(queryOperation);
 
         final CompilationResult compilationResult =
-                compilePlan(
+                compile(
                         tableEnvironment,
                         Collections.singletonList(modifyOperation),
                         connectorOptions);
@@ -412,7 +415,7 @@ class DefaultServiceTasks implements ServiceTasks {
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions) {
         final CompilationResult compilationResult =
-                compilePlan(tableEnvironment, modifyOperations, connectorOptions);
+                compile(tableEnvironment, modifyOperations, connectorOptions);
 
         return new BackgroundResultPlan(compilationResult.compiledPlan);
     }
@@ -431,16 +434,17 @@ class DefaultServiceTasks implements ServiceTasks {
         }
     }
 
-    private static CompilationResult compilePlan(
+    private static CompilationResult compile(
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions) {
         final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
 
         final StreamPlanner planner = (StreamPlanner) tableEnv.getPlanner();
-        final ExecNodeGraphInternalPlan internalPlan =
-                (ExecNodeGraphInternalPlan) tableEnv.getPlanner().compilePlan(modifyOperations);
-        final ExecNodeGraph graph = internalPlan.getExecNodeGraph();
+
+        final List<FlinkPhysicalRel> physicalGraph = optimize(planner, modifyOperations);
+
+        final ExecNodeGraph graph = translate(planner, physicalGraph);
 
         graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
 
@@ -457,6 +461,24 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         return new CompilationResult(graph, compiledPlan);
+    }
+
+    /** Runs the optimizer and returns a list of {@link FlinkPhysicalRel}. */
+    @SuppressWarnings("unchecked")
+    private static List<FlinkPhysicalRel> optimize(
+            StreamPlanner planner, List<ModifyOperation> operations) {
+        final List<RelNode> logicalNodes =
+                operations.stream().map(planner::translateToRel).collect(Collectors.toList());
+        final List<RelNode> optimizedNodes = toJava(planner.optimize(toScala(logicalNodes)));
+        return (List<FlinkPhysicalRel>) (List<?>) optimizedNodes;
+    }
+
+    /** Runs the translation to an {@link ExecNodeGraph}. */
+    @SuppressWarnings("unchecked")
+    private static ExecNodeGraph translate(
+            StreamPlanner planner, List<FlinkPhysicalRel> physicalGraph) {
+        final List<RelNode> optimizedNodes = (List<RelNode>) (List<?>) physicalGraph;
+        return planner.translateToExecNodeGraph(toScala(optimizedNodes), true);
     }
 
     private static void exposePrivateConnectorOptions(
