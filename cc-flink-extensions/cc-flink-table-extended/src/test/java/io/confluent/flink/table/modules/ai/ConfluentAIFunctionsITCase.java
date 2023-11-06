@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import uk.org.webcompere.systemstubs.environment.EnvironmentVariables;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -40,13 +39,12 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
     private static final int PARALLELISM = 4;
     private static final ServiceTasks INSTANCE = ServiceTasks.INSTANCE;
 
-    private StreamExecutionEnvironment env;
     private final MockWebServer mockWebServer = new MockWebServer();
 
     @BeforeEach
     public void before() {
-        this.env = StreamExecutionEnvironment.getExecutionEnvironment();
-        this.env.setParallelism(PARALLELISM);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(PARALLELISM);
     }
 
     private static TableEnvironment getSqlServiceTableEnvironment(boolean aiFunctionsEnabled) {
@@ -86,7 +84,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         final TableEnvironment tableEnv = getJssTableEnvironment();
 
         final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT SECRET(\'something\');").getQueryOperation();
+                tableEnv.sqlQuery("SELECT SECRET('something');").getQueryOperation();
 
         final ForegroundResultPlan plan =
                 INSTANCE.compileForegroundQuery(
@@ -102,7 +100,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true);
 
         final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT SECRET(\'something\');").getQueryOperation();
+                tableEnv.sqlQuery("SELECT SECRET('something');").getQueryOperation();
 
         final ForegroundResultPlan plan =
                 INSTANCE.compileForegroundQuery(
@@ -116,24 +114,21 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
     public void testAIFunctionDisabled() {
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(false);
 
-        assertThatThrownBy(() -> tableEnv.executeSql("SELECT SECRET(\'a\', \'b\');"))
-                .satisfies(
-                        e ->
-                                e.getMessage()
-                                        .contains("No match found for function signature SECRET"));
+        assertThatThrownBy(() -> tableEnv.executeSql("SELECT SECRET('a', 'b');"))
+                .hasMessageContaining("No match found for function signature SECRET");
     }
 
     @Test
     public void testAIFunctionSecretUDF() throws Exception {
         final String apiKey = "someOpenAIKey";
-        final List<Row> expectedRows = Arrays.asList(Row.of(apiKey));
+        final List<Row> expectedRows = Collections.singletonList(Row.of(apiKey));
 
         new EnvironmentVariables("OPENAI_API_KEY", apiKey)
                 .execute(
                         () -> {
                             // in here the environment is temporarily set
                             TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
-                            TableResult result = tEnv.executeSql("SELECT SECRET(\'a\', \'b\');");
+                            TableResult result = tEnv.executeSql("SELECT SECRET('a', 'b');");
                             final List<Row> results = new ArrayList<>();
                             result.collect().forEachRemaining(results::add);
                             assertThat(results).containsExactlyInAnyOrderElementsOf(expectedRows);
@@ -146,11 +141,10 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
         assertThatThrownBy(
                         () -> {
-                            TableResult result = tEnv.executeSql("SELECT SECRET(\'a\', \'b\');");
-                            final List<Row> results = new ArrayList<>();
-                            result.collect().forEachRemaining(results::add);
+                            TableResult result = tEnv.executeSql("SELECT SECRET('a', 'b');");
+                            result.collect().forEachRemaining(System.out::println);
                         })
-                .satisfies(e -> e.getMessage().contains("OPENAI_API_KEY"));
+                .hasStackTraceContaining("OPENAI_API_KEY");
     }
 
     @Test
@@ -158,7 +152,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         this.mockWebServer.start();
         final HttpUrl baseUrl = mockWebServer.url("/v1/chat/completions");
         // value parse from JSON message.content
-        final List<Row> expectedRows = Arrays.asList(Row.of("4"));
+        final List<Row> expectedRows = Collections.singletonList(Row.of("4"));
         // mock openAI completions JSON response
         mockWebServer.enqueue(
                 new MockResponse()
