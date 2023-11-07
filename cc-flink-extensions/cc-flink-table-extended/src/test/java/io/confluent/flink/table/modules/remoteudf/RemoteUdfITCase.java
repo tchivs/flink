@@ -9,13 +9,13 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ForegroundResultPlan;
+import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.utils.Base64SerializationUtil;
 import io.grpc.Server;
@@ -50,12 +50,10 @@ public class RemoteUdfITCase extends AbstractTestBase {
     private static final int SERVER_PORT = 8100;
     private static final String SERVER_TARGET = SERVER_HOST_NAME + ":" + SERVER_PORT;
 
-    private StreamExecutionEnvironment env;
-
     @BeforeEach
     public void before() {
-        this.env = StreamExecutionEnvironment.getExecutionEnvironment();
-        this.env.setParallelism(PARALLELISM);
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(PARALLELISM);
     }
 
     static TableEnvironment getSqlServiceTableEnvironment(
@@ -101,16 +99,10 @@ public class RemoteUdfITCase extends AbstractTestBase {
         // should be enabled by default for JSS service
         final TableEnvironment tableEnv = getJssTableEnvironment();
 
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery(
-                                "SELECT CALL_REMOTE_SCALAR(\'handler\', \'function\', \'STRING\', \'payload\');")
-                        .getQueryOperation();
-
         final ForegroundResultPlan plan =
-                INSTANCE.compileForegroundQuery(
+                ResultPlanUtils.foregroundQueryCustomConfig(
                         tableEnv,
-                        queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -119,16 +111,10 @@ public class RemoteUdfITCase extends AbstractTestBase {
         // SQL service controls remote UDFs using config params
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true, true);
 
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery(
-                                "SELECT CALL_REMOTE_SCALAR(\'handler\',\'function\', \'STRING\', \'payload\');")
-                        .getQueryOperation();
-
         final ForegroundResultPlan plan =
-                INSTANCE.compileForegroundQuery(
+                ResultPlanUtils.foregroundQueryCustomConfig(
                         tableEnv,
-                        queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -138,7 +124,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
         assertThatThrownBy(
                         () ->
                                 tableEnv.executeSql(
-                                        "SELECT CALL_REMOTE_SCALAR(\'handler\',\'function\', \'STRING\', \'payload\');"))
+                                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')"))
                 .message()
                 .contains("No match found for function signature CALL_REMOTE_SCALAR");
     }
@@ -186,7 +172,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
             TableResult result =
                     tEnv.executeSql(
                             String.format(
-                                    "SELECT CALL_REMOTE_SCALAR(\'%s\', \'%s\',\'STRING\', 1, \'test\', 4);",
+                                    "SELECT CALL_REMOTE_SCALAR('%s', '%s', 'STRING', 1, 'test', 4);",
                                     testHandlerName, testFunName));
             final List<Row> results = new ArrayList<>();
             try (CloseableIterator<Row> collect = result.collect()) {
@@ -216,7 +202,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
             TableResult result =
                     tEnv.executeSql(
                             String.format(
-                                    "SELECT CALL_REMOTE_SCALAR_STR(\'%s\', \'%s\');",
+                                    "SELECT CALL_REMOTE_SCALAR_STR('%s', '%s');",
                                     testFunName, payload));
             final List<Row> results = new ArrayList<>();
             try (CloseableIterator<Row> collect = result.collect()) {

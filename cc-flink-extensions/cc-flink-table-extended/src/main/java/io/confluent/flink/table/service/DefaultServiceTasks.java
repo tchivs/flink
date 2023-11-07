@@ -52,6 +52,7 @@ import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
+import io.confluent.flink.table.service.summary.QuerySummary;
 import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 
@@ -331,6 +332,7 @@ class DefaultServiceTasks implements ServiceTasks {
 
         final CompilationResult compilationResult =
                 compile(
+                        true,
                         tableEnvironment,
                         Collections.singletonList(modifyOperation),
                         connectorOptions);
@@ -338,7 +340,8 @@ class DefaultServiceTasks implements ServiceTasks {
         final String operatorId =
                 extractOperatorId(tableEnvironment.getConfig(), compilationResult.execNodeGraph);
 
-        return new ForegroundResultPlan(compilationResult.compiledPlan, operatorId);
+        return new ForegroundResultPlan(
+                compilationResult.querySummary, compilationResult.compiledPlan, operatorId);
     }
 
     /**
@@ -415,9 +418,10 @@ class DefaultServiceTasks implements ServiceTasks {
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions) {
         final CompilationResult compilationResult =
-                compile(tableEnvironment, modifyOperations, connectorOptions);
+                compile(false, tableEnvironment, modifyOperations, connectorOptions);
 
-        return new BackgroundResultPlan(compilationResult.compiledPlan);
+        return new BackgroundResultPlan(
+                compilationResult.querySummary, compilationResult.compiledPlan);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -425,16 +429,20 @@ class DefaultServiceTasks implements ServiceTasks {
     // --------------------------------------------------------------------------------------------
 
     private static class CompilationResult {
+        final QuerySummary querySummary;
         final ExecNodeGraph execNodeGraph;
         final String compiledPlan;
 
-        CompilationResult(ExecNodeGraph execNodeGraph, String compiledPlan) {
+        CompilationResult(
+                QuerySummary querySummary, ExecNodeGraph execNodeGraph, String compiledPlan) {
+            this.querySummary = querySummary;
             this.execNodeGraph = execNodeGraph;
             this.compiledPlan = compiledPlan;
         }
     }
 
     private static CompilationResult compile(
+            boolean isForeground,
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions) {
@@ -443,6 +451,8 @@ class DefaultServiceTasks implements ServiceTasks {
         final StreamPlanner planner = (StreamPlanner) tableEnv.getPlanner();
 
         final List<FlinkPhysicalRel> physicalGraph = optimize(planner, modifyOperations);
+
+        final QuerySummary querySummary = QuerySummary.summarize(isForeground, physicalGraph);
 
         final ExecNodeGraph graph = translate(planner, physicalGraph);
 
@@ -460,7 +470,7 @@ class DefaultServiceTasks implements ServiceTasks {
             throw new IllegalArgumentException("Unable to serialize given ExecNodeGraph", e);
         }
 
-        return new CompilationResult(graph, compiledPlan);
+        return new CompilationResult(querySummary, graph, compiledPlan);
     }
 
     /** Runs the optimizer and returns a list of {@link FlinkPhysicalRel}. */

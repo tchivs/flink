@@ -9,12 +9,12 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ForegroundResultPlan;
+import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import okhttp3.HttpUrl;
@@ -83,14 +83,8 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // should be enabled by default for JSS service
         final TableEnvironment tableEnv = getJssTableEnvironment();
 
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT SECRET('something');").getQueryOperation();
-
         final ForegroundResultPlan plan =
-                INSTANCE.compileForegroundQuery(
-                        tableEnv,
-                        queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                ResultPlanUtils.foregroundQueryCustomConfig(tableEnv, "SELECT SECRET('something')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -99,14 +93,8 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // SQL service controls AI functions using config params
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true);
 
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT SECRET('something');").getQueryOperation();
-
         final ForegroundResultPlan plan =
-                INSTANCE.compileForegroundQuery(
-                        tableEnv,
-                        queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                ResultPlanUtils.foregroundQueryCustomConfig(tableEnv, "SELECT SECRET('something')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 

@@ -46,14 +46,10 @@ public class DefaultServiceTasksTest {
     void testCompileForegroundQuery() throws Exception {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT * FROM (VALUES (1), (2), (3))").getQueryOperation();
 
         final ForegroundResultPlan plan =
-                INSTANCE.compileForegroundQuery(
-                        tableEnv,
-                        queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                ResultPlanUtils.foregroundQuery(tableEnv, "SELECT * FROM (VALUES (1), (2), (3))");
+
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -111,19 +107,12 @@ public class DefaultServiceTasksTest {
     void testConfigurationNonDeterminism() {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(
-                tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
-
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery("SELECT NOW(), COUNT(*) FROM (VALUES (1), (2), (3))")
-                        .getQueryOperation();
 
         assertThatThrownBy(
                         () ->
-                                INSTANCE.compileForegroundQuery(
+                                ResultPlanUtils.foregroundQuery(
                                         tableEnv,
-                                        queryOperation,
-                                        (identifier, execNodeId) -> Collections.emptyMap()))
+                                        "SELECT NOW(), COUNT(*) FROM (VALUES (1), (2), (3))"))
                 .hasMessageContaining("can not satisfy the determinism requirement");
     }
 
@@ -194,19 +183,13 @@ public class DefaultServiceTasksTest {
                 Collections.singletonMap("connector", "datagen"),
                 Collections.emptyMap());
 
-        final QueryOperation queryOperation =
-                tableEnv.sqlQuery(
-                                "SELECT SUM(amount) "
-                                        + "FROM source "
-                                        + "GROUP BY user, TUMBLE(ts, INTERVAL '5' SECOND)")
-                        .getQueryOperation();
-
         assertThatThrownBy(
                         () ->
-                                INSTANCE.compileForegroundQuery(
+                                ResultPlanUtils.foregroundQuery(
                                         tableEnv,
-                                        queryOperation,
-                                        (identifier, execNodeId) -> Collections.emptyMap()))
+                                        "SELECT SUM(amount) "
+                                                + "FROM source "
+                                                + "GROUP BY user, TUMBLE(ts, INTERVAL '5' SECOND)"))
                 .hasMessageContaining(
                         "SQL syntax that calls TUMBLE, HOP, and SESSION in the GROUP BY clause is "
                                 + "not supported. Use table-valued function (TVF) syntax instead "
@@ -235,7 +218,7 @@ public class DefaultServiceTasksTest {
         tableEnv.registerCatalog("my_cat", new GenericInMemoryCatalog("my_cat", "my_db"));
 
         final Map<String, String> resourceOptions =
-                ServiceTasks.INSTANCE.configureEnvironment(
+                INSTANCE.configureEnvironment(
                         tableEnv, validPublicOptions, validPrivateOptions, Service.SQL_SERVICE);
 
         final Map<String, String> expectedResourceOptions = new HashMap<>();
@@ -268,7 +251,7 @@ public class DefaultServiceTasksTest {
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
         // Deprecated keys
-        ServiceTasks.INSTANCE.configureEnvironment(
+        INSTANCE.configureEnvironment(
                 tableEnv,
                 Collections.singletonMap(
                         "catalog", TableConfigOptions.TABLE_CATALOG_NAME.defaultValue()),
@@ -278,7 +261,7 @@ public class DefaultServiceTasksTest {
         // Invalid values
         assertThatThrownBy(
                         () ->
-                                ServiceTasks.INSTANCE.configureEnvironment(
+                                INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap("sql.state-ttl", "INVALID"),
                                         Collections.emptyMap(),
@@ -286,7 +269,7 @@ public class DefaultServiceTasksTest {
                 .hasMessageContaining("Invalid value for option 'sql.state-ttl'.");
         assertThatThrownBy(
                         () ->
-                                ServiceTasks.INSTANCE.configureEnvironment(
+                                INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap(
                                                 "sql.local-time-zone", "UTC-01:00"),
@@ -297,7 +280,7 @@ public class DefaultServiceTasksTest {
         // Invalid key space
         assertThatThrownBy(
                         () ->
-                                ServiceTasks.INSTANCE.configureEnvironment(
+                                INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap("does-not-exist", "42"),
                                         Collections.emptyMap(),
@@ -322,7 +305,7 @@ public class DefaultServiceTasksTest {
         // Reserved catalog name
         assertThatThrownBy(
                         () ->
-                                ServiceTasks.INSTANCE.configureEnvironment(
+                                INSTANCE.configureEnvironment(
                                         tableEnv,
                                         Collections.singletonMap(
                                                 "sql.current-catalog", "<UNKNOWN>"),
