@@ -15,6 +15,8 @@ Copyright 2023 Confluent Inc.
 	<artifactId>cc-flink-failure-enrichers</artifactId>
 	<name>Confluent Flink : Failure Enrichers</name>
 
+	<packaging>jar</packaging>
+
 	<properties>
 		<japicmp.skip>true</japicmp.skip>
 	</properties>
@@ -37,6 +39,7 @@ Copyright 2023 Confluent Inc.
 			<groupId>org.apache.kafka</groupId>
 			<artifactId>kafka-clients</artifactId>
 			<version>${kafka.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 
 		<!-- Test Utils -->
@@ -86,6 +89,12 @@ Copyright 2023 Confluent Inc.
 							<goal>shade</goal>
 						</goals>
 						<configuration>
+							<artifactSet>
+								<includes>
+									<!-- Include all FailureEnricher dependencies here -->
+									<include>org.apache.kafka:*</include>
+								</includes>
+							</artifactSet>
 							<filters>
 								<filter>
 									<!-- Do not copy the signatures in the META-INF folder.
@@ -96,6 +105,14 @@ Copyright 2023 Confluent Inc.
 										<exclude>META-INF/*.DSA</exclude>
 										<exclude>META-INF/*.RSA</exclude>
 									</excludes>
+								</filter>
+								<filter>
+								<artifact>org.apache.kafka:*</artifact>
+								<excludes>
+									<exclude>kafka/kafka-version.properties</exclude>
+									<exclude>LICENSE</exclude>
+									<exclude>NOTICE</exclude>
+								</excludes>
 								</filter>
 							</filters>
 						</configuration>
