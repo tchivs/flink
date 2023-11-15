@@ -10,6 +10,7 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.Catalog;
@@ -243,6 +244,91 @@ public class DefaultServiceTasksTest {
         assertThat(tableEnv.getConfig().getLocalTimeZone()).isEqualTo(ZoneId.of("Europe/Berlin"));
         assertThat(tableEnv.getConfig().get(TABLE_EXEC_SOURCE_IDLE_TIMEOUT))
                 .isEqualTo(Duration.ofMinutes(5));
+    }
+
+    @Test
+    void testEscapingCatalogAndDBConfiguration() {
+        final Map<String, String> validPublicOptions = new HashMap<>();
+        validPublicOptions.put("sql.current-catalog", "`my_cat`");
+        validPublicOptions.put("sql.current-database", "`my_db`");
+
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tableEnv.registerCatalog("my_cat", new GenericInMemoryCatalog("my_cat", "my_db"));
+
+        final Map<String, String> resourceOptions =
+                INSTANCE.configureEnvironment(
+                        tableEnv, validPublicOptions, Collections.emptyMap(), Service.SQL_SERVICE);
+
+        final Map<String, String> expectedResourceOptions = new HashMap<>();
+        expectedResourceOptions.put("confluent.user.sql.current-catalog", "`my_cat`");
+        expectedResourceOptions.put("confluent.user.sql.current-database", "`my_db`");
+
+        assertThat(resourceOptions).isEqualTo(expectedResourceOptions);
+
+        assertThat(tableEnv.getCurrentCatalog()).isEqualTo("my_cat");
+        assertThat(tableEnv.getCurrentDatabase()).isEqualTo("my_db");
+    }
+
+    @Test
+    void testTwoPartDatabaseConfiguration() {
+        final Map<String, String> validPublicOptions = new HashMap<>();
+        validPublicOptions.put("sql.current-database", "`my_cat`.`my_db`");
+
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tableEnv.registerCatalog("my_cat", new GenericInMemoryCatalog("my_cat", "my_db"));
+
+        final Map<String, String> resourceOptions =
+                INSTANCE.configureEnvironment(
+                        tableEnv, validPublicOptions, Collections.emptyMap(), Service.SQL_SERVICE);
+
+        final Map<String, String> expectedResourceOptions = new HashMap<>();
+        expectedResourceOptions.put("confluent.user.sql.current-database", "`my_cat`.`my_db`");
+
+        assertThat(resourceOptions).isEqualTo(expectedResourceOptions);
+
+        assertThat(tableEnv.getCurrentCatalog()).isEqualTo("my_cat");
+        assertThat(tableEnv.getCurrentDatabase()).isEqualTo("my_db");
+    }
+
+    @Test
+    void testInvalidCatalogModulesIdentifier() {
+        final Map<String, String> validPublicOptions = new HashMap<>();
+        validPublicOptions.put("sql.current-catalog", "MODULES abc");
+
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tableEnv.loadModule("abc", new CoreProxyModule());
+
+        assertThatThrownBy(
+                        () ->
+                                INSTANCE.configureEnvironment(
+                                        tableEnv,
+                                        validPublicOptions,
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Wrong format for the current catalog: MODULES abc");
+    }
+
+    @Test
+    void testInvalidThreePartDatabaseIdentifier() {
+        final Map<String, String> validPublicOptions = new HashMap<>();
+        validPublicOptions.put("sql.current-database", "`a`.`b`.`c`");
+
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        assertThatThrownBy(
+                        () ->
+                                INSTANCE.configureEnvironment(
+                                        tableEnv,
+                                        validPublicOptions,
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Wrong format for the current database: `a`.`b`.`c`");
     }
 
     @Test
