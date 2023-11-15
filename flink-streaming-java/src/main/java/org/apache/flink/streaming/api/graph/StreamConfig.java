@@ -516,6 +516,16 @@ public class StreamConfig implements Serializable {
         return config.getBoolean(ExecutionCheckpointingOptions.ENABLE_UNALIGNED, false);
     }
 
+    public void setUnalignedCheckpointsSplittableTimersEnabled(boolean enabled) {
+        config.setBoolean(
+                ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS, enabled);
+    }
+
+    public boolean isUnalignedCheckpointsSplittableTimersEnabled() {
+        return config.getBoolean(
+                ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS, false);
+    }
+
     public boolean isExactlyOnceCheckpointMode() {
         return getCheckpointMode() == CheckpointingMode.EXACTLY_ONCE;
     }
@@ -724,6 +734,16 @@ public class StreamConfig implements Serializable {
             throw new StreamTaskException(
                     "Could not instantiate state key serializer from task config.", e);
         }
+    }
+
+    /**
+     * Returns whether the state key serializer is set in the config. This signals that the operator
+     * is stateful.
+     *
+     * @return true if state key serializer is defined
+     */
+    public boolean hasStateKeySerializer() {
+        return this.config.containsKey(STATE_KEY_SERIALIZER);
     }
 
     // ------------------------------------------------------------------------

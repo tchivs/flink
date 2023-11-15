@@ -18,6 +18,7 @@
 
 package org.apache.flink.streaming.api.environment;
 
+import org.apache.flink.annotation.Experimental;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.docs.Documentation;
@@ -168,6 +169,14 @@ public class ExecutionCheckpointingOptions {
                                                     CheckpointingMode.EXACTLY_ONCE.toString()),
                                             TextElement.code(MAX_CONCURRENT_CHECKPOINTS.key()))
                                     .build());
+
+    @Experimental
+    public static final ConfigOption<Boolean> ENABLE_UNALIGNED_SPLITTABLE_TIMERS =
+            ConfigOptions.key("execution.checkpointing.unaligned.splittable-timers.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Allows unaligned checkpoints to skip timers that are currently being fired.");
 
     public static final ConfigOption<Duration> ALIGNED_CHECKPOINT_TIMEOUT =
             ConfigOptions.key("execution.checkpointing.aligned-checkpoint-timeout")

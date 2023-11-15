@@ -76,6 +76,16 @@ public class StreamOperatorFactoryUtil {
             processingTimeService = null;
         }
 
+        if (configuration.isUnalignedCheckpointsEnabled()
+                && configuration.isUnalignedCheckpointsSplittableTimersEnabled()
+                && configuration.hasStateKeySerializer()) {
+            // In case we support unaligned checkpoints and the operator is stateful, we support
+            // "splittable timers".
+            output =
+                    new WatermarkHoldingOutput<>(
+                            output, mailboxExecutor, () -> containingTask.hasMail());
+        }
+
         // TODO: what to do with ProcessingTimeServiceAware?
         OP op =
                 operatorFactory.createStreamOperator(

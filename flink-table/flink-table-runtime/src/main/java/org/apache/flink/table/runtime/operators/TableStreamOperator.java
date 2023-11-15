@@ -24,6 +24,7 @@ import org.apache.flink.streaming.api.TimerService;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.InternalTimerService;
+import org.apache.flink.streaming.api.operators.WatermarkHoldingOutput;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
@@ -54,8 +55,12 @@ public abstract class TableStreamOperator<OUT> extends AbstractStreamOperator<OU
 
     @Override
     public void processWatermark(Watermark mark) throws Exception {
-        super.processWatermark(mark);
         currentWatermark = mark.getTimestamp();
+        if (getTimeServiceManager().isPresent()) {
+            WatermarkHoldingOutput.emitWatermarkInsideMailbox(this, mark);
+        } else {
+            output.emitWatermark(mark);
+        }
     }
 
     /** Compute memory size from memory faction. */

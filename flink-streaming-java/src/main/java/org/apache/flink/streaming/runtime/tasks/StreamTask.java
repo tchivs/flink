@@ -893,6 +893,11 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
     }
 
     @VisibleForTesting
+    public boolean runSingleMailboxLoop() throws Exception {
+        return mailboxProcessor.runSingleMailboxLoop();
+    }
+
+    @VisibleForTesting
     public boolean runMailboxStep() throws Exception {
         return mailboxProcessor.runMailboxStep();
     }
@@ -1062,6 +1067,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
     public MailboxExecutorFactory getMailboxExecutorFactory() {
         return this.mailboxProcessor::getMailboxExecutor;
+    }
+
+    public boolean hasMail() {
+        return mailboxProcessor.hasMail();
     }
 
     private boolean taskIsAvailable() {

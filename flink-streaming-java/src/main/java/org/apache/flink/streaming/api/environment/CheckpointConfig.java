@@ -545,6 +545,17 @@ public class CheckpointConfig implements java.io.Serializable {
         return configuration.get(ExecutionCheckpointingOptions.ENABLE_UNALIGNED);
     }
 
+    @Experimental
+    public void enableUnalignedCheckpointsSplittableTimers(boolean enabled) {
+        configuration.set(
+                ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS, enabled);
+    }
+
+    @Experimental
+    public boolean isUnalignedCheckpointsSplittableTimersEnabled() {
+        return configuration.get(ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS);
+    }
+
     /**
      * Only relevant if {@link #isUnalignedCheckpointsEnabled} is enabled.
      *
