@@ -121,6 +121,12 @@ Copyright 2023 Confluent Inc.
 		</dependency>
 
 		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+			<version>${protoc.version}</version>
+		</dependency>
+
+		<dependency>
 			<groupId>javax.annotation</groupId>
 			<artifactId>javax.annotation-api</artifactId>
 			<version>${annotation-api.version}</version>
