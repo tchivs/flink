@@ -24,10 +24,7 @@ public class RemoteUdfModule implements Module {
                 Stream.of(
                                 new AbstractMap.SimpleEntry<>(
                                         RemoteScalarFunction.NAME,
-                                        new RemoteScalarFunction(config)),
-                                new AbstractMap.SimpleEntry<>(
-                                        RemoteStringScalarFunction.NAME,
-                                        new RemoteStringScalarFunction(config)))
+                                        new RemoteScalarFunction(config)))
                         .collect(
                                 Collectors.toMap(
                                         AbstractMap.SimpleEntry::getKey,

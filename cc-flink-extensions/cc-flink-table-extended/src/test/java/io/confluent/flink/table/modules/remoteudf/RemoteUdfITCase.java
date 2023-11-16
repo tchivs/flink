@@ -5,10 +5,13 @@
 package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.data.binary.BinaryStringData;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
@@ -16,10 +19,7 @@ import org.apache.flink.util.CloseableIterator;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
-import io.confluent.flink.table.utils.Base64SerializationUtil;
 import io.grpc.Server;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
@@ -89,9 +90,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), SERVER_TARGET);
         final RemoteUdfModule remoteUdfModule = new RemoteUdfModule(confMap);
-        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(2);
+        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(1);
         assertThat(remoteUdfModule.getFunctionDefinition("CALL_REMOTE_SCALAR")).isPresent();
-        assertThat(remoteUdfModule.getFunctionDefinition("CALL_REMOTE_SCALAR_STR")).isPresent();
     }
 
     @Test
@@ -148,23 +148,23 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
     @Test
     public void testRemoteUdfGateway() throws Exception {
-        testRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_HANDLER, "funName");
-        testStringRemoteUdfGatewayInternal(ArgsConcatUdfGateway.TEST_HANDLER_STR);
+        testRemoteUdfGatewayInternal(TestUdfGateway.IDENTIFY_FUNCTION_ID, "funName");
     }
 
     @Test
     public void testRemoteUdfGatewayFailOnPersistentError() {
         assertThatThrownBy(() -> testRemoteUdfGatewayInternal("NoSuchHandler", "NoFunc"))
-                .hasStackTraceContaining("Unknown handler");
+                .hasStackTraceContaining("errorCode 1: Unknown function id: NoSuchHandler");
     }
 
     private void testRemoteUdfGatewayInternal(String testHandlerName, String testFunName)
             throws Exception {
         Server server = null;
         try {
+            TestUdfGateway testUdfGateway = new TestUdfGateway();
             server =
                     NettyServerBuilder.forAddress(new InetSocketAddress("localhost", SERVER_PORT))
-                            .addService(new ArgsConcatUdfGateway())
+                            .addService(testUdfGateway)
                             .build()
                             .start();
 
@@ -181,36 +181,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
             Assertions.assertEquals(1, results.size());
             Row row = results.get(0);
             Assertions.assertEquals("[1, test, 4]", row.getField(0));
-        } finally {
-            if (server != null) {
-                server.shutdownNow();
-            }
-        }
-    }
-
-    private void testStringRemoteUdfGatewayInternal(String testFunName) throws Exception {
-        String payload = "test_payload";
-        Server server = null;
-        try {
-            server =
-                    NettyServerBuilder.forAddress(new InetSocketAddress("localhost", SERVER_PORT))
-                            .addService(new ArgsConcatUdfGateway())
-                            .build()
-                            .start();
-
-            final TableEnvironment tEnv = getSqlServiceTableEnvironment(true, true);
-            TableResult result =
-                    tEnv.executeSql(
-                            String.format(
-                                    "SELECT CALL_REMOTE_SCALAR_STR('%s', '%s');",
-                                    testFunName, payload));
-            final List<Row> results = new ArrayList<>();
-            try (CloseableIterator<Row> collect = result.collect()) {
-                collect.forEachRemaining(results::add);
-            }
-            Assertions.assertEquals(1, results.size());
-            Row row = results.get(0);
-            Assertions.assertEquals(row.getField(0), payload);
+            Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
         } finally {
             if (server != null) {
                 server.shutdownNow();
@@ -219,60 +190,113 @@ public class RemoteUdfITCase extends AbstractTestBase {
     }
 
     /** Mock implementation of the UDF gateway. */
-    private static class ArgsConcatUdfGateway extends UdfGatewayGrpc.UdfGatewayImplBase {
+    private static class TestUdfGateway extends UdfGatewayGrpc.UdfGatewayImplBase {
 
-        /** The mock gateway only knows this Udf name. */
-        static final String TEST_HANDLER = "test_fun";
-
-        static final String TEST_HANDLER_STR = "test_fun_str";
+        static final String IDENTIFY_FUNCTION_ID = "IdentityFunction";
+        final Map<String, RemoteUdfSpec> instanceToFuncIds = new HashMap<>();
 
         @Override
         public void invoke(
                 UdfGatewayOuterClass.InvokeRequest request,
                 StreamObserver<UdfGatewayOuterClass.InvokeResponse> responseObserver) {
-            try {
-                if (TEST_HANDLER.equals(request.getFuncName())) {
-                    String payload = request.getPayload();
-                    String[] payloadParts = payload.substring(0, payload.length() - 1).split(" ");
-                    String responsePayload =
-                            Base64SerializationUtil.serialize(
-                                    (oos) ->
-                                            oos.writeObject(
-                                                    Base64SerializationUtil.deserialize(
-                                                            payloadParts[1],
-                                                            (ois) -> {
-                                                                Object o = ois.readObject();
-                                                                if (o.getClass().isArray()) {
-                                                                    return Arrays.toString(
-                                                                            (Object[]) o);
-                                                                }
-                                                                return String.valueOf(o);
-                                                            })));
 
-                    UdfGatewayOuterClass.InvokeResponse response =
-                            UdfGatewayOuterClass.InvokeResponse.newBuilder()
-                                    .setPayload('"' + responsePayload + '"')
-                                    .build();
-                    responseObserver.onNext(response);
-                    responseObserver.onCompleted();
-                } else if (TEST_HANDLER_STR.equals(request.getFuncName())) {
-                    {
-                        UdfGatewayOuterClass.InvokeResponse response =
-                                UdfGatewayOuterClass.InvokeResponse.newBuilder()
-                                        .setPayload(request.getPayload())
-                                        .build();
-                        responseObserver.onNext(response);
-                        responseObserver.onCompleted();
-                    }
+            UdfGatewayOuterClass.InvokeResponse.Builder builder =
+                    UdfGatewayOuterClass.InvokeResponse.newBuilder();
+
+            try {
+                RemoteUdfSpec remoteUdfSpec = instanceToFuncIds.get(request.getFuncInstanceId());
+
+                if (remoteUdfSpec != null) {
+                    List<TypeSerializer<Object>> argumentSerializers =
+                            remoteUdfSpec.createArgumentSerializers();
+                    RemoteUdfSerialization serialization =
+                            new RemoteUdfSerialization(
+                                    remoteUdfSpec.createReturnTypeSerializer(),
+                                    argumentSerializers);
+                    Object[] args = new Object[argumentSerializers.size()];
+                    serialization.deserializeArguments(
+                            request.getPayload().asReadOnlyByteBuffer(), args);
+                    builder.setPayload(
+                            serialization.serializeReturnValue(
+                                    BinaryStringData.fromString(Arrays.asList(args).toString())));
                 } else {
-                    responseObserver.onError(
-                            new StatusRuntimeException(
-                                    Status.ABORTED.withDescription(
-                                            "Unknown handler: " + request.getFuncName())));
+                    throw new Exception("Unknown instance: " + request.getFuncInstanceId());
                 }
+            } catch (Exception ex) {
+                builder.setError(
+                        UdfGatewayOuterClass.Error.newBuilder()
+                                .setCode(1)
+                                .setMessage(ex.getMessage())
+                                .build());
+            }
+            responseObserver.onNext(builder.build());
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void createInstances(
+                UdfGatewayOuterClass.CreateInstancesRequest request,
+                StreamObserver<UdfGatewayOuterClass.CreateInstancesResponse> responseObserver) {
+
+            try {
+                UdfGatewayOuterClass.CreateInstancesResponse.Builder builder =
+                        UdfGatewayOuterClass.CreateInstancesResponse.newBuilder();
+
+                if (IDENTIFY_FUNCTION_ID.equals(request.getFuncId())) {
+
+                    DataInputDeserializer in =
+                            new DataInputDeserializer(request.getPayload().asReadOnlyByteBuffer());
+
+                    RemoteUdfSpec udfSpec =
+                            RemoteUdfSpec.deserialize(
+                                    in, Thread.currentThread().getContextClassLoader());
+
+                    List<String> newInstanceIds = new ArrayList<>(request.getNumInstances());
+                    for (int i = 0; i < request.getNumInstances(); ++i) {
+                        String uuid = UUID.randomUUID().toString();
+                        newInstanceIds.add(uuid);
+                        instanceToFuncIds.put(uuid, udfSpec);
+                    }
+                    builder.addAllFuncInstanceIds(newInstanceIds);
+                } else {
+                    builder.setError(
+                            UdfGatewayOuterClass.Error.newBuilder()
+                                    .setCode(1)
+                                    .setMessage("Unknown function id: " + request.getFuncId())
+                                    .build());
+                }
+
+                responseObserver.onNext(builder.build());
+                responseObserver.onCompleted();
             } catch (Exception ex) {
                 responseObserver.onError(ex);
             }
+        }
+
+        @Override
+        public void deleteInstances(
+                UdfGatewayOuterClass.DeleteInstancesRequest request,
+                StreamObserver<UdfGatewayOuterClass.DeleteInstancesResponse> responseObserver) {
+
+            List<String> error = new ArrayList<>(0);
+            for (String instanceIdToDelete : request.getFuncInstanceIdsList()) {
+                if (instanceToFuncIds.remove(instanceIdToDelete) == null) {
+                    error.add(instanceIdToDelete);
+                }
+            }
+
+            UdfGatewayOuterClass.DeleteInstancesResponse.Builder builder =
+                    UdfGatewayOuterClass.DeleteInstancesResponse.newBuilder();
+            if (!error.isEmpty()) {
+                builder.setError(
+                        UdfGatewayOuterClass.Error.newBuilder()
+                                .setCode(1)
+                                .setMessage(error.toString())
+                                .build());
+            }
+
+            responseObserver.onNext(builder.build());
+            responseObserver.onCompleted();
         }
     }
 }

@@ -6,17 +6,107 @@ syntax = "proto3";
 
 option java_package = "io.confluent.flink.table.modules.remoteudf";
 
+option go_package = "github.com/confluentinc/udf-gateway/protos";
+
 package udf.gateway;
 
 service UdfGateway {
+  /// Udf Runtime
   rpc Invoke(InvokeRequest) returns (InvokeResponse) {}
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+
+  /// Udf Lifecycle
+  rpc CreateInstances(CreateInstancesRequest) returns (CreateInstancesResponse) {}
+  rpc DeleteInstances(DeleteInstancesRequest) returns (DeleteInstancesResponse) {}
+
+  /// Udf Registration
+  rpc CreateFunction(CreateFunctionRequest) returns (CreateFunctionResponse) {}
+  rpc ListFunctions(ListFunctionsRequest) returns (ListFunctionsResponse) {}
+  rpc DeleteFunction(DeleteFunctionRequest) returns (DeleteFunctionResponse) {}
+}
+
+message Error {
+  int32 code = 1;
+  string message = 2;
+  bytes payload = 3;
 }
 
 message InvokeRequest {
-  string func_name = 1;
-  string payload = 2;
+  string func_instance_id = 1;
+  bytes payload = 2;
 }
 
 message InvokeResponse {
-  string payload = 1;
+  Error error = 1;
+  string func_instance_id = 2;
+  bytes payload = 3;
+}
+
+message ResourceClaims {
+  string cpu = 1;   // in milli-cores, default to 100m CPU
+  string memory = 2; // in bytes, default to 128MB
+  string heap_size = 3;  // 64MB
+}
+
+message CreateInstancesRequest {
+  string func_id = 1;   // can be used to derive: func_name, func_uri, etc
+  int32 num_instances = 2;
+  bytes payload = 3;
+  ResourceClaims resource_claims = 4;
+}
+
+message CreateInstancesResponse {
+  Error error = 1;
+  repeated string func_instance_ids = 2;
+}
+
+message DeleteInstancesRequest {
+  string func_id = 1;
+  repeated string func_instance_ids = 2;   // if empty list, delete all registered instances; otherwise, delete only the specified instances
+  bytes payload = 3;
+}
+
+message DeleteInstancesResponse {
+  Error error = 1;
+}
+
+message HeartbeatRequest {
+  string func_id = 1;
+  repeated string func_instance_ids = 2;   // if empty list, heartbeat all registered instances; otherwise, heartbeat only the specified instances
+}
+
+message HeartbeatResponse {
+  Error error = 1;
+  map<string, Error> instance_errors = 2;
+}
+
+message UdfFunction {
+  string id = 1;
+  string download_url = 2;
+  string handler_classname = 3;
+}
+
+message CreateFunctionRequest {
+  UdfFunction udf_func = 1;
+}
+
+message CreateFunctionResponse {
+  Error error = 1;
+  UdfFunction udf_func = 2;
+}
+
+message ListFunctionsRequest {
+}
+
+message ListFunctionsResponse {
+  Error error = 1;
+  repeated UdfFunction udf_funcs = 2;
+}
+
+message DeleteFunctionRequest {
+  string func_id = 1;
+}
+
+message DeleteFunctionResponse {
+  Error error = 1;
 }

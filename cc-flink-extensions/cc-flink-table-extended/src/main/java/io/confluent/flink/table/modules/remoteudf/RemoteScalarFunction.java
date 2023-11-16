@@ -5,32 +5,32 @@
 package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.table.catalog.DataTypeFactory;
+import org.apache.flink.table.functions.FunctionContext;
+import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.functions.SpecializedFunction;
 import org.apache.flink.table.functions.UserDefinedFunction;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.inference.CallContext;
 import org.apache.flink.table.types.inference.TypeInference;
+import org.apache.flink.table.types.inference.strategies.AnyArgumentBridgeToInternalTypeStrategy;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 
-import io.confluent.flink.table.utils.Base64SerializationUtil;
+import io.confluent.flink.table.service.ServiceTasksOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
-import static org.apache.flink.table.types.inference.InputTypeStrategies.ANY;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.logical;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.varyingSequence;
 
 /** Proof-of-concept implementation for remote scalar UDF. */
-public class RemoteScalarFunction extends RemoteScalarFunctionBase implements SpecializedFunction {
+public class RemoteScalarFunction extends ScalarFunction implements SpecializedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(RemoteScalarFunction.class);
 
@@ -40,61 +40,76 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
     /** Number of metadata arguments to this function. */
     private static final int NUM_META_ARGS = 3;
 
-    private final List<DataType> argumentTypes;
-    private final List<Class<?>> argumentClasses;
-    private final String callerUUID;
+    /** The UDF service gateway target address (e.g. localhost:5001). */
+    private final String udfGatewayTarget;
 
-    private String serializedArgumentClasses;
+    /** The specification of the remote UDF, e.g. class name, argument and return value types. */
+    @Nullable private final RemoteUdfSpec remoteUdfSpec;
+
+    /** Runtime to invoke the remote function. */
+    private transient RemoteUdfRuntime remoteUdfRuntime;
 
     public RemoteScalarFunction(Map<String, String> config) {
-        super(config);
-        this.argumentTypes = new ArrayList<>();
-        this.argumentClasses = new ArrayList<>();
-        this.callerUUID = UUID.randomUUID().toString();
+        LOG.info("RemoteScalarFunction config: {}", config);
+        String udfGatewayTarget = config.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key());
+
+        if (udfGatewayTarget != null && !udfGatewayTarget.isEmpty()) {
+            this.udfGatewayTarget = udfGatewayTarget;
+        } else {
+            // TODO: remove hardcoded proxy
+            this.udfGatewayTarget = "udf-proxy.udf-proxy:50051";
+        }
+
+        this.remoteUdfSpec = null;
+    }
+
+    private RemoteScalarFunction(String udfGatewayTarget, RemoteUdfSpec remoteUdfSpec) {
+        this.udfGatewayTarget = udfGatewayTarget;
+        this.remoteUdfSpec = remoteUdfSpec;
     }
 
     /**
      * Calls the given remote function of given return type with the given payload and returns the
      * return value.
      *
-     * @param handler name of the remote function to call.
+     * @param functionId registration id of the remote function to call.
      * @param functionClass the name of the function class to call.
      * @param rtype return type of the remote function to call (INT, DOUBLE, STRING).
      * @param args arguments for the remote function call.
      * @return the return value of the remote UDF execution.
      */
-    public @Nullable Object eval(String handler, String functionClass, String rtype, Object... args)
+    public @Nullable Object eval(
+            String functionId, String functionClass, String rtype, Object... args)
             throws Exception {
 
         LOG.debug(
                 "Invoking remote scalar function. Handler: {}, Function: {}, Rtype: {}, Args: {}",
-                handler,
+                functionId,
                 functionClass,
                 rtype,
                 args);
 
-        String encodedArgs = Base64SerializationUtil.serialize((oos) -> oos.writeObject(args));
+        return remoteUdfRuntime.callRemoteUdf(args);
+    }
 
-        String payload =
-                '"'
-                        + callerUUID
-                        + " "
-                        + encodedArgs
-                        + " "
-                        + functionClass
-                        + " "
-                        + serializedArgumentClasses
-                        + '"';
+    @Override
+    public void open(FunctionContext context) throws Exception {
+        super.open(context);
 
-        UdfGatewayOuterClass.InvokeRequest request =
-                UdfGatewayOuterClass.InvokeRequest.newBuilder()
-                        .setFuncName(handler)
-                        .setPayload(payload)
-                        .build();
-        UdfGatewayOuterClass.InvokeResponse response = getUdfGateway().invoke(request);
-        String result = response.getPayload();
-        result = result.substring(1, result.length() - 1);
-        return Base64SerializationUtil.deserialize(result, ObjectInputStream::readObject);
+        // Open should never be called twice, but just in case...
+        if (this.remoteUdfRuntime != null) {
+            remoteUdfRuntime.close();
+        }
+
+        this.remoteUdfRuntime = RemoteUdfRuntime.open(udfGatewayTarget, remoteUdfSpec);
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (remoteUdfRuntime != null) {
+            this.remoteUdfRuntime.close();
+        }
+        super.close();
     }
 
     @Override
@@ -107,7 +122,8 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
                                 logical(LogicalTypeFamily.CHARACTER_STRING),
-                                ANY))
+                                // ANY type, bridged to internal type
+                                new AnyArgumentBridgeToInternalTypeStrategy()))
                 .outputTypeStrategy(
                         callContext -> {
                             if (!callContext.isArgumentLiteral(2)
@@ -118,33 +134,33 @@ public class RemoteScalarFunction extends RemoteScalarFunctionBase implements Sp
                             // return a data type based on a literal
                             final String literal =
                                     callContext.getArgumentValue(2, String.class).orElse("STRING");
-                            return Optional.of(typeFactory.createDataType(literal));
+                            return Optional.of(typeFactory.createDataType(literal))
+                                    .map(DataType::toInternal);
                         })
                 .build();
     }
 
     @Override
     public UserDefinedFunction specialize(SpecializedContext context) {
-        this.argumentTypes.clear();
-        this.argumentClasses.clear();
-        List<DataType> argumentDataTypes = context.getCallContext().getArgumentDataTypes();
+        CallContext callContext = context.getCallContext();
+        List<DataType> ctxArgumentTypeList = callContext.getArgumentDataTypes();
+
+        int size = ctxArgumentTypeList.size() - NUM_META_ARGS;
+        List<DataType> argumentTypes = new ArrayList<>(size);
+        String functionId = callContext.getArgumentValue(0, String.class).get();
+        String functionClass = callContext.getArgumentValue(1, String.class).get();
+        DataType returnType = callContext.getOutputDataType().get();
+
         // Skip the meta arguments, they are not part of the payload and their data types don't
         // matter.
-        for (int i = NUM_META_ARGS; i < argumentDataTypes.size(); ++i) {
-            argumentTypes.add(argumentDataTypes.get(i));
+        for (int i = NUM_META_ARGS; i < ctxArgumentTypeList.size(); ++i) {
+            argumentTypes.add(ctxArgumentTypeList.get(i));
         }
 
-        this.argumentTypes.stream()
-                .map(DataType::getConversionClass)
-                .collect(Collectors.toCollection(() -> this.argumentClasses));
-        try {
-            this.serializedArgumentClasses =
-                    Base64SerializationUtil.serialize((oos) -> oos.writeObject(argumentClasses));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        // TODO: With this information we can also setup proper SQL type serialization instead of
-        //  using Java serialization.
-        return this;
+        RemoteUdfSpec remoteUdfSpec =
+                new RemoteUdfSpec(functionId, functionClass, returnType, argumentTypes);
+
+        // Return the specialized instance
+        return new RemoteScalarFunction(udfGatewayTarget, remoteUdfSpec);
     }
 }
