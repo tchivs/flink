@@ -19,6 +19,8 @@
 package org.apache.flink.streaming.runtime.operators.sink;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.connector.sink2.CommitterContext;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
@@ -26,6 +28,7 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -65,11 +68,7 @@ public final class CommitterOperatorFactory<CommT>
                             processingTimeService,
                             sink.getCommittableSerializer(),
                             sink.createCommitter(
-                                    () ->
-                                            parameters
-                                                    .getContainingTask()
-                                                    .getEnvironment()
-                                                    .getJobID()),
+                                    new CommitterContextImpl(parameters.getContainingTask())),
                             sink instanceof WithPostCommitTopology,
                             isBatchMode,
                             isCheckpointingEnabled);
@@ -90,5 +89,25 @@ public final class CommitterOperatorFactory<CommT>
     @SuppressWarnings("rawtypes")
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
         return CommitterOperator.class;
+    }
+
+    private static final class CommitterContextImpl implements CommitterContext {
+        private final JobID jobID;
+        private final int subtaskId;
+
+        private CommitterContextImpl(StreamTask<?, ?> containingTask) {
+            this.jobID = containingTask.getEnvironment().getJobID();
+            this.subtaskId = containingTask.getIndexInSubtaskGroup();
+        }
+
+        @Override
+        public JobID getJobID() {
+            return jobID;
+        }
+
+        @Override
+        public int getSubtaskId() {
+            return subtaskId;
+        }
     }
 }

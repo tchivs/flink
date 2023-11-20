@@ -15,4 +15,6 @@ public interface CommitterContext {
 
     /** Gets the job id of this job. */
     JobID getJobID();
+
+    int getSubtaskId();
 }
