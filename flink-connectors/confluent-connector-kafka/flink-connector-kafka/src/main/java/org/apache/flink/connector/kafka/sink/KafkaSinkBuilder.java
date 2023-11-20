@@ -27,6 +27,8 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
@@ -70,6 +72,7 @@ public class KafkaSinkBuilder<IN> {
     private static final int MAXIMUM_PREFIX_BYTES = 64000;
 
     private DeliveryGuarantee deliveryGuarantee = DeliveryGuarantee.NONE;
+    private @Nullable String clientIdPrefix = null;
     private String transactionalIdPrefix = "kafka-sink";
 
     private final Properties kafkaProducerConfig;
@@ -181,6 +184,18 @@ public class KafkaSinkBuilder<IN> {
     }
 
     /**
+     * Sets a prefix for client ids used by Kafka producer clients. All clients on the same subtask
+     * of the KafkaSink will create their client id to be {@code clientIdPrefix-subtaskId}.
+     *
+     * @param clientIdPrefix the prefix for client ids to use.
+     * @return
+     */
+    public KafkaSinkBuilder<IN> setClientIdPrefix(String clientIdPrefix) {
+        this.clientIdPrefix = checkNotNull(clientIdPrefix, "clientIdPrefix");
+        return this;
+    }
+
+    /**
      * Sets the Kafka bootstrap servers.
      *
      * @param bootstrapServers a comma separated list of valid URIs to reach the Kafka broker
@@ -210,6 +225,10 @@ public class KafkaSinkBuilder<IN> {
     public KafkaSink<IN> build() {
         sanityCheck();
         return new KafkaSink<>(
-                deliveryGuarantee, kafkaProducerConfig, transactionalIdPrefix, recordSerializer);
+                deliveryGuarantee,
+                kafkaProducerConfig,
+                clientIdPrefix,
+                transactionalIdPrefix,
+                recordSerializer);
     }
 }

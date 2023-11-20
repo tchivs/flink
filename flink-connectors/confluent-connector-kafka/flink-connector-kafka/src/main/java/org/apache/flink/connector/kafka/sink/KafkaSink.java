@@ -27,6 +27,10 @@ import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
+import org.apache.kafka.clients.producer.ProducerConfig;
+
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -66,15 +70,18 @@ public class KafkaSink<IN>
 
     private final KafkaRecordSerializationSchema<IN> recordSerializer;
     private final Properties kafkaProducerConfig;
+    private final @Nullable String clientIdPrefix;
     private final String transactionalIdPrefix;
 
     KafkaSink(
             DeliveryGuarantee deliveryGuarantee,
             Properties kafkaProducerConfig,
+            @Nullable String clientIdPrefix,
             String transactionalIdPrefix,
             KafkaRecordSerializationSchema<IN> recordSerializer) {
         this.deliveryGuarantee = deliveryGuarantee;
         this.kafkaProducerConfig = kafkaProducerConfig;
+        this.clientIdPrefix = clientIdPrefix;
         this.transactionalIdPrefix = transactionalIdPrefix;
         this.recordSerializer = recordSerializer;
     }
@@ -100,6 +107,7 @@ public class KafkaSink<IN>
     public Committer<KafkaCommittable> createCommitter(CommitterContext committerContext)
             throws IOException {
         addCredentialsToProperties(committerContext.getJobID(), kafkaProducerConfig);
+        maybeAddClientIdToProperties(committerContext.getSubtaskId(), kafkaProducerConfig);
 
         return new KafkaCommitter(kafkaProducerConfig);
     }
@@ -114,6 +122,7 @@ public class KafkaSink<IN>
     @Override
     public KafkaWriter<IN> createWriter(InitContext context) throws IOException {
         addCredentialsToProperties(context.getJobId(), kafkaProducerConfig);
+        maybeAddClientIdToProperties(context.getSubtaskId(), kafkaProducerConfig);
 
         return new KafkaWriter<IN>(
                 deliveryGuarantee,
@@ -130,6 +139,7 @@ public class KafkaSink<IN>
     public KafkaWriter<IN> restoreWriter(
             InitContext context, Collection<KafkaWriterState> recoveredState) throws IOException {
         addCredentialsToProperties(context.getJobId(), kafkaProducerConfig);
+        maybeAddClientIdToProperties(context.getSubtaskId(), kafkaProducerConfig);
 
         return new KafkaWriter<>(
                 deliveryGuarantee,
@@ -150,5 +160,16 @@ public class KafkaSink<IN>
     @VisibleForTesting
     protected Properties getKafkaProducerConfig() {
         return kafkaProducerConfig;
+    }
+
+    private void maybeAddClientIdToProperties(int subtaskId, Properties properties) {
+        if (clientIdPrefix != null) {
+            properties.setProperty(
+                    ProducerConfig.CLIENT_ID_CONFIG, createClientId(clientIdPrefix, subtaskId));
+        }
+    }
+
+    private static String createClientId(String prefix, int subtaskIndex) {
+        return prefix + "-" + subtaskIndex;
     }
 }
