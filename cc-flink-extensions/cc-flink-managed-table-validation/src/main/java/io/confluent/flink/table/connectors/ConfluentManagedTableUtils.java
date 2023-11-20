@@ -42,6 +42,7 @@ import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_BOOTSTRAP_SERVERS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CLIENT_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CONSUMER_GROUP_ID;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CREDENTIALS_SOURCE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_LOGICAL_CLUSTER_ID;
@@ -139,6 +140,7 @@ public class ConfluentManagedTableUtils {
                 properties,
                 startupOptions,
                 boundedOptions,
+                options.getOptional(CONFLUENT_KAFKA_CLIENT_ID_PREFIX).orElse(null),
                 options.getOptional(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
                 tableMode,
                 tableIdentifier,
@@ -155,6 +157,7 @@ public class ConfluentManagedTableUtils {
         final Properties properties;
         final StartupOptions startupOptions;
         final BoundedOptions boundedOptions;
+        final @Nullable String clientIdPrefix;
         final @Nullable String transactionalIdPrefix;
         final ManagedChangelogMode tableMode;
         final String tableIdentifier;
@@ -169,6 +172,7 @@ public class ConfluentManagedTableUtils {
                 Properties properties,
                 StartupOptions startupOptions,
                 BoundedOptions boundedOptions,
+                @Nullable String clientIdPrefix,
                 @Nullable String transactionalIdPrefix,
                 ManagedChangelogMode tableMode,
                 String tableIdentifier,
@@ -181,6 +185,7 @@ public class ConfluentManagedTableUtils {
             this.properties = properties;
             this.startupOptions = startupOptions;
             this.boundedOptions = boundedOptions;
+            this.clientIdPrefix = clientIdPrefix;
             this.transactionalIdPrefix = transactionalIdPrefix;
             this.tableMode = tableMode;
             this.tableIdentifier = tableIdentifier;
@@ -204,6 +209,7 @@ public class ConfluentManagedTableUtils {
                     && properties.equals(that.properties)
                     && startupOptions.equals(that.startupOptions)
                     && boundedOptions.equals(that.boundedOptions)
+                    && Objects.equals(clientIdPrefix, that.clientIdPrefix)
                     && Objects.equals(transactionalIdPrefix, that.transactionalIdPrefix)
                     && tableMode == that.tableMode
                     && tableIdentifier.equals(that.tableIdentifier)
@@ -220,6 +226,7 @@ public class ConfluentManagedTableUtils {
                             properties,
                             startupOptions,
                             boundedOptions,
+                            clientIdPrefix,
                             transactionalIdPrefix,
                             tableMode,
                             tableIdentifier,

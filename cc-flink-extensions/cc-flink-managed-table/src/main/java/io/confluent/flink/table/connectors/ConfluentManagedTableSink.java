@@ -97,6 +97,10 @@ public class ConfluentManagedTableSink
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
         final KafkaSinkBuilder<RowData> sinkBuilder = KafkaSink.builder();
 
+        if (parameters.clientIdPrefix != null) {
+            sinkBuilder.setClientIdPrefix(parameters.clientIdPrefix);
+        }
+
         // For upsert mode, regardless whether Kafka or the format performs the upsert, upsert
         // mode is lenient for duplicates. Other modes need exactly once.
         if (parameters.tableMode != ManagedChangelogMode.UPSERT

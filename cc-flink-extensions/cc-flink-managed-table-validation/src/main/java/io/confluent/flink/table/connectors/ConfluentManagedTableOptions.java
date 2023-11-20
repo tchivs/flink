@@ -249,6 +249,12 @@ public class ConfluentManagedTableOptions {
                     .noDefaultValue()
                     .withDescription("Forwarded as 'properties.group.id' for CC.");
 
+    public static final ConfigOption<String> CONFLUENT_KAFKA_CLIENT_ID_PREFIX =
+            ConfigOptions.key(PRIVATE_PREFIX + "kafka.client-id-prefix")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Prefix for 'client.id' for CC.");
+
     public static final ConfigOption<String> CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX =
             ConfigOptions.key(PRIVATE_PREFIX + "kafka.transactional-id-prefix")
                     .stringType()

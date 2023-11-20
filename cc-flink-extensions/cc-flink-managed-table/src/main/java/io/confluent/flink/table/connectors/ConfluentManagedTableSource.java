@@ -334,6 +334,10 @@ public class ConfluentManagedTableSource
 
         kafkaSourceBuilder.setProperties(parameters.properties).setDeserializer(kafkaDeserializer);
 
+        if (parameters.clientIdPrefix != null) {
+            kafkaSourceBuilder.setClientIdPrefix(parameters.clientIdPrefix);
+        }
+
         return kafkaSourceBuilder.build();
     }
 
