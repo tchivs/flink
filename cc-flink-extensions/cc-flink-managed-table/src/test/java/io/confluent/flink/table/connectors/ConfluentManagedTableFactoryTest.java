@@ -117,6 +117,10 @@ public class ConfluentManagedTableFactoryTest {
                                 .containsEntry("bootstrap.servers", "localhost:8080")
                                 .containsEntry("confluent.kafka.logical.cluster.id", "lkc-4242")
                                 .containsEntry("group.id", "generated_consumer_id_4242");
+                        assertThat(parameters.sourceClientIdPrefix)
+                                .isEqualTo("generated_client_id_4242-source");
+                        assertThat(parameters.sinkClientIdPrefix)
+                                .isEqualTo("generated_client_id_4242-sink");
                         assertThat(parameters.transactionalIdPrefix)
                                 .isEqualTo("generated_transact_id_4242");
                     };
@@ -136,12 +140,15 @@ public class ConfluentManagedTableFactoryTest {
             // Unique IDs can be created in a later stage.
             final Map<String, String> options = getComplexOptions();
             options.remove("confluent.kafka.consumer-group-id");
+            options.remove("confluent.kafka.client-id-prefix");
             options.remove("confluent.kafka.transactional-id-prefix");
 
             final Consumer<DynamicTableParameters> testParameters =
                     (parameters) -> {
                         assertThat(parameters.properties)
                                 .doesNotContainEntry("group.id", "generated_consumer_id_4242");
+                        assertThat(parameters.sourceClientIdPrefix).isNull();
+                        assertThat(parameters.sinkClientIdPrefix).isNull();
                         assertThat(parameters.transactionalIdPrefix).isNull();
                     };
 
@@ -540,6 +547,7 @@ public class ConfluentManagedTableFactoryTest {
         options.put("confluent.kafka.bootstrap-servers", "localhost:8080");
         options.put("confluent.kafka.logical-cluster-id", "lkc-4242");
         options.put("confluent.kafka.consumer-group-id", "generated_consumer_id_4242");
+        options.put("confluent.kafka.client-id-prefix", "generated_client_id_4242");
         options.put("confluent.kafka.transactional-id-prefix", "generated_transact_id_4242");
         return options;
     }
