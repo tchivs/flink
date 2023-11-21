@@ -157,7 +157,8 @@ public class ConfluentManagedTableUtils {
         final Properties properties;
         final StartupOptions startupOptions;
         final BoundedOptions boundedOptions;
-        final @Nullable String clientIdPrefix;
+        final @Nullable String sourceClientIdPrefix;
+        final @Nullable String sinkClientIdPrefix;
         final @Nullable String transactionalIdPrefix;
         final ManagedChangelogMode tableMode;
         final String tableIdentifier;
@@ -185,7 +186,9 @@ public class ConfluentManagedTableUtils {
             this.properties = properties;
             this.startupOptions = startupOptions;
             this.boundedOptions = boundedOptions;
-            this.clientIdPrefix = clientIdPrefix;
+            this.sourceClientIdPrefix =
+                    (clientIdPrefix != null) ? clientIdPrefix + "-source" : null;
+            this.sinkClientIdPrefix = (clientIdPrefix != null) ? clientIdPrefix + "-sink" : null;
             this.transactionalIdPrefix = transactionalIdPrefix;
             this.tableMode = tableMode;
             this.tableIdentifier = tableIdentifier;
@@ -209,7 +212,8 @@ public class ConfluentManagedTableUtils {
                     && properties.equals(that.properties)
                     && startupOptions.equals(that.startupOptions)
                     && boundedOptions.equals(that.boundedOptions)
-                    && Objects.equals(clientIdPrefix, that.clientIdPrefix)
+                    && Objects.equals(sourceClientIdPrefix, that.sourceClientIdPrefix)
+                    && Objects.equals(sinkClientIdPrefix, that.sinkClientIdPrefix)
                     && Objects.equals(transactionalIdPrefix, that.transactionalIdPrefix)
                     && tableMode == that.tableMode
                     && tableIdentifier.equals(that.tableIdentifier)
@@ -226,7 +230,8 @@ public class ConfluentManagedTableUtils {
                             properties,
                             startupOptions,
                             boundedOptions,
-                            clientIdPrefix,
+                            sourceClientIdPrefix,
+                            sinkClientIdPrefix,
                             transactionalIdPrefix,
                             tableMode,
                             tableIdentifier,
