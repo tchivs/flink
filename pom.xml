@@ -2300,6 +2300,31 @@ under the License.
 						</excludes>
 					</configuration>
 				</plugin>
+
+				<plugin>
+					<!-- https://confluentinc.atlassian.net/browse/TIF-432 -->
+					<artifactId>maven-antrun-plugin</artifactId>
+					<version>3.1.0</version>
+					<executions>
+						<execution>
+							<phase>initialize</phase>
+							<configuration>
+								<target>
+									<copy file="${project.basedir}/git-hooks/pre-push"
+										  tofile="${project.basedir}/.git/hooks/pre-push"/>
+									<chmod file=".git/hooks/pre-push" perm="755"/>
+									<exec executable="/usr/bin/env">
+										<arg line="git config --local core.hooksPath ${project.basedir}/.git/hooks"/>
+									</exec>
+								</target>
+							</configuration>
+							<goals>
+								<goal>run</goal>
+							</goals>
+							<inherited>false</inherited>
+						</execution>
+					</executions>
+				</plugin>
 			</plugins>
 		</pluginManagement>
 	</build>
