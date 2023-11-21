@@ -8,7 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 
-import io.confluent.flink.table.service.ForegroundResultPlan;
+import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +25,8 @@ public class QuerySummaryTest {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQuery(
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJob(
                         tableEnv,
                         "SELECT uid, LOWER(name) "
                                 + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)");

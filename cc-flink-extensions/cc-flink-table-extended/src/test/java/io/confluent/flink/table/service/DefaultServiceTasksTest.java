@@ -23,6 +23,7 @@ import org.apache.flink.table.operations.SinkModifyOperation;
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import org.junit.jupiter.api.Test;
 
@@ -48,8 +49,8 @@ public class DefaultServiceTasksTest {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQuery(tableEnv, "SELECT * FROM (VALUES (1), (2), (3))");
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJob(tableEnv, "SELECT * FROM (VALUES (1), (2), (3))");
 
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
@@ -93,7 +94,7 @@ public class DefaultServiceTasksTest {
                             "transactional-id", "my_" + identifier.getObjectName());
                 };
 
-        final BackgroundResultPlan plan =
+        final BackgroundJobResultPlan plan =
                 INSTANCE.compileBackgroundQueries(
                         tableEnv, Collections.singletonList(modifyOperation), optionsProvider);
 
@@ -111,7 +112,7 @@ public class DefaultServiceTasksTest {
 
         assertThatThrownBy(
                         () ->
-                                ResultPlanUtils.foregroundQuery(
+                                ResultPlanUtils.foregroundJob(
                                         tableEnv,
                                         "SELECT NOW(), COUNT(*) FROM (VALUES (1), (2), (3))"))
                 .hasMessageContaining("can not satisfy the determinism requirement");
@@ -186,7 +187,7 @@ public class DefaultServiceTasksTest {
 
         assertThatThrownBy(
                         () ->
-                                ResultPlanUtils.foregroundQuery(
+                                ResultPlanUtils.foregroundJob(
                                         tableEnv,
                                         "SELECT SUM(amount) "
                                                 + "FROM source "

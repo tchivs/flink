@@ -40,7 +40,13 @@ public enum ExpressionKind {
     // Add more items to the list if there is a need for it.
     // The list could also be more specific in the future,
     // not just SQL kind but also Confluent-provided functions.
-    EQUALITY(SqlKind.EQUALS),
+    EQUALS(SqlKind.EQUALS),
+    NOT_EQUALS(SqlKind.NOT_EQUALS),
+    SEARCH(SqlKind.SEARCH),
+    IS_NULL(SqlKind.IS_NULL),
+    IS_NOT_NULL(SqlKind.IS_NOT_NULL),
+    AND(SqlKind.AND),
+    OR(SqlKind.OR),
     CAST(SqlKind.CAST),
     INPUT_REF(SqlKind.INPUT_REF),
     LITERAL(SqlKind.LITERAL);

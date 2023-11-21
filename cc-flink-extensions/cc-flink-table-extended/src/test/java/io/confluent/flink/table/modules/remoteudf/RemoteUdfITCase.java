@@ -14,7 +14,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
-import io.confluent.flink.table.service.ForegroundResultPlan;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.utils.Base64SerializationUtil;
@@ -35,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET;
@@ -99,8 +99,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
         // should be enabled by default for JSS service
         final TableEnvironment tableEnv = getJssTableEnvironment();
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQueryCustomConfig(
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(
                         tableEnv,
                         "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
@@ -111,8 +111,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
         // SQL service controls remote UDFs using config params
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true, true);
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQueryCustomConfig(
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(
                         tableEnv,
                         "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);

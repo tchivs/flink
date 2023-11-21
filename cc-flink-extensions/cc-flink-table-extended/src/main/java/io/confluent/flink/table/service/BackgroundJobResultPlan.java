@@ -9,13 +9,13 @@ import org.apache.flink.table.api.CompiledPlan;
 
 import io.confluent.flink.table.service.summary.QuerySummary;
 
-/** {@link CompiledPlan} for a background job. */
+/** A background job defined by a {@link CompiledPlan}. */
 @Confluent
-public class BackgroundResultPlan extends ResultPlan {
+public class BackgroundJobResultPlan extends ResultPlan {
 
     private final String compiledPlan;
 
-    public BackgroundResultPlan(QuerySummary querySummary, String compiledPlan) {
+    public BackgroundJobResultPlan(QuerySummary querySummary, String compiledPlan) {
         super(querySummary);
         this.compiledPlan = compiledPlan;
     }

@@ -13,7 +13,6 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
-import io.confluent.flink.table.service.ForegroundResultPlan;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.service.ServiceTasks.Service;
@@ -28,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -83,8 +83,8 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // should be enabled by default for JSS service
         final TableEnvironment tableEnv = getJssTableEnvironment();
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQueryCustomConfig(tableEnv, "SELECT SECRET('something')");
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT SECRET('something')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -93,8 +93,8 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // SQL service controls AI functions using config params
         final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true);
 
-        final ForegroundResultPlan plan =
-                ResultPlanUtils.foregroundQueryCustomConfig(tableEnv, "SELECT SECRET('something')");
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT SECRET('something')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 

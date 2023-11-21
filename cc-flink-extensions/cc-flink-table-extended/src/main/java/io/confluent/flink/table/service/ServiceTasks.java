@@ -75,7 +75,7 @@ public interface ServiceTasks {
      * Compiles one or more {@link ModifyOperation}s (i.e. an INSERT INTO or STATEMENT SET) for
      * background queries.
      */
-    BackgroundResultPlan compileBackgroundQueries(
+    BackgroundJobResultPlan compileBackgroundQueries(
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions)

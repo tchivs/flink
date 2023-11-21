@@ -28,6 +28,7 @@ import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.delegation.Parser;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.operations.ModifyOperation;
@@ -38,6 +39,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.JsonSerdeUtil;
+import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecGroupWindowAggregate;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecLookupJoin;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
@@ -55,6 +57,9 @@ import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
+import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
+import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
+import io.confluent.flink.table.service.local.LocalExecution;
 import io.confluent.flink.table.service.summary.QuerySummary;
 import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
@@ -66,6 +71,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -385,10 +391,15 @@ class DefaultServiceTasks implements ServiceTasks {
                         Collections.singletonList(modifyOperation),
                         connectorOptions);
 
+        if (compilationResult.isLocal()) {
+            return new ForegroundLocalResultPlan(
+                    compilationResult.querySummary, compilationResult.data);
+        }
+
         final String operatorId =
                 extractOperatorId(tableEnvironment.getConfig(), compilationResult.execNodeGraph);
 
-        return new ForegroundResultPlan(
+        return new ForegroundJobResultPlan(
                 compilationResult.querySummary, compilationResult.compiledPlan, operatorId);
     }
 
@@ -461,14 +472,19 @@ class DefaultServiceTasks implements ServiceTasks {
     // --------------------------------------------------------------------------------------------
 
     @Override
-    public BackgroundResultPlan compileBackgroundQueries(
+    public BackgroundJobResultPlan compileBackgroundQueries(
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
             ConnectorOptionsProvider connectorOptions) {
         final CompilationResult compilationResult =
                 compile(false, tableEnvironment, modifyOperations, connectorOptions);
 
-        return new BackgroundResultPlan(
+        if (compilationResult.isLocal()) {
+            throw new UnsupportedOperationException(
+                    "Local execution is currently not supported for background queries.");
+        }
+
+        return new BackgroundJobResultPlan(
                 compilationResult.querySummary, compilationResult.compiledPlan);
     }
 
@@ -478,14 +494,32 @@ class DefaultServiceTasks implements ServiceTasks {
 
     private static class CompilationResult {
         final QuerySummary querySummary;
+        final Stream<RowData> data;
         final ExecNodeGraph execNodeGraph;
         final String compiledPlan;
 
-        CompilationResult(
-                QuerySummary querySummary, ExecNodeGraph execNodeGraph, String compiledPlan) {
+        private CompilationResult(
+                QuerySummary querySummary,
+                ExecNodeGraph execNodeGraph,
+                String compiledPlan,
+                Stream<RowData> data) {
             this.querySummary = querySummary;
             this.execNodeGraph = execNodeGraph;
             this.compiledPlan = compiledPlan;
+            this.data = data;
+        }
+
+        static CompilationResult job(
+                QuerySummary querySummary, ExecNodeGraph execNodeGraph, String compiledPlan) {
+            return new CompilationResult(querySummary, execNodeGraph, compiledPlan, null);
+        }
+
+        static CompilationResult local(QuerySummary querySummary, Stream<RowData> data) {
+            return new CompilationResult(querySummary, null, null, data);
+        }
+
+        boolean isLocal() {
+            return data != null;
         }
     }
 
@@ -502,6 +536,18 @@ class DefaultServiceTasks implements ServiceTasks {
 
         final QuerySummary querySummary = QuerySummary.summarize(isForeground, physicalGraph);
 
+        final SerdeContext serdeContext = planner.createSerdeContext();
+
+        final Optional<Stream<RowData>> localResults =
+                LocalExecution.RULES.stream()
+                        .filter(r -> r.matches(querySummary))
+                        .findFirst()
+                        .flatMap(e -> e.execute(serdeContext, physicalGraph));
+
+        if (localResults.isPresent()) {
+            return CompilationResult.local(querySummary, localResults.get());
+        }
+
         final ExecNodeGraph graph = translate(planner, physicalGraph);
 
         graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
@@ -511,14 +557,14 @@ class DefaultServiceTasks implements ServiceTasks {
         final String compiledPlan;
         try {
             compiledPlan =
-                    JsonSerdeUtil.createObjectWriter(planner.createSerdeContext())
+                    JsonSerdeUtil.createObjectWriter(serdeContext)
                             .withDefaultPrettyPrinter()
                             .writeValueAsString(graph);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Unable to serialize given ExecNodeGraph", e);
         }
 
-        return new CompilationResult(querySummary, graph, compiledPlan);
+        return CompilationResult.job(querySummary, graph, compiledPlan);
     }
 
     /** Runs the optimizer and returns a list of {@link FlinkPhysicalRel}. */
