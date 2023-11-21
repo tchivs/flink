@@ -1638,6 +1638,13 @@ under the License.
 
 						<!-- The most recently published version configuration file -->
 						<exclude>flink-test-utils-parent/flink-migration-test-utils/src/main/resources/most_recently_published_version</exclude>
+
+						<!-- CFLT specific excludes -->
+						<exclude>mk-include/**</exclude>
+						<exclude>.semaphore/**</exclude>
+						<exclude>Makefile</exclude>
+						<exclude>service.yaml</exclude>
+						<exclude>tools/ci/confluent/**</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
