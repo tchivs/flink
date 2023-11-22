@@ -1638,6 +1638,13 @@ under the License.
 
 						<!-- The most recently published version configuration file -->
 						<exclude>flink-test-utils-parent/flink-migration-test-utils/src/main/resources/most_recently_published_version</exclude>
+
+						<!-- CFLT specific excludes -->
+						<exclude>mk-include/**</exclude>
+						<exclude>.semaphore/**</exclude>
+						<exclude>Makefile</exclude>
+						<exclude>service.yaml</exclude>
+						<exclude>tools/ci/confluent/**</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
@@ -2292,6 +2299,31 @@ under the License.
 							<exclude>*flink-yarn-tests*</exclude>
 						</excludes>
 					</configuration>
+				</plugin>
+
+				<plugin>
+					<!-- https://confluentinc.atlassian.net/browse/TIF-432 -->
+					<artifactId>maven-antrun-plugin</artifactId>
+					<version>3.1.0</version>
+					<executions>
+						<execution>
+							<phase>initialize</phase>
+							<configuration>
+								<target>
+									<copy file="${project.basedir}/git-hooks/pre-push"
+										  tofile="${project.basedir}/.git/hooks/pre-push"/>
+									<chmod file=".git/hooks/pre-push" perm="755"/>
+									<exec executable="/usr/bin/env">
+										<arg line="git config --local core.hooksPath ${project.basedir}/.git/hooks"/>
+									</exec>
+								</target>
+							</configuration>
+							<goals>
+								<goal>run</goal>
+							</goals>
+							<inherited>false</inherited>
+						</execution>
+					</executions>
 				</plugin>
 			</plugins>
 		</pluginManagement>

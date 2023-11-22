@@ -1,0 +1,14 @@
+name: flink
+lang: java
+lang_version: 11
+git:
+  enable: true
+github:
+  enable: true
+contact:
+  name: flink
+  jira_project_key: FLINKCC
+  slack_team_channel: flink-oncall
+make:
+  enable: true
+  enable_updates: true
