@@ -33,9 +33,9 @@ global_job_config:
       value: "shared-cache"
   prologue:
     commands:
-      - sem-version java 8
+      - sem-version java 11
       # workaround for failing e2e tests - see https://confluent.slack.com/archives/C065732SFHV/p1704882814371079?thread_ts=1704831317.971149&cid=C065732SFHV
-      - export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64/jre/"
+      - export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64/"
       # hugo
       - sudo mkdir -p /usr/share/hugo
       - curl -fsSL -o /tmp/hugo.tar.gz https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/hugo_extended_0.98.0_Linux-64bit.tar.gz
@@ -53,6 +53,7 @@ global_job_config:
       # Configure maven to use CFLT mirrors and repository - !!!DO NOT REMOVE THIS LINE UNTIL inc_rcca-15715-code-artifact-returning-intermittent-403-error resolved!!!!
       - . vault-sem-get-secret maven-settings-no-cloudfront
       - . vault-sem-get-secret ci-reporting
+      - export PROFILE="-Pjdk11"
 blocks:
   - name: compile_ci
     dependencies: []
@@ -143,8 +144,9 @@ blocks:
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache
+            - export PROFILE="-Pfast -Pskip-webui-build -Pjdk11"
             - ./tools/azure-pipelines/cache_docker_images.sh load
-            - PROFILE="-Pfast -Pskip-webui-build" ./tools/ci/compile_ci.sh
+            - ./tools/ci/compile_ci.sh
             - FLINK_DIR=$(pwd)/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
             - ./tools/azure-pipelines/cache_docker_images.sh save
             - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
