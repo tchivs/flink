@@ -169,7 +169,7 @@ public class MiniEvaluatorTest {
     @Test
     void testUnsupportedCast() {
         assertUnsupported(
-                "SELECT CAST(name AS VARCHAR(100)), score FROM source1", "Unsupported cast type");
+                "SELECT CAST(name AS VARCHAR(100)), score FROM source1", "Unsupported cast");
     }
 
     private static class TestMiniEvaluator extends MiniEvaluator {

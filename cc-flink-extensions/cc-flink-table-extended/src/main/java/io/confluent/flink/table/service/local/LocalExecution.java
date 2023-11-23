@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 @Confluent
 public interface LocalExecution {
 
-    List<LocalExecution> RULES = Collections.emptyList();
+    List<LocalExecution> RULES = Collections.singletonList(InfoSchemaExecution.INSTANCE);
 
     /**
      * Searches for patterns that qualify for a local execution.

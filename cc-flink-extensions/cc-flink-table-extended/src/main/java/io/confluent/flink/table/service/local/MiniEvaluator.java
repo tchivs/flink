@@ -262,8 +262,11 @@ public abstract class MiniEvaluator {
         final RexCall call = (RexCall) node;
         final RelDataType targetType = call.getType();
 
-        if (!isSupportedCastType(call.getType()) || !isSupportedCastType(targetType)) {
-            throw new UnsupportedOperationException("Unsupported cast type: " + node);
+        if (!isSupportedCastType(targetType)) {
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Unsupported cast to '%s'. Currently, only STRING and INT types are supported.",
+                            node.getType()));
         }
 
         final ExpressionEvaluator input = translateExpression(call.getOperands().get(0));
