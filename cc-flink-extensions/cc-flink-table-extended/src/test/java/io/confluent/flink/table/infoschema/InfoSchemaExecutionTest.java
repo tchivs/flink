@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,11 +65,37 @@ public class InfoSchemaExecutionTest {
                     tableEnv.registerCatalog(catalogInfo.getId(), catalog);
                     tableEnv.registerCatalog(catalogInfo.getName(), catalog);
                 });
-        tableEnv.useCatalog("cat2");
-        tableEnv.useDatabase("db1");
+        tableEnv.useCatalog("env-2");
+        tableEnv.useDatabase("lkc-1");
 
-        tableEnv.executeSql("CREATE TABLE sink (s STRING) WITH ('connector' = 'blackhole')");
-        tableEnv.executeSql("CREATE TABLE simple_source (s STRING) WITH ('connector' = 'datagen')");
+        tableEnv.executeSql(
+                "CREATE TABLE `env-2`.`lkc-1`.`simple_sink` (s STRING) WITH ('connector' = 'blackhole')");
+        tableEnv.executeSql(
+                "CREATE TABLE `env-2`.`lkc-1`.`simple_source` (s STRING) WITH ('connector' = 'datagen')");
+
+        tableEnv.executeSql(
+                "CREATE TABLE `env-1`.`lkc-1`.`table1` (\n"
+                        + "s STRING,\n"
+                        + "i INT NOT NULL,\n"
+                        + "t TIMESTAMP_LTZ(3),\n"
+                        + "WATERMARK FOR t AS t + INTERVAL '1' SECOND,\n"
+                        + "c AS UPPER(s))\n"
+                        + "WITH ('connector' = 'confluent', 'confluent.kafka.topic' = 'SECRET')");
+        tableEnv.executeSql(
+                "CREATE TABLE `env-1`.`lkc-1`.`table2` (\n"
+                        + "s STRING,\n"
+                        + "headers MAP<STRING, STRING> METADATA VIRTUAL,\n"
+                        + "ts TIMESTAMP(3) METADATA FROM 'timestamp'\n"
+                        + ")\n"
+                        + "COMMENT 'Hello'\n"
+                        + "PARTITIONED BY (s)\n"
+                        + "WITH ('connector' = 'confluent')");
+        tableEnv.executeSql(
+                "CREATE TABLE `env-1`.`lkc-2`.`table3` (\n"
+                        + "s STRING,\n"
+                        + "$rowtime TIMESTAMP_LTZ(3) NOT NULL METADATA VIRTUAL COMMENT 'SYSTEM'\n"
+                        + ")\n"
+                        + "WITH ('connector' = 'confluent')");
     }
 
     @Test
@@ -104,12 +131,198 @@ public class InfoSchemaExecutionTest {
     }
 
     @Test
+    void testListTables() throws Exception {
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`TABLES` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table1",
+                        "BASE TABLE",
+                        "NO",
+                        null,
+                        null,
+                        // IS_WATERMARKED
+                        "YES",
+                        "t",
+                        "`t` + INTERVAL '1' SECOND",
+                        "NO",
+                        null),
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table2",
+                        "BASE TABLE",
+                        // IS_DISTRIBUTED
+                        "YES",
+                        "HASH",
+                        null,
+                        "NO",
+                        null,
+                        null,
+                        null,
+                        // COMMENT
+                        "Hello"),
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "table3",
+                        "BASE TABLE",
+                        "NO",
+                        null,
+                        null,
+                        "NO",
+                        null,
+                        null,
+                        null,
+                        null));
+    }
+
+    @Test
+    void testListViews() throws Exception {
+        // Testing one INFORMATION_SCHEMA table should be sufficient
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`TABLES` "
+                        + "WHERE `TABLE_SCHEMA` = 'INFORMATION_SCHEMA' AND `TABLE_NAME` = 'SCHEMATA'",
+                row(
+                        "env-1",
+                        "cat1",
+                        "$information-schema",
+                        "INFORMATION_SCHEMA",
+                        "SCHEMATA",
+                        "VIEW",
+                        "NO",
+                        null,
+                        null,
+                        "NO",
+                        null,
+                        null,
+                        null,
+                        "SYSTEM"));
+    }
+
+    @Test
+    void testListTableOptions() throws Exception {
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`TABLE_OPTIONS` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
+                // The private option is correctly filtered out.
+                row("env-1", "cat1", "lkc-1", "db1", "table1", "connector", "confluent"),
+                row("env-1", "cat1", "lkc-1", "db1", "table2", "connector", "confluent"),
+                row("env-1", "cat1", "lkc-2", "db2", "table3", "connector", "confluent"));
+    }
+
+    @Test
+    void testListColumns() throws Exception {
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`COLUMNS` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA' AND `TABLE_NAME` = 'table1'",
+                // physical column with STRING
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table1",
+                        "s",
+                        1,
+                        "YES",
+                        "VARCHAR",
+                        "VARCHAR(2147483647)",
+                        "NO",
+                        "NO",
+                        null,
+                        "NO",
+                        null,
+                        "YES",
+                        null),
+                // physical column with NOT NULL
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table1",
+                        "i",
+                        2,
+                        "NO",
+                        "INTEGER",
+                        "INT NOT NULL",
+                        "NO",
+                        "NO",
+                        null,
+                        "NO",
+                        null,
+                        "YES",
+                        null),
+                // physical column with TIMESTAMP_LTZ
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table1",
+                        "t",
+                        3,
+                        "YES",
+                        "TIMESTAMP_LTZ",
+                        "TIMESTAMP(3) WITH LOCAL TIME ZONE",
+                        "NO",
+                        "NO",
+                        null,
+                        "NO",
+                        null,
+                        "YES",
+                        null),
+                // computed column
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-1",
+                        "db1",
+                        "table1",
+                        "c",
+                        4,
+                        "YES",
+                        "VARCHAR",
+                        "VARCHAR(2147483647)",
+                        "NO",
+                        "YES",
+                        "UPPER(`s`)",
+                        "NO",
+                        null,
+                        "NO",
+                        null));
+    }
+
+    @Test
+    void testListColumnsWithMetadata() throws Exception {
+        assertResult(
+                "SELECT `COLUMN_NAME`, `IS_HIDDEN`, `METADATA_KEY`, `IS_PERSISTED` "
+                        + "FROM `env-1`.`INFORMATION_SCHEMA`.`COLUMNS` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA' AND `IS_METADATA` = 'YES'",
+                // virtual metadata column
+                row("headers", "NO", null, "NO"),
+                // persisted metadata column with key
+                row("ts", "NO", "timestamp", "YES"),
+                // system column
+                row("$rowtime", "YES", null, "NO"));
+    }
+
+    @Test
     void testUnsupportedBackgroundQuery() {
         assertThatThrownBy(
                         () ->
                                 ResultPlanUtils.backgroundJob(
                                         tableEnv,
-                                        "INSERT INTO sink SELECT `SCHEMA_NAME` "
+                                        "INSERT INTO simple_sink SELECT `SCHEMA_NAME` "
                                                 + "FROM `INFORMATION_SCHEMA`.`SCHEMATA`"))
                 .hasMessageContaining(
                         "Access to INFORMATION_SCHEMA is currently limited. "
@@ -148,7 +361,7 @@ public class InfoSchemaExecutionTest {
         assertUnsupported(
                 "SELECT `SCHEMA_NAME` FROM `$system`.`$metadata`.`SCHEMATA`",
                 "Table '`$system`.`$metadata`.`SCHEMATA`' cannot "
-                        + "be accessed without providing the required columns: [CATALOG_ID]");
+                        + "be accessed without providing the required column: CATALOG_ID");
     }
 
     private static void assertResult(String selectSql, GenericRowData... expectedData)
@@ -208,23 +421,29 @@ public class InfoSchemaExecutionTest {
 
         @Override
         public List<String> listViews(String databaseName) throws DatabaseNotExistException {
-            // List INFORMATION_SCHEMA views
-            // For testing purposes only by name.
-            return Stream.concat(
+            // Include INFORMATION_SCHEMA views
+            return Stream.of(
                             InfoSchemaTables.listViewsByName(databaseName).stream(),
+                            InfoSchemaTables.listViewsById(databaseName).stream(),
                             super.listViews(databaseName).stream())
+                    .flatMap(Function.identity())
                     .collect(Collectors.toList());
         }
 
         @Override
         public CatalogBaseTable getTable(ObjectPath tablePath) throws TableNotExistException {
-            // Lookup INFORMATION_SCHEMA tables.
-            // For testing purposes only by name.
-            final Optional<CatalogView> infoSchemaTable =
-                    InfoSchemaTables.getViewByName(catalogInfo, tablePath);
-            if (infoSchemaTable.isPresent()) {
-                return infoSchemaTable.get();
+            // Include INFORMATION_SCHEMA tables
+            final Optional<CatalogView> infoSchemaById =
+                    InfoSchemaTables.getViewById(catalogInfo, tablePath);
+            if (infoSchemaById.isPresent()) {
+                return infoSchemaById.get();
             }
+            final Optional<CatalogView> infoSchemaByName =
+                    InfoSchemaTables.getViewByName(catalogInfo, tablePath);
+            if (infoSchemaByName.isPresent()) {
+                return infoSchemaByName.get();
+            }
+
             final CatalogBaseTable baseTable = super.getTable(tablePath);
             if (baseTable.getTableKind() == CatalogBaseTable.TableKind.VIEW) {
                 return baseTable;

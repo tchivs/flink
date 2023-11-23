@@ -8,6 +8,10 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanBoundedMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanStartupMode;
+
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
@@ -82,46 +86,19 @@ public final class ServiceTasksOptions {
     // --------------------------------------------------------------------------------------------
 
     public static final ConfigOption<Duration> SQL_TABLES_SCAN_IDLE_TIMEOUT =
-            ConfigOptions.key("sql.tables.scan.idle-timeout")
-                    .durationType()
-                    .defaultValue(Duration.ZERO)
-                    .withDescription(
-                            "If a table's partition does not receive any elements within the given interval, it will be "
-                                    + "marked as temporarily idle. This allows downstream tasks to advance their "
-                                    + "watermarks without the need to wait for watermarks from all inputs. The "
-                                    + "default value is 0 which means that idle detection is disabled.");
+            ConfluentManagedTableOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT;
 
     public static final ConfigOption<GlobalScanStartupMode> SQL_TABLES_SCAN_STARTUP_MODE =
-            ConfigOptions.key("sql.tables.scan.startup.mode")
-                    .enumType(GlobalScanStartupMode.class)
-                    .noDefaultValue()
-                    .withDescription(
-                            "Overwrites 'scan.startup.mode' for Confluent-native tables used in newly created queries. "
-                                    + "This option is not applied if the table uses a value that differs from the default value.");
+            ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 
     public static final ConfigOption<Long> SQL_TABLES_SCAN_STARTUP_MILLIS =
-            ConfigOptions.key("sql.tables.scan.startup.timestamp-millis")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Overwrites 'scan.startup.timestamp-millis' for Confluent-native tables used in newly created queries. "
-                                    + "This option is not applied if the table has already set a value.");
+            ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
 
     public static final ConfigOption<GlobalScanBoundedMode> SQL_TABLES_SCAN_BOUNDED_MODE =
-            ConfigOptions.key("sql.tables.scan.bounded.mode")
-                    .enumType(GlobalScanBoundedMode.class)
-                    .noDefaultValue()
-                    .withDescription(
-                            "Overwrites 'scan.bounded.mode' for Confluent-native tables used in newly created queries. "
-                                    + "This option is not applied if the table uses a value that differs from the default value.");
+            ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
 
     public static final ConfigOption<Long> SQL_TABLES_SCAN_BOUNDED_MILLIS =
-            ConfigOptions.key("sql.tables.scan.bounded.timestamp-millis")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Overwrites 'scan.bounded.timestamp-millis' for Confluent-native tables used in newly created queries. "
-                                    + "This option is not applied if the table has already set a value.");
+            ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
 
     // --------------------------------------------------------------------------------------------
     // Private Options
@@ -177,48 +154,6 @@ public final class ServiceTasksOptions {
         options.add(SQL_TABLES_SCAN_BOUNDED_MODE);
         options.add(SQL_TABLES_SCAN_BOUNDED_MILLIS);
         return Collections.unmodifiableSet(options);
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // Enums
-    // --------------------------------------------------------------------------------------------
-
-    /** Enum for {@link #SQL_TABLES_SCAN_STARTUP_MODE}. */
-    public enum GlobalScanStartupMode {
-        EARLIEST_OFFSET("earliest-offset"),
-        LATEST_OFFSET("latest-offset"),
-        GROUP_OFFSETS("group-offsets"),
-        TIMESTAMP("timestamp");
-
-        private final String value;
-
-        GlobalScanStartupMode(String value) {
-            this.value = value;
-        }
-
-        @Override
-        public String toString() {
-            return value;
-        }
-    }
-
-    /** Enum for {@link #SQL_TABLES_SCAN_BOUNDED_MODE}. */
-    public enum GlobalScanBoundedMode {
-        LATEST_OFFSET("latest-offset"),
-        GROUP_OFFSETS("group-offsets"),
-        TIMESTAMP("timestamp"),
-        UNBOUNDED("unbounded");
-
-        private final String value;
-
-        GlobalScanBoundedMode(String value) {
-            this.value = value;
-        }
-
-        @Override
-        public String toString() {
-            return value;
-        }
     }
 
     private ServiceTasksOptions() {

@@ -46,6 +46,12 @@ Copyright 2023 Confluent Inc.
 			<scope>provided</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-managed-table-validation</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
 		<!-- otlp proto dependency is only required for OTLP functions declared in
 		     io.confluent.flink.table.modules.otlp.OtlpFunctionsModule  -->
 		<dependency>

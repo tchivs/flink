@@ -21,6 +21,8 @@ import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.connectors.InfoSchemaTableFactory;
 import io.confluent.flink.table.connectors.InfoSchemaTableSource;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,6 +100,18 @@ public class InfoSchemaTables {
     /** A table that contains a row for every database the user has access to. */
     public static final String TABLE_SCHEMATA = "SCHEMATA";
 
+    /** A table that contains a row for every (view/base) table the user has access to. */
+    public static final String TABLE_TABLES = "TABLES";
+
+    /**
+     * A table that contains a row for every option (i.e. property in the WITH clause) of all tables
+     * the user has access to.
+     */
+    public static final String TABLE_TABLE_OPTIONS = "TABLE_OPTIONS";
+
+    /** A table that contains a row for every column of all tables the user has access to. */
+    public static final String TABLE_COLUMNS = "COLUMNS";
+
     private static final Map<String, InfoSchemaTable> TABLES = initTables();
 
     private static Map<String, InfoSchemaTable> initTables() {
@@ -106,33 +120,104 @@ public class InfoSchemaTables {
         tables.put(
                 TABLE_CATALOGS,
                 InfoSchemaTable.of(
-                        Schema.newBuilder()
-                                .column("CATALOG_ID", "STRING NOT NULL")
-                                .column("CATALOG_NAME", "STRING NOT NULL")
-                                .build(),
-                        CatalogsStreamProvider.INSTANCE));
+                                Schema.newBuilder()
+                                        .column("CATALOG_ID", "STRING NOT NULL")
+                                        .column("CATALOG_NAME", "STRING NOT NULL")
+                                        .build(),
+                                CatalogsStreamProvider.INSTANCE)
+                        .build());
 
         tables.put(
                 TABLE_CATALOG_NAME,
                 InfoSchemaTable.of(
-                        Schema.newBuilder()
-                                .column("CATALOG_ID", "STRING NOT NULL")
-                                .column("CATALOG_NAME", "STRING NOT NULL")
-                                .build(),
-                        CatalogNameStreamProvider.INSTANCE,
-                        "CATALOG_ID"));
+                                Schema.newBuilder()
+                                        .column("CATALOG_ID", "STRING NOT NULL")
+                                        .column("CATALOG_NAME", "STRING NOT NULL")
+                                        .build(),
+                                CatalogNameStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("CATALOG_ID")
+                        .build());
 
         tables.put(
                 TABLE_SCHEMATA,
                 InfoSchemaTable.of(
-                        Schema.newBuilder()
-                                .column("CATALOG_ID", "STRING NOT NULL")
-                                .column("CATALOG_NAME", "STRING NOT NULL")
-                                .column("SCHEMA_ID", "STRING NOT NULL")
-                                .column("SCHEMA_NAME", "STRING NOT NULL")
-                                .build(),
-                        SchemataStreamProvider.INSTANCE,
-                        "CATALOG_ID"));
+                                Schema.newBuilder()
+                                        .column("CATALOG_ID", "STRING NOT NULL")
+                                        .column("CATALOG_NAME", "STRING NOT NULL")
+                                        .column("SCHEMA_ID", "STRING NOT NULL")
+                                        .column("SCHEMA_NAME", "STRING NOT NULL")
+                                        .build(),
+                                SchemataStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("CATALOG_ID")
+                        .build());
+
+        tables.put(
+                TABLE_TABLES,
+                InfoSchemaTable.of(
+                                Schema.newBuilder()
+                                        .column("TABLE_CATALOG_ID", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA", "STRING NOT NULL")
+                                        .column("TABLE_NAME", "STRING NOT NULL")
+                                        .column("TABLE_TYPE", "STRING NOT NULL")
+                                        .column("IS_DISTRIBUTED", "STRING NOT NULL")
+                                        .column("DISTRIBUTION_ALGORITHM", "STRING NULL")
+                                        .column("DISTRIBUTION_BUCKETS", "INT NULL")
+                                        .column("IS_WATERMARKED", "STRING NOT NULL")
+                                        .column("WATERMARK_COLUMN", "STRING NULL")
+                                        .column("WATERMARK_EXPRESSION", "STRING NULL")
+                                        .column("WATERMARK_IS_HIDDEN", "STRING NULL")
+                                        .column("COMMENT", "STRING NULL")
+                                        .build(),
+                                TablesStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("TABLE_CATALOG_ID")
+                        .withFilterColumns("TABLE_SCHEMA_ID", "TABLE_SCHEMA", "TABLE_NAME")
+                        .build());
+
+        tables.put(
+                TABLE_TABLE_OPTIONS,
+                InfoSchemaTable.of(
+                                Schema.newBuilder()
+                                        .column("TABLE_CATALOG_ID", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA", "STRING NOT NULL")
+                                        .column("TABLE_NAME", "STRING NOT NULL")
+                                        .column("OPTION_KEY", "STRING NOT NULL")
+                                        .column("OPTION_VALUE", "STRING NOT NULL")
+                                        .build(),
+                                TableOptionsStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("TABLE_CATALOG_ID")
+                        .withFilterColumns("TABLE_SCHEMA_ID", "TABLE_SCHEMA", "TABLE_NAME")
+                        .build());
+
+        tables.put(
+                TABLE_COLUMNS,
+                InfoSchemaTable.of(
+                                Schema.newBuilder()
+                                        .column("TABLE_CATALOG_ID", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA", "STRING NOT NULL")
+                                        .column("TABLE_NAME", "STRING NOT NULL")
+                                        .column("COLUMN_NAME", "STRING NOT NULL")
+                                        .column("ORDINAL_POSITION", "INT NOT NULL")
+                                        .column("IS_NULLABLE", "STRING NOT NULL")
+                                        .column("DATA_TYPE", "STRING NOT NULL")
+                                        .column("FULL_DATA_TYPE", "STRING NOT NULL")
+                                        .column("IS_HIDDEN", "STRING NOT NULL")
+                                        .column("IS_GENERATED", "STRING NOT NULL")
+                                        .column("GENERATION_EXPRESSION", "STRING NULL")
+                                        .column("IS_METADATA", "STRING NOT NULL")
+                                        .column("METADATA_KEY", "STRING NULL")
+                                        .column("IS_PERSISTED", "STRING NOT NULL")
+                                        .column("COMMENT", "STRING NULL")
+                                        .build(),
+                                ColumnsStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("TABLE_CATALOG_ID")
+                        .withFilterColumns("TABLE_SCHEMA_ID", "TABLE_SCHEMA", "TABLE_NAME")
+                        .build());
 
         return tables;
     }
@@ -184,8 +269,8 @@ public class InfoSchemaTables {
 
     /** Helper to produce a stream of data for the requested Information Schema table. */
     public static Stream<GenericRowData> getStreamForTable(
-            String tableName, SerdeContext context, Map<String, String> idColumns) {
-        return TABLES.get(tableName).streamProvider.createStream(context, idColumns);
+            String tableName, SerdeContext context, Map<String, String> pushedFilters) {
+        return TABLES.get(tableName).streamProvider.createStream(context, pushedFilters);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -214,12 +299,19 @@ public class InfoSchemaTables {
     // --------------------------------------------------------------------------------------------
 
     /**
-     * Helper for {@link InfoSchemaTableSource} that lists columns for identifying the requested
-     * catalog.
+     * Helper for {@link InfoSchemaTableSource} that returns the column for identifying the
+     * requested catalog.
      */
-    public static Set<String> getCatalogIdColumns(String tableName) {
+    public static Optional<String> getCatalogIdColumn(String tableName) {
         final InfoSchemaTable table = TABLES.get(tableName);
-        return table.catalogIdColumns;
+        return Optional.ofNullable(table.catalogIdColumn);
+    }
+
+    /** Helper for {@link InfoSchemaTableSource} that lists columns for filter push down. */
+    public static Set<String> getFilterColumns(String tableName) {
+        final InfoSchemaTable table = TABLES.get(tableName);
+        return Stream.concat(Stream.of(table.catalogIdColumn), table.filterColumns.stream())
+                .collect(Collectors.toSet());
     }
 
     // --------------------------------------------------------------------------------------------
@@ -229,39 +321,51 @@ public class InfoSchemaTables {
     /** Declaration of a schema table used for both the information and definition schema. */
     private static class InfoSchemaTable {
         final Schema schema;
-        final Set<String> catalogIdColumns;
+        final @Nullable String catalogIdColumn;
+        final Set<String> filterColumns;
         final InfoTableStreamProvider streamProvider;
 
         InfoSchemaTable(
                 Schema schema,
-                Set<String> catalogIdColumns,
+                @Nullable String catalogIdColumn,
+                Set<String> filterColumns,
                 InfoTableStreamProvider streamProvider) {
             this.schema = schema;
-            this.catalogIdColumns = catalogIdColumns;
+            this.catalogIdColumn = catalogIdColumn;
+            this.filterColumns = filterColumns;
             this.streamProvider = streamProvider;
         }
 
-        static InfoSchemaTable of(
-                Schema schema, InfoTableStreamProvider streamProvider, String... catalogColumns) {
-            return new InfoSchemaTable(
-                    schema, new HashSet<>(Arrays.asList(catalogColumns)), streamProvider);
+        static Builder of(Schema schema, InfoTableStreamProvider streamProvider) {
+            return new Builder(schema, streamProvider);
         }
-    }
 
-    /** Provider for data of the {@link InfoSchemaTable}. */
-    interface InfoTableStreamProvider {
-        Stream<GenericRowData> createStream(SerdeContext context, Map<String, String> idColumns);
+        static class Builder {
 
-        // ---
-        // Common logic shared between InfoTableStreamProvider
-        // ---
+            final Schema schema;
+            final InfoTableStreamProvider streamProvider;
 
-        static ConfluentCatalog getCatalog(SerdeContext context, String catalogId) {
-            return context.getFlinkContext()
-                    .getCatalogManager()
-                    .getCatalog(catalogId)
-                    .map(ConfluentCatalog.class::cast)
-                    .orElseThrow(IllegalStateException::new);
+            @Nullable String catalogIdColumn;
+            Set<String> filterColumns = new HashSet<>();
+
+            Builder(Schema schema, InfoTableStreamProvider streamProvider) {
+                this.schema = schema;
+                this.streamProvider = streamProvider;
+            }
+
+            Builder withCatalogIdColumn(String catalogIdColumn) {
+                this.catalogIdColumn = catalogIdColumn;
+                return this;
+            }
+
+            Builder withFilterColumns(String... filterColumns) {
+                this.filterColumns.addAll(Arrays.asList(filterColumns));
+                return this;
+            }
+
+            InfoSchemaTable build() {
+                return new InfoSchemaTable(schema, catalogIdColumn, filterColumns, streamProvider);
+            }
         }
     }
 
@@ -279,17 +383,13 @@ public class InfoSchemaTables {
         sql.append(EncodingUtils.escapeIdentifier(DEFINITION_SCHEMA_DATABASE_ID));
         sql.append(".");
         sql.append(EncodingUtils.escapeIdentifier(tableName));
-        if (!table.catalogIdColumns.isEmpty()) {
+        if (table.catalogIdColumn != null) {
             sql.append(" WHERE ");
-            sql.append(
-                    table.catalogIdColumns.stream()
-                            .map(EncodingUtils::escapeIdentifier)
-                            .map(
-                                    c ->
-                                            String.format(
-                                                    "%s = '%s'",
-                                                    c, EncodingUtils.escapeSingleQuotes(catalogId)))
-                            .collect(Collectors.joining(" AND ")));
+            sql.append(EncodingUtils.escapeIdentifier(table.catalogIdColumn));
+            sql.append(" = ");
+            sql.append("'");
+            sql.append(EncodingUtils.escapeSingleQuotes(catalogId));
+            sql.append("'");
         }
 
         final String view = sql.toString();

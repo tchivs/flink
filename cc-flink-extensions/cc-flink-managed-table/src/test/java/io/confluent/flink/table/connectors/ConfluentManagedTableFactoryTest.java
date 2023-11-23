@@ -23,13 +23,13 @@ import org.apache.flink.table.factories.utils.FactoryMocks;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
 
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanBoundedMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.DynamicTableParameters;
 import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.ScanTopicPartition;
-import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanBoundedMode;
-import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanStartupMode;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 

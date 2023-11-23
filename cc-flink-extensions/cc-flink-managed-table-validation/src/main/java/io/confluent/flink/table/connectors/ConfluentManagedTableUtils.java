@@ -17,12 +17,12 @@ import org.apache.flink.types.RowKind;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CleanupPolicy;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CredentialsSource;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.FieldsInclude;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanBoundedMode;
+import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ManagedChangelogMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanBoundedMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.ScanStartupMode;
 import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SourceWatermarkVersion;
-import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanBoundedMode;
-import io.confluent.flink.table.service.ServiceTasksOptions.GlobalScanStartupMode;
 
 import javax.annotation.Nullable;
 
@@ -60,12 +60,12 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.S
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_STARTUP_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_STARTUP_SPECIFIC_OFFSETS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FIELDS_INCLUDE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FORMAT;
-import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
-import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
-import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
-import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 import static org.apache.flink.util.OptionalUtils.firstPresent;
 
 /** Utilities for Confluent-native tables. */

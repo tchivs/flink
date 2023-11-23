@@ -104,18 +104,18 @@ public class InfoSchemaExecution implements LocalExecution {
             final InfoSchemaTableSource infoSchemaSource =
                     (InfoSchemaTableSource) scan.tableSource();
             final String tableName = infoSchemaSource.getTableName();
-            final Map<String, String> idColumns = infoSchemaSource.getPushedCatalogIds();
+            final Map<String, String> pushedFilters = infoSchemaSource.getPushedFilters();
 
-            final Set<String> requiredIdColumns = InfoSchemaTables.getCatalogIdColumns(tableName);
-            if (!requiredIdColumns.equals(idColumns.keySet())) {
+            final Optional<String> requiredColumn = InfoSchemaTables.getCatalogIdColumn(tableName);
+            if (requiredColumn.map(c -> !pushedFilters.containsKey(c)).orElse(false)) {
                 throw new TableException(
                         String.format(
-                                "Table '%s' cannot be accessed without providing the required columns: %s",
+                                "Table '%s' cannot be accessed without providing the required column: %s",
                                 scan.tableSourceTable().contextResolvedTable().getIdentifier(),
-                                requiredIdColumns));
+                                requiredColumn.get()));
             }
 
-            return InfoSchemaTables.getStreamForTable(tableName, context, idColumns);
+            return InfoSchemaTables.getStreamForTable(tableName, context, pushedFilters);
         }
     }
 

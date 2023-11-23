@@ -19,7 +19,10 @@ import static io.confluent.flink.table.infoschema.InfoSchemaTables.INFORMATION_S
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.INFORMATION_SCHEMA_DATABASE_NAME;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOGS;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOG_NAME;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_COLUMNS;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_SCHEMATA;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLES;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLE_OPTIONS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link InfoSchemaTables}. */
@@ -28,13 +31,25 @@ public class InfoSchemaTablesTest {
     @Test
     void testListViewsByName() {
         assertThat(InfoSchemaTables.listViewsByName(INFORMATION_SCHEMA_DATABASE_NAME))
-                .containsExactlyInAnyOrder(TABLE_CATALOGS, TABLE_CATALOG_NAME, TABLE_SCHEMATA);
+                .containsExactlyInAnyOrder(
+                        TABLE_CATALOGS,
+                        TABLE_CATALOG_NAME,
+                        TABLE_SCHEMATA,
+                        TABLE_TABLES,
+                        TABLE_COLUMNS,
+                        TABLE_TABLE_OPTIONS);
     }
 
     @Test
     void testListViewsById() {
         assertThat(InfoSchemaTables.listViewsById(INFORMATION_SCHEMA_DATABASE_ID))
-                .containsExactlyInAnyOrder(TABLE_CATALOGS, TABLE_CATALOG_NAME, TABLE_SCHEMATA);
+                .containsExactlyInAnyOrder(
+                        TABLE_CATALOGS,
+                        TABLE_CATALOG_NAME,
+                        TABLE_SCHEMATA,
+                        TABLE_TABLES,
+                        TABLE_COLUMNS,
+                        TABLE_TABLE_OPTIONS);
     }
 
     @Test
@@ -68,7 +83,13 @@ public class InfoSchemaTablesTest {
     @Test
     void testListBaseTablesById() {
         assertThat(InfoSchemaTables.listBaseTablesById(DEFINITION_SCHEMA_DATABASE_ID))
-                .containsExactlyInAnyOrder(TABLE_CATALOGS, TABLE_CATALOG_NAME, TABLE_SCHEMATA);
+                .containsExactlyInAnyOrder(
+                        TABLE_CATALOGS,
+                        TABLE_CATALOG_NAME,
+                        TABLE_SCHEMATA,
+                        TABLE_TABLES,
+                        TABLE_COLUMNS,
+                        TABLE_TABLE_OPTIONS);
     }
 
     @Test

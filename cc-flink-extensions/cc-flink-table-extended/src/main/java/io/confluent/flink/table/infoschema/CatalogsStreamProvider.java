@@ -10,20 +10,19 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
 
 import io.confluent.flink.table.catalog.ConfluentSystemCatalog;
-import io.confluent.flink.table.infoschema.InfoSchemaTables.InfoTableStreamProvider;
 
 import java.util.Map;
 import java.util.stream.Stream;
 
 /** {@link InfoTableStreamProvider} for {@link InfoSchemaTables#TABLE_CATALOGS}. */
 @Confluent
-class CatalogsStreamProvider implements InfoTableStreamProvider {
+class CatalogsStreamProvider extends InfoTableStreamProvider {
 
     static final CatalogsStreamProvider INSTANCE = new CatalogsStreamProvider();
 
     @Override
     public Stream<GenericRowData> createStream(
-            SerdeContext context, Map<String, String> idColumns) {
+            SerdeContext context, Map<String, String> pushedFilters) {
         final ConfluentSystemCatalog accountCatalog =
                 (ConfluentSystemCatalog)
                         InfoTableStreamProvider.getCatalog(context, ConfluentSystemCatalog.ID);
