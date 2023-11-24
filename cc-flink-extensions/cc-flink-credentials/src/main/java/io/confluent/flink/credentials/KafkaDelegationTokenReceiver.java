@@ -60,7 +60,7 @@ public class KafkaDelegationTokenReceiver implements DelegationTokenReceiver {
         Map<JobID, KafkaCredentials> credentialsByJobId =
                 InstantiationUtil.deserializeObject(
                         tokens, KafkaDelegationTokenReceiver.class.getClassLoader());
-        LOG.info("Received credentials for jobs {}", credentialsByJobId.keySet());
+        LOG.debug("Received credentials for jobs {}", credentialsByJobId.keySet());
         kafkaCredentialsCache.onNewCredentialsObtained(credentialsByJobId);
     }
 }

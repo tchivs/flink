@@ -217,7 +217,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
                                 Collectors.toMap(
                                         Entry::getKey, e -> e.getValue().getKafkaCredentials()));
 
-        LOG.info("Sending credentials for jobs {}", credentials.keySet());
+        LOG.debug("Sending credentials for jobs {}", credentials.keySet());
         return new ObtainedDelegationTokens(
                 InstantiationUtil.serializeObject(credentials),
                 Optional.of(clock.absoluteTimeMillis() + checkPeriodMs));
