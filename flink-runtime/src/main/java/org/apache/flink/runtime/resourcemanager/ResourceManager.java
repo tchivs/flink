@@ -1577,7 +1577,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
     public void onNewTokensObtained(byte[] tokens) throws Exception {
         latestTokens.set(tokens);
 
-        log.info("Updating delegation tokens for {} task manager(s).", taskExecutors.size());
+        log.debug("Updating delegation tokens for {} task manager(s).", taskExecutors.size());
 
         if (!taskExecutors.isEmpty()) {
             final List<CompletableFuture<Acknowledge>> futures =
@@ -1586,7 +1586,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
             for (Map.Entry<ResourceID, WorkerRegistration<WorkerType>> workerRegistrationEntry :
                     taskExecutors.entrySet()) {
                 WorkerRegistration<WorkerType> registration = workerRegistrationEntry.getValue();
-                log.info("Updating delegation tokens for node {}.", registration.getNodeId());
+                log.debug("Updating delegation tokens for node {}.", registration.getNodeId());
                 final TaskExecutorGateway taskExecutorGateway =
                         registration.getTaskExecutorGateway();
                 futures.add(taskExecutorGateway.updateDelegationTokens(getFencingToken(), tokens));

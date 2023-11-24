@@ -306,17 +306,17 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
     @VisibleForTesting
     void startTokensUpdate() {
         try {
-            LOG.info("Starting tokens update task");
+            LOG.debug("Starting tokens update task");
             DelegationTokenContainer container = new DelegationTokenContainer();
             Optional<Long> nextRenewal = obtainDelegationTokensAndGetNextRenewal(container);
 
             if (container.hasTokens()) {
                 delegationTokenReceiverRepository.onNewTokensObtained(container);
 
-                LOG.info("Notifying listener about new tokens");
+                LOG.debug("Notifying listener about new tokens");
                 checkNotNull(listener, "Listener must not be null");
                 listener.onNewTokensObtained(InstantiationUtil.serializeObject(container));
-                LOG.info("Listener notified successfully");
+                LOG.debug("Listener notified successfully");
             } else {
                 LOG.warn("No tokens obtained so skipping notifications");
             }
@@ -331,7 +331,7 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
                                     renewalDelay,
                                     TimeUnit.MILLISECONDS);
                 }
-                LOG.info("Tokens update task started with {} ms delay", renewalDelay);
+                LOG.debug("Tokens update task started with {} ms delay", renewalDelay);
             } else {
                 LOG.warn(
                         "Tokens update task not started because either no tokens obtained or none of the tokens specified its renewal date");

@@ -50,6 +50,11 @@ public class KafkaCredentialsCacheImpl implements KafkaCredentialsCache {
     @Override
     public synchronized void onNewCredentialsObtained(
             Map<JobID, KafkaCredentials> credentialsByJobId) {
+        if (this.credentialsByJobId.equals(credentialsByJobId)) {
+            LOG.debug("credentials didn't change");
+            return;
+        }
+        LOG.info("credentials updated, new job ID set: {}", credentialsByJobId.keySet());
         this.credentialsByJobId = new HashMap<>(credentialsByJobId);
         notifyAll();
     }
