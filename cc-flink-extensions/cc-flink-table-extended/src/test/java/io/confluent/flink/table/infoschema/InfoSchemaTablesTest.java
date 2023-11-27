@@ -20,8 +20,10 @@ import static io.confluent.flink.table.infoschema.InfoSchemaTables.INFORMATION_S
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOGS;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOG_NAME;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_COLUMNS;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_KEY_COLUMN_USAGE;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_SCHEMATA;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLES;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLE_CONSTRAINTS;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLE_OPTIONS;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +39,9 @@ public class InfoSchemaTablesTest {
                         TABLE_SCHEMATA,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
-                        TABLE_TABLE_OPTIONS);
+                        TABLE_TABLE_OPTIONS,
+                        TABLE_TABLE_CONSTRAINTS,
+                        TABLE_KEY_COLUMN_USAGE);
     }
 
     @Test
@@ -49,7 +53,9 @@ public class InfoSchemaTablesTest {
                         TABLE_SCHEMATA,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
-                        TABLE_TABLE_OPTIONS);
+                        TABLE_TABLE_OPTIONS,
+                        TABLE_TABLE_CONSTRAINTS,
+                        TABLE_KEY_COLUMN_USAGE);
     }
 
     @Test
@@ -89,7 +95,9 @@ public class InfoSchemaTablesTest {
                         TABLE_SCHEMATA,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
-                        TABLE_TABLE_OPTIONS);
+                        TABLE_TABLE_OPTIONS,
+                        TABLE_TABLE_CONSTRAINTS,
+                        TABLE_KEY_COLUMN_USAGE);
     }
 
     @Test

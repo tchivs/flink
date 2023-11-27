@@ -44,7 +44,7 @@ class TablesStreamProvider extends InfoTableStreamProvider {
     }
 
     private static GenericRowData tableInfoToRow(SerdeContext context, TableInfo tableInfo) {
-        final ResolvedCatalogBaseTable<?> baseTable = tableInfo.getBaseTable(context);
+        final ResolvedCatalogBaseTable<?> baseTable = tableInfo.getResolvedTable(context);
 
         final GenericRowData out = new GenericRowData(14);
 

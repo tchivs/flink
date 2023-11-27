@@ -112,6 +112,18 @@ public class InfoSchemaTables {
     /** A table that contains a row for every column of all tables the user has access to. */
     public static final String TABLE_COLUMNS = "COLUMNS";
 
+    /**
+     * A table that contains a row for every constraint that is a defined for a table the user has
+     * access to.
+     */
+    public static final String TABLE_TABLE_CONSTRAINTS = "TABLE_CONSTRAINTS";
+
+    /**
+     * A table that contains a row for every column that is a defined in a table constraint the user
+     * has access to.
+     */
+    public static final String TABLE_KEY_COLUMN_USAGE = "KEY_COLUMN_USAGE";
+
     private static final Map<String, InfoSchemaTable> TABLES = initTables();
 
     private static Map<String, InfoSchemaTable> initTables() {
@@ -212,11 +224,69 @@ public class InfoSchemaTables {
                                         .column("IS_METADATA", "STRING NOT NULL")
                                         .column("METADATA_KEY", "STRING NULL")
                                         .column("IS_PERSISTED", "STRING NOT NULL")
+                                        .column("DISTRIBUTION_ORDINAL_POSITION", "INT NULL")
                                         .column("COMMENT", "STRING NULL")
                                         .build(),
                                 ColumnsStreamProvider.INSTANCE)
                         .withCatalogIdColumn("TABLE_CATALOG_ID")
                         .withFilterColumns("TABLE_SCHEMA_ID", "TABLE_SCHEMA", "TABLE_NAME")
+                        .build());
+
+        tables.put(
+                TABLE_TABLE_CONSTRAINTS,
+                InfoSchemaTable.of(
+                                Schema.newBuilder()
+                                        .column("CONSTRAINT_CATALOG_ID", "STRING NOT NULL")
+                                        .column("CONSTRAINT_CATALOG", "STRING NOT NULL")
+                                        .column("CONSTRAINT_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("CONSTRAINT_SCHEMA", "STRING NOT NULL")
+                                        .column("CONSTRAINT_NAME", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG_ID", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA", "STRING NOT NULL")
+                                        .column("TABLE_NAME", "STRING NOT NULL")
+                                        .column("CONSTRAINT_TYPE", "STRING NOT NULL")
+                                        .column("ENFORCED", "STRING NOT NULL")
+                                        .build(),
+                                TableConstraintsStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("CONSTRAINT_CATALOG_ID")
+                        // TABLE_CATALOG_ID is always equal to CONSTRAINT_CATALOG_ID. Once we lift
+                        // the requirement on having a catalog ID column we should include
+                        // TABLE_CATALOG_ID in the filter push down columns.
+                        .withFilterColumns(
+                                "CONSTRAINT_SCHEMA_ID",
+                                "CONSTRAINT_SCHEMA",
+                                "TABLE_SCHEMA_ID",
+                                "TABLE_SCHEMA",
+                                "TABLE_NAME")
+                        .build());
+
+        tables.put(
+                TABLE_KEY_COLUMN_USAGE,
+                InfoSchemaTable.of(
+                                Schema.newBuilder()
+                                        .column("CONSTRAINT_CATALOG_ID", "STRING NOT NULL")
+                                        .column("CONSTRAINT_CATALOG", "STRING NOT NULL")
+                                        .column("CONSTRAINT_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("CONSTRAINT_SCHEMA", "STRING NOT NULL")
+                                        .column("CONSTRAINT_NAME", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG_ID", "STRING NOT NULL")
+                                        .column("TABLE_CATALOG", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA_ID", "STRING NOT NULL")
+                                        .column("TABLE_SCHEMA", "STRING NOT NULL")
+                                        .column("TABLE_NAME", "STRING NOT NULL")
+                                        .column("COLUMN_NAME", "STRING NOT NULL")
+                                        .column("ORDINAL_POSITION", "INT NOT NULL")
+                                        .build(),
+                                KeyColumnUsageStreamProvider.INSTANCE)
+                        .withCatalogIdColumn("CONSTRAINT_CATALOG_ID")
+                        .withFilterColumns(
+                                "CONSTRAINT_SCHEMA_ID",
+                                "CONSTRAINT_SCHEMA",
+                                "TABLE_SCHEMA_ID",
+                                "TABLE_SCHEMA",
+                                "TABLE_NAME")
                         .build());
 
         return tables;

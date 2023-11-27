@@ -5,9 +5,12 @@
 package io.confluent.flink.table.infoschema;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
@@ -98,13 +101,26 @@ public abstract class InfoTableStreamProvider {
             this.tableName = tableName;
         }
 
-        ResolvedCatalogBaseTable<?> getBaseTable(SerdeContext context) {
+        ResolvedCatalogBaseTable<?> getResolvedTable(SerdeContext context) {
             final ObjectIdentifier id =
                     ObjectIdentifier.of(catalogInfo.getId(), databaseInfo.getId(), tableName);
             return context.getFlinkContext()
                     .getCatalogManager()
                     .getTableOrError(id)
                     .getResolvedTable();
+        }
+
+        CatalogBaseTable getUnresolvedTable(SerdeContext context) {
+            try {
+                return context.getFlinkContext()
+                        .getCatalogManager()
+                        .getCatalog(catalogInfo.getId())
+                        .orElseThrow(IllegalStateException::new)
+                        .getTable(new ObjectPath(databaseInfo.getId(), tableName));
+            } catch (TableNotExistException | IllegalStateException e) {
+                // Should never happen, just for a consistent exception
+                return getResolvedTable(context);
+            }
         }
     }
 

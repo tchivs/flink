@@ -5,7 +5,7 @@
 package io.confluent.flink.table.infoschema;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
@@ -32,8 +32,8 @@ class TableOptionsStreamProvider extends InfoTableStreamProvider {
         return getTableInfoStream(context, catalogId, databaseId, databaseName, tableName)
                 .flatMap(
                         tableInfo -> {
-                            final ResolvedCatalogBaseTable<?> baseTable =
-                                    tableInfo.getBaseTable(context);
+                            final CatalogBaseTable baseTable =
+                                    tableInfo.getUnresolvedTable(context);
 
                             final Map<String, String> filteredOptions =
                                     ConfluentManagedTableValidator.filterForPublicOptions(

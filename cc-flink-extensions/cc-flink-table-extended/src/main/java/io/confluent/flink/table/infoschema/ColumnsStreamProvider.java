@@ -5,10 +5,12 @@
 package io.confluent.flink.table.infoschema;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.catalog.CatalogBaseTable.TableKind;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.Column.ComputedColumn;
 import org.apache.flink.table.catalog.Column.MetadataColumn;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
@@ -17,9 +19,11 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 
 import io.confluent.flink.table.catalog.SystemColumnUtil;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -43,17 +47,39 @@ class ColumnsStreamProvider extends InfoTableStreamProvider {
                 .flatMap(
                         tableInfo -> {
                             final ResolvedCatalogBaseTable<?> baseTable =
-                                    tableInfo.getBaseTable(context);
+                                    tableInfo.getResolvedTable(context);
 
+                            final Map<String, Integer> distributionKeys;
+                            if (baseTable.getTableKind() == TableKind.TABLE) {
+                                final ResolvedCatalogTable resolvedTable =
+                                        (ResolvedCatalogTable) baseTable;
+                                // TODO rework this after DISTRIBUTED BY is supported
+                                final List<String> keys = resolvedTable.getPartitionKeys();
+                                distributionKeys =
+                                        IntStream.range(0, keys.size())
+                                                .boxed()
+                                                .collect(
+                                                        Collectors.toMap(
+                                                                keys::get, pos -> pos + 1));
+                            } else {
+                                distributionKeys = Collections.emptyMap();
+                            }
                             final List<Column> columns = baseTable.getResolvedSchema().getColumns();
 
                             return IntStream.range(0, columns.size())
-                                    .mapToObj(i -> columnToRow(tableInfo, columns.get(i), i));
+                                    .mapToObj(
+                                            i ->
+                                                    columnToRow(
+                                                            tableInfo,
+                                                            columns.get(i),
+                                                            i,
+                                                            distributionKeys));
                         });
     }
 
-    private static GenericRowData columnToRow(TableInfo tableInfo, Column column, int pos) {
-        final GenericRowData out = new GenericRowData(17);
+    private static GenericRowData columnToRow(
+            TableInfo tableInfo, Column column, int pos, Map<String, Integer> distributionKeys) {
+        final GenericRowData out = new GenericRowData(18);
 
         // TABLE_CATALOG_ID, TABLE_CATALOG, TABLE_SCHEMA_ID, TABLE_SCHEMA, TABLE_NAME
         fillIdentifiers(out, 0, tableInfo.catalogInfo, tableInfo.databaseInfo, tableInfo.tableName);
@@ -110,8 +136,11 @@ class ColumnsStreamProvider extends InfoTableStreamProvider {
         // IS_PERSISTED
         out.setField(15, StringData.fromString(column.isPersisted() ? YES : NO));
 
+        // DISTRIBUTION_ORDINAL_POSITION
+        out.setField(16, distributionKeys.get(column.getName()));
+
         // COMMENT
-        out.setField(16, StringData.fromString(column.getComment().orElse(null)));
+        out.setField(17, StringData.fromString(column.getComment().orElse(null)));
 
         return out;
     }

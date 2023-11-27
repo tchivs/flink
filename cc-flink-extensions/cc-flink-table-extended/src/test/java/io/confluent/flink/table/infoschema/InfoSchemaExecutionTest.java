@@ -80,6 +80,7 @@ public class InfoSchemaExecutionTest {
                         + "t TIMESTAMP_LTZ(3),\n"
                         + "WATERMARK FOR t AS t + INTERVAL '1' SECOND,\n"
                         + "c AS UPPER(s))\n"
+                        + "PARTITIONED BY (s)\n"
                         + "WITH ('connector' = 'confluent', 'confluent.kafka.topic' = 'SECRET')");
         tableEnv.executeSql(
                 "CREATE TABLE `env-1`.`lkc-1`.`table2` (\n"
@@ -92,8 +93,16 @@ public class InfoSchemaExecutionTest {
                         + "WITH ('connector' = 'confluent')");
         tableEnv.executeSql(
                 "CREATE TABLE `env-1`.`lkc-2`.`table3` (\n"
-                        + "s STRING,\n"
+                        + "s STRING PRIMARY KEY NOT ENFORCED,\n"
                         + "$rowtime TIMESTAMP_LTZ(3) NOT NULL METADATA VIRTUAL COMMENT 'SYSTEM'\n"
+                        + ")\n"
+                        + "WITH ('connector' = 'confluent')");
+        tableEnv.executeSql(
+                "CREATE TABLE `env-1`.`lkc-2`.`table4` (\n"
+                        + "s1 STRING,\n"
+                        + "s2 STRING,\n"
+                        + "i INT,\n"
+                        + "CONSTRAINT my_pk PRIMARY KEY (s1, s2) NOT ENFORCED\n"
                         + ")\n"
                         + "WITH ('connector' = 'confluent')");
     }
@@ -142,8 +151,9 @@ public class InfoSchemaExecutionTest {
                         "db1",
                         "table1",
                         "BASE TABLE",
-                        "NO",
-                        null,
+                        // IS_DISTRIBUTED
+                        "YES",
+                        "HASH",
                         null,
                         // IS_WATERMARKED
                         "YES",
@@ -174,6 +184,21 @@ public class InfoSchemaExecutionTest {
                         "lkc-2",
                         "db2",
                         "table3",
+                        "BASE TABLE",
+                        "NO",
+                        null,
+                        null,
+                        "NO",
+                        null,
+                        null,
+                        null,
+                        null),
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "table4",
                         "BASE TABLE",
                         "NO",
                         null,
@@ -216,7 +241,8 @@ public class InfoSchemaExecutionTest {
                 // The private option is correctly filtered out.
                 row("env-1", "cat1", "lkc-1", "db1", "table1", "connector", "confluent"),
                 row("env-1", "cat1", "lkc-1", "db1", "table2", "connector", "confluent"),
-                row("env-1", "cat1", "lkc-2", "db2", "table3", "connector", "confluent"));
+                row("env-1", "cat1", "lkc-2", "db2", "table3", "connector", "confluent"),
+                row("env-1", "cat1", "lkc-2", "db2", "table4", "connector", "confluent"));
     }
 
     @Test
@@ -224,7 +250,7 @@ public class InfoSchemaExecutionTest {
         assertResult(
                 "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`COLUMNS` "
                         + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA' AND `TABLE_NAME` = 'table1'",
-                // physical column with STRING
+                // physical column with STRING and distribution key
                 row(
                         "env-1",
                         "cat1",
@@ -242,6 +268,7 @@ public class InfoSchemaExecutionTest {
                         "NO",
                         null,
                         "YES",
+                        1,
                         null),
                 // physical column with NOT NULL
                 row(
@@ -261,6 +288,7 @@ public class InfoSchemaExecutionTest {
                         "NO",
                         null,
                         "YES",
+                        null,
                         null),
                 // physical column with TIMESTAMP_LTZ
                 row(
@@ -280,6 +308,7 @@ public class InfoSchemaExecutionTest {
                         "NO",
                         null,
                         "YES",
+                        null,
                         null),
                 // computed column
                 row(
@@ -299,6 +328,7 @@ public class InfoSchemaExecutionTest {
                         "NO",
                         null,
                         "NO",
+                        null,
                         null));
     }
 
@@ -314,6 +344,57 @@ public class InfoSchemaExecutionTest {
                 row("ts", "NO", "timestamp", "YES"),
                 // system column
                 row("$rowtime", "YES", null, "NO"));
+    }
+
+    @Test
+    void testListConstraints() throws Exception {
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`TABLE_CONSTRAINTS` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
+                // primary key not enforced with auto-generated name
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "PK_146",
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "table3",
+                        "PRIMARY KEY",
+                        "NO"),
+                // primary key not enforced with name "my_pk"
+                row(
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "my_pk",
+                        "env-1",
+                        "cat1",
+                        "lkc-2",
+                        "db2",
+                        "table4",
+                        "PRIMARY KEY",
+                        "NO"));
+    }
+
+    @Test
+    void testListKeyColumnUsage() throws Exception {
+        assertResult(
+                "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` "
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
+                row(
+                        "env-1", "cat1", "lkc-2", "db2", "PK_146", "env-1", "cat1", "lkc-2", "db2",
+                        "table3", "s", 1),
+                row(
+                        "env-1", "cat1", "lkc-2", "db2", "my_pk", "env-1", "cat1", "lkc-2", "db2",
+                        "table4", "s1", 1),
+                row(
+                        "env-1", "cat1", "lkc-2", "db2", "my_pk", "env-1", "cat1", "lkc-2", "db2",
+                        "table4", "s2", 2));
     }
 
     @Test
