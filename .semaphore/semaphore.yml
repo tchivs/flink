@@ -80,7 +80,7 @@ blocks:
         - name: tests
           matrix:
             - env_var: module
-              values: ["core", "table", "connect_1", "connect_2", "tests", "misc", "finegrained_resource_management"]
+              values: ["core", "table", "connect", "tests", "misc"]
             - env_var: SYSTEM_JOBTIMEOUT
               values: ["240"]
           commands:
