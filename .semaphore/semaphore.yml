@@ -11,8 +11,6 @@ auto_cancel:
     when: "branch !~ '^release-[0-9]+\\.[0-9]+-confluent$'"
 
 global_job_config:
-  secrets:
-    - name: vault_sem2_approle
   env_vars:
     - name: FLINK_ARTIFACT_DIR
       value: "/home/semaphore/flink_artifact"
@@ -35,7 +33,6 @@ global_job_config:
       value: "shared-cache"
   prologue:
     commands:
-      - chmod 400 ~/.ssh/id_rsa
       - sem-version java 8
       # hugo
       - sudo mkdir -p /usr/share/hugo
@@ -50,14 +47,10 @@ global_job_config:
       # use branch name as cache prefix
       - if [ -n "$SEMAPHORE_GIT_PR_BRANCH" ]; then export CACHE_PREFIX="$SEMAPHORE_GIT_PR_BRANCH"; else export CACHE_PREFIX="$SEMAPHORE_GIT_BRANCH"; fi
       - checkout
-      - make install-vault
-      - . mk-include/bin/vault-setup
+      - . vault-setup
       # Configure maven to use CFLT mirrors and repository
       - . vault-sem-get-secret maven-settings-no-cloudfront
       - . vault-sem-get-secret ci-reporting
-      - . vault-sem-get-secret ssh_id_rsa
-      - . vault-sem-get-secret gitconfig
-      - . vault-sem-get-secret dockerhub-semaphore-cred-ro
 blocks:
   - name: compile_ci
     dependencies: []
