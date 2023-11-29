@@ -1576,4 +1576,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId>
         @Override
         public void unblockResources(Collection<BlockedNode> unblockedNodes) {}
     }
+
+    @Override
+    public CompletableFuture<Void> fail(Exception error, Time timeout) {
+        schedulerNG.handleGlobalFailure(error);
+
+        return CompletableFuture.completedFuture(null);
+    }
 }

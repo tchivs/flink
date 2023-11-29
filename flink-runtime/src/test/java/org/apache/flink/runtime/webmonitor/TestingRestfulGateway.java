@@ -136,6 +136,9 @@ public class TestingRestfulGateway implements RestfulGateway {
                             OperatorID operatorId,
                             SerializedValue<CoordinationRequest> serializedRequest) ->
                             FutureUtils.completedExceptionally(new UnsupportedOperationException());
+
+    static final Function<JobID, CompletableFuture<Void>> DEFAULT_FAIL_JOB_FUNCTION =
+            jobId -> CompletableFuture.completedFuture(null);
     static final String LOCALHOST = "localhost";
 
     protected String address;
@@ -203,6 +206,8 @@ public class TestingRestfulGateway implements RestfulGateway {
                     CompletableFuture<CoordinationResponse>>
             deliverCoordinationRequestToCoordinatorFunction;
 
+    protected Function<JobID, CompletableFuture<Void>> failJobFunction;
+
     public TestingRestfulGateway() {
         this(
                 LOCALHOST,
@@ -224,7 +229,8 @@ public class TestingRestfulGateway implements RestfulGateway {
                 DEFAULT_STOP_WITH_SAVEPOINT_FUNCTION,
                 DEFAULT_GET_SAVEPOINT_STATUS_FUNCTION,
                 DEFAULT_CLUSTER_SHUTDOWN_SUPPLIER,
-                DEFAULT_DELIVER_COORDINATION_REQUEST_TO_COORDINATOR_FUNCTION);
+                DEFAULT_DELIVER_COORDINATION_REQUEST_TO_COORDINATOR_FUNCTION,
+                DEFAULT_FAIL_JOB_FUNCTION);
     }
 
     public TestingRestfulGateway(
@@ -269,7 +275,8 @@ public class TestingRestfulGateway implements RestfulGateway {
                             OperatorID,
                             SerializedValue<CoordinationRequest>,
                             CompletableFuture<CoordinationResponse>>
-                    deliverCoordinationRequestToCoordinatorFunction) {
+                    deliverCoordinationRequestToCoordinatorFunction,
+            Function<JobID, CompletableFuture<Void>> failJobFunction) {
         this.address = address;
         this.hostname = hostname;
         this.cancelJobFunction = cancelJobFunction;
@@ -293,6 +300,7 @@ public class TestingRestfulGateway implements RestfulGateway {
         this.clusterShutdownSupplier = clusterShutdownSupplier;
         this.deliverCoordinationRequestToCoordinatorFunction =
                 deliverCoordinationRequestToCoordinatorFunction;
+        this.failJobFunction = failJobFunction;
     }
 
     @Override
@@ -416,6 +424,11 @@ public class TestingRestfulGateway implements RestfulGateway {
         return hostname;
     }
 
+    @Override
+    public CompletableFuture<Void> failJob(JobID jobId, Exception message, Time timeout) {
+        return failJobFunction.apply(jobId);
+    }
+
     /**
      * Abstract builder class for {@link TestingRestfulGateway} and its subclasses.
      *
@@ -467,6 +480,8 @@ public class TestingRestfulGateway implements RestfulGateway {
                         SerializedValue<CoordinationRequest>,
                         CompletableFuture<CoordinationResponse>>
                 deliverCoordinationRequestToCoordinatorFunction;
+
+        protected Function<JobID, CompletableFuture<Void>> failJobFunction;
 
         protected AbstractBuilder() {
             cancelJobFunction = DEFAULT_CANCEL_JOB_FUNCTION;
@@ -632,6 +647,11 @@ public class TestingRestfulGateway implements RestfulGateway {
             return self();
         }
 
+        public T setFailJobFunction(Function<JobID, CompletableFuture<Void>> failJobFunction) {
+            this.failJobFunction = failJobFunction;
+            return self();
+        }
+
         protected abstract T self();
 
         public abstract TestingRestfulGateway build();
@@ -667,7 +687,8 @@ public class TestingRestfulGateway implements RestfulGateway {
                     stopWithSavepointFunction,
                     getSavepointStatusFunction,
                     clusterShutdownSupplier,
-                    deliverCoordinationRequestToCoordinatorFunction);
+                    deliverCoordinationRequestToCoordinatorFunction,
+                    failJobFunction);
         }
     }
 }

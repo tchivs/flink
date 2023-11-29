@@ -53,6 +53,7 @@ import org.apache.flink.runtime.rest.handler.job.JobConfigHandler;
 import org.apache.flink.runtime.rest.handler.job.JobDetailsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobExceptionsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobExecutionResultHandler;
+import org.apache.flink.runtime.rest.handler.job.JobFailHandler;
 import org.apache.flink.runtime.rest.handler.job.JobIdsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobManagerJobConfigurationHandler;
 import org.apache.flink.runtime.rest.handler.job.JobManagerJobEnvironmentHandler;
@@ -732,6 +733,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         final StandbyTaskManagerActivationHandler standbyTaskManagerActivationHandler =
                 new StandbyTaskManagerActivationHandler(leaderRetriever, timeout, responseHeaders);
 
+        final JobFailHandler jobFailHandler =
+                new JobFailHandler(leaderRetriever, timeout, responseHeaders);
         final File webUiDir = restConfiguration.getWebUiDir();
 
         Optional<StaticFileServerHandler<T>> optWebContent;
@@ -911,6 +914,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         clientCoordinationHandler.getMessageHeaders(), clientCoordinationHandler));
         handlers.add(
                 Tuple2.of(foregroundResultHandler.getMessageHeaders(), foregroundResultHandler));
+
+        handlers.add(Tuple2.of(jobFailHandler.getMessageHeaders(), jobFailHandler));
 
         // TODO: Remove once the Yarn proxy can forward all REST verbs
         handlers.add(

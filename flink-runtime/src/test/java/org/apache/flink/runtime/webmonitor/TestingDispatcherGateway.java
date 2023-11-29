@@ -169,7 +169,8 @@ public final class TestingDispatcherGateway extends TestingRestfulGateway
                             OperatorID,
                             SerializedValue<CoordinationRequest>,
                             CompletableFuture<CoordinationResponse>>
-                    deliverCoordinationRequestToCoordinatorFunction) {
+                    deliverCoordinationRequestToCoordinatorFunction,
+            Function<JobID, CompletableFuture<Void>> failJobFunction) {
         super(
                 address,
                 hostname,
@@ -190,7 +191,8 @@ public final class TestingDispatcherGateway extends TestingRestfulGateway
                 stopWithSavepointFunction,
                 getSavepointStatusFunction,
                 clusterShutdownSupplier,
-                deliverCoordinationRequestToCoordinatorFunction);
+                deliverCoordinationRequestToCoordinatorFunction,
+                failJobFunction);
         this.submitFunction = submitFunction;
         this.submitFailedFunction = submitFailedFunction;
         this.listFunction = listFunction;
@@ -382,7 +384,8 @@ public final class TestingDispatcherGateway extends TestingRestfulGateway
                     requestArchivedJobFunction,
                     clusterShutdownSupplier,
                     clusterShutdownWithStatusFunction,
-                    deliverCoordinationRequestToCoordinatorFunction);
+                    deliverCoordinationRequestToCoordinatorFunction,
+                    failJobFunction);
         }
     }
 }

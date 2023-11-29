@@ -1601,4 +1601,16 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
                         .collect(Collectors.toMap(Function.identity(), jobManagerConfig::get));
         return Configuration.fromMap(taskManagerConfig);
     }
+
+    @Override
+    public CompletableFuture<Void> failJob(JobID jobId, Exception error, Time timeout) {
+        Optional<JobManagerRunner> maybeJob = getJobManagerRunner(jobId);
+
+        if (maybeJob.isPresent()) {
+            return maybeJob.get().fail(error, timeout);
+        }
+
+        // re-use existing logic
+        return cancelJob(jobId, timeout).thenApply(i -> null);
+    }
 }
