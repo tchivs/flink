@@ -1590,6 +1590,8 @@ under the License.
 						<exclude>flink-end-to-end-tests/flink-tpcds-test/tpcds-tool/answer_set/*</exclude>
 						<exclude>flink-end-to-end-tests/flink-tpcds-test/tpcds-tool/query/*</exclude>
 						<exclude>flink-table/flink-table-code-splitter/src/test/resources/**</exclude>
+						<exclude>flink-connectors/confluent-connector-kafka/flink-connector-kafka/src/test/resources/**</exclude>
+						<exclude>flink-connectors/confluent-connector-kafka/tools/japicmp-output/**</exclude>
 
 						<!-- ArchUnit violation stores  -->
 						<exclude>**/archunit-violations/**</exclude>

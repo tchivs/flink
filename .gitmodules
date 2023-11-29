@@ -1,3 +1,7 @@
 [submodule "docs/themes/book"]
 	path = docs/themes/book
 	url = https://github.com/alex-shpak/hugo-book
+[submodule "flink-connectors/confluent-connector-kafka/tools/releasing/shared"]
+	path = flink-connectors/confluent-connector-kafka/tools/releasing/shared
+	url = https://github.com/apache/flink-connector-shared-utils
+	branch = release_utils
