@@ -72,6 +72,12 @@ Copyright 2023 Confluent Inc.
       <version>${project.version}</version>
     </dependency>
     <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-connector-base</artifactId>
+        <version>${project.version}</version>
+        <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-connector-kafka</artifactId>
       <version>${project.version}</version>
