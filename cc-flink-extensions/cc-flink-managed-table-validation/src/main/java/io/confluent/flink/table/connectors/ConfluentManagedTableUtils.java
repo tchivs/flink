@@ -140,6 +140,7 @@ public class ConfluentManagedTableUtils {
                 properties,
                 startupOptions,
                 boundedOptions,
+                options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID).orElse(null),
                 options.getOptional(CONFLUENT_KAFKA_CLIENT_ID_PREFIX).orElse(null),
                 options.getOptional(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX).orElse(null),
                 tableMode,
@@ -173,6 +174,7 @@ public class ConfluentManagedTableUtils {
                 Properties properties,
                 StartupOptions startupOptions,
                 BoundedOptions boundedOptions,
+                @Nullable String groupId,
                 @Nullable String clientIdPrefix,
                 @Nullable String transactionalIdPrefix,
                 ManagedChangelogMode tableMode,
@@ -186,13 +188,16 @@ public class ConfluentManagedTableUtils {
             this.properties = properties;
             this.startupOptions = startupOptions;
             this.boundedOptions = boundedOptions;
-            this.sourceClientIdPrefix =
-                    (clientIdPrefix != null) ? clientIdPrefix + "-source" : null;
-            this.sinkClientIdPrefix = (clientIdPrefix != null) ? clientIdPrefix + "-sink" : null;
             this.transactionalIdPrefix = transactionalIdPrefix;
             this.tableMode = tableMode;
             this.tableIdentifier = tableIdentifier;
             this.watermarkOptions = watermarkOptions;
+
+            final String resolvedClientIdPrefix = resolveClientIdPrefix(clientIdPrefix, groupId);
+            this.sourceClientIdPrefix =
+                    (resolvedClientIdPrefix != null) ? resolvedClientIdPrefix + "-source" : null;
+            this.sinkClientIdPrefix =
+                    (resolvedClientIdPrefix != null) ? resolvedClientIdPrefix + "-sink" : null;
         }
 
         @Override
@@ -239,6 +244,18 @@ public class ConfluentManagedTableUtils {
             result = 31 * result + Arrays.hashCode(keyProjection);
             result = 31 * result + Arrays.hashCode(valueProjection);
             return result;
+        }
+
+        private static @Nullable String resolveClientIdPrefix(
+                @Nullable String clientIdPrefix, @Nullable String groupId) {
+            if (clientIdPrefix != null) {
+                return clientIdPrefix;
+            } else {
+                // backwards compatibility path for SQL services that don't yet
+                // set the clientIdPrefix explicitly; piggyback on top of
+                // configured groupId
+                return groupId;
+            }
         }
     }
 

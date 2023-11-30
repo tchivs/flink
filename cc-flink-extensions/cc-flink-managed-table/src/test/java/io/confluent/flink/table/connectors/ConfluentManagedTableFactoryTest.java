@@ -165,6 +165,30 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
+        void testComplexOptionsUsesGroupIdAsClientPrefixWhenAbsent() {
+            final Map<String, String> options = getComplexOptions();
+            // if client id prefix isn't set, then the group id should be used
+            // as the prefix instead
+            options.remove("confluent.kafka.client-id-prefix");
+
+            final Consumer<DynamicTableParameters> testParameters =
+                    (parameters) -> {
+                        assertThat(parameters.sourceClientIdPrefix)
+                                .isEqualTo("generated_consumer_id_4242-source");
+                        assertThat(parameters.sinkClientIdPrefix)
+                                .isEqualTo("generated_consumer_id_4242-sink");
+                    };
+
+            final ConfluentManagedTableSource source =
+                    createTableSource(SCHEMA_WITH_PK, options, Arrays.asList(KEY_K1, KEY_K2));
+            testParameters.accept(source.getParameters());
+
+            final ConfluentManagedTableSink sink =
+                    createTableSink(SCHEMA_WITH_PK, options, Arrays.asList(KEY_K1, KEY_K2));
+            testParameters.accept(sink.getParameters());
+        }
+
+        @Test
         void testWithoutPartitionKeys() {
             final Map<String, String> options = getComplexOptions();
             options.remove("key.format");
