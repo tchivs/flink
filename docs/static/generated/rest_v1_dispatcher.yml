@@ -733,6 +733,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobExecutionResultResponseBody'
+  /jobs/{jobid}/fail:
+    patch:
+      description: Fail a job.
+      operationId: failJob
+      parameters:
+      - name: jobid
+        in: path
+        description: 32-character hexadecimal string value that identifies a job.
+        required: true
+        schema:
+          $ref: '#/components/schemas/JobID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobFailRequestBody'
+      responses:
+        "202":
+          description: The request was successful.
   /jobs/{jobid}/foreground-result/{operatorid}:
     post:
       description: Sends a request to a specified coordinator of the specified job
@@ -1597,6 +1616,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AggregatedMetricsResponseBody'
+  /taskmanagers/standby-activation:
+    post:
+      description: Activates standby TaskManager on given address
+      operationId: activateStandbyTaskManager
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandbyTaskManagerActivationRequestBody'
+      responses:
+        "202":
+          description: The request was successful.
   /taskmanagers/{taskmanagerid}:
     get:
       description: Returns details for a task manager. "metrics.memorySegmentsAvailable"
@@ -1761,6 +1792,11 @@ components:
             type: object
             additionalProperties:
               type: number
+        taskManagerTimestamps:
+          type: object
+          additionalProperties:
+            type: string
+            format: date-time
         taskMetrics:
           type: object
           additionalProperties:
@@ -2563,6 +2599,11 @@ components:
           $ref: '#/components/schemas/JobResult'
         status:
           $ref: '#/components/schemas/QueueStatus'
+    JobFailRequestBody:
+      type: object
+      properties:
+        failReason:
+          type: string
     JobID:
       pattern: "[0-9a-f]{32}"
       type: string
@@ -2977,6 +3018,13 @@ components:
           $ref: '#/components/schemas/JobID'
         resource:
           $ref: '#/components/schemas/ResourceProfileInfo'
+    StandbyTaskManagerActivationRequestBody:
+      type: object
+      properties:
+        rpcHost:
+          type: string
+        rpcPort:
+          type: string
     StatsSummaryDto:
       type: object
       properties:
