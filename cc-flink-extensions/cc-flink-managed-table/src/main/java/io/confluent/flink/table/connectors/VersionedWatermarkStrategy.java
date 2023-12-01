@@ -28,22 +28,33 @@ public class VersionedWatermarkStrategy {
 
     /** Maps a version to a concrete implementation. */
     public static WatermarkStrategy<RowData> forOptions(WatermarkOptions options) {
+        final WatermarkStrategy<RowData> strategy;
         switch (options.version) {
             case V0:
                 // Fallback in case something is wrong with the default implementation.
-                return WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10));
+                strategy = WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10));
+                break;
             case V1:
-                return WatermarkStrategy.forGenerator(
-                        ctx ->
-                                new HistogramWatermarkGenerator(
-                                        DEFAULT_MAX_CAPACITY,
-                                        DEFAULT_BUCKET_TARGET,
-                                        DEFAULT_MIN_DELAY,
-                                        DEFAULT_MAX_DELAY,
-                                        DEFAULT_PERCENTILE,
-                                        options.emitPerRow ? EmitMode.PER_ROW : EmitMode.PERIODIC));
+                strategy =
+                        WatermarkStrategy.forGenerator(
+                                ctx ->
+                                        new HistogramWatermarkGenerator(
+                                                DEFAULT_MAX_CAPACITY,
+                                                DEFAULT_BUCKET_TARGET,
+                                                DEFAULT_MIN_DELAY,
+                                                DEFAULT_MAX_DELAY,
+                                                DEFAULT_PERCENTILE,
+                                                options.emitPerRow
+                                                        ? EmitMode.PER_ROW
+                                                        : EmitMode.PERIODIC));
+                break;
             default:
                 throw new IllegalArgumentException("Unknown watermark generator version.");
+        }
+        if (options.idleTimeout.isZero() || options.idleTimeout.isNegative()) {
+            return strategy;
+        } else {
+            return strategy.withIdleness(options.idleTimeout);
         }
     }
 

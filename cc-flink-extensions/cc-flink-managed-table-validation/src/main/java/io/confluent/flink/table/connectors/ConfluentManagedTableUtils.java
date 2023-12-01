@@ -27,6 +27,7 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SourceWa
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,6 +63,7 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.S
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.VALUE_FIELDS_INCLUDE;
@@ -129,7 +131,7 @@ public class ConfluentManagedTableUtils {
 
         final BoundedOptions boundedOptions = getBoundedOptions(sessionConfig, options);
 
-        final WatermarkOptions watermarkOptions = getWatermarkOptions(options);
+        final WatermarkOptions watermarkOptions = getWatermarkOptions(sessionConfig, options);
 
         return new DynamicTableParameters(
                 physicalDataType,
@@ -361,10 +363,13 @@ public class ConfluentManagedTableUtils {
     public static final class WatermarkOptions implements Serializable {
         public final SourceWatermarkVersion version;
         public final boolean emitPerRow;
+        public final Duration idleTimeout;
 
-        public WatermarkOptions(SourceWatermarkVersion version, boolean emitPerRow) {
+        public WatermarkOptions(
+                SourceWatermarkVersion version, boolean emitPerRow, Duration idleTimeout) {
             this.version = version;
             this.emitPerRow = emitPerRow;
+            this.idleTimeout = idleTimeout;
         }
 
         @Override
@@ -376,12 +381,14 @@ public class ConfluentManagedTableUtils {
                 return false;
             }
             final WatermarkOptions that = (WatermarkOptions) o;
-            return emitPerRow == that.emitPerRow && version == that.version;
+            return emitPerRow == that.emitPerRow
+                    && version == that.version
+                    && Objects.equals(idleTimeout, that.idleTimeout);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(version, emitPerRow);
+            return Objects.hash(version, emitPerRow, idleTimeout);
         }
     }
 
@@ -473,13 +480,19 @@ public class ConfluentManagedTableUtils {
                 });
     }
 
-    private static @Nullable WatermarkOptions getWatermarkOptions(ReadableConfig options) {
+    private static @Nullable WatermarkOptions getWatermarkOptions(
+            @Nullable ReadableConfig sessionConfig, ReadableConfig options) {
         return options.getOptional(CONFLUENT_SOURCE_WATERMARK_VERSION)
                 .map(
                         version ->
                                 new WatermarkOptions(
                                         version,
-                                        options.get(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW)))
+                                        options.get(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW),
+                                        Optional.ofNullable(sessionConfig)
+                                                .map(c -> c.get(SQL_TABLES_SCAN_IDLE_TIMEOUT))
+                                                .orElse(
+                                                        SQL_TABLES_SCAN_IDLE_TIMEOUT
+                                                                .defaultValue())))
                 .orElse(null);
     }
 

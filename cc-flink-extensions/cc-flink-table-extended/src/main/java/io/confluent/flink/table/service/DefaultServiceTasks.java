@@ -122,6 +122,9 @@ class DefaultServiceTasks implements ServiceTasks {
         final Configuration privateConfig = Configuration.fromMap(privateOptions);
         applyPrivateConfig(tableEnvironment, privateConfig, service);
 
+        tableEnvironment.getConfig().addConfiguration(publicConfig);
+        tableEnvironment.getConfig().addConfiguration(privateConfig);
+
         // Prepare options for persisting in resources
         final Map<String, String> resourceOptions = new HashMap<>(privateConfig.toMap());
         publicConfig

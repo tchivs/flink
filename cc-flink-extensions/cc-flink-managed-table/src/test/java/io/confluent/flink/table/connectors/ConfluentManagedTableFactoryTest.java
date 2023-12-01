@@ -33,6 +33,7 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableUtils.ScanTopicP
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,6 +45,7 @@ import java.util.function.Consumer;
 
 import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MILLIS;
 import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_BOUNDED_MODE;
+import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT;
 import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MILLIS;
 import static io.confluent.flink.table.service.ServiceTasksOptions.SQL_TABLES_SCAN_STARTUP_MODE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -336,6 +338,7 @@ public class ConfluentManagedTableFactoryTest {
             sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MODE, GlobalScanStartupMode.TIMESTAMP);
             sessionConfig.set(SQL_TABLES_SCAN_STARTUP_MILLIS, 42L);
             sessionConfig.set(SQL_TABLES_SCAN_BOUNDED_MODE, GlobalScanBoundedMode.LATEST_OFFSET);
+            sessionConfig.set(SQL_TABLES_SCAN_IDLE_TIMEOUT, Duration.ofMillis(100));
 
             final ConfluentManagedTableFactory factory = new ConfluentManagedTableFactory();
             final DynamicTableFactory.Context context =
@@ -351,6 +354,7 @@ public class ConfluentManagedTableFactoryTest {
             assertThat(parameters.startupOptions.startupMode)
                     .isEqualTo(ScanStartupMode.SPECIFIC_OFFSETS);
             assertThat(parameters.boundedOptions.boundedMode).isEqualTo(ScanBoundedMode.TIMESTAMP);
+            assertThat(parameters.watermarkOptions.idleTimeout).isEqualTo(Duration.ofMillis(100));
         }
     }
 
@@ -573,6 +577,8 @@ public class ConfluentManagedTableFactoryTest {
         options.put("confluent.kafka.consumer-group-id", "generated_consumer_id_4242");
         options.put("confluent.kafka.client-id-prefix", "generated_client_id_4242");
         options.put("confluent.kafka.transactional-id-prefix", "generated_transact_id_4242");
+        options.put("confluent.source-watermark.version", "V1");
+        options.put("confluent.source-watermark.emit-per-row", "true");
         return options;
     }
 
