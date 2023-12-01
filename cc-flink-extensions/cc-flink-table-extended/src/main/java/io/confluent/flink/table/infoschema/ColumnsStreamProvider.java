@@ -101,7 +101,7 @@ class ColumnsStreamProvider extends InfoTableStreamProvider {
         out.setField(8, StringData.fromString(rootAsString));
 
         // FULL_DATA_TYPE
-        out.setField(9, StringData.fromString(type.asSerializableString()));
+        out.setField(9, StringData.fromString(type.copy(true).asSerializableString()));
 
         final boolean isSystemColumn = SystemColumnUtil.isSystemColumn(column);
         // IS_HIDDEN

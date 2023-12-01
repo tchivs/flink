@@ -281,24 +281,8 @@ public class InfoSchemaExecutionTest {
                         null),
                 // physical column with NOT NULL
                 row(
-                        "env-1",
-                        "cat1",
-                        "lkc-1",
-                        "db1",
-                        "table1",
-                        "i",
-                        2,
-                        "NO",
-                        "INTEGER",
-                        "INT NOT NULL",
-                        "NO",
-                        "NO",
-                        null,
-                        "NO",
-                        null,
-                        "YES",
-                        null,
-                        null),
+                        "env-1", "cat1", "lkc-1", "db1", "table1", "i", 2, "NO", "INTEGER", "INT",
+                        "NO", "NO", null, "NO", null, "YES", null, null),
                 // physical column with TIMESTAMP_LTZ
                 row(
                         "env-1",
