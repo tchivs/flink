@@ -46,8 +46,7 @@ class ColumnsStreamProvider extends InfoTableStreamProvider {
         return getTableInfoStream(context, catalogId, databaseId, databaseName, tableName)
                 .flatMap(
                         tableInfo -> {
-                            final ResolvedCatalogBaseTable<?> baseTable =
-                                    tableInfo.getResolvedTable(context);
+                            final ResolvedCatalogBaseTable<?> baseTable = tableInfo.baseTable;
 
                             final Map<String, Integer> distributionKeys;
                             if (baseTable.getTableKind() == TableKind.TABLE) {

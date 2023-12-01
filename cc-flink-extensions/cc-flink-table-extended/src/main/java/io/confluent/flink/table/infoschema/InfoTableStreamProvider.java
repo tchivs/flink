@@ -5,12 +5,10 @@
 package io.confluent.flink.table.infoschema;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
-import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
-import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
@@ -23,6 +21,7 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -86,7 +85,12 @@ public abstract class InfoTableStreamProvider {
                             return Stream.concat(tables.stream(), views.stream())
                                     .map(t -> new TableInfo(catalogInfo, databaseInfo, t))
                                     .filter(tableFilter);
-                        });
+                        })
+                // Filter in case the table gets deleted between listTables() and
+                // getTable(). This makes the implementation more lenient. Errors coming from the
+                // catalog should still be propagated to the user but TableNotExistException can be
+                // ignored.
+                .filter(tableInfo -> tableInfo.resolveTable(context));
     }
 
     /** Helper object to represent a table with catalog and database origins. */
@@ -94,6 +98,7 @@ public abstract class InfoTableStreamProvider {
         protected final CatalogInfo catalogInfo;
         protected final DatabaseInfo databaseInfo;
         protected final String tableName;
+        protected ResolvedCatalogBaseTable<?> baseTable;
 
         TableInfo(CatalogInfo catalogInfo, DatabaseInfo databaseInfo, String tableName) {
             this.catalogInfo = catalogInfo;
@@ -101,26 +106,19 @@ public abstract class InfoTableStreamProvider {
             this.tableName = tableName;
         }
 
-        ResolvedCatalogBaseTable<?> getResolvedTable(SerdeContext context) {
+        private boolean resolveTable(SerdeContext context) {
             final ObjectIdentifier id =
                     ObjectIdentifier.of(catalogInfo.getId(), databaseInfo.getId(), tableName);
-            return context.getFlinkContext()
-                    .getCatalogManager()
-                    .getTableOrError(id)
-                    .getResolvedTable();
-        }
-
-        CatalogBaseTable getUnresolvedTable(SerdeContext context) {
-            try {
-                return context.getFlinkContext()
-                        .getCatalogManager()
-                        .getCatalog(catalogInfo.getId())
-                        .orElseThrow(IllegalStateException::new)
-                        .getTable(new ObjectPath(databaseInfo.getId(), tableName));
-            } catch (TableNotExistException | IllegalStateException e) {
-                // Should never happen, just for a consistent exception
-                return getResolvedTable(context);
+            final Optional<ResolvedCatalogBaseTable<?>> baseTableOrEmpty =
+                    context.getFlinkContext()
+                            .getCatalogManager()
+                            .getTable(id)
+                            .map(ContextResolvedTable::getResolvedTable);
+            if (baseTableOrEmpty.isPresent()) {
+                this.baseTable = baseTableOrEmpty.get();
+                return true;
             }
+            return false;
         }
     }
 

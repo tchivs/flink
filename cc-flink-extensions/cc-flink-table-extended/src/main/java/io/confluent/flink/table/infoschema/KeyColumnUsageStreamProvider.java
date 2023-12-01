@@ -5,7 +5,6 @@
 package io.confluent.flink.table.infoschema;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
@@ -34,16 +33,13 @@ class KeyColumnUsageStreamProvider extends InfoTableStreamProvider {
 
         return getTableInfoStream(context, catalogId, databaseId, databaseName, tableName)
                 .flatMap(
-                        tableInfo -> {
-                            final ResolvedCatalogBaseTable<?> baseTable =
-                                    tableInfo.getResolvedTable(context);
-
-                            return baseTable
-                                    .getResolvedSchema()
-                                    .getPrimaryKey()
-                                    .map(c -> constraintToStream(tableInfo, c))
-                                    .orElseGet(Stream::empty);
-                        });
+                        tableInfo ->
+                                tableInfo
+                                        .baseTable
+                                        .getResolvedSchema()
+                                        .getPrimaryKey()
+                                        .map(c -> constraintToStream(tableInfo, c))
+                                        .orElseGet(Stream::empty));
     }
 
     private static Stream<GenericRowData> constraintToStream(

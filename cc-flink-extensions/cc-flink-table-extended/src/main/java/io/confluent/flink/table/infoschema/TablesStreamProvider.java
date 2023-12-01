@@ -40,11 +40,11 @@ class TablesStreamProvider extends InfoTableStreamProvider {
         final String tableName = pushedFilters.get("TABLE_NAME");
 
         return getTableInfoStream(context, catalogId, databaseId, databaseName, tableName)
-                .map(tableInfo -> tableInfoToRow(context, tableInfo));
+                .map(TablesStreamProvider::tableInfoToRow);
     }
 
-    private static GenericRowData tableInfoToRow(SerdeContext context, TableInfo tableInfo) {
-        final ResolvedCatalogBaseTable<?> baseTable = tableInfo.getResolvedTable(context);
+    private static GenericRowData tableInfoToRow(TableInfo tableInfo) {
+        final ResolvedCatalogBaseTable<?> baseTable = tableInfo.baseTable;
 
         final GenericRowData out = new GenericRowData(14);
 
