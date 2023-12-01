@@ -20,6 +20,7 @@ import static io.confluent.flink.table.infoschema.InfoSchemaTables.INFORMATION_S
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOGS;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_CATALOG_NAME;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_COLUMNS;
+import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_DATABASES;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_KEY_COLUMN_USAGE;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_SCHEMATA;
 import static io.confluent.flink.table.infoschema.InfoSchemaTables.TABLE_TABLES;
@@ -37,6 +38,7 @@ public class InfoSchemaTablesTest {
                         TABLE_CATALOGS,
                         TABLE_CATALOG_NAME,
                         TABLE_SCHEMATA,
+                        TABLE_DATABASES,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
                         TABLE_TABLE_OPTIONS,
@@ -51,6 +53,7 @@ public class InfoSchemaTablesTest {
                         TABLE_CATALOGS,
                         TABLE_CATALOG_NAME,
                         TABLE_SCHEMATA,
+                        TABLE_DATABASES,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
                         TABLE_TABLE_OPTIONS,
@@ -93,6 +96,7 @@ public class InfoSchemaTablesTest {
                         TABLE_CATALOGS,
                         TABLE_CATALOG_NAME,
                         TABLE_SCHEMATA,
+                        TABLE_DATABASES,
                         TABLE_TABLES,
                         TABLE_COLUMNS,
                         TABLE_TABLE_OPTIONS,

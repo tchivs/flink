@@ -100,6 +100,12 @@ public class InfoSchemaTables {
     /** A table that contains a row for every database the user has access to. */
     public static final String TABLE_SCHEMATA = "SCHEMATA";
 
+    /**
+     * Synonym of {@link #TABLE_SCHEMATA} using Flink terminology to avoid confusion with the
+     * standard compliant table name.
+     */
+    public static final String TABLE_DATABASES = "DATABASES";
+
     /** A table that contains a row for every (view/base) table the user has access to. */
     public static final String TABLE_TABLES = "TABLES";
 
@@ -162,6 +168,8 @@ public class InfoSchemaTables {
                                 SchemataStreamProvider.INSTANCE)
                         .withCatalogIdColumn("CATALOG_ID")
                         .build());
+
+        tables.put(TABLE_DATABASES, tables.get(TABLE_SCHEMATA));
 
         tables.put(
                 TABLE_TABLES,

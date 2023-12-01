@@ -132,6 +132,15 @@ public class InfoSchemaExecutionTest {
     }
 
     @Test
+    void testListDatabases() throws Exception {
+        assertResult(
+                "SELECT * FROM `INFORMATION_SCHEMA`.`DATABASES`",
+                row("env-2", "cat2", "lkc-1", "db1"),
+                row("env-2", "cat2", "lkc-2", "db2"),
+                row("env-2", "cat2", "$information-schema", "INFORMATION_SCHEMA"));
+    }
+
+    @Test
     void testListSchemataWithFilter() throws Exception {
         assertResult(
                 "SELECT * FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE `SCHEMA_NAME` <> 'INFORMATION_SCHEMA'",
