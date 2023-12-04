@@ -18,6 +18,8 @@ import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DE
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_MAX_CAPACITY;
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_MAX_DELAY;
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_MIN_DELAY;
+import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_PERCENTILE;
+import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_SAFETY_MARGIN;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link HistogramWatermarkGenerator}. */
@@ -31,9 +33,16 @@ public class HistogramWatermarkGeneratorTest {
         final int minDelay = 50;
         final int maxDelay = 1000;
         final double percentile = 1.0;
+        final int[] safetyMargin = new int[] {100, 5, 1, 0, 0};
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
+                        capacity,
+                        bucketTarget,
+                        minDelay,
+                        maxDelay,
+                        percentile,
+                        safetyMargin,
+                        EmitMode.PERIODIC);
 
         // Initial state
         assertThat(g.bucketIntervals).containsExactly(63, 125, 251, 501, 1000);
@@ -49,17 +58,17 @@ public class HistogramWatermarkGeneratorTest {
         // timestamp=15, delay=0
         g.onEvent(null, 15, null);
         assertThat(g.maxTimestamp).isEqualTo(15L);
-        // lowest interval + the highest safety margin
-        assertThat(g.percentileDelay).isEqualTo(1063);
+        // lowest interval (63) + the highest safety margin (100)
+        assertThat(g.percentileDelay).isEqualTo(163);
 
         // timestamp=20, delay=0
         g.onEvent(null, 20, null);
-        // highest interval + reduced safety margin
-        assertThat(g.percentileDelay).isEqualTo(564);
+        // lowest interval (63) + reduced safety margin (5)
+        assertThat(g.percentileDelay).isEqualTo(68);
 
         // timestamp=21 till 29, delay=0
         IntStream.range(0, 9).forEach(i -> g.onEvent(null, 21 + i, null));
-        // lowest interval + no safety margin
+        // lowest interval (63) + no safety margin (0)
         assertThat(g.percentileDelay).isEqualTo(63);
     }
 
@@ -70,9 +79,16 @@ public class HistogramWatermarkGeneratorTest {
         final int minDelay = 50;
         final int maxDelay = 1000;
         final double percentile = 1.0;
+        final int[] safetyMargin = new int[] {100, 5, 1, 0, 0};
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
+                        capacity,
+                        bucketTarget,
+                        minDelay,
+                        maxDelay,
+                        percentile,
+                        safetyMargin,
+                        EmitMode.PERIODIC);
 
         // Initial state
         assertThat(g.bucketIntervals).containsExactly(63, 125, 251, 501, 1000);
@@ -88,20 +104,20 @@ public class HistogramWatermarkGeneratorTest {
         // timestamp=400, delay=0
         g.onEvent(null, 400, null);
         assertThat(g.bucketCounts).containsExactly(1, 0, 0, 0, 0);
-        // lowest interval + the highest safety margin
-        assertThat(g.percentileDelay).isEqualTo(1063);
+        // lowest interval (63) + the highest safety margin (100)
+        assertThat(g.percentileDelay).isEqualTo(163);
 
         // timestamp=200, delay=200
         g.onEvent(null, 200, null);
         assertThat(g.bucketCounts).containsExactly(1, 0, 1, 0, 0);
-        // higher interval (251) + lower safety margin (501)
-        assertThat(g.percentileDelay).isEqualTo(752);
+        // higher interval (251) + lower safety margin (5)
+        assertThat(g.percentileDelay).isEqualTo(256);
 
         // timestamp=100, delay=300
         g.onEvent(null, 100, null);
         assertThat(g.bucketCounts).containsExactly(1, 0, 1, 1, 0);
-        // higher interval (501) + lower safety margin (501)
-        assertThat(g.percentileDelay).isEqualTo(1002);
+        // higher interval (501) + lower safety margin (5)
+        assertThat(g.percentileDelay).isEqualTo(506);
 
         // timestamp=392-399, delay=1
         IntStream.range(0, 7).forEach(i -> g.onEvent(null, 392 + i, null));
@@ -120,6 +136,7 @@ public class HistogramWatermarkGeneratorTest {
                         DEFAULT_MIN_DELAY,
                         DEFAULT_MAX_DELAY,
                         percentile,
+                        DEFAULT_SAFETY_MARGIN,
                         EmitMode.PERIODIC);
 
         final ThreadLocalRandom r = ThreadLocalRandom.current();
@@ -142,6 +159,7 @@ public class HistogramWatermarkGeneratorTest {
                         DEFAULT_MIN_DELAY,
                         DEFAULT_MAX_DELAY,
                         percentile,
+                        DEFAULT_SAFETY_MARGIN,
                         EmitMode.PERIODIC);
 
         long clock = 0;
@@ -177,9 +195,16 @@ public class HistogramWatermarkGeneratorTest {
         final int minDelay = 50;
         final int maxDelay = 1000;
         final double percentile = 1.0;
+        final int[] safetyMargin = new int[] {0};
         final HistogramWatermarkGenerator g =
                 new HistogramWatermarkGenerator(
-                        capacity, bucketTarget, minDelay, maxDelay, percentile, EmitMode.PERIODIC);
+                        capacity,
+                        bucketTarget,
+                        minDelay,
+                        maxDelay,
+                        percentile,
+                        safetyMargin,
+                        EmitMode.PERIODIC);
 
         // Completely fills the buffer
         g.onEvent(null, 1, null);
@@ -210,6 +235,43 @@ public class HistogramWatermarkGeneratorTest {
         g.onPeriodicEmit(testingWatermarkOutput);
         // No overflow
         assertThat(testingWatermarkOutput.value).isEqualTo(Long.MIN_VALUE);
+    }
+
+    @Test
+    void testDefaultSafetyMargin() {
+        final HistogramWatermarkGenerator g =
+                new HistogramWatermarkGenerator(
+                        DEFAULT_MAX_CAPACITY,
+                        DEFAULT_BUCKET_TARGET,
+                        DEFAULT_MIN_DELAY,
+                        DEFAULT_MAX_DELAY,
+                        DEFAULT_PERCENTILE,
+                        DEFAULT_SAFETY_MARGIN,
+                        EmitMode.PERIODIC);
+
+        long clock = 0;
+        for (int i = 0; i < 250; i++) {
+            clock++;
+            g.onEvent(null, clock, null);
+        }
+        // lowest interval (57) + the highest safety margin (7 days = 604800000)
+        assertThat(g.percentileDelay).isEqualTo(604800057);
+
+        clock++;
+        g.onEvent(null, clock, null);
+
+        // after 251 elements the watermark drops significantly
+        // lowest interval (57) + the reduced safety margin (30s = 604800000)
+        assertThat(g.percentileDelay).isEqualTo(30057);
+
+        for (int i = 0; i < 750; i++) {
+            clock++;
+            g.onEvent(null, clock, null);
+        }
+
+        // after 1001 elements there is no safety margin added to the watermark
+        // lowest interval (57) + no safety margin (0)
+        assertThat(g.percentileDelay).isEqualTo(57);
     }
 
     // @Test

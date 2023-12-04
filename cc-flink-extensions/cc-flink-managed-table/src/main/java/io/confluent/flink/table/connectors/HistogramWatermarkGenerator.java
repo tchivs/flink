@@ -23,8 +23,8 @@ import java.util.Set;
  *
  * <p>For efficiency, the histogram algorithm uses a fixed number of buckets with exponentially
  * increasing intervals. A percentile parameter defines how many elements must be included when
- * generating a watermark. The maximum number of elements in the histogram is capped. An
- * exponentially decreasing safety margin is added until the histogram has been fully warmed up.
+ * generating a watermark. The maximum number of elements in the histogram is capped. A decreasing
+ * safety margin is added until the histogram has been fully warmed up.
  */
 @Confluent
 public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> {
@@ -32,24 +32,62 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
     /** Mode when to emit watermarks. */
     public enum EmitMode {
         PER_ROW,
-        PERIODIC;
+        PERIODIC
     }
 
     public static final double DEFAULT_PERCENTILE = 0.95;
 
+    /** A high capacity is desirable to maintain a long history. */
     public static final int DEFAULT_MAX_CAPACITY = 5000;
 
     public static final int DEFAULT_MIN_DELAY = 50;
 
+    /** Kafka's default retention time. */
     public static final int DEFAULT_MAX_DELAY = (int) Duration.ofDays(7).toMillis();
 
     public static final int DEFAULT_BUCKET_TARGET = 100;
+
+    /**
+     * With respect to {@link #DEFAULT_MAX_CAPACITY} a safety margin is added. Once the buffer is
+     * filled, it will be 0.
+     */
+    public static final int[] DEFAULT_SAFETY_MARGIN =
+            new int[] {
+                // from element 0
+                (int) Duration.ofDays(7).toMillis(),
+                // from element 250
+                (int) Duration.ofSeconds(30).toMillis(),
+                // from element 500
+                (int) Duration.ofSeconds(10).toMillis(),
+                // from element 750
+                (int) Duration.ofSeconds(1).toMillis(),
+                // from element 1000
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            };
 
     /** Mode when to emit watermarks. */
     private final EmitMode emitMode;
 
     /** Fraction of elements to be included during watermark calculation. */
     private final double percentile;
+
+    /** Intervals added while filling the {@link #delays}. */
+    private final int[] safetyMargin;
 
     /** Delays considered in the histogram. */
     @VisibleForTesting final int[] delays;
@@ -82,6 +120,7 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
      *     7 days)
      * @param percentile percentage of elements that should be included during watermark calculation
      *     (e.g. 0.95 declares ~5% of the data as late)
+     * @param safetyMargin intervals added while reaching the {@param capacity}
      * @param emitMode mode when to emit watermarks, mostly intended for testing purposes.
      */
     public HistogramWatermarkGenerator(
@@ -90,6 +129,7 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
             int minDelay,
             int maxDelay,
             double percentile,
+            int[] safetyMargin,
             EmitMode emitMode) {
         Preconditions.checkArgument(capacity > 0);
         Preconditions.checkArgument(bucketTarget > 0);
@@ -98,6 +138,7 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
 
         this.emitMode = emitMode;
         this.percentile = percentile;
+        this.safetyMargin = safetyMargin;
         delays = new int[capacity];
         Arrays.fill(delays, -1);
         bucketIntervals = assignBuckets(bucketTarget, minDelay, maxDelay);
@@ -112,6 +153,7 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
                 DEFAULT_MIN_DELAY,
                 DEFAULT_MAX_DELAY,
                 DEFAULT_PERCENTILE,
+                DEFAULT_SAFETY_MARGIN,
                 EmitMode.PERIODIC);
     }
 
@@ -201,17 +243,17 @@ public class HistogramWatermarkGenerator implements WatermarkGenerator<RowData> 
 
     /**
      * Until the histogram is filled with enough data, calculate a safety margin that accounts for
-     * uncertainty. It exponentially decreases until the buffer is filled. When the buffer is empty,
-     * the safety margin is the highest bucket interval. When the buffer is fully filled, the safety
-     * margin is 0.
+     * uncertainty. It should exponentially decrease until the buffer is filled. When the buffer is
+     * empty, the safety margin is the highest. When the buffer is fully filled, the safety margin
+     * is 0.
      */
     private int findSafetyMargin(int totalCount) {
         final double filledPercentage = ((double) totalCount) / delays.length;
-        final int safetyBuckets = (int) (bucketIntervals.length * filledPercentage);
-        if (safetyBuckets == bucketIntervals.length) {
+        final int safetyMarginPos = (int) (safetyMargin.length * filledPercentage);
+        if (safetyMarginPos == safetyMargin.length) {
             return 0;
         }
-        return bucketIntervals[bucketIntervals.length - safetyBuckets - 1];
+        return safetyMargin[safetyMarginPos];
     }
 
     private int findPercentile(int totalCount) {

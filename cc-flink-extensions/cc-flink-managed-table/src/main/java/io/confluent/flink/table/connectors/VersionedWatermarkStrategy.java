@@ -19,6 +19,7 @@ import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DE
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_MAX_DELAY;
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_MIN_DELAY;
 import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_PERCENTILE;
+import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DEFAULT_SAFETY_MARGIN;
 
 /**
  * Handles multiple {@link WatermarkGenerator}s with evolving algorithms and fine-tuned parameters.
@@ -44,6 +45,7 @@ public class VersionedWatermarkStrategy {
                                                 DEFAULT_MIN_DELAY,
                                                 DEFAULT_MAX_DELAY,
                                                 DEFAULT_PERCENTILE,
+                                                DEFAULT_SAFETY_MARGIN,
                                                 options.emitPerRow
                                                         ? EmitMode.PER_ROW
                                                         : EmitMode.PERIODIC));
