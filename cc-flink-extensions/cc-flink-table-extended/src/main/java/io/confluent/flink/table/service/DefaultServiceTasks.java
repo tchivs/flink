@@ -11,7 +11,6 @@ import org.apache.flink.configuration.FallbackKey;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.api.SqlParserException;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
@@ -27,9 +26,7 @@ import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.delegation.Parser;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
@@ -154,7 +151,7 @@ class DefaultServiceTasks implements ServiceTasks {
                                     throw new ValidationException(
                                             String.format("Catalog name '%s' is not allowed.", v));
                                 }
-                                setCurrentCatalog(tableEnvironment, v);
+                                tableEnvironment.useCatalog(v);
                             });
             publicConfig
                     .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
@@ -165,7 +162,7 @@ class DefaultServiceTasks implements ServiceTasks {
                                     throw new ValidationException(
                                             String.format("Database name '%s' is not allowed.", v));
                                 }
-                                setDatabase(tableEnvironment, v);
+                                tableEnvironment.useDatabase(v);
                             });
         }
 
@@ -182,51 +179,6 @@ class DefaultServiceTasks implements ServiceTasks {
         publicConfig
                 .getOptional(ServiceTasksOptions.SQL_TABLES_SCAN_IDLE_TIMEOUT)
                 .ifPresent(v -> config.set(TABLE_EXEC_SOURCE_IDLE_TIMEOUT, v));
-    }
-
-    private static void setCurrentCatalog(TableEnvironment tableEnvironment, String v) {
-        if (tableEnvironment instanceof TableEnvironmentImpl) {
-            try {
-                final Parser parser = ((TableEnvironmentImpl) tableEnvironment).getParser();
-                final UnresolvedIdentifier identifier = parser.parseIdentifier(v);
-                if (identifier.getCatalogName().isPresent()
-                        || identifier.getDatabaseName().isPresent()) {
-                    throw new ValidationException("Wrong format for the current catalog: " + v);
-                }
-                tableEnvironment.useCatalog(identifier.getObjectName());
-            } catch (SqlParserException e) {
-                throw new ValidationException("Wrong format for the current catalog: " + v);
-            }
-        } else {
-            // we should never end up here. There is no other implementation of TableEnvironment
-            tableEnvironment.useCatalog(v);
-        }
-    }
-
-    private static void setDatabase(TableEnvironment tableEnvironment, String v) {
-        if (tableEnvironment instanceof TableEnvironmentImpl) {
-            try {
-                final Parser parser = ((TableEnvironmentImpl) tableEnvironment).getParser();
-                final UnresolvedIdentifier identifier = parser.parseIdentifier(v);
-                // the parts are shifted for a database, if the provided
-                // identifier has two parts, the name is the database name
-                // and the 'database name' is actually catalog's name
-                identifier
-                        .getCatalogName()
-                        .ifPresent(
-                                name -> {
-                                    throw new ValidationException(
-                                            "Wrong format for the current database: " + v);
-                                });
-                identifier.getDatabaseName().ifPresent(tableEnvironment::useCatalog);
-                tableEnvironment.useDatabase(identifier.getObjectName());
-            } catch (SqlParserException e) {
-                throw new ValidationException("Wrong format for the current database: " + v);
-            }
-        } else {
-            // we should never end up here. There is no other implementation of TableEnvironment
-            tableEnvironment.useDatabase(v);
-        }
     }
 
     private void applyPrivateConfig(
