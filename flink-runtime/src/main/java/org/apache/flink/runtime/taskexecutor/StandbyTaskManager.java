@@ -6,6 +6,7 @@ package org.apache.flink.runtime.taskexecutor;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.runtime.rpc.RpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -41,6 +42,9 @@ public class StandbyTaskManager extends RpcEndpoint implements StandbyTaskManage
             return;
         }
 
+        LOG.info(
+                "Received configuration for the activation: {}",
+                ConfigurationUtils.hideSensitiveValues(overrides.toMap()));
         activationFuture.complete(overrides);
     }
 
