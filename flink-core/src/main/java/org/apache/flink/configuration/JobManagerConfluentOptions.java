@@ -23,7 +23,7 @@ public class JobManagerConfluentOptions {
                     .asList()
                     .defaultValues()
                     .withDescription(
-                            "Comma-separate list of options that should be taken from JobManager while it takes over standby TaskManager.");
+                            "Semicolon-separate list of options that should be taken from JobManager while it takes over standby TaskManager.");
 
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
