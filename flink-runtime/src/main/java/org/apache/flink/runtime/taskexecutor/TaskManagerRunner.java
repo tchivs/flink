@@ -103,8 +103,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.concurrent.FutureUtils.composeAfterwards;
-import static org.apache.flink.util.concurrent.FutureUtils.runAfterwards;
 
 /**
  * This class is the executable entry point for the task manager in yarn or standalone mode. It
@@ -146,6 +144,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     @GuardedBy("lock")
     private RpcService rpcService;
+
+    @GuardedBy("lock")
+    private RpcService standbyRpcService;
 
     @GuardedBy("lock")
     private HighAvailabilityServices highAvailabilityServices;
@@ -191,7 +192,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     private void startTaskManagerRunnerServices() throws Exception {
         synchronized (lock) {
-            rpcSystem = RpcSystem.load(configuration);
+            if (rpcSystem == null) {
+                rpcSystem = RpcSystem.load(configuration);
+            }
 
             this.executor =
                     Executors.newScheduledThreadPool(
@@ -316,23 +319,20 @@ public class TaskManagerRunner implements FatalErrorHandler {
                             TaskManagerConfluentOptions.STANDBY_MODE.key()));
         }
 
-        CompletableFuture<Void> closeableFuture;
+        CompletableFuture<Void> activationFuture;
         synchronized (lock) {
+            // This RPC System won't be restarted after the activation. So all configurations like
+            // TMP_DIRS that are required for its start are impossible to override from JM.
             rpcSystem = RpcSystem.load(configuration);
-            rpcService = createRpcService(configuration, null, rpcSystem);
-            standbyTaskManager = new StandbyTaskManager(rpcService);
+            standbyRpcService = createRpcService(configuration, null, rpcSystem);
+            standbyTaskManager = new StandbyTaskManager(standbyRpcService);
             standbyTaskManager.start();
 
-            CompletableFuture<Void> activationFuture =
+            activationFuture =
                     standbyTaskManager.getActivationFuture().thenAccept(configuration::addAll);
-
-            // StandbyTaskManager endpoint is only for one-time use. Close it after successful.
-            closeableFuture = composeAfterwards(activationFuture, standbyTaskManager::closeAsync);
-            closeableFuture = composeAfterwards(closeableFuture, rpcService::closeAsync);
-            closeableFuture = runAfterwards(closeableFuture, rpcSystem::close);
         }
 
-        closeableFuture.get();
+        activationFuture.get();
     }
 
     public void close() throws Exception {
@@ -443,6 +443,10 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 } catch (Exception e) {
                     exception = ExceptionUtils.firstOrSuppressed(e, exception);
                 }
+            }
+
+            if (standbyRpcService != null) {
+                terminationFutures.add(standbyRpcService.closeAsync());
             }
 
             if (rpcService != null) {

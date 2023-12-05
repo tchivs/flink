@@ -92,6 +92,23 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
         assertEquals(
                 "UNTOUCHED_ORIGINAL_VALUE",
                 taskExecutorServiceFactory.lastReceivedConfig.get(untouchedKey));
+
+        // when: Activate the TaskManagerRunner for the second time.
+        overrideConfig = new Configuration();
+        overrideConfig.setString(keyForOverride, "OVERRIDE_NEW_VALUE_AGAIN");
+
+        configuratorGateway.activate(overrideConfig);
+
+        waitUntilCondition(() -> taskExecutorServiceFactory.callCounter.get() > 0);
+
+        // then: taskExecutorServiceFactory should NOT be called for the second time.
+        assertEquals(1, taskExecutorServiceFactory.callCounter.get());
+        assertEquals(
+                "OVERRIDE_NEW_VALUE",
+                taskExecutorServiceFactory.lastReceivedConfig.get(keyForOverride));
+        assertEquals(
+                "UNTOUCHED_ORIGINAL_VALUE",
+                taskExecutorServiceFactory.lastReceivedConfig.get(untouchedKey));
     }
 
     private static Configuration createConfiguration() {
