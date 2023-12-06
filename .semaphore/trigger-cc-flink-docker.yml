@@ -1,0 +1,24 @@
+version: v1.0
+name: trigger-cc-flink-docker
+agent:
+  machine:
+    type: s1-prod-ubuntu20-04-amd64-1
+
+global_job_config:
+  env_vars:
+    - name: CC_FLINK_DOCKER_ID
+      value: d758d257-1bf0-4ca5-bdb6-e571de1b743b
+    - name: TRIGGER_BRANCH
+      value: v1.18.x
+
+blocks:
+  - name: trigger cc-flink-docker
+    skip:
+      when: "branch !~ '^release-[0-9]+\\.[0-9]+-confluent$'"
+    task:
+      jobs:
+        - name: trigger cc-flink-docker
+          commands:
+            - . vault-setup
+            - . vault-sem-get-secret onprem-prod-semaphorebot-api-token
+            - 'curl --fail -i -H "Authorization: Token $SEMAPHORE_API_TOKEN" -d "project_id=$CC_FLINK_DOCKER_ID&reference=refs/heads/$TRIGGER_BRANCH" -X POST  "https://semaphore.ci.confluent.io/api/v1alpha/plumber-workflows"'
