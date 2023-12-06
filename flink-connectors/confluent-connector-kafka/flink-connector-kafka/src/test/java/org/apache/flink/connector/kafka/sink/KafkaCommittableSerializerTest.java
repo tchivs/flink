@@ -26,7 +26,7 @@ import java.io.IOException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for serializing and deserialzing {@link KafkaCommittable} with {@link
+ * Tests for serializing and deserialzing {@link KafkaCommittableV1} with {@link
  * KafkaCommittableSerializer}.
  */
 public class KafkaCommittableSerializerTest extends TestLogger {
@@ -37,7 +37,8 @@ public class KafkaCommittableSerializerTest extends TestLogger {
     public void testCommittableSerDe() throws IOException {
         final String transactionalId = "test-id";
         final short epoch = 5;
-        final KafkaCommittable committable = new KafkaCommittable(1L, epoch, transactionalId, null);
+        final KafkaCommittableV1 committable =
+                new KafkaCommittableV1(1L, epoch, transactionalId, null);
         final byte[] serialized = SERIALIZER.serialize(committable);
         assertThat(SERIALIZER.deserialize(1, serialized)).isEqualTo(committable);
     }

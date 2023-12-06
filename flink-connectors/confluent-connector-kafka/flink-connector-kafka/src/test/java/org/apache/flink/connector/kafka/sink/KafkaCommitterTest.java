@@ -51,11 +51,12 @@ public class KafkaCommitterTest {
                         new FlinkKafkaInternalProducer<>(properties, TRANSACTIONAL_ID);
                 Recyclable<FlinkKafkaInternalProducer<Object, Object>> recyclable =
                         new Recyclable<>(producer, p -> {})) {
+            final KafkaCommittable committable =
+                    new KafkaCommittableV1(PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable);
             final MockCommitRequest<KafkaCommittable> request =
-                    new MockCommitRequest<>(
-                            new KafkaCommittable(PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
+                    new MockCommitRequest<>(committable);
 
-            producer.resumeTransaction(PRODUCER_ID, EPOCH);
+            producer.resumePreparedTransaction(committable);
             committer.commit(Collections.singletonList(request));
 
             assertThat(request.getNumberOfRetries()).isEqualTo(1);
@@ -76,7 +77,8 @@ public class KafkaCommitterTest {
             // will fail because transaction not started
             final MockCommitRequest<KafkaCommittable> request =
                     new MockCommitRequest<>(
-                            new KafkaCommittable(PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
+                            new KafkaCommittableV1(
+                                    PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
             committer.commit(Collections.singletonList(request));
             assertThat(request.getFailedWithUnknownReason())
                     .isInstanceOf(IllegalStateException.class);
@@ -105,7 +107,8 @@ public class KafkaCommitterTest {
                         new Recyclable<>(producer, p -> {})) {
             final MockCommitRequest<KafkaCommittable> request =
                     new MockCommitRequest<>(
-                            new KafkaCommittable(PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
+                            new KafkaCommittableV1(
+                                    PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
 
             committer.commit(Collections.singletonList(request));
             assertThat(recyclable.isRecycled()).isTrue();

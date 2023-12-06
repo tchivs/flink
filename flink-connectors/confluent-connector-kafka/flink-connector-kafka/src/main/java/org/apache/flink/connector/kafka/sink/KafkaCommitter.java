@@ -62,13 +62,13 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
             final KafkaCommittable committable = request.getCommittable();
             final String transactionalId = committable.getTransactionalId();
             LOG.debug("Committing Kafka transaction {}", transactionalId);
-            Optional<Recyclable<? extends FlinkKafkaInternalProducer<?, ?>>> recyclable =
+            Optional<Recyclable<? extends InternalKafkaProducer<?, ?>>> recyclable =
                     committable.getProducer();
-            FlinkKafkaInternalProducer<?, ?> producer;
+            InternalKafkaProducer<?, ?> producer;
             try {
                 producer =
                         recyclable
-                                .<FlinkKafkaInternalProducer<?, ?>>map(Recyclable::getObject)
+                                .<InternalKafkaProducer<?, ?>>map(Recyclable::getObject)
                                 .orElseGet(() -> getRecoveryProducer(committable));
                 producer.commitTransaction();
                 producer.flush();
@@ -130,7 +130,7 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
 
     /**
      * Creates a producer that can commit into the same transaction as the upstream producer that
-     * was serialized into {@link KafkaCommittable}.
+     * was serialized into {@link KafkaCommittableV1}.
      */
     private FlinkKafkaInternalProducer<?, ?> getRecoveryProducer(KafkaCommittable committable) {
         if (recoveryProducer == null) {
@@ -140,7 +140,7 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
         } else {
             recoveryProducer.setTransactionId(committable.getTransactionalId());
         }
-        recoveryProducer.resumeTransaction(committable.getProducerId(), committable.getEpoch());
+        recoveryProducer.resumePreparedTransaction(committable);
         return recoveryProducer;
     }
 }

@@ -393,9 +393,9 @@ public class KafkaWriterITCase {
     void useSameProducerForNonTransactional(DeliveryGuarantee guarantee) throws Exception {
         try (final KafkaWriter<Integer> writer =
                 createWriterWithConfiguration(getKafkaClientConfiguration(), guarantee)) {
-            assertThat(writer.getProducerPool()).hasSize(0);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(0);
 
-            FlinkKafkaInternalProducer<byte[], byte[]> firstProducer = writer.getCurrentProducer();
+            InternalKafkaProducer<byte[], byte[]> firstProducer = writer.getCurrentProducer();
             writer.flush(false);
             Collection<KafkaCommittable> committables = writer.prepareCommit();
             writer.snapshotState(0);
@@ -404,7 +404,7 @@ public class KafkaWriterITCase {
             assertThat(writer.getCurrentProducer() == firstProducer)
                     .as("Expected same producer")
                     .isTrue();
-            assertThat(writer.getProducerPool()).hasSize(0);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(0);
         }
     }
 
@@ -414,7 +414,7 @@ public class KafkaWriterITCase {
         try (final KafkaWriter<Integer> writer =
                 createWriterWithConfiguration(
                         getKafkaClientConfiguration(), DeliveryGuarantee.EXACTLY_ONCE)) {
-            assertThat(writer.getProducerPool()).hasSize(0);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(0);
 
             writer.write(1, SINK_WRITER_CONTEXT);
             writer.flush(false);
@@ -424,17 +424,16 @@ public class KafkaWriterITCase {
             final KafkaCommittable committable = committables0.stream().findFirst().get();
             assertThat(committable.getProducer().isPresent()).isTrue();
 
-            FlinkKafkaInternalProducer<?, ?> firstProducer =
-                    committable.getProducer().get().getObject();
+            InternalKafkaProducer<?, ?> firstProducer = committable.getProducer().get().getObject();
             assertThat(firstProducer != writer.getCurrentProducer())
                     .as("Expected different producer")
                     .isTrue();
 
             // recycle first producer, KafkaCommitter would commit it and then return it
-            assertThat(writer.getProducerPool()).hasSize(0);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(0);
             firstProducer.commitTransaction();
             committable.getProducer().get().close();
-            assertThat(writer.getProducerPool()).hasSize(1);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(1);
 
             writer.write(1, SINK_WRITER_CONTEXT);
             writer.flush(false);
@@ -460,17 +459,14 @@ public class KafkaWriterITCase {
         try (final KafkaWriter<Integer> writer =
                 createWriterWithConfiguration(
                         getKafkaClientConfiguration(), DeliveryGuarantee.EXACTLY_ONCE)) {
-            assertThat(writer.getProducerPool()).hasSize(0);
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(0);
 
             // no data written to current transaction
             writer.flush(false);
             Collection<KafkaCommittable> emptyCommittables = writer.prepareCommit();
 
             assertThat(emptyCommittables).hasSize(0);
-            assertThat(writer.getProducerPool()).hasSize(1);
-            final FlinkKafkaInternalProducer<?, ?> recycledProducer =
-                    writer.getProducerPool().pop();
-            assertThat(recycledProducer.isInTransaction()).isFalse();
+            assertThat(writer.getProducerPool().numProducers()).isEqualTo(1);
         }
     }
 
@@ -500,7 +496,7 @@ public class KafkaWriterITCase {
             String transactionalId = committable.getTransactionalId();
             try (FlinkKafkaInternalProducer<byte[], byte[]> producer =
                     new FlinkKafkaInternalProducer<>(properties, transactionalId)) {
-                producer.resumeTransaction(committable.getProducerId(), committable.getEpoch());
+                producer.resumePreparedTransaction(committable);
                 producer.commitTransaction();
             }
 

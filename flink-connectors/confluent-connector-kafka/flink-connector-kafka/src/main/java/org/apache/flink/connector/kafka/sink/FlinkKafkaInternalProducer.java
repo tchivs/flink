@@ -37,13 +37,15 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * A {@link KafkaProducer} that exposes private fields to allow resume producing from a given state.
  */
-class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V> {
+class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V>
+        implements InternalKafkaProducer<K, V> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkKafkaInternalProducer.class);
     private static final String TRANSACTION_MANAGER_FIELD_NAME = "transactionManager";
@@ -92,6 +94,21 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V> {
     public void beginTransaction() throws ProducerFencedException {
         super.beginTransaction();
         inTransaction = true;
+    }
+
+    @Override
+    public KafkaCommittable prepareTransaction(Consumer<InternalKafkaProducer<K, V>> recycler) {
+        return new KafkaCommittableV1(
+                getProducerId(),
+                getEpoch(),
+                getTransactionalId(),
+                new Recyclable<>(this, recycler));
+    }
+
+    @Override
+    public void resumePreparedTransaction(KafkaCommittable restoredCommittable) {
+        final KafkaCommittableV1 committableV1 = KafkaCommittableV1.tryCast(restoredCommittable);
+        resumeTransactionInternal(committableV1.getProducerId(), committableV1.getEpoch());
     }
 
     @Override
@@ -292,7 +309,7 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V> {
      * method is based on {@link KafkaProducer#initTransactions}.
      * https://github.com/apache/kafka/commit/5d2422258cb975a137a42a4e08f03573c49a387e#diff-f4ef1afd8792cd2a2e9069cd7ddea630
      */
-    public void resumeTransaction(long producerId, short epoch) {
+    private void resumeTransactionInternal(long producerId, short epoch) {
         checkState(!inTransaction, "Already in transaction %s", transactionalId);
         checkState(
                 producerId >= 0 && epoch >= 0,

@@ -99,13 +99,12 @@ class FlinkKafkaInternalProducerITCase {
             producer.beginTransaction();
             producer.send(new ProducerRecord<>(topic, "test-value"));
             producer.flush();
-            snapshottedCommittable = KafkaCommittable.of(producer, ignored -> {});
+            snapshottedCommittable = producer.prepareTransaction(ignored -> {});
         }
 
         try (FlinkKafkaInternalProducer<String, String> resumedProducer =
                 new FlinkKafkaInternalProducer<>(getProperties(), transactionalId)) {
-            resumedProducer.resumeTransaction(
-                    snapshottedCommittable.getProducerId(), snapshottedCommittable.getEpoch());
+            resumedProducer.resumePreparedTransaction(snapshottedCommittable);
             resumedProducer.commitTransaction();
         }
 
@@ -120,13 +119,12 @@ class FlinkKafkaInternalProducerITCase {
                 new FlinkKafkaInternalProducer<>(getProperties(), "dummy")) {
             producer.initTransactions();
             producer.beginTransaction();
-            snapshottedCommittable = KafkaCommittable.of(producer, ignored -> {});
+            snapshottedCommittable = producer.prepareTransaction(ignored -> {});
         }
 
         try (FlinkKafkaInternalProducer<String, String> resumedProducer =
                 new FlinkKafkaInternalProducer<>(getProperties(), "dummy")) {
-            resumedProducer.resumeTransaction(
-                    snapshottedCommittable.getProducerId(), snapshottedCommittable.getEpoch());
+            resumedProducer.resumePreparedTransaction(snapshottedCommittable);
 
             assertThatThrownBy(resumedProducer::commitTransaction)
                     .isInstanceOf(InvalidTxnStateException.class);

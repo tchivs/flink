@@ -34,11 +34,13 @@ class KafkaCommittableSerializer implements SimpleVersionedSerializer<KafkaCommi
 
     @Override
     public byte[] serialize(KafkaCommittable state) throws IOException {
+        final KafkaCommittableV1 committableV1 = KafkaCommittableV1.tryCast(state);
+
         try (final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 final DataOutputStream out = new DataOutputStream(baos)) {
-            out.writeShort(state.getEpoch());
-            out.writeLong(state.getProducerId());
-            out.writeUTF(state.getTransactionalId());
+            out.writeShort(committableV1.getEpoch());
+            out.writeLong(committableV1.getProducerId());
+            out.writeUTF(committableV1.getTransactionalId());
             out.flush();
             return baos.toByteArray();
         }
@@ -51,7 +53,7 @@ class KafkaCommittableSerializer implements SimpleVersionedSerializer<KafkaCommi
             final short epoch = in.readShort();
             final long producerId = in.readLong();
             final String transactionalId = in.readUTF();
-            return new KafkaCommittable(producerId, epoch, transactionalId, null);
+            return new KafkaCommittableV1(producerId, epoch, transactionalId, null);
         }
     }
 }
