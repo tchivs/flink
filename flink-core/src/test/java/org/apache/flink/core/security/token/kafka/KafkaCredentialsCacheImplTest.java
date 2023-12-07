@@ -123,31 +123,47 @@ public class KafkaCredentialsCacheImplTest {
 
     @Test
     public void testReceive_interrupted() throws Throwable {
+        final Object lock = new Object();
+
         credentialsCache.init(configuration);
         AtomicReference<Thread> thread = new AtomicReference<>();
         AtomicBoolean isInterrupted = new AtomicBoolean(false);
         AtomicBoolean isDone = new AtomicBoolean(false);
+
         executor.submit(
                 () -> {
                     try {
                         thread.set(Thread.currentThread());
+                        synchronized (lock) {
+                            lock.notifyAll();
+                        }
                         credentialsCache.getCredentials(new ManualClock(), jobId1);
                     } catch (Exception e) {
                         isInterrupted.set(Thread.currentThread().isInterrupted());
                         return;
                     } finally {
-                        isDone.set(true);
+                        synchronized (lock) {
+                            isDone.set(true);
+                            lock.notifyAll();
+                        }
                     }
                     fail("Shouldn't get to here");
                 });
 
-        while (thread.get() == null) {
-            Thread.sleep(10);
+        synchronized (lock) {
+            while (thread.get() == null) {
+                lock.wait();
+            }
         }
+
         thread.get().interrupt();
-        while (!isDone.get()) {
-            Thread.sleep(10);
+
+        synchronized (lock) {
+            while (!isDone.get()) {
+                lock.wait();
+            }
         }
+
         assertThat(isInterrupted.get()).isTrue();
     }
 

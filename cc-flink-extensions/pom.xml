@@ -34,7 +34,8 @@ Copyright 2023 Confluent Inc.
 		<module>cc-flink-schema-registry</module>
 		<module>cc-flink-schema-converters</module>
 		<module>cc-flink-credentials</module>
-    	<module>cc-flink-failure-enrichers</module>
+		<module>cc-flink-compute-credentials</module>
+		<module>cc-flink-failure-enrichers</module>
 		<module>cc-flink-common-metrics</module>
 		<module>cc-flink-state-backend-extended</module>
 		<module>cc-flink-kubernetes-extended</module>

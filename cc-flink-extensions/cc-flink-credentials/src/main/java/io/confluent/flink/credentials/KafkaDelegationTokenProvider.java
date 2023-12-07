@@ -70,7 +70,7 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
     private Clock clock;
 
     public KafkaDelegationTokenProvider() {
-        this.credentialDecrypter = CredentialDecrypterImpl.INSTANCE;
+        this.credentialDecrypter = FileCredentialDecrypterImpl.INSTANCE;
     }
 
     @VisibleForTesting

@@ -32,14 +32,14 @@ import static io.confluent.flink.credentials.KafkaCredentialsOptions.MOUNTED_SEC
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Tests for {@link CredentialDecrypterImpl}. */
+/** Tests for {@link FileCredentialDecrypterImpl}. */
 @Confluent
 @ExtendWith(TestLoggerExtension.class)
-public class CredentialDecrypterImplTest {
+public class FileCredentialDecrypterImplTest {
 
     private KeyPair kp;
     private Configuration configuration;
-    private CredentialDecrypterImpl decrypter;
+    private FileCredentialDecrypterImpl decrypter;
 
     @BeforeEach
     public void setUp(@TempDir File temporaryFolder) throws IOException, NoSuchAlgorithmException {
@@ -48,7 +48,7 @@ public class CredentialDecrypterImplTest {
         writeSecret(kp, secretPath);
         configuration = new Configuration();
         configuration.setString(MOUNTED_SECRET, secretPath);
-        decrypter = CredentialDecrypterImpl.INSTANCE;
+        decrypter = FileCredentialDecrypterImpl.INSTANCE;
     }
 
     private static KeyPair createKeyPair() throws NoSuchAlgorithmException {
