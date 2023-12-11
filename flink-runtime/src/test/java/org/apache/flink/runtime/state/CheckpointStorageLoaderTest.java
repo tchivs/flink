@@ -19,22 +19,16 @@
 package org.apache.flink.runtime.state;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.HighAvailabilityOptions;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.runtime.execution.Environment;
-import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.storage.FileSystemCheckpointStorage;
 import org.apache.flink.runtime.state.storage.JobManagerCheckpointStorage;
-import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.DynamicCodeLoadingException;
 import org.apache.flink.util.TestLogger;
 
@@ -48,7 +42,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.util.Collection;
 
 /** This test validates that checkpoint storage is properly loaded from configuration. */
 public class CheckpointStorageLoaderTest extends TestLogger {
@@ -420,28 +413,13 @@ public class CheckpointStorageLoaderTest extends TestLogger {
 
         @Override
         public <K> CheckpointableKeyedStateBackend<K> createKeyedStateBackend(
-                Environment env,
-                JobID jobID,
-                String operatorIdentifier,
-                TypeSerializer<K> keySerializer,
-                int numberOfKeyGroups,
-                KeyGroupRange keyGroupRange,
-                TaskKvStateRegistry kvStateRegistry,
-                TtlTimeProvider ttlTimeProvider,
-                MetricGroup metricGroup,
-                Collection<KeyedStateHandle> stateHandles,
-                CloseableRegistry cancelStreamRegistry)
-                throws Exception {
+                KeyedStateBackendParameters<K> parameters) throws Exception {
             return null;
         }
 
         @Override
         public OperatorStateBackend createOperatorStateBackend(
-                Environment env,
-                String operatorIdentifier,
-                Collection<OperatorStateHandle> stateHandles,
-                CloseableRegistry cancelStreamRegistry)
-                throws Exception {
+                OperatorStateBackendParameters parameters) throws Exception {
             return null;
         }
     }
@@ -450,28 +428,13 @@ public class CheckpointStorageLoaderTest extends TestLogger {
 
         @Override
         public <K> CheckpointableKeyedStateBackend<K> createKeyedStateBackend(
-                Environment env,
-                JobID jobID,
-                String operatorIdentifier,
-                TypeSerializer<K> keySerializer,
-                int numberOfKeyGroups,
-                KeyGroupRange keyGroupRange,
-                TaskKvStateRegistry kvStateRegistry,
-                TtlTimeProvider ttlTimeProvider,
-                MetricGroup metricGroup,
-                Collection<KeyedStateHandle> stateHandles,
-                CloseableRegistry cancelStreamRegistry)
-                throws Exception {
+                KeyedStateBackendParameters<K> parameters) throws Exception {
             return null;
         }
 
         @Override
         public OperatorStateBackend createOperatorStateBackend(
-                Environment env,
-                String operatorIdentifier,
-                Collection<OperatorStateHandle> stateHandles,
-                CloseableRegistry cancelStreamRegistry)
-                throws Exception {
+                OperatorStateBackendParameters parameters) throws Exception {
             return null;
         }
     }

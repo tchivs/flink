@@ -39,6 +39,7 @@ import org.apache.flink.contrib.streaming.state.RocksDBResourceContainer;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.operators.testutils.MockEnvironment;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
@@ -46,6 +47,7 @@ import org.apache.flink.runtime.state.AbstractStateBackend;
 import org.apache.flink.runtime.state.CheckpointableKeyedStateBackend;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateBackend;
+import org.apache.flink.runtime.state.KeyedStateBackendParametersImpl;
 import org.apache.flink.runtime.state.KeyedStateFunction;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.TestLocalRecoveryConfig;
@@ -109,19 +111,23 @@ public class StateBackendBenchmarkUtils {
     }
 
     private static CheckpointableKeyedStateBackend<Long> createBatchExecutionStateBackend() {
+        Environment env = MockEnvironment.builder().build();
+        JobID jobID = new JobID();
+        KeyGroupRange keyGroupRange = new KeyGroupRange(0, 1);
         return new BatchExecutionStateBackend()
                 .createKeyedStateBackend(
-                        MockEnvironment.builder().build(),
-                        new JobID(),
-                        "Test",
-                        new LongSerializer(),
-                        2,
-                        new KeyGroupRange(0, 1),
-                        null,
-                        TtlTimeProvider.DEFAULT,
-                        new UnregisteredMetricsGroup(),
-                        Collections.emptyList(),
-                        null);
+                        new KeyedStateBackendParametersImpl<>(
+                                env,
+                                jobID,
+                                "Test",
+                                new LongSerializer(),
+                                2,
+                                keyGroupRange,
+                                null,
+                                TtlTimeProvider.DEFAULT,
+                                new UnregisteredMetricsGroup(),
+                                Collections.emptyList(),
+                                null));
     }
 
     private static ChangelogKeyedStateBackend<Long> createChangelogKeyedStateBackend(

@@ -41,6 +41,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.runtime.checkpoint.SavepointType;
 import org.apache.flink.runtime.checkpoint.SnapshotType;
+import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetricsBuilder;
 import org.apache.flink.runtime.checkpoint.SubtaskState;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
@@ -2307,9 +2308,10 @@ public class StreamTaskTest {
         protected void cleanUpInternal() throws Exception {}
 
         @Override
-        public StreamTaskStateInitializer createStreamTaskStateInitializer() {
+        public StreamTaskStateInitializer createStreamTaskStateInitializer(
+                SubTaskInitializationMetricsBuilder initializationMetrics) {
             final StreamTaskStateInitializer streamTaskStateManager =
-                    super.createStreamTaskStateInitializer();
+                    super.createStreamTaskStateInitializer(initializationMetrics);
             return (operatorID,
                     operatorClassName,
                     processingTimeService,
