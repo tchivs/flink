@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.credentials;
+package io.confluent.flink.compute.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
-/** Tests for {@link ComputePoolKeyCache}. */
+/** Tests for {@link io.confluent.flink.compute.credentials.ComputePoolKeyCache}. */
 @Confluent
 public class ComputePoolKeyCacheImplTest {
 

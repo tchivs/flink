@@ -17,7 +17,7 @@ import java.util.Set;
 public class AIFunctionsModule implements Module {
 
     public static final AIFunctionsModule INSTANCE = new AIFunctionsModule();
-    private final Map<String, FunctionDefinition> normalizedFunctions;
+    Map<String, FunctionDefinition> normalizedFunctions;
 
     public AIFunctionsModule() {
         normalizedFunctions =

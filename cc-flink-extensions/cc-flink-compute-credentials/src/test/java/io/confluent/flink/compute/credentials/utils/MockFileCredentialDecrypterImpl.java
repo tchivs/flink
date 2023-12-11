@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.credentials.utils;
+package io.confluent.flink.compute.credentials.utils;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;

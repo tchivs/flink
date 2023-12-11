@@ -17,6 +17,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
+import io.confluent.flink.credentials.CredentialDecrypter;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,6 +30,8 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 /** Class implementing aiGenerate function by calling OpenAI API. */
@@ -38,7 +42,9 @@ public class AIResponseGenerator extends ScalarFunction {
     private static final String openAICompletionsURL = "https://api.openai.com/v1/chat/completions";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     public static final MediaType JSON = MediaType.get("application/json");
+    private static final String CONFLUENT_USER_FLINK_SECRET = "confluent.user.flink.secret";
     private URL baseURL;
+    private String confluentUserFlinkSecret;
     private transient OkHttpClient httpClient;
     private transient ObjectMapper mapper;
 
@@ -46,40 +52,49 @@ public class AIResponseGenerator extends ScalarFunction {
         setBaseUrl(openAICompletionsURL);
     }
 
+    @VisibleForTesting
+    public AIResponseGenerator(String baseUrl) {
+        setBaseUrl(baseUrl);
+    }
+
     @Override
     public void open(FunctionContext context) throws Exception {
         this.httpClient = new OkHttpClient.Builder().build();
         this.mapper = new ObjectMapper();
-    }
-
-    public void setBaseUrl(String baseURL) {
-        try {
-            this.baseURL = new URL(baseURL);
-        } catch (MalformedURLException e) {
-            throw new RuntimeException("Badly configured server: " + openAICompletionsURL);
+        final byte[] confluentUserFlinkProperty =
+                Base64.getDecoder()
+                        .decode(context.getJobParameter(CONFLUENT_USER_FLINK_SECRET, ""));
+        if (confluentUserFlinkProperty.length != 0) {
+            CredentialDecrypter decrypter = InMemoryCredentialDecrypterImpl.INSTANCE;
+            this.confluentUserFlinkSecret =
+                    new String(
+                            decrypter.decrypt(confluentUserFlinkProperty), StandardCharsets.UTF_8);
         }
     }
 
-    public @Nullable String eval(
-            String baseUrl, @Nullable String prompt, @Nullable String input, String apiKey) {
-        setBaseUrl(baseUrl.toString());
-        return eval(prompt, input, apiKey);
+    public @Nullable String eval(@Nullable String prompt, @Nullable String input) {
+        // Support both pass User secret using SET property and Secret UDF
+        // TODO: To be removed FRT-249
+        return eval(prompt, input, this.confluentUserFlinkSecret);
     }
 
     public @Nullable String eval(@Nullable String prompt, @Nullable String input, String apiKey) {
         if (prompt == null || input == null) {
             return null;
         }
+        // Make sure we have a valid key
+        validateSecret(apiKey);
+
         final ObjectNode node = mapper.createObjectNode();
         node.put("model", "gpt-3.5-turbo");
         node.put("temperature", 0.7);
         final ArrayNode arrayNode = node.putArray("messages");
         final ObjectNode messageSystem = arrayNode.addObject();
         messageSystem.put("role", "system");
-        messageSystem.put("content", prompt.toString());
+        messageSystem.put("content", prompt);
         final ObjectNode messageUser = arrayNode.addObject();
         messageUser.put("role", "user");
-        messageUser.put("content", input.toString());
+        messageUser.put("content", input);
 
         final RequestBody body = RequestBody.create(JSON, node.toString());
         final Request request =
@@ -90,13 +105,14 @@ public class AIResponseGenerator extends ScalarFunction {
                         .build();
         try (Response response = httpClient.newCall(request).execute()) {
             if (response.isSuccessful()) {
-                return getContentFromResponse(mapper, response.body().string());
+                return getContentFromResponse(
+                        mapper, response.body() != null ? response.body().string() : "");
             } else {
                 throw new FlinkRuntimeException(
                         String.format(
                                 "Received bad response code %d message %s",
                                 response.code(),
-                                Strings.isNullOrEmpty(response.message())
+                                Strings.isNullOrEmpty(response.message()) && response.body() != null
                                         ? response.body().string().trim()
                                         : response.message()));
             }
@@ -117,7 +133,7 @@ public class AIResponseGenerator extends ScalarFunction {
             throw new FlinkRuntimeException("Error fetching token: " + jsonResponse);
         }
         final List<JsonNode> choices = ImmutableList.copyOf(choicesNode.elements());
-        if (choices.size() == 0) {
+        if (choices.isEmpty()) {
             throw new FlinkRuntimeException("Empty choices: " + jsonResponse);
         }
         final JsonNode choiceNode = choices.get(0);
@@ -132,5 +148,22 @@ public class AIResponseGenerator extends ScalarFunction {
     @Override
     public boolean isDeterministic() {
         return false;
+    }
+
+    private void setBaseUrl(String baseURL) {
+        try {
+            this.baseURL = new URL(baseURL);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Badly configured server: " + openAICompletionsURL);
+        }
+    }
+
+    private static void validateSecret(String encryptedSecret) {
+        if (encryptedSecret == null) {
+            throw new FlinkRuntimeException(
+                    "Secret is null. Please SET `"
+                            + CONFLUENT_USER_FLINK_SECRET
+                            + "` job property.");
+        }
     }
 }

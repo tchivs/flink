@@ -2,14 +2,14 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.credentials;
+package io.confluent.flink.compute.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.core.security.token.DelegationTokenProvider.ObtainedDelegationTokens;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.TestLoggerExtension;
 
-import io.confluent.flink.credentials.utils.MockFileCredentialDecrypterImpl;
+import io.confluent.flink.compute.credentials.utils.MockFileCredentialDecrypterImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -2,11 +2,13 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.credentials;
+package io.confluent.flink.compute.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.FlinkRuntimeException;
+
+import io.confluent.flink.credentials.AbstractCredentialDecrypterImpl;
 
 import java.util.Optional;
 

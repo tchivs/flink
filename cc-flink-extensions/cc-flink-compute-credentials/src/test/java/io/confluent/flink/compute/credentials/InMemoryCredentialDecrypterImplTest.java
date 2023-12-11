@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.credentials;
+package io.confluent.flink.compute.credentials;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
@@ -26,7 +26,7 @@ import java.security.spec.MGF1ParameterSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Tests for {@link InMemoryCredentialDecrypterImpl}. */
+/** Tests for {@link io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl}. */
 @Confluent
 @ExtendWith(TestLoggerExtension.class)
 public class InMemoryCredentialDecrypterImplTest {
