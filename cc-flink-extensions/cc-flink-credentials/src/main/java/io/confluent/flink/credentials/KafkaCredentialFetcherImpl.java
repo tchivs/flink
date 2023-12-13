@@ -12,7 +12,8 @@ import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGr
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
 import com.google.protobuf.ByteString;
-import io.grpc.CallOptions;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
@@ -142,7 +143,8 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                 parts.get("organization"), parts.get("environment"), parts.get("statement"));
     }
 
-    // Fetch the single static credential associated to the computePool. Principals are provided
+    // Fetch the single static credential associated to the computePool. Principals
+    // are provided
     // for audit logging but there is only one single key for each compute pool.
     private Pair<String, ByteString> fetchCredentialV2(
             JobCredentialsMetadata jobCredentialsMetadata) {
@@ -156,20 +158,27 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                         .addAllPrincipalIds(jobCredentialsMetadata.getPrincipals())
                         .build();
 
-        final CallOptions.Key<Object> orgIdKey = CallOptions.Key.create("org_resource_id");
-        final CallOptions.Key<Object> envIdKey = CallOptions.Key.create("environment_id");
-        final CallOptions.Key<Object> statementIdKey = CallOptions.Key.create("statement_id");
-        final CallOptions.Key<Object> crnKey = CallOptions.Key.create("crn");
         final Triple<String, String, String> orgIdAndEnv =
                 extractOrgAndEnvFromCRN(jobCredentialsMetadata.getStatementIdCRN());
+
+        final Metadata md = new Metadata();
+        md.put(
+                Metadata.Key.of("org_resource_id", Metadata.ASCII_STRING_MARSHALLER),
+                orgIdAndEnv.getLeft());
+        md.put(
+                Metadata.Key.of("environment_id", Metadata.ASCII_STRING_MARSHALLER),
+                orgIdAndEnv.getMiddle());
+        md.put(
+                Metadata.Key.of("statement_id", Metadata.ASCII_STRING_MARSHALLER),
+                orgIdAndEnv.getRight());
+        md.put(
+                Metadata.Key.of("crn", Metadata.ASCII_STRING_MARSHALLER),
+                jobCredentialsMetadata.getStatementIdCRN());
 
         response =
                 credentialService
                         .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
-                        .withOption(orgIdKey, orgIdAndEnv.getLeft())
-                        .withOption(envIdKey, orgIdAndEnv.getMiddle())
-                        .withOption(statementIdKey, orgIdAndEnv.getRight())
-                        .withOption(crnKey, jobCredentialsMetadata.getStatementIdCRN())
+                        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(md))
                         .getCredentialV2(request);
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
