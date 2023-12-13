@@ -15,15 +15,11 @@ import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * This class does the token exchange process to fetch a DPAT token used when accessing Kafka,
@@ -99,50 +95,6 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         return fetchCredentialV2(jobCredentialsMetadata);
     }
 
-    private Triple<String, String, String> extractOrgAndEnvFromCRN(String crn) {
-        Map<String, String> parts =
-                Arrays.stream(crn.split("/"))
-                        .filter(
-                                s ->
-                                        s.startsWith("organization=")
-                                                || s.startsWith("environment=")
-                                                || s.startsWith("statement="))
-                        .map(
-                                s -> {
-                                    int delimiterIdx = s.indexOf("=");
-                                    return Pair.of(
-                                            s.substring(0, delimiterIdx),
-                                            s.substring(delimiterIdx + 1));
-                                })
-                        .collect(
-                                Collectors.groupingBy(
-                                        p -> p.getLeft(),
-                                        Collectors.collectingAndThen(
-                                                Collectors.toList(),
-                                                l -> {
-                                                    if (l.size() != 1) {
-                                                        throw new FlinkRuntimeException(
-                                                                String.format(
-                                                                        "Failed to extract org and env from CRN: %s, found multiple values for: %s",
-                                                                        crn, l.get(0).getLeft()));
-                                                    }
-                                                    return l.get(0).getRight();
-                                                })));
-
-        if (parts.size() != 3
-                || !parts.containsKey("organization")
-                || !parts.containsKey("environment")
-                || !parts.containsKey("statement")) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "Failed to extract org and env from CRN, one of 'organization', 'environment', 'statement' missing in %s",
-                            crn));
-        }
-
-        return Triple.of(
-                parts.get("organization"), parts.get("environment"), parts.get("statement"));
-    }
-
     // Fetch the single static credential associated to the computePool. Principals
     // are provided
     // for audit logging but there is only one single key for each compute pool.
@@ -158,19 +110,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                         .addAllPrincipalIds(jobCredentialsMetadata.getPrincipals())
                         .build();
 
-        final Triple<String, String, String> orgIdAndEnv =
-                extractOrgAndEnvFromCRN(jobCredentialsMetadata.getStatementIdCRN());
-
         final Metadata md = new Metadata();
-        md.put(
-                Metadata.Key.of("org_resource_id", Metadata.ASCII_STRING_MARSHALLER),
-                orgIdAndEnv.getLeft());
-        md.put(
-                Metadata.Key.of("environment_id", Metadata.ASCII_STRING_MARSHALLER),
-                orgIdAndEnv.getMiddle());
-        md.put(
-                Metadata.Key.of("statement_id", Metadata.ASCII_STRING_MARSHALLER),
-                orgIdAndEnv.getRight());
         md.put(
                 Metadata.Key.of("crn", Metadata.ASCII_STRING_MARSHALLER),
                 jobCredentialsMetadata.getStatementIdCRN());
