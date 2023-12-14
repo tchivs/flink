@@ -12,17 +12,14 @@ import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGr
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
 import com.google.protobuf.ByteString;
-import io.grpc.CallOptions;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * This class does the token exchange process to fetch a DPAT token used when accessing Kafka,
@@ -98,51 +95,8 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         return fetchCredentialV2(jobCredentialsMetadata);
     }
 
-    private Triple<String, String, String> extractOrgAndEnvFromCRN(String crn) {
-        Map<String, String> parts =
-                Arrays.stream(crn.split("/"))
-                        .filter(
-                                s ->
-                                        s.startsWith("organization=")
-                                                || s.startsWith("environment=")
-                                                || s.startsWith("statement="))
-                        .map(
-                                s -> {
-                                    int delimiterIdx = s.indexOf("=");
-                                    return Pair.of(
-                                            s.substring(0, delimiterIdx),
-                                            s.substring(delimiterIdx + 1));
-                                })
-                        .collect(
-                                Collectors.groupingBy(
-                                        p -> p.getLeft(),
-                                        Collectors.collectingAndThen(
-                                                Collectors.toList(),
-                                                l -> {
-                                                    if (l.size() != 1) {
-                                                        throw new FlinkRuntimeException(
-                                                                String.format(
-                                                                        "Failed to extract org and env from CRN: %s, found multiple values for: %s",
-                                                                        crn, l.get(0).getLeft()));
-                                                    }
-                                                    return l.get(0).getRight();
-                                                })));
-
-        if (parts.size() != 3
-                || !parts.containsKey("organization")
-                || !parts.containsKey("environment")
-                || !parts.containsKey("statement")) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "Failed to extract org and env from CRN, one of 'organization', 'environment', 'statement' missing in %s",
-                            crn));
-        }
-
-        return Triple.of(
-                parts.get("organization"), parts.get("environment"), parts.get("statement"));
-    }
-
-    // Fetch the single static credential associated to the computePool. Principals are provided
+    // Fetch the single static credential associated to the computePool. Principals
+    // are provided
     // for audit logging but there is only one single key for each compute pool.
     private Pair<String, ByteString> fetchCredentialV2(
             JobCredentialsMetadata jobCredentialsMetadata) {
@@ -156,20 +110,15 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                         .addAllPrincipalIds(jobCredentialsMetadata.getPrincipals())
                         .build();
 
-        final CallOptions.Key<Object> orgIdKey = CallOptions.Key.create("org_resource_id");
-        final CallOptions.Key<Object> envIdKey = CallOptions.Key.create("environment_id");
-        final CallOptions.Key<Object> statementIdKey = CallOptions.Key.create("statement_id");
-        final CallOptions.Key<Object> crnKey = CallOptions.Key.create("crn");
-        final Triple<String, String, String> orgIdAndEnv =
-                extractOrgAndEnvFromCRN(jobCredentialsMetadata.getStatementIdCRN());
+        final Metadata md = new Metadata();
+        md.put(
+                Metadata.Key.of("crn", Metadata.ASCII_STRING_MARSHALLER),
+                jobCredentialsMetadata.getStatementIdCRN());
 
         response =
                 credentialService
                         .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
-                        .withOption(orgIdKey, orgIdAndEnv.getLeft())
-                        .withOption(envIdKey, orgIdAndEnv.getMiddle())
-                        .withOption(statementIdKey, orgIdAndEnv.getRight())
-                        .withOption(crnKey, jobCredentialsMetadata.getStatementIdCRN())
+                        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(md))
                         .getCredentialV2(request);
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
