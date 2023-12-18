@@ -15,6 +15,7 @@ import io.confluent.flink.table.connectors.ConfluentManagedTableOptions.GlobalSc
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /** Supported configuration options for {@link ServiceTasks}. */
@@ -90,6 +91,16 @@ public final class ServiceTasksOptions {
                                     + "saving time. Fixed offsets are supported using 'GMT-03:00' or 'GMT+03:00'. "
                                     + "'UTC' is used by default.");
 
+    // This will eventually be replaced by a secret store see
+    // https://confluentinc.atlassian.net/browse/FRT-256
+    public static final ConfigOption<Map<String, String>> SQL_SECRETS =
+            ConfigOptions.key("sql.secrets")
+                    .mapType()
+                    .defaultValue(Collections.emptyMap())
+                    .withDescription(
+                            "User secrets map can be used to access remote services, e.g, "
+                                    + "'sql.secrets.openai'");
+
     // --------------------------------------------------------------------------------------------
     // Global table options
     // --------------------------------------------------------------------------------------------
@@ -146,12 +157,12 @@ public final class ServiceTasksOptions {
     public static final String PRIVATE_USER_PREFIX = PRIVATE_PREFIX + "user.";
 
     // --------------------------------------------------------------------------------------------
-    // Public Options
+    // Stable Public Options
     // --------------------------------------------------------------------------------------------
 
-    public static final Set<ConfigOption<?>> PUBLIC_OPTIONS = initPublicOptions();
+    public static final Set<ConfigOption<?>> STABLE_PUBLIC_OPTIONS = initStablePublicOptions();
 
-    private static Set<ConfigOption<?>> initPublicOptions() {
+    private static Set<ConfigOption<?>> initStablePublicOptions() {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SQL_CURRENT_CATALOG);
         options.add(SQL_CURRENT_DATABASE);
@@ -163,6 +174,31 @@ public final class ServiceTasksOptions {
         options.add(SQL_TABLES_SCAN_STARTUP_MILLIS);
         options.add(SQL_TABLES_SCAN_BOUNDED_MODE);
         options.add(SQL_TABLES_SCAN_BOUNDED_MILLIS);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Early Access Public Options
+    // --------------------------------------------------------------------------------------------
+
+    public static final Set<ConfigOption<?>> EARLY_ACCESS_PUBLIC_OPTIONS = initEAPublicOptions();
+
+    private static Set<ConfigOption<?>> initEAPublicOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(SQL_SECRETS);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // All Public Options
+    // --------------------------------------------------------------------------------------------
+
+    public static final Set<ConfigOption<?>> ALL_PUBLIC_OPTIONS = initAllPublicOptions();
+
+    private static Set<ConfigOption<?>> initAllPublicOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.addAll(STABLE_PUBLIC_OPTIONS);
+        options.addAll(EARLY_ACCESS_PUBLIC_OPTIONS);
         return Collections.unmodifiableSet(options);
     }
 

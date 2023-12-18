@@ -210,6 +210,8 @@ public class DefaultServiceTasksTest {
         validPublicOptions.put("sql.tables.scan.startup.timestamp-millis", "1001");
         validPublicOptions.put("sql.tables.scan.bounded.mode", "latest-offset");
         validPublicOptions.put("sql.tables.scan.bounded.timestamp-millis", "1002");
+        validPublicOptions.put("sql.secrets.openai", "api-key-secret");
+        validPublicOptions.put("sql.secrets.remote", "remote-api-key-secret");
 
         final Map<String, String> validPrivateOptions = new HashMap<>();
         validPrivateOptions.put("confluent.ai-functions.enabled", "true");
@@ -234,6 +236,8 @@ public class DefaultServiceTasksTest {
         expectedResourceOptions.put("confluent.user.sql.tables.scan.bounded.mode", "latest-offset");
         expectedResourceOptions.put(
                 "confluent.user.sql.tables.scan.bounded.timestamp-millis", "1002");
+        expectedResourceOptions.put("confluent.user.sql.secrets.openai", "api-key-secret");
+        expectedResourceOptions.put("confluent.user.sql.secrets.remote", "remote-api-key-secret");
         expectedResourceOptions.put("confluent.ai-functions.enabled", "true");
 
         assertThat(resourceOptions).isEqualTo(expectedResourceOptions);
@@ -327,6 +331,16 @@ public class DefaultServiceTasksTest {
                                 + "sql.tables.scan.idle-timeout\n"
                                 + "sql.tables.scan.startup.mode\n"
                                 + "sql.tables.scan.startup.timestamp-millis");
+
+        // Early access options should not be shown in error messages
+        assertThatThrownBy(
+                        () ->
+                                INSTANCE.configureEnvironment(
+                                        tableEnv,
+                                        Collections.singletonMap("does-not-exist", "42"),
+                                        Collections.emptyMap(),
+                                        Service.SQL_SERVICE))
+                .hasMessageNotContaining("sql.secrets");
 
         // Reserved catalog name
         assertThatThrownBy(
