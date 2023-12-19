@@ -247,6 +247,30 @@ public class DefaultServiceTasksTest {
     }
 
     @Test
+    void testDryRun() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.singletonMap(ServiceTasksOptions.SQL_DRY_RUN.key(), "true"),
+                Collections.emptyMap(),
+                Service.SQL_SERVICE);
+
+        // Invalid values
+        assertThatThrownBy(
+                        () ->
+                                INSTANCE.configureEnvironment(
+                                        tableEnv,
+                                        Collections.singletonMap(
+                                                ServiceTasksOptions.SQL_DRY_RUN.key(), "true"),
+                                        Collections.emptyMap(),
+                                        Service.JOB_SUBMISSION_SERVICE))
+                .hasMessageContaining(
+                        "Statement submitted for a dry run. It should never reach the JSS.");
+    }
+
+    @Test
     void testConfigurationValidation() {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
@@ -295,6 +319,7 @@ public class DefaultServiceTasksTest {
                                 + "Supported options:\n"
                                 + "sql.current-catalog\n"
                                 + "sql.current-database\n"
+                                + "sql.dry-run\n"
                                 + "sql.local-time-zone\n"
                                 + "sql.state-ttl\n"
                                 + "sql.tables.scan.bounded.mode\n"

@@ -59,6 +59,15 @@ public final class ServiceTasksOptions {
                     // Used during EA, can be dropped after OP
                     .withDeprecatedKeys("default_database", "database");
 
+    public static final ConfigOption<Boolean> SQL_DRY_RUN =
+            ConfigOptions.key("sql.dry-run")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Statement submitted with the flag enabled will be parsed and "
+                                    + "validated the same way as a statement without the flag. "
+                                    + "However, it will not be executed.");
+
     public static final ConfigOption<Duration> SQL_STATE_TTL =
             ConfigOptions.key("sql.state-ttl")
                     .durationType()
@@ -146,6 +155,7 @@ public final class ServiceTasksOptions {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SQL_CURRENT_CATALOG);
         options.add(SQL_CURRENT_DATABASE);
+        options.add(SQL_DRY_RUN);
         options.add(SQL_STATE_TTL);
         options.add(SQL_LOCAL_TIME_ZONE);
         options.add(SQL_TABLES_SCAN_IDLE_TIMEOUT);

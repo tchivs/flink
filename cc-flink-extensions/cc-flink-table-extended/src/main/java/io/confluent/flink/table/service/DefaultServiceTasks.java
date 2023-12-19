@@ -137,6 +137,12 @@ class DefaultServiceTasks implements ServiceTasks {
             TableEnvironment tableEnvironment, Configuration publicConfig, Service service) {
         final TableConfig config = tableEnvironment.getConfig();
 
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                && publicConfig.get(ServiceTasksOptions.SQL_DRY_RUN)) {
+            throw new IllegalStateException(
+                    "Statement submitted for a dry run. It should never reach the JSS.");
+        }
+
         // Handle catalog and database
         if (service == Service.SQL_SERVICE) {
             // Metastore is available
