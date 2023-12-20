@@ -150,6 +150,13 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent OTLP functions.");
 
+    // Used by Flink Sql Service - [SQL-1354]
+    public static final ConfigOption<Boolean> CONFLUENT_TABLE_ASYNC_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "table-async.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("A flag to enable or disable TableRequest Async.");
+
     /**
      * Prefix to mark options that have been introduced by Confluent and set by the user. It is used
      * in resources to avoid namespace collision with current or future Flink options.

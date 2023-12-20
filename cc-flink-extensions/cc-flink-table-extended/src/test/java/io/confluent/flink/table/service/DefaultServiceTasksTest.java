@@ -215,6 +215,7 @@ public class DefaultServiceTasksTest {
 
         final Map<String, String> validPrivateOptions = new HashMap<>();
         validPrivateOptions.put("confluent.ai-functions.enabled", "true");
+        validPrivateOptions.put("confluent.table-async.enabled", "true");
 
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
@@ -239,6 +240,7 @@ public class DefaultServiceTasksTest {
         expectedResourceOptions.put("confluent.user.sql.secrets.openai", "api-key-secret");
         expectedResourceOptions.put("confluent.user.sql.secrets.remote", "remote-api-key-secret");
         expectedResourceOptions.put("confluent.ai-functions.enabled", "true");
+        expectedResourceOptions.put("confluent.table-async.enabled", "true");
 
         assertThat(resourceOptions).isEqualTo(expectedResourceOptions);
 
