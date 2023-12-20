@@ -265,6 +265,7 @@ under the License.
                         </goals>
                         <configuration>
                             <includes>
+								<include>**/KafkaTestBase*</include>
                                 <include>**/KafkaTestEnvironment*</include>
                                 <include>**/testutils/*</include>
                                 <include>META-INF/LICENSE</include>
@@ -289,6 +290,7 @@ under the License.
                                 <addMavenDescriptor>false</addMavenDescriptor>
                             </archive>
                             <includes>
+								<include>**/KafkaTestBase*</include>
                                 <include>**/KafkaTestEnvironment*</include>
                                 <include>**/testutils/*</include>
                                 <include>META-INF/LICENSE</include>

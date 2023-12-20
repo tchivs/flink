@@ -10,8 +10,10 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 
 import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +77,9 @@ public class TypeFailureEnricher implements FailureEnricher {
         },
         forThrowable(TableException.class, Type.USER),
         forThrowable(ArithmeticException.class, Type.USER),
+        // Kafka exceptions.
+        forThrowable(TimeoutException.class, Type.USER),
+        forThrowable(UnknownTopicOrPartitionException.class, Type.USER),
         // Cast exceptions.
         forThrowable(NumberFormatException.class, Type.USER),
         forThrowable(DateTimeException.class, Type.USER),
