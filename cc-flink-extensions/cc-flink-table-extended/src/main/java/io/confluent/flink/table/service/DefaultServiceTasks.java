@@ -249,8 +249,9 @@ class DefaultServiceTasks implements ServiceTasks {
         // FactoryUtil is actually intended for factories but has very convenient
         // validation capabilities. We can replace this call with something custom
         // if necessary.
+
         FactoryUtil.validateFactoryOptions(
-                Collections.emptySet(), ServiceTasksOptions.PUBLIC_OPTIONS, providedOptions);
+                Collections.emptySet(), ServiceTasksOptions.ALL_PUBLIC_OPTIONS, providedOptions);
 
         try {
             TableConfigValidation.validateTimeZone(
@@ -264,7 +265,7 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         // Also the validation of unconsumed keys is borrowed from FactoryUtil.
-        validateUnconsumedKeys(ServiceTasksOptions.PUBLIC_OPTIONS, providedOptions);
+        validateUnconsumedKeys(ServiceTasksOptions.ALL_PUBLIC_OPTIONS, providedOptions);
     }
 
     private static void validateUnconsumedKeys(
@@ -279,6 +280,13 @@ class DefaultServiceTasks implements ServiceTasks {
         final Set<String> deprecatedOptionKeys =
                 optionalOptions.stream()
                         .flatMap(DefaultServiceTasks::deprecatedKeys)
+                        .collect(Collectors.toSet());
+
+        final Set<String> earlyAccessOptionKeys =
+                ServiceTasksOptions.EARLY_ACCESS_PUBLIC_OPTIONS.stream()
+                        .flatMap(
+                                option ->
+                                        allKeysExpanded(option, providedOptions.keySet()).stream())
                         .collect(Collectors.toSet());
 
         final Set<String> remainingOptionKeys = new HashSet<>(providedOptions.keySet());
@@ -297,7 +305,11 @@ class DefaultServiceTasks implements ServiceTasks {
                             remainingOptionKeys.stream().sorted().collect(Collectors.joining("\n")),
                             consumedOptionKeys.stream()
                                     // Deprecated keys are not shown to not advertise them.
-                                    .filter(k -> !deprecatedOptionKeys.contains(k))
+                                    // Early access options should not be shown in error messages.
+                                    .filter(
+                                            k ->
+                                                    !deprecatedOptionKeys.contains(k)
+                                                            && !earlyAccessOptionKeys.contains(k))
                                     .sorted()
                                     .collect(Collectors.joining("\n"))));
         }

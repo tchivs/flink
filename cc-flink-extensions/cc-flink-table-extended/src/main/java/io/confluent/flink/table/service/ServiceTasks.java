@@ -48,8 +48,8 @@ public interface ServiceTasks {
      * customizing Flink with low-level options is necessary. Also, metastore cannot be accessed in
      * JSS.
      *
-     * @param publicOptions map of {@link ServiceTasksOptions#PUBLIC_OPTIONS} to be validated and
-     *     applied
+     * @param publicOptions map of {@link ServiceTasksOptions#ALL_PUBLIC_OPTIONS} to be validated
+     *     and applied
      * @param privateOptions map of {@link ServiceTasksOptions} with {@link
      *     ServiceTasksOptions#PRIVATE_PREFIX} to be applied
      * @return prepared {@link ServiceTasksOptions} to be persisted in resources (i.e. private
