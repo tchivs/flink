@@ -65,20 +65,35 @@ class CompiledPlanJobGraphGeneratorV3ImplTest {
                                         Collections.singletonList(PRELOAD_PLAN),
                                         Collections.singletonMap(
                                                 "confluent.user.sql.state-ttl", "INVALID")))
-                .hasMessageContaining("Could not parse value 'INVALID' for key 'sql.state-ttl'.");
+                .hasMessageContaining("Internal error occurred.");
     }
 
     @Test
-    void testJobGraphGenerationClassifiesExceptions() {
-        CompiledPlanJobGraphGeneratorV3Impl compiledPlanJobGraphGeneratorV3 =
+    void testJobGraphGenerationClassifiesInternalExceptions() {
+        final CompiledPlanJobGraphGeneratorV3Impl compiledPlanJobGraphGeneratorV3 =
                 new CompiledPlanJobGraphGeneratorV3Impl();
 
-        // system planning error should be reported mostly as is:
+        // Don't expose internal errors
         assertThatThrownBy(
                         () ->
                                 compiledPlanJobGraphGeneratorV3.generateJobGraph(
                                         Collections.singletonList("invalid plan reference"),
                                         Collections.emptyMap()))
-                .hasMessageContaining("invalid plan reference");
+                .hasMessageContaining("Internal error occurred.");
+    }
+
+    @Test
+    void testJobGraphGenerationClassifiesPublicExceptions() {
+        final CompiledPlanJobGraphGeneratorV3Impl compiledPlanJobGraphGeneratorV3 =
+                new CompiledPlanJobGraphGeneratorV3Impl();
+
+        // Expose a human readable error message
+        assertThatThrownBy(
+                        () ->
+                                compiledPlanJobGraphGeneratorV3.generateJobGraph(
+                                        Collections.singletonList(PRELOAD_PLAN),
+                                        Collections.singletonMap(
+                                                "confluent.user.sql.local-time-zone", "UTC+1")))
+                .hasMessageContaining("Invalid time zone.");
     }
 }
