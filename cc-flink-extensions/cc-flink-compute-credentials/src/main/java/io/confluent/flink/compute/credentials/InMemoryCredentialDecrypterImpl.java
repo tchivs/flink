@@ -10,6 +10,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.credentials.AbstractCredentialDecrypterImpl;
 
+import java.io.Serializable;
 import java.util.Optional;
 
 /**
@@ -17,7 +18,8 @@ import java.util.Optional;
  * key from the FCP Credential Service.
  */
 @Confluent
-public class InMemoryCredentialDecrypterImpl extends AbstractCredentialDecrypterImpl {
+public class InMemoryCredentialDecrypterImpl extends AbstractCredentialDecrypterImpl
+        implements Serializable {
 
     public static final InMemoryCredentialDecrypterImpl INSTANCE =
             new InMemoryCredentialDecrypterImpl();

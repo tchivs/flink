@@ -117,7 +117,9 @@ class DefaultServiceTasks implements ServiceTasks {
         applyPublicConfig(tableEnvironment, publicConfig, service);
 
         final Configuration privateConfig = Configuration.fromMap(privateOptions);
-        applyPrivateConfig(tableEnvironment, privateConfig, service);
+        final Map<String, String> sqlSecretsConf =
+                privateConfig.get(ServiceTasksOptions.SQL_SECRETS);
+        applyPrivateConfig(tableEnvironment, privateConfig, sqlSecretsConf, service);
 
         tableEnvironment.getConfig().addConfiguration(publicConfig);
         tableEnvironment.getConfig().addConfiguration(privateConfig);
@@ -188,7 +190,10 @@ class DefaultServiceTasks implements ServiceTasks {
     }
 
     private void applyPrivateConfig(
-            TableEnvironment tableEnvironment, Configuration privateConfig, Service service) {
+            TableEnvironment tableEnvironment,
+            Configuration privateConfig,
+            Map<String, String> sqlSecretsConf,
+            Service service) {
         final TableConfig config = tableEnvironment.getConfig();
 
         // Prevents invalid retractions e.g. through non-deterministic time functions like NOW()
@@ -224,7 +229,7 @@ class DefaultServiceTasks implements ServiceTasks {
 
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
-            tableEnvironment.loadModule("openai", AIFunctionsModule.INSTANCE);
+            tableEnvironment.loadModule("openai", new AIFunctionsModule(sqlSecretsConf));
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE

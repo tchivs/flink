@@ -14,6 +14,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.confluent.flink.compute.credentials.ComputePoolKeyCacheImpl;
+import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
@@ -120,7 +121,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
     @Test
     public void testNumberOfBuiltinFunctions() {
-        final AIFunctionsModule aiFunctionsModule = new AIFunctionsModule();
+        final AIFunctionsModule aiFunctionsModule = new AIFunctionsModule(Collections.emptyMap());
         assertThat(aiFunctionsModule.listFunctions().size()).isEqualTo(2);
         assertThat(aiFunctionsModule.getFunctionDefinition("INVOKE_OPENAI")).isPresent();
         assertThat(aiFunctionsModule.getFunctionDefinition("SECRET")).isPresent();
@@ -164,7 +165,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                         () -> {
                             // in here the environment is temporarily set
                             TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
-                            TableResult result = tEnv.executeSql("SELECT SECRET('a', 'b');");
+                            TableResult result = tEnv.executeSql("SELECT SECRET();");
                             final List<Row> results = new ArrayList<>();
                             result.collect().forEachRemaining(results::add);
                             assertThat(results).containsExactlyInAnyOrderElementsOf(expectedRows);
@@ -177,65 +178,94 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
         assertThatThrownBy(
                         () -> {
-                            TableResult result = tEnv.executeSql("SELECT SECRET('a', 'b');");
+                            TableResult result = tEnv.executeSql("SELECT SECRET();");
                             result.collect().forEachRemaining(System.out::println);
                         })
                 .hasStackTraceContaining("OPENAI_API_KEY");
     }
 
     @Test
-    public void testAIFunctionAiGenerateWithSecretUDF() {
+    public void testSecretUDFNoSecretSet() {
+        final HttpUrl baseUrl = mockOpenAiWebServer.url("/v1/chat/completions");
+        final TableEnvironment tEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tEnv.loadModule(
+                "testOpenAi",
+                new AIFunctionsTestModule(
+                        baseUrl.toString(),
+                        new MockedInMemoryCredentialDecrypterImpl(null),
+                        Collections.emptyMap()));
+
+        assertThatThrownBy(
+                        () -> {
+                            TableResult result =
+                                    tEnv.executeSql("SELECT SECRET('unknownSecretName');");
+                            result.collect().forEachRemaining(System.out::println);
+                        })
+                .hasStackTraceContaining(
+                        "SECRET is null. Please SET 'unknownSecretName' and resubmit job.");
+    }
+
+    @Test
+    public void testAIFunctionAiGenerateWithMockedSecretUDF() throws Exception {
         final HttpUrl baseUrl = mockOpenAiWebServer.url("/v1/chat/completions");
         // value parse from JSON message.content
         final List<Row> expectedRows = Collections.singletonList(Row.of("4"));
         // mock openAI completions JSON response
         mockOpenAiWebServer.enqueue(mockOpenAiResponse);
+        final String base64EncryptedSecret =
+                Base64.getEncoder()
+                        .encodeToString(encryptMessage("someApiKeyValue", keyPair.getPublic()));
         // Mock AIResponseGenerator baseURL to make sure we control responses
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        tableEnv.loadModule("testOpenAi", new AIFunctionsTestModule(baseUrl.toString()));
+        tableEnv.loadModule(
+                "testOpenAi",
+                new AIFunctionsTestModule(
+                        baseUrl.toString(),
+                        new MockedInMemoryCredentialDecrypterImpl(
+                                keyPair.getPrivate().getEncoded()),
+                        Collections.singletonMap(
+                                AISecret.SECRET_KEY_CONF_PREFIX + "someApiKey",
+                                base64EncryptedSecret)));
 
         // test INVOKE_OPENAI with SECRET UDF
         final TableResult result =
                 tableEnv.executeSql(
-                        "SELECT INVOKE_OPENAI('Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down', 'someApiKey');");
+                        "SELECT INVOKE_OPENAI('Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down', SECRET('someApiKey'));");
         final List<Row> results = new ArrayList<>();
         result.collect().forEachRemaining(results::add);
         assertThat(results).containsExactlyInAnyOrderElementsOf(expectedRows);
     }
 
     @Test
-    public void testAIFunctionAiGenerateWithSetSecret() throws Exception {
+    public void testAIFunctionAiGenerateWithSecretUDFPropagation() throws Exception {
         final HttpUrl baseUrl = mockOpenAiWebServer.url("/v1/chat/completions");
         mockOpenAiWebServer.enqueue(mockOpenAiResponse);
         // value parse from JSON message.content
         final List<Row> expectedRows = Collections.singletonList(Row.of("4"));
+        final String base64EncryptedSecret =
+                Base64.getEncoder()
+                        .encodeToString(encryptMessage("someUserSecretValue", keyPair.getPublic()));
         // mock AIResponseGenerator baseURL to make sure we control responses
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        tableEnv.loadModule("testOpenAi", new AIFunctionsTestModule(baseUrl.toString()));
-
-        // test INVOKE_OPENAI with SET property not properly passed
-        assertThatThrownBy(
-                        () ->
-                                tableEnv.executeSql(
-                                                "SELECT INVOKE_OPENAI('Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down');")
-                                        .collect()
-                                        .forEachRemaining(System.out::println))
-                .hasStackTraceContaining(
-                        "Secret is null. Please SET `confluent.user.flink.secret` job property.");
+        tableEnv.loadModule(
+                "testOpenAi",
+                new AIFunctionsTestModule(
+                        baseUrl.toString(),
+                        InMemoryCredentialDecrypterImpl.INSTANCE,
+                        Collections.singletonMap(
+                                AISecret.SECRET_KEY_CONF_PREFIX + "someUserSecretName",
+                                base64EncryptedSecret)));
 
         // test INVOKE_OPENAI with SET property passing down encrypted Secret
         final AtomicBoolean isPropagatorDone = new AtomicBoolean(false);
         secretExecPropagator(isPropagatorDone);
 
-        final String base64EncryptedSecret =
-                Base64.getEncoder()
-                        .encodeToString(encryptMessage("anotherKey", keyPair.getPublic()));
-        tableEnv.getConfig().addJobParameter("confluent.user.flink.secret", base64EncryptedSecret);
         final TableResult setResult =
                 tableEnv.executeSql(
-                        "SELECT INVOKE_OPENAI('Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down');");
+                        "SELECT INVOKE_OPENAI('Take the following text and score it from happy to sad, outputting a 0 to 10 numeric scale.  Respond only with the numeric score.', 'Im feeling a little down', SECRET('someUserSecretName'));");
         final List<Row> setResults = new ArrayList<>();
         setResult.collect().forEachRemaining(setResults::add);
         assertThat(setResults).containsExactlyInAnyOrderElementsOf(expectedRows);
@@ -276,5 +306,19 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                         PSource.PSpecified.DEFAULT);
         cipher.init(Cipher.ENCRYPT_MODE, pubKey, oaepParams);
         return cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static class MockedInMemoryCredentialDecrypterImpl
+            extends InMemoryCredentialDecrypterImpl {
+        final byte[] privateKey;
+
+        MockedInMemoryCredentialDecrypterImpl(byte[] privateKey) {
+            this.privateKey = privateKey;
+        }
+
+        @Override
+        protected byte[] readPrivateKey() {
+            return privateKey;
+        }
     }
 }

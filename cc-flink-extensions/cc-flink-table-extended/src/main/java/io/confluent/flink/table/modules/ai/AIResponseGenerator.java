@@ -17,8 +17,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
-import io.confluent.flink.credentials.CredentialDecrypter;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -30,8 +28,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 
 /** Class implementing aiGenerate function by calling OpenAI API. */
@@ -42,9 +38,7 @@ public class AIResponseGenerator extends ScalarFunction {
     private static final String openAICompletionsURL = "https://api.openai.com/v1/chat/completions";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     public static final MediaType JSON = MediaType.get("application/json");
-    private static final String CONFLUENT_USER_FLINK_SECRET = "confluent.user.flink.secret";
     private URL baseURL;
-    private String confluentUserFlinkSecret;
     private transient OkHttpClient httpClient;
     private transient ObjectMapper mapper;
 
@@ -61,29 +55,12 @@ public class AIResponseGenerator extends ScalarFunction {
     public void open(FunctionContext context) throws Exception {
         this.httpClient = new OkHttpClient.Builder().build();
         this.mapper = new ObjectMapper();
-        final byte[] confluentUserFlinkProperty =
-                Base64.getDecoder()
-                        .decode(context.getJobParameter(CONFLUENT_USER_FLINK_SECRET, ""));
-        if (confluentUserFlinkProperty.length != 0) {
-            CredentialDecrypter decrypter = InMemoryCredentialDecrypterImpl.INSTANCE;
-            this.confluentUserFlinkSecret =
-                    new String(
-                            decrypter.decrypt(confluentUserFlinkProperty), StandardCharsets.UTF_8);
-        }
-    }
-
-    public @Nullable String eval(@Nullable String prompt, @Nullable String input) {
-        // Support both pass User secret using SET property and Secret UDF
-        // TODO: To be removed FRT-249
-        return eval(prompt, input, this.confluentUserFlinkSecret);
     }
 
     public @Nullable String eval(@Nullable String prompt, @Nullable String input, String apiKey) {
         if (prompt == null || input == null) {
             return null;
         }
-        // Make sure we have a valid key
-        validateSecret(apiKey);
 
         final ObjectNode node = mapper.createObjectNode();
         node.put("model", "gpt-3.5-turbo");
@@ -155,15 +132,6 @@ public class AIResponseGenerator extends ScalarFunction {
             this.baseURL = new URL(baseURL);
         } catch (MalformedURLException e) {
             throw new RuntimeException("Badly configured server: " + openAICompletionsURL);
-        }
-    }
-
-    private static void validateSecret(String encryptedSecret) {
-        if (encryptedSecret == null) {
-            throw new FlinkRuntimeException(
-                    "Secret is null. Please SET `"
-                            + CONFLUENT_USER_FLINK_SECRET
-                            + "` job property.");
         }
     }
 }

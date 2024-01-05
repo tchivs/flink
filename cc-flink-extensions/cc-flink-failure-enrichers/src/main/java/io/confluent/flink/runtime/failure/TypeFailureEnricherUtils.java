@@ -5,11 +5,21 @@
 package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import java.util.Optional;
 
 final class TypeFailureEnricherUtils {
+    /**
+     * @param t the Throwable to check
+     * @return true when the Throwable is a User Secret error message {@code
+     *     io.confluent.flink.table.modules.ai.AISecret}, false otherwise
+     */
+    @Internal
+    public static boolean isUserSecretErrorMessage(Throwable t) {
+        return ExceptionUtils.findThrowableWithMessage(t, "SECRET is null.").isPresent();
+    }
 
     /**
      * @param classLoader the clasLoader to check

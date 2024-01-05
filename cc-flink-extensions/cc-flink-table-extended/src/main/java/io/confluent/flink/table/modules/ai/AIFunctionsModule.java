@@ -7,6 +7,8 @@ package io.confluent.flink.table.modules.ai;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
+import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -15,15 +17,19 @@ import java.util.Set;
 
 /** Module to provide OpenAI built-in functions. */
 public class AIFunctionsModule implements Module {
-
-    public static final AIFunctionsModule INSTANCE = new AIFunctionsModule();
     Map<String, FunctionDefinition> normalizedFunctions;
+    final Map<String, String> sqlSecretsConfig;
 
-    public AIFunctionsModule() {
-        normalizedFunctions =
+    public AIFunctionsModule(Map<String, String> sqlSecretsConfig) {
+        this.sqlSecretsConfig = sqlSecretsConfig;
+        this.normalizedFunctions =
                 new HashMap() {
                     {
-                        put(AISecret.NAME, new AISecret());
+                        put(
+                                AISecret.NAME,
+                                new AISecret(
+                                        InMemoryCredentialDecrypterImpl.INSTANCE,
+                                        sqlSecretsConfig));
                         put(AIResponseGenerator.NAME, new AIResponseGenerator());
                     }
                 };

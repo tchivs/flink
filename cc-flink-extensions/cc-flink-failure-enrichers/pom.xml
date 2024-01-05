@@ -92,6 +92,12 @@ Copyright 2023 Confluent Inc.
 			<artifactId>kafka</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-table-extended_2.12</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

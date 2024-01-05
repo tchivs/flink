@@ -86,6 +86,8 @@ public class TypeFailureEnricher implements FailureEnricher {
         // Authorization exceptions coming from Kafka.
         forThrowable(TransactionalIdAuthorizationException.class, Type.USER),
         forThrowable(TopicAuthorizationException.class, Type.USER),
+        // User Secret error message.
+        forPredicate(TypeFailureEnricherUtils::isUserSecretErrorMessage, Type.USER),
         // System exceptions.
         forThrowable(FlinkException.class, Type.SYSTEM),
         forPredicate(ExceptionUtils::isJvmFatalOrOutOfMemoryError, Type.SYSTEM),

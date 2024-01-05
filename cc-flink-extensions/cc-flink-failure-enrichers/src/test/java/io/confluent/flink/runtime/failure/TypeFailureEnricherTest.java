@@ -9,10 +9,12 @@ import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.FlinkUserCodeClassLoaders;
 import org.apache.flink.util.MutableURLClassLoader;
 import org.apache.flink.util.SerializedThrowable;
 
+import io.confluent.flink.table.modules.ai.AISecret;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
 import org.junit.jupiter.api.BeforeAll;
@@ -41,8 +43,8 @@ import java.util.jar.JarOutputStream;
 
 import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
 import static org.apache.flink.util.FlinkUserCodeClassLoader.NOOP_EXCEPTION_HANDLER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TypeFailureEnricherTest {
     @TempDir static File temporaryFile;
@@ -86,9 +88,7 @@ class TypeFailureEnricherTest {
 
         final Class<?> systemClass =
                 Class.forName(FailureEnricher.class.getName(), false, classLoader);
-        assertEquals(
-                false,
-                TypeFailureEnricherUtils.isUserCodeClassLoader(systemClass.getClassLoader()));
+        assertFalse(TypeFailureEnricherUtils.isUserCodeClassLoader(systemClass.getClassLoader()));
 
         Class<?> userClass = Class.forName(USER_CLASS, false, classLoader);
         assertTrue(TypeFailureEnricherUtils.isUserCodeClassLoader(userClass.getClassLoader()));
@@ -115,6 +115,13 @@ class TypeFailureEnricherTest {
                         + "You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' "
                         + "to suppress this exception and drop such records silently.";
         assertFailureEnricherLabelIsExpectedLabel(new TableException(errorMsg), "USER");
+    }
+
+    @Test
+    void testUserSecretExceptionClassification() throws ExecutionException, InterruptedException {
+        Exception toValidate =
+                new FlinkRuntimeException(String.format(AISecret.ERROR_MESSAGE, "name"));
+        assertFailureEnricherLabelIsExpectedLabel(toValidate, "USER");
     }
 
     /** Pack the generated classes into a JAR and return the path of the JAR. */
