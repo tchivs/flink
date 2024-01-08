@@ -49,6 +49,7 @@ global_job_config:
       - checkout
       - . vault-setup
       # Configure maven to use CFLT mirrors and repository
+      - . vault-sem-get-secret maven-settings-no-cloudfront
       - . vault-sem-get-secret ci-reporting
 blocks:
   - name: compile_ci
