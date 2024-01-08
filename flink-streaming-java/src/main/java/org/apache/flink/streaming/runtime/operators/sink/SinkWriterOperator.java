@@ -29,6 +29,7 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.Sink.InitContext;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink.PrecommittingSinkWriter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -118,6 +119,10 @@ class SinkWriterOperator<InputT, CommT> extends AbstractStreamOperator<Committab
         if (sink instanceof StatefulSink) {
             writerStateHandler =
                     new StatefulSinkWriterStateHandler<>((StatefulSink<InputT, ?>) sink);
+        } else if (sink instanceof StatefulSinkWithGlobalState) {
+            writerStateHandler =
+                    new GlobalStatefulSinkWriterStateHandler<>(
+                            (StatefulSinkWithGlobalState<InputT, ?, ?>) sink);
         } else {
             writerStateHandler = new StatelessSinkWriterStateHandler<>(sink);
         }
