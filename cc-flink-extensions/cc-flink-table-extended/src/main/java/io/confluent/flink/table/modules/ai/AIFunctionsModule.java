@@ -18,10 +18,8 @@ import java.util.Set;
 /** Module to provide OpenAI built-in functions. */
 public class AIFunctionsModule implements Module {
     Map<String, FunctionDefinition> normalizedFunctions;
-    final Map<String, String> sqlSecretsConfig;
 
     public AIFunctionsModule(Map<String, String> sqlSecretsConfig) {
-        this.sqlSecretsConfig = sqlSecretsConfig;
         this.normalizedFunctions =
                 new HashMap() {
                     {

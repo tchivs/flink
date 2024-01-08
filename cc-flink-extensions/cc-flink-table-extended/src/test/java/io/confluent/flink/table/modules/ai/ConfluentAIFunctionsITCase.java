@@ -5,6 +5,7 @@
 package io.confluent.flink.table.modules.ai;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -19,6 +20,7 @@ import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.flink.table.service.ServiceTasks.Service;
+import io.confluent.flink.table.service.ServiceTasksOptions;
 import okhttp3.HttpUrl;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -219,15 +221,22 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // Mock AIResponseGenerator baseURL to make sure we control responses
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        // Setup private Conf with SQL_SECRETS
+        final Configuration privateConfig =
+                Configuration.fromMap(
+                        Collections.singletonMap(
+                                String.format(
+                                        "%s.%s",
+                                        ServiceTasksOptions.SQL_SECRETS.key(), "someApiKey"),
+                                base64EncryptedSecret));
+
         tableEnv.loadModule(
                 "testOpenAi",
                 new AIFunctionsTestModule(
                         baseUrl.toString(),
                         new MockedInMemoryCredentialDecrypterImpl(
                                 keyPair.getPrivate().getEncoded()),
-                        Collections.singletonMap(
-                                AISecret.SECRET_KEY_CONF_PREFIX + "someApiKey",
-                                base64EncryptedSecret)));
+                        privateConfig.get(ServiceTasksOptions.SQL_SECRETS)));
 
         // test INVOKE_OPENAI with SECRET UDF
         final TableResult result =
@@ -250,14 +259,22 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         // mock AIResponseGenerator baseURL to make sure we control responses
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        // Setup private Conf with SQL_SECRETS
+        final Configuration privateConfig =
+                Configuration.fromMap(
+                        Collections.singletonMap(
+                                String.format(
+                                        "%s.%s",
+                                        ServiceTasksOptions.SQL_SECRETS.key(),
+                                        "someUserSecretName"),
+                                base64EncryptedSecret));
+
         tableEnv.loadModule(
                 "testOpenAi",
                 new AIFunctionsTestModule(
                         baseUrl.toString(),
                         InMemoryCredentialDecrypterImpl.INSTANCE,
-                        Collections.singletonMap(
-                                AISecret.SECRET_KEY_CONF_PREFIX + "someUserSecretName",
-                                base64EncryptedSecret)));
+                        privateConfig.get(ServiceTasksOptions.SQL_SECRETS)));
 
         // test INVOKE_OPENAI with SET property passing down encrypted Secret
         final AtomicBoolean isPropagatorDone = new AtomicBoolean(false);

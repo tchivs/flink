@@ -18,7 +18,6 @@ public class AISecret extends ScalarFunction {
 
     public static final String NAME = "SECRET";
     public static final String ERROR_MESSAGE = "SECRET is null. Please SET '%s' and resubmit job.";
-    public static final String SECRET_KEY_CONF_PREFIX = "sql.secrets.";
 
     private final Map<String, String> userSecretsConfig;
     private final CredentialDecrypter decrypter;
@@ -29,8 +28,7 @@ public class AISecret extends ScalarFunction {
     }
 
     public String eval(String secretName) {
-        final String secretKey = SECRET_KEY_CONF_PREFIX + secretName;
-        final String secretValue = userSecretsConfig.get(secretKey);
+        final String secretValue = userSecretsConfig.get(secretName);
         // Make sure we have a valid key
         validateSecret(secretName, secretValue);
 
