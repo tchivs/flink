@@ -5,6 +5,7 @@
 package io.confluent.flink.table.connectors;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.ObjectPath;
@@ -16,6 +17,7 @@ import org.apache.flink.table.types.DataType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -121,7 +123,13 @@ public class ConfluentManagedTableValidatorTest {
                 .containsEntry("kafka.max-message-size", "2097164 bytes")
                 .containsEntry("kafka.partitions", "6")
                 .containsEntry("kafka.retention.size", "0 bytes")
-                .containsEntry("kafka.retention.time", "604800000 ms")
+                .hasEntrySatisfying(
+                        "kafka.retention.time",
+                        v ->
+                                assertThat(
+                                                ConfigurationUtils.<Duration>convertValue(
+                                                        v, Duration.class))
+                                        .isEqualTo(Duration.ofDays(7)))
                 .containsEntry("scan.bounded.mode", "unbounded")
                 .containsEntry("scan.startup.mode", "earliest-offset")
                 .containsEntry("value.format", "avro-registry")
