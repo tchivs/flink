@@ -6,6 +6,7 @@ package io.confluent.flink.formats.converters.json;
 
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
@@ -27,7 +28,11 @@ import org.everit.json.schema.NumberSchema;
 import org.everit.json.schema.ObjectSchema;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.StringSchema;
+import org.everit.json.schema.loader.SchemaLoader;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -181,7 +186,43 @@ public final class CommonMappings {
                                         new RowField("int8", new TinyIntType(true)),
                                         new RowField(
                                                 "string",
-                                                new VarCharType(false, VarCharType.MAX_LENGTH))))));
+                                                new VarCharType(false, VarCharType.MAX_LENGTH))))),
+                new TypeMapping(
+                        decimalSchema(),
+                        new RowType(
+                                false,
+                                Collections.singletonList(
+                                        new RowField("decimal", new DecimalType(10, 2))))));
+    }
+
+    private static Schema decimalSchema() {
+        // SQL-1593 case
+        String schemaStr =
+                "{\n"
+                        + "  \"properties\": {\n"
+                        + "    \"decimal\": {\n"
+                        + "      \"connect.index\": 0,\n"
+                        + "      \"oneOf\": [\n"
+                        + "        {\n"
+                        + "          \"type\": \"null\"\n"
+                        + "        },\n"
+                        + "        {\n"
+                        + "          \"connect.parameters\": {\n"
+                        + "            \"connect.decimal.precision\": \"10\",\n"
+                        + "            \"scale\": \"2\"\n"
+                        + "          },\n"
+                        + "          \"connect.type\": \"bytes\",\n"
+                        + "          \"title\": \"org.apache.kafka.connect.data.Decimal\",\n"
+                        + "          \"type\": \"number\"\n"
+                        + "        }\n"
+                        + "      ]\n"
+                        + "    }"
+                        + "  },\n"
+                        + "  \"title\": \"io.confluent.row\",\n"
+                        + "  \"type\": \"object\"\n"
+                        + "}";
+        JSONObject rawSchema = new JSONObject(new JSONTokener(new StringReader(schemaStr)));
+        return SchemaLoader.load(rawSchema);
     }
 
     private static Schema recordSchema() {

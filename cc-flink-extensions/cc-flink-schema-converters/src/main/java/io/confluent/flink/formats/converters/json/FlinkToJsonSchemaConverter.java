@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_BYTES;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_DATE;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_DECIMAL;
@@ -160,14 +161,11 @@ public class FlinkToJsonSchemaConverter {
             case TIME_WITHOUT_TIME_ZONE:
                 return convertTime((TimeType) logicalType);
             case DECIMAL:
-                DecimalType decimalType = (DecimalType) logicalType;
-                // store BigDecimal as byte[]
-                final Map<String, Object> props = new HashMap<>();
-                props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_DECIMAL);
-                props.put(
-                        CONNECT_TYPE_DECIMAL_PRECISION, String.valueOf(decimalType.getPrecision()));
-                props.put(CONNECT_TYPE_DECIMAL_SCALE, String.valueOf(decimalType.getScale()));
-                return NumberSchema.builder().unprocessedProperties(props);
+                final Map<String, Object> props = getDecimalProperties((DecimalType) logicalType);
+
+                return NumberSchema.builder()
+                        .unprocessedProperties(props)
+                        .title(CONNECT_TYPE_DECIMAL);
             case ROW:
                 RowType rowType = (RowType) logicalType;
                 List<String> fieldNames = rowType.getFieldNames();
@@ -210,6 +208,17 @@ public class FlinkToJsonSchemaConverter {
                 throw new UnsupportedOperationException(
                         "Unsupported to derive Schema for type: " + logicalType);
         }
+    }
+
+    private static Map<String, Object> getDecimalProperties(DecimalType logicalType) {
+        final Map<String, Object> props = new HashMap<>();
+        props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES);
+
+        final Map<String, Object> parameters = new HashMap<>();
+        parameters.put(CONNECT_TYPE_DECIMAL_PRECISION, String.valueOf(logicalType.getPrecision()));
+        parameters.put(CONNECT_TYPE_DECIMAL_SCALE, String.valueOf(logicalType.getScale()));
+        props.put(CONNECT_PARAMETERS, parameters);
+        return props;
     }
 
     private static Schema.Builder<?> convertMap(MapType logicalType, String rowName) {

@@ -27,6 +27,7 @@ public class CommonConstants {
     static final String CONNECT_TYPE_TIMESTAMP = "org.apache.kafka.connect.data.Timestamp";
 
     static final String CONNECT_TYPE_DECIMAL = "org.apache.kafka.connect.data.Decimal";
+    static final String CONNECT_PARAMETERS = "connect.parameters";
     static final String CONNECT_TYPE_DECIMAL_SCALE = "scale";
     static final String CONNECT_TYPE_DECIMAL_PRECISION = "connect.decimal.precision";
     static final String GENERALIZED_TYPE_UNION_PREFIX = "connect_union_field_";

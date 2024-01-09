@@ -36,6 +36,7 @@ import org.everit.json.schema.Schema;
 import org.everit.json.schema.StringSchema;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_BYTES;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_DATE;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_DECIMAL;
@@ -172,7 +174,12 @@ public class JsonToFlinkSchemaConverter {
                         if (!CONNECT_TYPE_DECIMAL.equals(title)) {
                             throw new IllegalArgumentException("Expected decimal type");
                         }
-                        final Map<String, Object> properties = schema.getUnprocessedProperties();
+                        @SuppressWarnings("unchecked")
+                        final Map<String, Object> properties =
+                                (Map<String, Object>)
+                                        schema.getUnprocessedProperties()
+                                                .getOrDefault(
+                                                        CONNECT_PARAMETERS, Collections.emptyMap());
                         final int scale =
                                 Optional.ofNullable(properties.get(CONNECT_TYPE_DECIMAL_SCALE))
                                         .map(prop -> Integer.parseInt((String) prop))
