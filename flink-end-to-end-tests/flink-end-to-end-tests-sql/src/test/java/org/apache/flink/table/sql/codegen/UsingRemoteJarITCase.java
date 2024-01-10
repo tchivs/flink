@@ -18,12 +18,6 @@
 
 package org.apache.flink.table.sql.codegen;
 
-import org.apache.flink.formats.json.debezium.DebeziumJsonDeserializationSchema;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.catalog.Column;
-import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.UniqueConstraint;
-
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -36,17 +30,6 @@ import java.util.Map;
 
 /** End-to-End tests for using remote jar. */
 public class UsingRemoteJarITCase extends HdfsITCaseBase {
-
-    private static final ResolvedSchema USER_ORDER_SCHEMA =
-            new ResolvedSchema(
-                    Arrays.asList(
-                            Column.physical("user_name", DataTypes.STRING()),
-                            Column.physical("order_cnt", DataTypes.BIGINT())),
-                    Collections.emptyList(),
-                    UniqueConstraint.primaryKey("pk", Collections.singletonList("user_name")));
-
-    private static final DebeziumJsonDeserializationSchema USER_ORDER_DESERIALIZATION_SCHEMA =
-            createDebeziumDeserializationSchema(USER_ORDER_SCHEMA);
 
     @Rule public TestName name = new TestName();
     private org.apache.hadoop.fs.Path hdPath;
@@ -84,10 +67,9 @@ public class UsingRemoteJarITCase extends HdfsITCaseBase {
     public void testUdfInRemoteJar() throws Exception {
         runAndCheckSQL(
                 "remote_jar_e2e.sql",
-                Arrays.asList("+I[Bob, 2]", "+I[Alice, 1]"),
-                raw ->
-                        convertToMaterializedResult(
-                                raw, USER_ORDER_SCHEMA, USER_ORDER_DESERIALIZATION_SCHEMA));
+                Arrays.asList(
+                        "{\"before\":null,\"after\":{\"user_name\":\"Alice\",\"order_cnt\":1},\"op\":\"c\"}",
+                        "{\"before\":null,\"after\":{\"user_name\":\"Bob\",\"order_cnt\":2},\"op\":\"c\"}"));
     }
 
     @Test
@@ -102,20 +84,18 @@ public class UsingRemoteJarITCase extends HdfsITCaseBase {
     public void testCreateTemporarySystemFunctionUsingRemoteJar() throws Exception {
         runAndCheckSQL(
                 "create_function_using_remote_jar_e2e.sql",
-                Arrays.asList("+I[Bob, 2]", "+I[Alice, 1]"),
-                raw ->
-                        convertToMaterializedResult(
-                                raw, USER_ORDER_SCHEMA, USER_ORDER_DESERIALIZATION_SCHEMA));
+                Arrays.asList(
+                        "{\"before\":null,\"after\":{\"user_name\":\"Alice\",\"order_cnt\":1},\"op\":\"c\"}",
+                        "{\"before\":null,\"after\":{\"user_name\":\"Bob\",\"order_cnt\":2},\"op\":\"c\"}"));
     }
 
     @Test
     public void testCreateCatalogFunctionUsingRemoteJar() throws Exception {
         runAndCheckSQL(
                 "create_function_using_remote_jar_e2e.sql",
-                Arrays.asList("+I[Bob, 2]", "+I[Alice, 1]"),
-                raw ->
-                        convertToMaterializedResult(
-                                raw, USER_ORDER_SCHEMA, USER_ORDER_DESERIALIZATION_SCHEMA));
+                Arrays.asList(
+                        "{\"before\":null,\"after\":{\"user_name\":\"Alice\",\"order_cnt\":1},\"op\":\"c\"}",
+                        "{\"before\":null,\"after\":{\"user_name\":\"Bob\",\"order_cnt\":2},\"op\":\"c\"}"));
     }
 
     @Test
@@ -124,10 +104,9 @@ public class UsingRemoteJarITCase extends HdfsITCaseBase {
         replaceVars.put("$TEMPORARY", "TEMPORARY");
         runAndCheckSQL(
                 "create_function_using_remote_jar_e2e.sql",
-                Arrays.asList("+I[Bob, 2]", "+I[Alice, 1]"),
-                raw ->
-                        convertToMaterializedResult(
-                                raw, USER_ORDER_SCHEMA, USER_ORDER_DESERIALIZATION_SCHEMA));
+                Arrays.asList(
+                        "{\"before\":null,\"after\":{\"user_name\":\"Alice\",\"order_cnt\":1},\"op\":\"c\"}",
+                        "{\"before\":null,\"after\":{\"user_name\":\"Bob\",\"order_cnt\":2},\"op\":\"c\"}"));
     }
 
     @Override

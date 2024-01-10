@@ -483,8 +483,7 @@ public class ParquetSplitReaderUtil {
             case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 checkArgument(
-                        typeName == PrimitiveType.PrimitiveTypeName.INT96
-                                || typeName == PrimitiveType.PrimitiveTypeName.INT64,
+                        typeName == PrimitiveType.PrimitiveTypeName.INT96,
                         "Unexpected type: %s",
                         typeName);
                 return new HeapTimestampVector(batchSize);

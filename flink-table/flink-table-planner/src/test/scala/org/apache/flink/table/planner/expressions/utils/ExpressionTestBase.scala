@@ -57,8 +57,6 @@ import org.junit.{After, Before, Rule}
 import org.junit.Assert.{assertEquals, assertTrue, fail}
 import org.junit.rules.ExpectedException
 
-import javax.annotation.Nullable
-
 import java.util.Collections
 
 import scala.collection.JavaConverters._
@@ -200,10 +198,6 @@ abstract class ExpressionTestBase(isStreaming: Boolean = true) {
     addSqlTestExpr(sqlExpr, expected, validExprs)
   }
 
-  def testSqlApi(sqlExpr: String): Unit = {
-    addSqlTestExpr(sqlExpr, null, validExprs)
-  }
-
   def testExpectedAllApisException(
       expr: Expression,
       sqlExpr: String,
@@ -299,7 +293,7 @@ abstract class ExpressionTestBase(isStreaming: Boolean = true) {
 
   private def addSqlTestExpr(
       sqlExpr: String,
-      @Nullable expected: String,
+      expected: String,
       exprsContainer: mutable.ArrayBuffer[_],
       exceptionClass: Class[_ <: Throwable] = null): Unit = {
     // create RelNode from SQL expression
@@ -324,7 +318,7 @@ abstract class ExpressionTestBase(isStreaming: Boolean = true) {
 
   private def addTestExpr(
       relNode: RelNode,
-      @Nullable expected: String,
+      expected: String,
       summaryString: String,
       exceptionClass: Class[_ <: Throwable],
       exprs: mutable.ArrayBuffer[_]): Unit = {
@@ -361,10 +355,6 @@ abstract class ExpressionTestBase(isStreaming: Boolean = true) {
       .zip(result)
       .foreach {
         case ((originalExpr, optimizedExpr, expected), actual) =>
-          if (expected == null) {
-            // no need to check the result
-            return
-          }
           val original = if (originalExpr == null) "" else s"for: [$originalExpr]"
           assertEquals(
             s"Wrong result $original optimized to: [$optimizedExpr]",

@@ -18,8 +18,6 @@
 
 package org.apache.flink.kubernetes.kubeclient.resources;
 
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.core.testutils.FlinkAssertions;
 import org.apache.flink.kubernetes.KubernetesExtension;
 import org.apache.flink.kubernetes.kubeclient.FlinkKubeClient;
 import org.apache.flink.kubernetes.kubeclient.KubernetesConfigMapSharedWatcher;
@@ -37,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,7 +54,8 @@ class KubernetesSharedInformerITCase {
     @RegisterExtension
     private static final KubernetesExtension kubernetesExtension = new KubernetesExtension();
 
-    private final String configMapName = "shared-informer-test-cluster";
+    private final ImmutableMap<String, String> labels =
+            ImmutableMap.of("app", "shared-informer-test-cluster");
 
     private FlinkKubeClient client;
     private ExecutorService watchCallbackExecutorService;
@@ -72,7 +72,7 @@ class KubernetesSharedInformerITCase {
     @AfterEach
     void tearDown() throws Exception {
         ExecutorUtils.gracefulShutdown(5, TimeUnit.SECONDS, watchCallbackExecutorService);
-        client.deleteConfigMap(configMapName).get();
+        client.deleteConfigMapsByLabels(labels).get();
     }
 
     @Test
@@ -80,38 +80,48 @@ class KubernetesSharedInformerITCase {
     public void testWatch() throws Exception {
 
         try (KubernetesConfigMapSharedWatcher watcher =
-                client.createConfigMapSharedWatcher(configMapName)) {
-            TestingCallbackHandler handler = new TestingCallbackHandler(configMapName);
-            try (Watch watch =
-                    watcher.watch(configMapName, handler.build(), watchCallbackExecutorService)) {
-                createConfigMap(configMapName);
-                FlinkAssertions.assertThatFuture(handler.addFuture)
-                        .as("The creation of the ConfigMap should have been processed, eventually.")
-                        .eventuallySucceeds();
+                client.createConfigMapSharedWatcher(labels)) {
+            for (int i = 0; i < 10; i++) {
+                List<TestingCallbackHandler> callbackHandlers = new ArrayList<>();
+                List<Watch> watchers = new ArrayList<>();
 
-                updateConfigMap(configMapName, ImmutableMap.of("foo", "bar"));
-                FlinkAssertions.assertThatFuture(handler.addOrUpdateFuture)
-                        .as("The update of the ConfigMap should have been processed, eventually.")
-                        .eventuallySucceeds();
-                assertThat(handler.assertFuture).isNotCompletedExceptionally();
-
-                client.deleteConfigMap(configMapName).get();
-                FlinkAssertions.assertThatFuture(handler.deleteFuture)
-                        .as("The deletion of the ConfigMap should have been processed, eventually.")
-                        .eventuallySucceeds();
-                if (handler.assertFuture.isCompletedExceptionally()) {
-                    handler.assertFuture.get();
+                watchInRange(watcher, callbackHandlers, watchers, 0, 20);
+                createConfigMapsInRange(0, 5);
+                watchInRange(watcher, callbackHandlers, watchers, 20, 40);
+                createConfigMapsInRange(5, 10);
+                updateConfigMapInRange(0, 10, ImmutableMap.of("foo", "bar"));
+                for (TestingCallbackHandler handler : callbackHandlers) {
+                    handler.addFuture.get();
+                    handler.addOrUpdateFuture.get();
+                    assertThat(handler.assertFuture).isNotCompletedExceptionally();
                 }
+                watchers.forEach(Watch::close);
+                callbackHandlers.clear();
+                watchers.clear();
+
+                watchInRange(watcher, callbackHandlers, watchers, 40, 60);
+                for (TestingCallbackHandler handler : callbackHandlers) {
+                    handler.addFuture.get();
+                    handler.addOrUpdateFuture.get();
+                }
+                client.deleteConfigMapsByLabels(labels).get();
+                for (TestingCallbackHandler handler : callbackHandlers) {
+                    handler.deleteFuture.get();
+                    if (handler.assertFuture.isCompletedExceptionally()) {
+                        handler.assertFuture.get();
+                    }
+                }
+                watchers.forEach(Watch::close);
             }
         }
     }
 
     @Test
     void testWatchWithBlockHandler() throws Exception {
-        final String configMapName = getConfigMapName(System.currentTimeMillis());
         try (KubernetesConfigMapSharedWatcher watcher =
-                client.createConfigMapSharedWatcher(configMapName)) {
+                client.createConfigMapSharedWatcher(labels)) {
 
+            final String configMapName = getConfigMapName(System.currentTimeMillis());
             final long block = 500;
             final long maxUpdateVal = 30;
 
@@ -153,15 +163,30 @@ class KubernetesSharedInformerITCase {
         }
     }
 
+    private void createConfigMapsInRange(int start, int end) throws Exception {
+        for (int i = start; i < end; i++) {
+            createConfigMap(getConfigMapName(i));
+        }
+    }
+
     private void createConfigMap(String name) throws Exception {
         client.createConfigMap(
                         new KubernetesConfigMap(
                                 new ConfigMapBuilder()
                                         .withNewMetadata()
                                         .withName(name)
+                                        .withLabels(labels)
                                         .endMetadata()
                                         .build()))
                 .get();
+    }
+
+    private void updateConfigMapInRange(int start, int end, Map<String, String> data)
+            throws Exception {
+        for (int i = start; i < end; i++) {
+            final String configMapName = getConfigMapName(i);
+            updateConfigMap(configMapName, data);
+        }
     }
 
     private void updateConfigMap(String configMapName, Map<String, String> data) throws Exception {
@@ -174,11 +199,20 @@ class KubernetesSharedInformerITCase {
                 .get();
     }
 
-    private Tuple2<TestingCallbackHandler, Watch> watch(
-            String name, KubernetesConfigMapSharedWatcher watcher) {
-        final TestingCallbackHandler handler = new TestingCallbackHandler(name);
-        final Watch watch = watcher.watch(name, handler.build(), watchCallbackExecutorService);
-        return Tuple2.of(handler, watch);
+    private void watchInRange(
+            KubernetesConfigMapSharedWatcher watcher,
+            List<TestingCallbackHandler> callbackHandlers,
+            List<Watch> watchers,
+            int start,
+            int end) {
+
+        for (int i = start; i < end; i++) {
+            final String name = getConfigMapName(i % 10);
+            final TestingCallbackHandler handler = new TestingCallbackHandler(name);
+            callbackHandlers.add(handler);
+            final Watch watch = watcher.watch(name, handler.build(), watchCallbackExecutorService);
+            watchers.add(watch);
+        }
     }
 
     private String getConfigMapName(long id) {

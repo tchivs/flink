@@ -87,13 +87,12 @@ class NestedProjectionUtilTest extends RexNodeTestBase {
           "$2",
           "$3",
           "$4",
-          "$5",
           "*($t2, $t3)",
           "100",
-          "<($t6, $t7)",
+          "<($t5, $t6)",
           "6",
-          ">($t1, $t9)",
-          "AND($t8, $t10)")))
+          ">($t1, $t8)",
+          "AND($t7, $t9)")))
 
     val nestedField = NestedProjectionUtil.build(exprs, rexProgram.getInputRowType)
     val paths = NestedProjectionUtil.convertToIndexArray(nestedField)
@@ -102,8 +101,7 @@ class NestedProjectionUtilTest extends RexNodeTestBase {
       Array(1),
       Array(2),
       Array(3),
-      Array(4),
-      Array(5)
+      Array(4)
     )
     assertArray(paths, orderedPaths)
     val builder = new FlinkRexBuilder(typeFactory)

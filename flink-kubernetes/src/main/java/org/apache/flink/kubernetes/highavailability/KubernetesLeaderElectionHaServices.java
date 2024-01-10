@@ -46,6 +46,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY;
 import static org.apache.flink.kubernetes.utils.Constants.NAME_SEPARATOR;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -73,7 +74,9 @@ public class KubernetesLeaderElectionHaServices extends AbstractHaServices {
         this(
                 kubeClient,
                 kubeClient.createConfigMapSharedWatcher(
-                        getClusterConfigMap(configuration.get(KubernetesConfigOptions.CLUSTER_ID))),
+                        KubernetesUtils.getConfigMapLabels(
+                                configuration.get(KubernetesConfigOptions.CLUSTER_ID),
+                                LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY)),
                 Executors.newCachedThreadPool(
                         new ExecutorThreadFactory("config-map-watch-handler")),
                 ioExecutor,
@@ -199,7 +202,11 @@ public class KubernetesLeaderElectionHaServices extends AbstractHaServices {
             exception = e;
         }
 
-        kubeClient.deleteConfigMap(getClusterConfigMap()).get();
+        kubeClient
+                .deleteConfigMapsByLabels(
+                        KubernetesUtils.getConfigMapLabels(
+                                clusterId, LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY))
+                .get();
 
         ExceptionUtils.tryRethrowException(exception);
     }

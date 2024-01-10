@@ -940,9 +940,7 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "RAND",
                     SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.cascade(
-                            ReturnTypes.explicit(SqlTypeName.DOUBLE),
-                            SqlTypeTransforms.TO_NULLABLE),
+                    ReturnTypes.DOUBLE,
                     null,
                     OperandTypes.or(
                             new SqlSingleOperandTypeChecker[] {
@@ -960,9 +958,7 @@ public class FlinkSqlOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "RAND_INTEGER",
                     SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.cascade(
-                            ReturnTypes.explicit(SqlTypeName.INTEGER),
-                            SqlTypeTransforms.TO_NULLABLE),
+                    ReturnTypes.INTEGER,
                     null,
                     OperandTypes.or(
                             new SqlSingleOperandTypeChecker[] {

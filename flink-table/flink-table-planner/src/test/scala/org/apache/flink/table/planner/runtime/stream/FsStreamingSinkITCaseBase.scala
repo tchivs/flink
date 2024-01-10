@@ -52,7 +52,7 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
   protected var resultPath: String = _
 
   // iso date
-  def getData: Seq[Row] = Seq(
+  private val data: Seq[Row] = Seq(
     Row.of(Integer.valueOf(1), "a", "b", "05-03-2020", "07"),
     Row.of(Integer.valueOf(2), "p", "q", "05-03-2020", "08"),
     Row.of(Integer.valueOf(3), "x", "y", "05-03-2020", "09"),
@@ -61,7 +61,7 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
   )
 
   // basic iso date
-  def getData2 = Seq(
+  private val data2 = Seq(
     Row.of(Integer.valueOf(1), "a", "b", "20200503", "07"),
     Row.of(Integer.valueOf(2), "p", "q", "20200503", "08"),
     Row.of(Integer.valueOf(3), "x", "y", "20200503", "09"),
@@ -105,13 +105,6 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
     testPartitionCustomFormatDate(partition = true, "metastore")
   }
 
-  def getDataStream2(fun: Row => Long) = {
-    new DataStream(
-      env.getJavaEnv.addSource(
-        new FiniteTestSource(getData2, fun),
-        new RowTypeInfo(Types.INT, Types.STRING, Types.STRING, Types.STRING, Types.STRING)))
-  }
-
   @Test
   def testPartitionWithBasicDate(): Unit = {
 
@@ -123,21 +116,19 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
       TimestampData.fromLocalDateTime(localDateTime).getMillisecond
     }
 
+    val stream: DataStream[Row] = new DataStream(
+      env.getJavaEnv.addSource(
+        new FiniteTestSource(data2, fun),
+        new RowTypeInfo(Types.INT, Types.STRING, Types.STRING, Types.STRING, Types.STRING)))
+
     // write out the data
-    test(getDataStream2(fun), "default", "yyyyMMdd", "$d", "d", "partition-time", "1d", getData2)
+    test(stream, "default", "yyyyMMdd", "$d", "d", "partition-time", "1d", data2)
 
     // verify that the written data is correct
     val basePath = new File(new URI(resultPath).getPath)
     Assert.assertEquals(2, basePath.list().length)
     Assert.assertTrue(new File(new File(basePath, "d=20200503"), "_MY_SUCCESS").exists())
     Assert.assertTrue(new File(new File(basePath, "d=20200504"), "_MY_SUCCESS").exists())
-  }
-
-  def getDataStream(fun: Row => Long): DataStream[Row] = {
-    new DataStream(
-      env.getJavaEnv.addSource(
-        new FiniteTestSource(getData, fun),
-        new RowTypeInfo(Types.INT, Types.STRING, Types.STRING, Types.STRING, Types.STRING)))
   }
 
   def testPartitionCustomFormatDate(partition: Boolean, policy: String = "success-file"): Unit = {
@@ -149,15 +140,20 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
       TimestampData.fromLocalDateTime(localDateTime).getMillisecond
     }
 
+    val stream = new DataStream(
+      env.getJavaEnv.addSource(
+        new FiniteTestSource(data, fun),
+        new RowTypeInfo(Types.INT, Types.STRING, Types.STRING, Types.STRING, Types.STRING)))
+
     test(
-      getDataStream(fun),
+      stream,
       "default",
       "MM-dd-yyyy HH:mm:ss",
       "$d $e:00:00",
       if (partition) "d,e" else "",
       "process-time",
       "1h",
-      getData,
+      data,
       policy)
   }
 
@@ -177,31 +173,6 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
 
     tEnv.createTemporaryView("my_table", dataStream, $("a"), $("b"), $("c"), $("d"), $("e"))
 
-    val ddl: String = getDDL(
-      timeExtractorKind,
-      timeExtractorFormatterPattern,
-      timeExtractorPattern,
-      partition,
-      commitTrigger,
-      commitDelay,
-      policy,
-      successFileName)
-    tEnv.executeSql(ddl)
-
-    tEnv.sqlQuery("select * from my_table").executeInsert("sink_table").await()
-
-    check("select * from sink_table", dataTest)
-  }
-
-  def getDDL(
-      timeExtractorKind: String,
-      timeExtractorFormatterPattern: String,
-      timeExtractorPattern: String,
-      partition: String,
-      commitTrigger: String,
-      commitDelay: String,
-      policy: String,
-      successFileName: String) = {
     val ddl =
       s"""
          |create table sink_table (
@@ -231,7 +202,11 @@ abstract class FsStreamingSinkITCaseBase extends StreamingTestBase {
          |  ${additionalProperties().mkString(",\n")}
          |)
        """.stripMargin
-    ddl
+    tEnv.executeSql(ddl)
+
+    tEnv.sqlQuery("select * from my_table").executeInsert("sink_table").await()
+
+    check("select * from sink_table", dataTest)
   }
 
   def check(sqlQuery: String, expectedResult: Seq[Row]): Unit = {

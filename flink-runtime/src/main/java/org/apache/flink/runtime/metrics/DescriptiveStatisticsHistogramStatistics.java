@@ -174,8 +174,6 @@ public class DescriptiveStatisticsHistogramStatistics extends HistogramStatistic
             }
             if (data != null) {
                 percentilesImpl.setData(data);
-            } else {
-                percentilesImpl.setData(new double[] {0.0});
             }
         }
     }

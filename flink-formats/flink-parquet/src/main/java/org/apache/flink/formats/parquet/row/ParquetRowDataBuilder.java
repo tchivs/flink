@@ -65,19 +65,13 @@ public class ParquetRowDataBuilder extends ParquetWriter.Builder<RowData, Parque
 
     @Override
     protected WriteSupport<RowData> getWriteSupport(Configuration conf) {
-        return new ParquetWriteSupport(conf);
+        return new ParquetWriteSupport();
     }
 
     private class ParquetWriteSupport extends WriteSupport<RowData> {
 
-        private MessageType schema = null;
+        private MessageType schema = convertToParquetMessageType("flink_schema", rowType);
         private ParquetRowDataWriter writer;
-        private Configuration conf;
-
-        private ParquetWriteSupport(Configuration conf) {
-            this.conf = conf;
-            schema = convertToParquetMessageType("flink_schema", rowType, conf);
-        }
 
         @Override
         public WriteContext init(Configuration configuration) {
@@ -86,8 +80,7 @@ public class ParquetRowDataBuilder extends ParquetWriter.Builder<RowData, Parque
 
         @Override
         public void prepareForWrite(RecordConsumer recordConsumer) {
-            this.writer =
-                    new ParquetRowDataWriter(recordConsumer, rowType, schema, utcTimestamp, conf);
+            this.writer = new ParquetRowDataWriter(recordConsumer, rowType, schema, utcTimestamp);
         }
 
         @Override

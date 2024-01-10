@@ -38,13 +38,11 @@ import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.CheckpointCoordinatorConfiguration;
 import org.apache.flink.runtime.jobgraph.tasks.JobCheckpointingSettings;
 import org.apache.flink.test.util.AbstractTestBase;
-import org.apache.flink.testutils.junit.FailsInGHAContainerWithRootUser;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
@@ -160,7 +158,6 @@ public class JobMasterTriggerSavepointITCase extends AbstractTestBase {
     }
 
     @Test
-    @Category(FailsInGHAContainerWithRootUser.class)
     public void testDoNotCancelJobIfSavepointFails() throws Exception {
         setUpWithCheckpointInterval(10L);
 

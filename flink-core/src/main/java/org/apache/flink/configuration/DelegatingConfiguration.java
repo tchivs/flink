@@ -22,8 +22,6 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.Preconditions;
 
-import javax.annotation.Nonnull;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,13 +44,14 @@ public final class DelegatingConfiguration extends Configuration {
 
     private final Configuration backingConfig; // the configuration actually storing the data
 
-    @Nonnull private String prefix; // the prefix key by which keys for this config are marked
+    private String prefix; // the prefix key by which keys for this config are marked
 
     // --------------------------------------------------------------------------------------------
 
     /** Default constructor for serialization. Creates an empty delegating configuration. */
     public DelegatingConfiguration() {
-        this(new Configuration(), "");
+        this.backingConfig = new Configuration();
+        this.prefix = "";
     }
 
     /**
@@ -64,7 +63,7 @@ public final class DelegatingConfiguration extends Configuration {
      */
     public DelegatingConfiguration(Configuration backingConfig, String prefix) {
         this.backingConfig = Preconditions.checkNotNull(backingConfig);
-        this.prefix = Preconditions.checkNotNull(prefix, "The 'prefix' attribute mustn't be null.");
+        this.prefix = prefix;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -91,7 +90,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setString(ConfigOption<String> key, String value) {
-        this.backingConfig.setString(prefixOption(key, prefix), value);
+        this.backingConfig.setString(prefix + key.key(), value);
     }
 
     @Override
@@ -118,7 +117,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public int getInteger(ConfigOption<Integer> configOption, int overrideDefault) {
-        return this.backingConfig.getInteger(prefixOption(configOption, prefix), overrideDefault);
+        return this.backingConfig.getInteger(configOption, overrideDefault);
     }
 
     @Override
@@ -128,7 +127,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setInteger(ConfigOption<Integer> key, int value) {
-        this.backingConfig.setInteger(prefixOption(key, prefix), value);
+        this.backingConfig.setInteger(prefix + key.key(), value);
     }
 
     @Override
@@ -143,7 +142,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public long getLong(ConfigOption<Long> configOption, long overrideDefault) {
-        return this.backingConfig.getLong(prefixOption(configOption, prefix), overrideDefault);
+        return this.backingConfig.getLong(configOption, overrideDefault);
     }
 
     @Override
@@ -153,7 +152,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setLong(ConfigOption<Long> key, long value) {
-        this.backingConfig.setLong(prefixOption(key, prefix), value);
+        this.backingConfig.setLong(prefix + key.key(), value);
     }
 
     @Override
@@ -173,12 +172,12 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setBoolean(ConfigOption<Boolean> key, boolean value) {
-        this.backingConfig.setBoolean(prefixOption(key, prefix), value);
+        this.backingConfig.setBoolean(prefix + key.key(), value);
     }
 
     @Override
     public boolean getBoolean(ConfigOption<Boolean> configOption, boolean overrideDefault) {
-        return this.backingConfig.getBoolean(prefixOption(configOption, prefix), overrideDefault);
+        return this.backingConfig.getBoolean(configOption, overrideDefault);
     }
 
     @Override
@@ -193,7 +192,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public float getFloat(ConfigOption<Float> configOption, float overrideDefault) {
-        return this.backingConfig.getFloat(prefixOption(configOption, prefix), overrideDefault);
+        return this.backingConfig.getFloat(configOption, overrideDefault);
     }
 
     @Override
@@ -203,7 +202,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setFloat(ConfigOption<Float> key, float value) {
-        this.backingConfig.setFloat(prefixOption(key, prefix), value);
+        this.backingConfig.setFloat(prefix + key.key(), value);
     }
 
     @Override
@@ -218,7 +217,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public double getDouble(ConfigOption<Double> configOption, double overrideDefault) {
-        return this.backingConfig.getDouble(prefixOption(configOption, prefix), overrideDefault);
+        return this.backingConfig.getDouble(configOption, overrideDefault);
     }
 
     @Override
@@ -228,7 +227,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void setDouble(ConfigOption<Double> key, double value) {
-        this.backingConfig.setDouble(prefixOption(key, prefix), value);
+        this.backingConfig.setDouble(prefix + key.key(), value);
     }
 
     @Override
@@ -286,7 +285,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public Set<String> keySet() {
-        if (this.prefix.isEmpty()) {
+        if (this.prefix == null) {
             return this.backingConfig.keySet();
         }
 
@@ -322,12 +321,12 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public <T> boolean removeConfig(ConfigOption<T> configOption) {
-        return backingConfig.removeConfig(prefixOption(configOption, prefix));
+        return backingConfig.removeConfig(configOption);
     }
 
     @Override
     public boolean removeKey(String key) {
-        return backingConfig.removeKey(prefix + key);
+        return backingConfig.removeKey(key);
     }
 
     @Override
@@ -360,7 +359,7 @@ public final class DelegatingConfiguration extends Configuration {
 
     @Override
     public void read(DataInputView in) throws IOException {
-        this.prefix = Preconditions.checkNotNull(in.readUTF());
+        this.prefix = in.readUTF();
         this.backingConfig.read(in);
     }
 

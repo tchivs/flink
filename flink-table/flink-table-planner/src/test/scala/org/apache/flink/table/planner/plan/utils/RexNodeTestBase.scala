@@ -39,16 +39,14 @@ abstract class RexNodeTestBase {
   val typeFactory: FlinkTypeFactory = new FlinkTypeFactory(
     Thread.currentThread().getContextClassLoader)
 
-  val allFieldNames: java.util.List[String] =
-    List("name", "id", "amount", "price", "flag", "blob").asJava
+  val allFieldNames: java.util.List[String] = List("name", "id", "amount", "price", "flag").asJava
 
   val allFieldTypes: java.util.List[RelDataType] = List(
     DataTypes.VARCHAR(100),
     DataTypes.BIGINT(),
     DataTypes.INT(),
     DataTypes.DOUBLE(),
-    DataTypes.BOOLEAN(),
-    DataTypes.BYTES())
+    DataTypes.BOOLEAN())
     .map(LogicalTypeDataTypeConverter.fromDataTypeToLogicalType)
     .map(typeFactory.createFieldTypeFromLogicalType)
     .asJava

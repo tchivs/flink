@@ -39,13 +39,12 @@ class RexNodeRewriterTest extends RexNodeTestBase {
           "$2",
           "$3",
           "$4",
-          "$5",
           "*($t2, $t3)",
           "100",
-          "<($t6, $t7)",
+          "<($t5, $t6)",
           "6",
-          ">($t1, $t9)",
-          "AND($t8, $t10)")))
+          ">($t1, $t8)",
+          "AND($t7, $t9)")))
 
     // use amount, id, price fields to create a new RexProgram
     val usedFields = Array(2, 3, 1)

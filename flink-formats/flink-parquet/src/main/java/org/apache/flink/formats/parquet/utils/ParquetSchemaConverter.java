@@ -26,10 +26,8 @@ import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.schema.ConversionPatterns;
 import org.apache.parquet.schema.GroupType;
-import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
@@ -39,33 +37,26 @@ import org.apache.parquet.schema.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.flink.formats.parquet.ParquetFileFormatFactory.IDENTIFIER;
-import static org.apache.flink.formats.parquet.ParquetFileFormatFactory.TIMESTAMP_TIME_UNIT;
-import static org.apache.flink.formats.parquet.ParquetFileFormatFactory.WRITE_INT64_TIMESTAMP;
-
 /** Schema converter converts Parquet schema to and from Flink internal types. */
 public class ParquetSchemaConverter {
 
     static final String MAP_REPEATED_NAME = "key_value";
     static final String LIST_ELEMENT_NAME = "element";
 
-    public static MessageType convertToParquetMessageType(
-            String name, RowType rowType, Configuration conf) {
+    public static MessageType convertToParquetMessageType(String name, RowType rowType) {
         Type[] types = new Type[rowType.getFieldCount()];
         for (int i = 0; i < rowType.getFieldCount(); i++) {
-            types[i] =
-                    convertToParquetType(
-                            rowType.getFieldNames().get(i), rowType.getTypeAt(i), conf);
+            types[i] = convertToParquetType(rowType.getFieldNames().get(i), rowType.getTypeAt(i));
         }
         return new MessageType(name, types);
     }
 
-    public static Type convertToParquetType(String name, LogicalType type, Configuration conf) {
-        return convertToParquetType(name, type, Type.Repetition.OPTIONAL, conf);
+    public static Type convertToParquetType(String name, LogicalType type) {
+        return convertToParquetType(name, type, Type.Repetition.OPTIONAL);
     }
 
     private static Type convertToParquetType(
-            String name, LogicalType type, Type.Repetition repetition, Configuration conf) {
+            String name, LogicalType type, Type.Repetition repetition) {
         switch (type.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
@@ -120,19 +111,6 @@ public class ParquetSchemaConverter {
                         .named(name);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                if (conf.getBoolean(
-                        IDENTIFIER + "." + WRITE_INT64_TIMESTAMP.key(),
-                        WRITE_INT64_TIMESTAMP.defaultValue())) {
-                    LogicalTypeAnnotation.TimeUnit timeUnit =
-                            LogicalTypeAnnotation.TimeUnit.valueOf(
-                                    conf.get(
-                                                    IDENTIFIER + "." + TIMESTAMP_TIME_UNIT.key(),
-                                                    TIMESTAMP_TIME_UNIT.defaultValue())
-                                            .toUpperCase());
-                    return Types.primitive(PrimitiveType.PrimitiveTypeName.INT64, repetition)
-                            .as(LogicalTypeAnnotation.timestampType(false, timeUnit))
-                            .named(name);
-                }
                 return Types.primitive(PrimitiveType.PrimitiveTypeName.INT96, repetition)
                         .named(name);
             case ARRAY:
@@ -140,37 +118,35 @@ public class ParquetSchemaConverter {
                 return ConversionPatterns.listOfElements(
                         repetition,
                         name,
-                        convertToParquetType(LIST_ELEMENT_NAME, arrayType.getElementType(), conf));
+                        convertToParquetType(LIST_ELEMENT_NAME, arrayType.getElementType()));
             case MAP:
                 MapType mapType = (MapType) type;
                 return ConversionPatterns.mapType(
                         repetition,
                         name,
                         MAP_REPEATED_NAME,
-                        convertToParquetType("key", mapType.getKeyType(), conf),
-                        convertToParquetType("value", mapType.getValueType(), conf));
+                        convertToParquetType("key", mapType.getKeyType()),
+                        convertToParquetType("value", mapType.getValueType()));
             case MULTISET:
                 MultisetType multisetType = (MultisetType) type;
                 return ConversionPatterns.mapType(
                         repetition,
                         name,
                         MAP_REPEATED_NAME,
-                        convertToParquetType("key", multisetType.getElementType(), conf),
-                        convertToParquetType("value", new IntType(false), conf));
+                        convertToParquetType("key", multisetType.getElementType()),
+                        convertToParquetType("value", new IntType(false)));
             case ROW:
                 RowType rowType = (RowType) type;
-                return new GroupType(repetition, name, convertToParquetTypes(rowType, conf));
+                return new GroupType(repetition, name, convertToParquetTypes(rowType));
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
     }
 
-    private static List<Type> convertToParquetTypes(RowType rowType, Configuration conf) {
+    private static List<Type> convertToParquetTypes(RowType rowType) {
         List<Type> types = new ArrayList<>(rowType.getFieldCount());
         for (int i = 0; i < rowType.getFieldCount(); i++) {
-            types.add(
-                    convertToParquetType(
-                            rowType.getFieldNames().get(i), rowType.getTypeAt(i), conf));
+            types.add(convertToParquetType(rowType.getFieldNames().get(i), rowType.getTypeAt(i)));
         }
         return types;
     }

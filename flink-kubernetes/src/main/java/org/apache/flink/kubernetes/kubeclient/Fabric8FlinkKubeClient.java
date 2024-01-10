@@ -342,6 +342,15 @@ public class Fabric8FlinkKubeClient implements FlinkKubeClient {
     }
 
     @Override
+    public CompletableFuture<Void> deleteConfigMapsByLabels(Map<String, String> labels) {
+        // the only time, the delete method returns false is due to a 404 HTTP status which is
+        // returned if the underlying resource doesn't exist
+        return CompletableFuture.runAsync(
+                () -> this.internalClient.configMaps().withLabels(labels).delete(),
+                kubeClientExecutorService);
+    }
+
+    @Override
     public CompletableFuture<Void> deleteConfigMap(String configMapName) {
         // the only time, the delete method returns false is due to a 404 HTTP status which is
         // returned if the underlying resource doesn't exist
@@ -351,9 +360,9 @@ public class Fabric8FlinkKubeClient implements FlinkKubeClient {
     }
 
     @Override
-    public KubernetesConfigMapSharedWatcher createConfigMapSharedWatcher(String name) {
-        LOG.info("Creating configmap shared watcher for {}.", name);
-        return new KubernetesConfigMapSharedInformer(this.internalClient, name);
+    public KubernetesConfigMapSharedWatcher createConfigMapSharedWatcher(
+            Map<String, String> labels) {
+        return new KubernetesConfigMapSharedInformer(this.internalClient, labels);
     }
 
     @Override

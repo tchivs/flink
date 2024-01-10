@@ -21,7 +21,6 @@ package org.apache.flink.runtime.blob;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.BlobServerOptions;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.testutils.junit.FailsInGHAContainerWithRootUser;
 import org.apache.flink.util.OperatingSystem;
 import org.apache.flink.util.TestLogger;
 
@@ -29,7 +28,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
@@ -39,7 +37,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 /** Tests for {@link BlobUtils} working on non-writable directories. */
-@Category(FailsInGHAContainerWithRootUser.class)
 public class BlobUtilsNonWritableTest extends TestLogger {
 
     private static final String CANNOT_CREATE_THIS = "cannot-create-this";
