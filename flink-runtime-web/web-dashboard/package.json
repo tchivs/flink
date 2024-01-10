@@ -10,7 +10,6 @@
     "lint:fix": "eslint --fix --cache src --ext .ts,.html && stylelint \"**/*.less\" --fix",
     "ci-check": "npm run lint && npm run build",
     "proxy": "ng serve --proxy-config proxy.conf.json",
-    "prepare": "echo \"Skipping husky TIF-432\"",
     "lint-staged": "lint-staged"
   },
   "private": true,
