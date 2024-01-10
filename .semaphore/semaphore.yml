@@ -34,6 +34,8 @@ global_job_config:
   prologue:
     commands:
       - sem-version java 8
+      # workaround for failing e2e tests - see https://confluent.slack.com/archives/C065732SFHV/p1704882814371079?thread_ts=1704831317.971149&cid=C065732SFHV
+      - export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64/jre/"
       # hugo
       - sudo mkdir -p /usr/share/hugo
       - curl -fsSL -o /tmp/hugo.tar.gz https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/hugo_extended_0.98.0_Linux-64bit.tar.gz
