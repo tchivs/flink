@@ -19,6 +19,7 @@ package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.runtime.state.IncrementalKeyedStateHandle;
 import org.apache.flink.runtime.state.StateBackend.CustomInitializationMetrics;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.util.ExceptionUtils;
@@ -35,11 +36,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.flink.runtime.metrics.MetricNames.DOWNLOAD_STATE_DURATION;
 
@@ -71,11 +73,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         closeableRegistry.registerCloseable(internalCloser);
         try {
             long startTimeMs = SystemClock.getInstance().relativeTimeMillis();
-            List<CompletableFuture<Void>> futures =
-                    transferAllStateDataToDirectoryAsync(downloadRequests, internalCloser)
-                            .collect(Collectors.toList());
-            // Wait until either all futures completed successfully or one failed exceptionally.
-            FutureUtils.completeAll(futures).get();
+            transferAllStateDataToDirectoryAsync(downloadRequests, internalCloser);
             customInitializationMetrics.addMetric(
                     DOWNLOAD_STATE_DURATION,
                     SystemClock.getInstance().relativeTimeMillis() - startTimeMs);
@@ -101,36 +99,51 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
     }
 
     /** Asynchronously runs the specified download requests on executorService. */
-    private Stream<CompletableFuture<Void>> transferAllStateDataToDirectoryAsync(
+    private void transferAllStateDataToDirectoryAsync(
             Collection<StateHandleDownloadSpec> handleWithPaths,
+            CloseableRegistry closeableRegistry)
+            throws ExecutionException, InterruptedException {
+        FutureUtils.completeAll(
+                        createDownloadRunnables(handleWithPaths, closeableRegistry).stream()
+                                .map(
+                                        runnable ->
+                                                CompletableFuture.runAsync(
+                                                        runnable, executorService))
+                                .collect(Collectors.toList()))
+                .get();
+    }
+
+    private List<Runnable> createDownloadRunnables(
+            Collection<StateHandleDownloadSpec> downloadRequests,
             CloseableRegistry closeableRegistry) {
-        return handleWithPaths.stream()
-                .flatMap(
-                        downloadRequest ->
-                                // Take all files from shared and private state.
-                                Streams.concat(
-                                                downloadRequest.getStateHandle().getSharedState()
-                                                        .stream(),
-                                                downloadRequest.getStateHandle().getPrivateState()
-                                                        .stream())
-                                        .map(
-                                                // Create one runnable for each StreamStateHandle
-                                                entry -> {
-                                                    String localPath = entry.getLocalPath();
-                                                    StreamStateHandle remoteFileHandle =
-                                                            entry.getHandle();
-                                                    Path downloadDest =
-                                                            downloadRequest
-                                                                    .getDownloadDestination()
-                                                                    .resolve(localPath);
-                                                    return ThrowingRunnable.unchecked(
-                                                            () ->
-                                                                    downloadDataForStateHandle(
-                                                                            downloadDest,
-                                                                            remoteFileHandle,
-                                                                            closeableRegistry));
-                                                }))
-                .map(runnable -> CompletableFuture.runAsync(runnable, executorService));
+        List<Runnable> runnables = new ArrayList<>();
+        for (StateHandleDownloadSpec downloadRequest : downloadRequests) {
+            Streams.concat(
+                            downloadRequest.getStateHandle().getSharedState().stream(),
+                            downloadRequest.getStateHandle().getPrivateState().stream())
+                    .map(
+                            handleAndLocalPath ->
+                                    runnables.add(
+                                            createDirectDownloadRunnable(
+                                                    downloadRequest,
+                                                    handleAndLocalPath,
+                                                    closeableRegistry)));
+        }
+        return runnables;
+    }
+
+    private Runnable createDirectDownloadRunnable(
+            StateHandleDownloadSpec downloadRequest,
+            IncrementalKeyedStateHandle.HandleAndLocalPath handleAndLocalPath,
+            CloseableRegistry closeableRegistry) {
+        return ThrowingRunnable.unchecked(
+                () ->
+                        downloadDataForStateHandle(
+                                downloadRequest
+                                        .getDownloadDestination()
+                                        .resolve(handleAndLocalPath.getLocalPath()),
+                                handleAndLocalPath.getHandle(),
+                                closeableRegistry));
     }
 
     /** Copies the file from a single state handle to the given path. */
