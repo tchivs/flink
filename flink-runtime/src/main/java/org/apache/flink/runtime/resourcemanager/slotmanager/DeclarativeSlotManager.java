@@ -191,12 +191,6 @@ public class DeclarativeSlotManager implements SlotManager {
         checkResourceRequirementsWithDelay();
     }
 
-    @Override
-    public Collection<TaskExecutorConnection> getTaskExecutorsWithAllocatedSlotsForJob(
-            JobID jobId) {
-        return slotTracker.getTaskExecutorsWithAllocatedSlotsForJob(jobId);
-    }
-
     // ---------------------------------------------------------------------------------------------
     // Component lifecycle methods
     // ---------------------------------------------------------------------------------------------
