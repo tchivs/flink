@@ -21,6 +21,9 @@ package org.apache.flink.runtime.state;
 import org.apache.flink.runtime.state.memory.ByteStreamStateHandle;
 
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+
+import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -53,5 +56,23 @@ public class KeyGroupsStateHandleTest {
         // return null if the keygroup intersection is empty.
         KeyGroupRange newRange = new KeyGroupRange(8, 11);
         assertNull(handle.getIntersection(newRange));
+    }
+
+    @Test
+    public void testCollectSizeStats() {
+        final KeyGroupRangeOffsets offsets = new KeyGroupRangeOffsets(0, 7);
+        final byte[] data = new byte[5];
+        final ByteStreamStateHandle innerHandle = new ByteStreamStateHandle("name", data);
+        KeyGroupsStateHandle handle = new KeyGroupsStateHandle(offsets, innerHandle);
+        StateObject.StateObjectSizeStatsCollector statsCollector =
+                StateObject.StateObjectSizeStatsCollector.create();
+        handle.collectSizeStats(statsCollector);
+        Assertions.assertEquals(
+                new HashMap<StateObject.StateObjectLocation, Long>() {
+                    {
+                        put(StateObject.StateObjectLocation.LOCAL_MEMORY, (long) data.length);
+                    }
+                },
+                statsCollector.getStats());
     }
 }
