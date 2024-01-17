@@ -1022,7 +1022,8 @@ public abstract class FileSystem implements IFileSystem {
     // ------------------------------------------------------------------------
 
     /** An identifier of a file system, via its scheme and its authority. */
-    private static final class FSKey {
+    @Internal
+    public static final class FSKey {
 
         /** The scheme of the file system. */
         private final String scheme;

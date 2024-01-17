@@ -19,7 +19,10 @@ package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
-import org.apache.flink.runtime.state.IncrementalKeyedStateHandle;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.PathsCopyingFileSystem;
+import org.apache.flink.core.fs.PathsCopyingFileSystem.CopyTask;
+import org.apache.flink.runtime.state.IncrementalKeyedStateHandle.HandleAndLocalPath;
 import org.apache.flink.runtime.state.StateBackend.CustomInitializationMetrics;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.util.ExceptionUtils;
@@ -32,21 +35,29 @@ import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.apache.flink.runtime.metrics.MetricNames.DOWNLOAD_STATE_DURATION;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Help class for downloading RocksDB state files. */
 public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
+    private static final Logger LOG = LoggerFactory.getLogger(RocksDBStateDownloader.class);
 
     private final CustomInitializationMetrics customInitializationMetrics;
 
@@ -102,8 +113,8 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
     private void transferAllStateDataToDirectoryAsync(
             Collection<StateHandleDownloadSpec> handleWithPaths,
             CloseableRegistry closeableRegistry)
-            throws ExecutionException, InterruptedException {
-        FutureUtils.completeAll(
+            throws Exception {
+        FutureUtils.waitForAll(
                         createDownloadRunnables(handleWithPaths, closeableRegistry).stream()
                                 .map(
                                         runnable ->
@@ -113,43 +124,95 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 .get();
     }
 
-    private List<Runnable> createDownloadRunnables(
+    private Collection<Runnable> createDownloadRunnables(
             Collection<StateHandleDownloadSpec> downloadRequests,
-            CloseableRegistry closeableRegistry) {
+            CloseableRegistry closeableRegistry)
+            throws IOException {
+        // We need to support recovery from multiple FileSystems. At least one scenario that it can
+        // happen is when:
+        // 1. A checkpoint/savepoint is created on FileSystem_1
+        // 2. Job terminates
+        // 3. Configuration is changed use checkpoint directory using FileSystem_2
+        // 4. Job is restarted from checkpoint (1.) using claim mode
+        // 5. New incremental checkpoint is created, that can refer to files both from FileSystem_1
+        // and FileSystem_2.
+        Map<FileSystem.FSKey, List<CopyTask>> filesSystemsFilesToDownload = new HashMap<>();
         List<Runnable> runnables = new ArrayList<>();
-        for (StateHandleDownloadSpec downloadRequest : downloadRequests) {
-            Streams.concat(
-                            downloadRequest.getStateHandle().getSharedState().stream(),
-                            downloadRequest.getStateHandle().getPrivateState().stream())
-                    .map(
-                            handleAndLocalPath ->
-                                    runnables.add(
-                                            createDirectDownloadRunnable(
-                                                    downloadRequest,
-                                                    handleAndLocalPath,
-                                                    closeableRegistry)));
+
+        for (StateHandleDownloadSpec downloadSpec : downloadRequests) {
+            for (HandleAndLocalPath handleAndLocalPath : getAllHandles(downloadSpec)) {
+                Path downloadDestination =
+                        downloadSpec
+                                .getDownloadDestination()
+                                .resolve(handleAndLocalPath.getLocalPath());
+                if (canCopyPaths(handleAndLocalPath.getHandle())) {
+                    org.apache.flink.core.fs.Path remotePath =
+                            handleAndLocalPath.getHandle().maybeGetPath().get();
+                    FileSystem.FSKey newFSKey = new FileSystem.FSKey(remotePath.toUri());
+                    List<CopyTask> filesToDownload =
+                            filesSystemsFilesToDownload.computeIfAbsent(
+                                    newFSKey, fsKey -> new ArrayList<>());
+                    filesToDownload.add(
+                            new CopyTask(
+                                    remotePath,
+                                    new org.apache.flink.core.fs.Path(
+                                            downloadDestination.toUri())));
+                } else {
+                    runnables.add(
+                            createDownloadRunnableUsingStreams(
+                                    handleAndLocalPath.getHandle(),
+                                    downloadDestination,
+                                    closeableRegistry));
+                }
+            }
         }
+
+        for (List<CopyTask> filesToDownload : filesSystemsFilesToDownload.values()) {
+            checkState(!filesToDownload.isEmpty());
+            FileSystem srcFileSystem = FileSystem.get(filesToDownload.get(0).getSrcPath().toUri());
+            checkState(srcFileSystem.canCopyPaths());
+            runnables.add(
+                    createDownloadRunnableUsingCopyFiles(
+                            (PathsCopyingFileSystem) srcFileSystem, filesToDownload));
+        }
+
         return runnables;
     }
 
-    private Runnable createDirectDownloadRunnable(
-            StateHandleDownloadSpec downloadRequest,
-            IncrementalKeyedStateHandle.HandleAndLocalPath handleAndLocalPath,
+    private boolean canCopyPaths(StreamStateHandle handle) throws IOException {
+        Optional<org.apache.flink.core.fs.Path> remotePath = handle.maybeGetPath();
+        if (!remotePath.isPresent()) {
+            return false;
+        }
+        return FileSystem.canCopyPaths(remotePath.get().toUri());
+    }
+
+    private Iterable<? extends HandleAndLocalPath> getAllHandles(
+            StateHandleDownloadSpec downloadSpec) {
+        return Streams.concat(
+                        downloadSpec.getStateHandle().getSharedState().stream(),
+                        downloadSpec.getStateHandle().getPrivateState().stream())
+                .collect(Collectors.toList());
+    }
+
+    private Runnable createDownloadRunnableUsingCopyFiles(
+            PathsCopyingFileSystem fileSystem, List<CopyTask> copyTasks) {
+        LOG.debug("Using copy paths for {} of file system [{}]", copyTasks, fileSystem);
+        return ThrowingRunnable.unchecked(() -> fileSystem.copyFiles(copyTasks));
+    }
+
+    private Runnable createDownloadRunnableUsingStreams(
+            StreamStateHandle remoteFileHandle,
+            Path destination,
             CloseableRegistry closeableRegistry) {
         return ThrowingRunnable.unchecked(
-                () ->
-                        downloadDataForStateHandle(
-                                downloadRequest
-                                        .getDownloadDestination()
-                                        .resolve(handleAndLocalPath.getLocalPath()),
-                                handleAndLocalPath.getHandle(),
-                                closeableRegistry));
+                () -> downloadDataForStateHandle(remoteFileHandle, destination, closeableRegistry));
     }
 
     /** Copies the file from a single state handle to the given path. */
     private void downloadDataForStateHandle(
-            Path restoreFilePath,
             StreamStateHandle remoteFileHandle,
+            Path restoreFilePath,
             CloseableRegistry closeableRegistry)
             throws IOException {
 
@@ -162,7 +225,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             closeableRegistry.registerCloseable(inputStream);
 
             Files.createDirectories(restoreFilePath.getParent());
-            OutputStream outputStream = Files.newOutputStream(restoreFilePath);
+            OutputStream outputStream = Files.newOutputStream(restoreFilePath, CREATE_NEW);
             closeableRegistry.registerCloseable(outputStream);
 
             byte[] buffer = new byte[8 * 1024];
