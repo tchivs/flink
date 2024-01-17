@@ -41,8 +41,8 @@ import java.util.List;
         name = "stream-exec-async-calc",
         version = 1,
         producedTransformations = CommonExecAsyncCalc.ASYNC_CALC_TRANSFORMATION,
-        minPlanVersion = FlinkVersion.v1_19,
-        minStateVersion = FlinkVersion.v1_19,
+        minPlanVersion = FlinkVersion.v1_18,
+        minStateVersion = FlinkVersion.v1_18,
         consumedOptions = {
             "table.exec.async-scalar.buffer-capacity",
             "table.exec.async-scalar.timeout",
