@@ -25,6 +25,7 @@ import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.FileSystemFactory;
+import org.apache.flink.fs.s3.common.FlinkS3FileSystem.S5CmdConfiguration;
 import org.apache.flink.fs.s3.common.token.AbstractS3DelegationTokenReceiver;
 import org.apache.flink.fs.s3.common.writer.S3AccessHelper;
 import org.apache.flink.runtime.util.HadoopConfigLoader;
@@ -56,6 +57,20 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
             ConfigOptions.key("s3.endpoint")
                     .stringType()
                     .defaultValue("This optionally defines S3 endpoint.");
+
+    public static final ConfigOption<String> S5CMD_PATH =
+            ConfigOptions.key("s3.s5cmd.path")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription(
+                            "When specified, s5cmd will be used for coping files to/from S3. Currently supported only "
+                                    + "during RocksDB Incremental state recovery.");
+
+    public static final ConfigOption<String> S5CMD_EXTRA_ARGS =
+            ConfigOptions.key("s3.s5cmd.args")
+                    .stringType()
+                    .defaultValue("-r 0 --no-sign-request")
+                    .withDescription("Extra arguments to be passed to s5cmd.");
 
     public static final ConfigOption<Long> PART_UPLOAD_MIN_SIZE =
             ConfigOptions.key("s3.upload.min.part.size")
@@ -172,6 +187,7 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
 
             return createFlinkFileSystem(
                     fs,
+                    S5CmdConfiguration.of(flinkConfig).orElse(null),
                     localTmpDirectory,
                     entropyInjectionKey,
                     numEntropyChars,
@@ -187,14 +203,16 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
 
     protected FileSystem createFlinkFileSystem(
             org.apache.hadoop.fs.FileSystem fs,
+            @Nullable S5CmdConfiguration s5CmdConfiguration,
             String localTmpDirectory,
-            String entropyInjectionKey,
+            @Nullable String entropyInjectionKey,
             int numEntropyChars,
-            S3AccessHelper s3AccessHelper,
+            @Nullable S3AccessHelper s3AccessHelper,
             long s3minPartSize,
             int maxConcurrentUploads) {
         return new FlinkS3FileSystem(
                 fs,
+                s5CmdConfiguration,
                 localTmpDirectory,
                 entropyInjectionKey,
                 numEntropyChars,
