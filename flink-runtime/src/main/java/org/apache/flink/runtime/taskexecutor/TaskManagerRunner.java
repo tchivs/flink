@@ -23,6 +23,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.AkkaOptions;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JMXServerOptions;
 import org.apache.flink.configuration.TaskManagerConfluentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
@@ -326,7 +327,23 @@ public class TaskManagerRunner implements FatalErrorHandler {
             // This RPC System won't be restarted after the activation. So all configurations like
             // TMP_DIRS that are required for its start are impossible to override from JM.
             rpcSystem = RpcSystem.load(configuration);
-            standbyRpcService = createRpcService(configuration, null, rpcSystem);
+            // use STANDBY_RPC_PORT as the rpc port for the standby rpc service
+            final int standbyRpcPort =
+                    configuration
+                            .getOptional(TaskManagerConfluentOptions.STANDBY_RPC_PORT)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalConfigurationException(
+                                                    String.format(
+                                                            "Option %s must be set.",
+                                                            TaskManagerConfluentOptions
+                                                                    .STANDBY_RPC_PORT
+                                                                    .key())));
+            final Configuration standbyConfiguration =
+                    new Configuration(configuration)
+                            .set(TaskManagerOptions.RPC_PORT, String.valueOf(standbyRpcPort));
+
+            standbyRpcService = createRpcService(standbyConfiguration, null, rpcSystem);
             standbyTaskManager = new StandbyTaskManager(standbyRpcService);
             standbyTaskManager.start();
 

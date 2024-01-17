@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.TaskManagerConfluentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Timeout;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.runtime.testutils.CommonTestUtils.waitUntilCondition;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for the {@link TaskManagerRunner} with STANDBY_MODE option. */
@@ -50,10 +52,29 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
     }
 
     @Test
+    public void testStandbySetupFailsIfStandbyRpcPortIsNotSet() throws Exception {
+        // given: Configured TaskManager in standby mode.
+        final Configuration configuration =
+                createConfiguration().set(TaskManagerConfluentOptions.STANDBY_MODE, true);
+
+        // when: Start the TaskManagerRunner.
+        DataCollectorExecutorServiceFactory taskExecutorServiceFactory =
+                new DataCollectorExecutorServiceFactory();
+        TaskManagerRunner taskManagerRunner1 =
+                createTaskManagerRunner(configuration, taskExecutorServiceFactory);
+
+        // then: the start-up should fail because no standby port was configured
+        assertThatThrownBy(taskManagerRunner1::start)
+                .isInstanceOf(IllegalConfigurationException.class);
+    }
+
+    @Test
     public void testTakingOverStandbyTaskManagers() throws Exception {
         // given: Configured TaskManager in standby mode.
-        final Configuration configuration = createConfiguration();
-        configuration.set(TaskManagerConfluentOptions.STANDBY_MODE, true);
+        final Configuration configuration =
+                createConfiguration()
+                        .set(TaskManagerConfluentOptions.STANDBY_MODE, true)
+                        .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0);
 
         // and: The one config that should be overridden and one should stay untouched.
         ConfigOption<String> keyForOverride =
@@ -66,7 +87,8 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
         // when: Start the TaskManagerRunner.
         DataCollectorExecutorServiceFactory taskExecutorServiceFactory =
                 new DataCollectorExecutorServiceFactory();
-        taskManagerRunner = createTaskManagerRunner(configuration, taskExecutorServiceFactory);
+        taskManagerRunner =
+                createAndStartTaskManagerRunner(configuration, taskExecutorServiceFactory);
         waitUntilCondition(() -> taskManagerRunner.getStandbyTaskManager() != null);
 
         // then: Runner should be switched to standby mode and taskExecutorServiceFactory should not
@@ -124,8 +146,15 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
             throws Exception {
         final PluginManager pluginManager =
                 PluginUtils.createPluginManagerFromRootFolder(configuration);
+        return new TaskManagerRunner(configuration, pluginManager, taskExecutorServiceFactory);
+    }
+
+    private static TaskManagerRunner createAndStartTaskManagerRunner(
+            final Configuration configuration,
+            TaskManagerRunner.TaskExecutorServiceFactory taskExecutorServiceFactory)
+            throws Exception {
         TaskManagerRunner taskManagerRunner =
-                new TaskManagerRunner(configuration, pluginManager, taskExecutorServiceFactory);
+                createTaskManagerRunner(configuration, taskExecutorServiceFactory);
         Thread startThread = new Thread(ThrowingRunnable.unchecked(taskManagerRunner::start));
         startThread.start();
         return taskManagerRunner;

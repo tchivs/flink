@@ -17,12 +17,14 @@ import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.fs.AutoCloseableRegistry;
 import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.core.plugin.PluginUtils;
+import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.dispatcher.DispatcherId;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServicesUtils;
 import org.apache.flink.runtime.leaderelection.TestingListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.messages.webmonitor.ClusterOverview;
 import org.apache.flink.runtime.rest.RestClient;
 import org.apache.flink.runtime.rest.messages.EmptyMessageParameters;
 import org.apache.flink.runtime.rest.messages.taskmanager.StandbyTaskManagerActivationHeaders;
@@ -37,6 +39,9 @@ import org.apache.flink.runtime.testutils.ZooKeeperTestUtils;
 import org.apache.flink.runtime.zookeeper.ZooKeeperTestEnvironment;
 import org.apache.flink.testutils.TestingUtils;
 import org.apache.flink.testutils.executor.TestExecutorExtension;
+import org.apache.flink.testutils.junit.RetryOnException;
+import org.apache.flink.testutils.junit.extensions.retry.RetryExtension;
+import org.apache.flink.util.NetUtils;
 import org.apache.flink.util.TestLoggerExtension;
 import org.apache.flink.util.concurrent.FixedRetryStrategy;
 import org.apache.flink.util.concurrent.FutureUtils;
@@ -46,15 +51,17 @@ import org.apache.flink.util.function.ThrowingRunnable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -67,13 +74,15 @@ import static org.apache.flink.runtime.testutils.CommonTestUtils.waitUntilCondit
  * providing the correct configuration.
  */
 @Confluent
-@ExtendWith(TestLoggerExtension.class)
+@ExtendWith({TestLoggerExtension.class, RetryExtension.class})
 public class StandbyTaskManagerActivationITCase {
 
     private static final String LOCALHOST = "localhost";
     private static ZooKeeperTestEnvironment zooKeeper;
 
     private static final Duration TEST_TIMEOUT = Duration.ofMinutes(5);
+
+    private static final Random RANDOM = new Random();
 
     @RegisterExtension
     public static final TestExecutorExtension<ScheduledExecutorService> EXECUTOR_RESOURCE =
@@ -98,7 +107,8 @@ public class StandbyTaskManagerActivationITCase {
         }
     }
 
-    @Test
+    @TestTemplate
+    @RetryOnException(times = 3, exception = BindException.class)
     public void testTaskManagerPauseOnStart() throws Exception {
         // given: The config for zookeeper.
         Configuration zooKeeperHAConfig =
@@ -125,25 +135,36 @@ public class StandbyTaskManagerActivationITCase {
             final PluginManager pluginManager =
                     PluginUtils.createPluginManagerFromRootFolder(zooKeeperHAConfig);
 
+            final NetUtils.Port availablePort = NetUtils.getAvailablePort();
+            autoCloseableRegistry.registerCloseable(availablePort);
             Configuration taskManagerConfig1 =
-                    createTaskManagerConfigWithoutHaMode(zooKeeperHAConfig, 1);
+                    createTaskManagerConfigWithoutHaMode(zooKeeperHAConfig, 1)
+                            .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0)
+                            // configure a specific but random RPC port, which fails the tests
+                            // if it were used by both the standby and main rpc service
+                            .set(
+                                    TaskManagerOptions.RPC_PORT,
+                                    String.valueOf(availablePort.getPort()));
             TaskManagerRunner taskManagerRunner1 =
                     new TaskManagerRunner(
                             taskManagerConfig1,
                             pluginManager,
                             TaskManagerRunner::createTaskExecutorService);
             autoCloseableRegistry.registerCloseable(taskManagerRunner1::close);
-            new Thread(ThrowingRunnable.unchecked(taskManagerRunner1::start)).start();
+            final CheckedThread taskManagerRunner1Thread = checkedThread(taskManagerRunner1::start);
+            taskManagerRunner1Thread.start();
 
             Configuration taskManagerConfig2 =
-                    createTaskManagerConfigWithoutHaMode(zooKeeperHAConfig, 3);
+                    createTaskManagerConfigWithoutHaMode(zooKeeperHAConfig, 3)
+                            .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0);
             TaskManagerRunner taskManagerRunner2 =
                     new TaskManagerRunner(
                             taskManagerConfig2,
                             pluginManager,
                             TaskManagerRunner::createTaskExecutorService);
             autoCloseableRegistry.registerCloseable(taskManagerRunner2::close);
-            new Thread(ThrowingRunnable.unchecked(taskManagerRunner2::start)).start();
+            final CheckedThread taskManagerRunner2Thread = checkedThread(taskManagerRunner2::start);
+            taskManagerRunner2Thread.start();
 
             // then: Zero TaskManagers should connect to JobManager.
             HighAvailabilityServices highAvailabilityServices =
@@ -172,7 +193,12 @@ public class StandbyTaskManagerActivationITCase {
                     taskManagerRunner2.getStandbyTaskManager().getRpcService().getPort());
 
             // then: One TaskManager with 3 slots should join the JobManager.
-            waitForTaskManagers(1, 3, dispatcherGateway, deadline.timeLeft());
+            waitForTaskManagersWithAbort(
+                    1,
+                    3,
+                    dispatcherGateway,
+                    () -> taskManagerRunner2Thread.trySync(1),
+                    deadline.timeLeft());
 
             // when: Takes over the second TaskManager with providing HA_MODE.
             waitUntilCondition(() -> taskManagerRunner1.getStandbyTaskManager() != null);
@@ -182,8 +208,22 @@ public class StandbyTaskManagerActivationITCase {
                     taskManagerRunner1.getStandbyTaskManager().getRpcService().getPort());
 
             // then: The second TaskManager with 1 slot should join the JobManager.
-            waitForTaskManagers(2, 4, dispatcherGateway, deadline.timeLeft());
+            waitForTaskManagersWithAbort(
+                    2,
+                    4,
+                    dispatcherGateway,
+                    () -> taskManagerRunner1Thread.trySync(1),
+                    deadline.timeLeft());
         }
+    }
+
+    private static CheckedThread checkedThread(ThrowingRunnable<Exception> r) {
+        return new CheckedThread() {
+            @Override
+            public void go() throws Exception {
+                r.run();
+            }
+        };
     }
 
     private static void activateTaskManager(RestClient restClient, int jobManagerRestPort, int port)
@@ -284,18 +324,31 @@ public class StandbyTaskManagerActivationITCase {
             int numberOfSlots,
             DispatcherGateway dispatcherGateway,
             Duration timeLeft)
-            throws ExecutionException, InterruptedException {
-        FutureUtils.retrySuccessfulWithDelay(
-                        () ->
-                                dispatcherGateway.requestClusterOverview(
-                                        Time.milliseconds(timeLeft.toMillis())),
-                        Duration.ofMillis(50L),
-                        Deadline.fromNow(Duration.ofMillis(timeLeft.toMillis())),
-                        clusterOverview ->
-                                clusterOverview.getNumTaskManagersConnected()
-                                                == numberOfTaskManagers
-                                        && clusterOverview.getNumSlotsTotal() == numberOfSlots,
-                        new ScheduledExecutorServiceAdapter(EXECUTOR_RESOURCE.getExecutor()))
-                .get();
+            throws Exception {
+        waitForTaskManagersWithAbort(
+                numberOfTaskManagers, numberOfSlots, dispatcherGateway, () -> {}, timeLeft);
+    }
+
+    private static void waitForTaskManagersWithAbort(
+            int numberOfTaskManagers,
+            int numberOfSlots,
+            DispatcherGateway dispatcherGateway,
+            ThrowingRunnable<Exception> abortCondition,
+            Duration timeLeft)
+            throws Exception {
+
+        final Deadline deadline = Deadline.fromNow(Duration.ofMillis(timeLeft.toMillis()));
+        for (; deadline.hasTimeLeft(); abortCondition.run()) {
+            ClusterOverview clusterOverview =
+                    dispatcherGateway
+                            .requestClusterOverview(Time.milliseconds(timeLeft.toMillis()))
+                            .join();
+
+            if (clusterOverview.getNumTaskManagersConnected() == numberOfTaskManagers
+                    && clusterOverview.getNumSlotsTotal() == numberOfSlots) {
+                return;
+            }
+            Thread.sleep(50L);
+        }
     }
 }
