@@ -12,10 +12,13 @@ import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.util.SimpleUserCodeClassLoader;
 import org.apache.flink.util.TestLoggerExtension;
 import org.apache.flink.util.UserCodeClassLoader;
@@ -30,7 +33,6 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData.Fixed;
-import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.avro.io.EncoderFactory;
@@ -223,16 +225,33 @@ class RegistryAvroRowDataDeserializationSchemaTest {
         assertThat(actual).isEqualTo(rowData);
     }
 
-    private static RowData deserialize(Schema schema, Record record) throws Exception {
+    @Test
+    void testDeserializingNonRecordType() throws Exception {
+        final Schema schema = SchemaBuilder.builder().stringType();
+
+        final GenericRowData rowData = new GenericRowData(1);
+        rowData.setField(0, StringData.fromString("ABCD"));
+
+        final Object actual = deserialize(schema, "ABCD");
+
+        assertThat(actual).isEqualTo(rowData);
+    }
+
+    private static RowData deserialize(Schema schema, Object record) throws Exception {
         final int schemaId = client.register(SUBJECT, new AvroSchema(schema));
         final LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(schema);
+        final RowType rowType;
+        if (flinkSchema.is(LogicalTypeRoot.ROW)) {
+            rowType = (RowType) flinkSchema;
+        } else {
+            rowType =
+                    new RowType(false, Collections.singletonList(new RowField("f0", flinkSchema)));
+        }
         final TestSchemaRegistryConfig schemaRegistryConfig =
                 new TestSchemaRegistryConfig(schemaId, client);
         final DeserializationSchema<RowData> deserializationSchema =
                 new AvroRegistryDeserializationSchema(
-                        schemaRegistryConfig,
-                        (RowType) flinkSchema,
-                        InternalTypeInfo.of(flinkSchema));
+                        schemaRegistryConfig, rowType, InternalTypeInfo.of(flinkSchema));
         final ByteArrayOutputStream stream = new ByteArrayOutputStream();
         writeSchemaId(stream, schemaId);
         new GenericDatumWriter<>(schema)

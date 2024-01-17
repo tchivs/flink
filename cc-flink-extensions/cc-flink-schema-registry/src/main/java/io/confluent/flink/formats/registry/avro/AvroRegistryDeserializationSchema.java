@@ -7,6 +7,7 @@ package io.confluent.flink.formats.registry.avro;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -18,9 +19,9 @@ import io.confluent.flink.formats.registry.utils.MutableByteArrayInputStream;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.Decoder;
 import org.apache.avro.io.DecoderFactory;
 
@@ -48,7 +49,7 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
     private transient AvroToRowDataConverter runtimeConverter;
 
     /** Reader that reads the serialized record from {@link MutableByteArrayInputStream}. */
-    private transient GenericDatumReader<GenericRecord> datumReader;
+    private transient GenericDatumReader<Object> datumReader;
 
     /** Input stream to read message from. */
     private transient MutableByteArrayInputStream inputStream;
@@ -80,7 +81,18 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
         final ParsedSchema schema =
                 schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         final Schema avroSchema = (Schema) schema.rawSchema();
-        this.runtimeConverter = AvroToRowDataConverters.createConverter(avroSchema, rowType);
+        if (avroSchema.getType() == Type.RECORD) {
+            this.runtimeConverter = AvroToRowDataConverters.createConverter(avroSchema, rowType);
+        } else {
+            final AvroToRowDataConverter fieldConverter =
+                    AvroToRowDataConverters.createConverter(avroSchema, rowType.getTypeAt(0));
+            this.runtimeConverter =
+                    object -> {
+                        final GenericRowData rowData = new GenericRowData(1);
+                        rowData.setField(0, fieldConverter.convert(object));
+                        return rowData;
+                    };
+        }
 
         this.datumReader =
                 new GenericDatumReader<>(
@@ -103,7 +115,7 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
             Schema writerSchema = (Schema) schemaCoder.readSchema(inputStream).rawSchema();
 
             datumReader.setSchema(writerSchema);
-            GenericRecord deserialize = datumReader.read(null, decoder);
+            Object deserialize = datumReader.read(null, decoder);
             return (RowData) runtimeConverter.convert(deserialize);
         } catch (Exception e) {
             throw new IOException("Failed to deserialize Avro record.", e);

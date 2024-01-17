@@ -9,9 +9,12 @@ import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
@@ -28,6 +31,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.util.Utf8;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -214,13 +218,32 @@ class RegistryAvroRowDataSerializationSchemaTest {
                                 .build());
     }
 
+    @Test
+    void testSerializingNonRecordType() throws Exception {
+        final Schema schema = SchemaBuilder.builder().stringType();
+
+        final GenericRowData rowData = new GenericRowData(1);
+        rowData.setField(0, StringData.fromString("ABCD"));
+
+        final Object actual = serialize(schema, rowData);
+
+        assertThat(actual).isEqualTo(new Utf8("ABCD"));
+    }
+
     private static Object serialize(Schema schema, GenericRowData rowData) throws Exception {
         final int schemaId = client.register(SUBJECT, new AvroSchema(schema));
 
         final LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(schema);
+        final RowType rowType;
+        if (flinkSchema.is(LogicalTypeRoot.ROW)) {
+            rowType = (RowType) flinkSchema;
+        } else {
+            rowType =
+                    new RowType(false, Collections.singletonList(new RowField("f0", flinkSchema)));
+        }
         final SerializationSchema<RowData> serializationSchema =
                 new AvroRegistrySerializationSchema(
-                        new TestSchemaRegistryConfig(schemaId, client), (RowType) flinkSchema);
+                        new TestSchemaRegistryConfig(schemaId, client), rowType);
         serializationSchema.open(new MockInitializationContext());
         final byte[] avroSerialised = serializationSchema.serialize(rowData);
         final ByteArrayInputStream stream = new ByteArrayInputStream(avroSerialised);

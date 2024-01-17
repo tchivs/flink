@@ -7,17 +7,20 @@ package io.confluent.flink.formats.registry.avro;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.RowData.FieldGetter;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.confluent.flink.formats.registry.SchemaRegistryCoder;
 import io.confluent.flink.formats.registry.SchemaRegistryConfig;
 import io.confluent.flink.formats.registry.avro.converters.RowDataToAvroConverters;
+import io.confluent.flink.formats.registry.avro.converters.RowDataToAvroConverters.RowDataToAvroConverter;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 
@@ -38,10 +41,10 @@ public class AvroRegistrySerializationSchema implements SerializationSchema<RowD
     // Initialized in open()
     //
     /** Runtime instance that performs the actual work. */
-    private transient RowDataToAvroConverters.RowDataToAvroConverter runtimeConverter;
+    private transient RowDataToAvroConverter runtimeConverter;
 
     /** Writer that writes the serialized record to {@link ByteArrayOutputStream}. */
-    private transient GenericDatumWriter<GenericRecord> datumWriter;
+    private transient GenericDatumWriter<Object> datumWriter;
 
     /** Output stream to write message to. */
     private transient ByteArrayOutputStream arrayOutputStream;
@@ -70,7 +73,19 @@ public class AvroRegistrySerializationSchema implements SerializationSchema<RowD
         final ParsedSchema schema =
                 schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         final Schema avroSchema = (Schema) schema.rawSchema();
-        this.runtimeConverter = RowDataToAvroConverters.createConverter(rowType, avroSchema);
+        if (avroSchema.getType() == Type.RECORD) {
+            this.runtimeConverter = RowDataToAvroConverters.createConverter(rowType, avroSchema);
+        } else {
+            final LogicalType fieldType = rowType.getTypeAt(0);
+            final RowDataToAvroConverter fieldConverter =
+                    RowDataToAvroConverters.createConverter(fieldType, avroSchema);
+            final FieldGetter fieldGetter = RowData.createFieldGetter(fieldType, 0);
+            this.runtimeConverter =
+                    object -> {
+                        final RowData rowData = (RowData) object;
+                        return fieldConverter.convert(fieldGetter.getFieldOrNull(rowData));
+                    };
+        }
 
         this.datumWriter =
                 new GenericDatumWriter<>(
@@ -89,7 +104,7 @@ public class AvroRegistrySerializationSchema implements SerializationSchema<RowD
                 return null;
             } else {
                 // convert to record
-                final GenericRecord record = (GenericRecord) runtimeConverter.convert(row);
+                final Object record = runtimeConverter.convert(row);
                 arrayOutputStream.reset();
                 schemaCoder.writeSchema(arrayOutputStream);
                 datumWriter.write(record, encoder);
