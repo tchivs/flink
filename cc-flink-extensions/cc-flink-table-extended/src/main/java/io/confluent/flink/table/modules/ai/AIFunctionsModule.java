@@ -21,7 +21,7 @@ public class AIFunctionsModule implements Module {
 
     public AIFunctionsModule(Map<String, String> sqlSecretsConfig) {
         this.normalizedFunctions =
-                new HashMap() {
+                new HashMap<String, FunctionDefinition>() {
                     {
                         put(
                                 AISecret.NAME,
