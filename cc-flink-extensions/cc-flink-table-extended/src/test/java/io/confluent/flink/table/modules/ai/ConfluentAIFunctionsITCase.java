@@ -42,7 +42,9 @@ import java.security.spec.MGF1ParameterSpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -123,7 +125,8 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
     @Test
     public void testNumberOfBuiltinFunctions() {
-        final AIFunctionsModule aiFunctionsModule = new AIFunctionsModule(Collections.emptyMap());
+        final AIFunctionsModule aiFunctionsModule =
+                new AIFunctionsModule(new Configuration(), Collections.emptyMap());
         assertThat(aiFunctionsModule.listFunctions().size()).isEqualTo(2);
         assertThat(aiFunctionsModule.getFunctionDefinition("INVOKE_OPENAI")).isPresent();
         assertThat(aiFunctionsModule.getFunctionDefinition("SECRET")).isPresent();
@@ -196,6 +199,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                 new AIFunctionsTestModule(
                         baseUrl.toString(),
                         new MockedInMemoryCredentialDecrypterImpl(null),
+                        new Configuration(),
                         Collections.emptyMap()));
 
         assertThatThrownBy(
@@ -222,13 +226,12 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         // Setup private Conf with SQL_SECRETS
-        final Configuration privateConfig =
-                Configuration.fromMap(
-                        Collections.singletonMap(
-                                String.format(
-                                        "%s.%s",
-                                        ServiceTasksOptions.SQL_SECRETS.key(), "someApiKey"),
-                                base64EncryptedSecret));
+        Map<String, String> privateMap = new HashMap<>();
+        privateMap.put(
+                String.format("%s.%s", ServiceTasksOptions.SQL_SECRETS.key(), "someApiKey"),
+                base64EncryptedSecret);
+        privateMap.put(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT.key(), "10s");
+        final Configuration privateConfig = Configuration.fromMap(privateMap);
 
         tableEnv.loadModule(
                 "testOpenAi",
@@ -236,6 +239,7 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                         baseUrl.toString(),
                         new MockedInMemoryCredentialDecrypterImpl(
                                 keyPair.getPrivate().getEncoded()),
+                        privateConfig,
                         privateConfig.get(ServiceTasksOptions.SQL_SECRETS)));
 
         // test INVOKE_OPENAI with SECRET UDF
@@ -260,20 +264,19 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         // Setup private Conf with SQL_SECRETS
-        final Configuration privateConfig =
-                Configuration.fromMap(
-                        Collections.singletonMap(
-                                String.format(
-                                        "%s.%s",
-                                        ServiceTasksOptions.SQL_SECRETS.key(),
-                                        "someUserSecretName"),
-                                base64EncryptedSecret));
+        Map<String, String> privateMap = new HashMap<>();
+        privateMap.put(
+                String.format("%s.%s", ServiceTasksOptions.SQL_SECRETS.key(), "someUserSecretName"),
+                base64EncryptedSecret);
+        privateMap.put(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT.key(), "10s");
+        final Configuration privateConfig = Configuration.fromMap(privateMap);
 
         tableEnv.loadModule(
                 "testOpenAi",
                 new AIFunctionsTestModule(
                         baseUrl.toString(),
                         InMemoryCredentialDecrypterImpl.INSTANCE,
+                        privateConfig,
                         privateConfig.get(ServiceTasksOptions.SQL_SECRETS)));
 
         // test INVOKE_OPENAI with SET property passing down encrypted Secret

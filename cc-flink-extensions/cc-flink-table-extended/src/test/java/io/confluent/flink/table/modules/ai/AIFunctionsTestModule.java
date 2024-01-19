@@ -4,6 +4,9 @@
 
 package io.confluent.flink.table.modules.ai;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.functions.FunctionDefinition;
+
 import io.confluent.flink.credentials.CredentialDecrypter;
 
 import java.util.Collections;
@@ -15,13 +18,16 @@ public class AIFunctionsTestModule extends AIFunctionsModule {
     public AIFunctionsTestModule(
             String testBaseUrl,
             CredentialDecrypter decrypter,
+            Configuration aiFunctionsConfig,
             Map<String, String> sqlSecretsConfig) {
-        super(Collections.emptyMap());
+        super(aiFunctionsConfig, Collections.emptyMap());
         super.normalizedFunctions =
-                new HashMap() {
+                new HashMap<String, FunctionDefinition>() {
                     {
                         put(AISecret.NAME, new AISecret(decrypter, sqlSecretsConfig));
-                        put(AIResponseGenerator.NAME, new AIResponseGenerator(testBaseUrl));
+                        put(
+                                AIResponseGenerator.NAME,
+                                new AIResponseGenerator(aiFunctionsConfig, testBaseUrl));
                     }
                 };
     }

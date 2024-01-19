@@ -229,7 +229,12 @@ class DefaultServiceTasks implements ServiceTasks {
 
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
-            tableEnvironment.loadModule("openai", new AIFunctionsModule(sqlSecretsConf));
+            Configuration aiFunctionsConfig = new Configuration();
+            aiFunctionsConfig.set(
+                    ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT,
+                    privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT));
+            tableEnvironment.loadModule(
+                    "openai", new AIFunctionsModule(aiFunctionsConfig, sqlSecretsConf));
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE

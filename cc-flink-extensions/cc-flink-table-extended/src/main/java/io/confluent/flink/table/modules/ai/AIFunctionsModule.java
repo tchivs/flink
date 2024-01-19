@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.ai;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
@@ -19,7 +20,8 @@ import java.util.Set;
 public class AIFunctionsModule implements Module {
     Map<String, FunctionDefinition> normalizedFunctions;
 
-    public AIFunctionsModule(Map<String, String> sqlSecretsConfig) {
+    public AIFunctionsModule(
+            Configuration aiFunctionsConfig, Map<String, String> sqlSecretsConfig) {
         this.normalizedFunctions =
                 new HashMap<String, FunctionDefinition>() {
                     {
@@ -28,7 +30,7 @@ public class AIFunctionsModule implements Module {
                                 new AISecret(
                                         InMemoryCredentialDecrypterImpl.INSTANCE,
                                         sqlSecretsConfig));
-                        put(AIResponseGenerator.NAME, new AIResponseGenerator());
+                        put(AIResponseGenerator.NAME, new AIResponseGenerator(aiFunctionsConfig));
                     }
                 };
     }

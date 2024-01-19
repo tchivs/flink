@@ -5,8 +5,9 @@
 package io.confluent.flink.table.modules.ai;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.functions.AsyncScalarFunction;
 import org.apache.flink.table.functions.FunctionContext;
-import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
@@ -17,11 +18,15 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.confluent.flink.table.service.ServiceTasksOptions;
+import okhttp3.Call;
+import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 import javax.annotation.Nullable;
 
@@ -29,39 +34,63 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /** Class implementing aiGenerate function by calling OpenAI API. */
-public class AIResponseGenerator extends ScalarFunction {
+public class AIResponseGenerator extends AsyncScalarFunction {
 
     public static final String NAME = "INVOKE_OPENAI";
 
     private static final String openAICompletionsURL = "https://api.openai.com/v1/chat/completions";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     public static final MediaType JSON = MediaType.get("application/json");
+    private final Configuration aiFunctionsConfig;
     private URL baseURL;
     private transient OkHttpClient httpClient;
     private transient ObjectMapper mapper;
 
-    public AIResponseGenerator() {
+    public AIResponseGenerator(Configuration aiFunctionsConfig) {
+        this.aiFunctionsConfig = aiFunctionsConfig;
         setBaseUrl(openAICompletionsURL);
     }
 
     @VisibleForTesting
-    public AIResponseGenerator(String baseUrl) {
+    public AIResponseGenerator(Configuration aiFunctionsConfig, String baseUrl) {
+        this.aiFunctionsConfig = aiFunctionsConfig;
         setBaseUrl(baseUrl);
     }
 
     @Override
     public void open(FunctionContext context) throws Exception {
-        this.httpClient = new OkHttpClient.Builder().build();
+        long callTimeout =
+                aiFunctionsConfig
+                        .get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT)
+                        .toMillis();
+        this.httpClient =
+                new OkHttpClient.Builder()
+                        .readTimeout(callTimeout, TimeUnit.MILLISECONDS)
+                        .writeTimeout(callTimeout, TimeUnit.MILLISECONDS)
+                        .connectTimeout(callTimeout, TimeUnit.MILLISECONDS)
+                        .callTimeout(callTimeout, TimeUnit.MILLISECONDS)
+                        .build();
         this.mapper = new ObjectMapper();
     }
 
-    public @Nullable String eval(@Nullable String prompt, @Nullable String input, String apiKey) {
-        if (prompt == null || input == null) {
-            return null;
-        }
+    public void close() {
+        this.httpClient.dispatcher().executorService().shutdown();
+        this.httpClient.connectionPool().evictAll();
+    }
 
+    public void eval(
+            CompletableFuture<String> future,
+            @Nullable String prompt,
+            @Nullable String input,
+            String apiKey) {
+        if (prompt == null || input == null) {
+            future.complete(null);
+            return;
+        }
         final ObjectNode node = mapper.createObjectNode();
         node.put("model", "gpt-3.5-turbo");
         node.put("temperature", 0.7);
@@ -80,25 +109,41 @@ public class AIResponseGenerator extends ScalarFunction {
                         .post(body)
                         .header(AUTHORIZATION_HEADER, "Bearer " + apiKey)
                         .build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (response.isSuccessful()) {
-                return getContentFromResponse(
-                        mapper, response.body() != null ? response.body().string() : "");
-            } else {
-                throw new FlinkRuntimeException(
-                        String.format(
-                                "Received bad response code %d message %s",
-                                response.code(),
-                                Strings.isNullOrEmpty(response.message()) && response.body() != null
-                                        ? response.body().string().trim()
-                                        : response.message()));
-            }
-        } catch (IOException e) {
-            throw new FlinkRuntimeException("Failed to fetch OpenAI Response", e);
-        } finally {
-            this.httpClient.dispatcher().executorService().shutdown();
-            this.httpClient.connectionPool().evictAll();
-        }
+        httpClient
+                .newCall(request)
+                .enqueue(
+                        new Callback() {
+                            @Override
+                            public void onFailure(Call call, IOException e) {
+                                future.completeExceptionally(e);
+                            }
+
+                            @Override
+                            public void onResponse(Call call, Response response)
+                                    throws IOException {
+                                try (ResponseBody responseBody = response.body()) {
+                                    if (response.isSuccessful()) {
+                                        future.complete(
+                                                getContentFromResponse(
+                                                        mapper,
+                                                        responseBody != null
+                                                                ? responseBody.string()
+                                                                : ""));
+                                    } else {
+                                        throw new FlinkRuntimeException(
+                                                String.format(
+                                                        "Received bad response code %d message %s",
+                                                        response.code(),
+                                                        Strings.isNullOrEmpty(response.message())
+                                                                        && responseBody != null
+                                                                ? responseBody.string().trim()
+                                                                : response.message()));
+                                    }
+                                } catch (Throwable t) {
+                                    future.completeExceptionally(t);
+                                }
+                            }
+                        });
     }
 
     @VisibleForTesting

@@ -132,6 +132,12 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent AI functions.");
 
+    public static final ConfigOption<Duration> CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT =
+            ConfigOptions.key(PRIVATE_PREFIX + "ai-functions.call-timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription("A timeout for Confluent AI function calls.");
+
     public static final ConfigOption<Boolean> CONFLUENT_REMOTE_UDF_ENABLED =
             ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.enabled")
                     .booleanType()
