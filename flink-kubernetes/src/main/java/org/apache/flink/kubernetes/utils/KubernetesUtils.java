@@ -24,6 +24,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.kubernetes.configuration.KubernetesConfigOptions;
+import org.apache.flink.kubernetes.highavailability.KubernetesCheckpointStateHandleStore;
 import org.apache.flink.kubernetes.highavailability.KubernetesCheckpointStoreUtil;
 import org.apache.flink.kubernetes.highavailability.KubernetesJobGraphStoreUtil;
 import org.apache.flink.kubernetes.highavailability.KubernetesStateHandleStore;
@@ -327,7 +328,8 @@ public class KubernetesUtils {
                                 configuration),
                         COMPLETED_CHECKPOINT_FILE_SUFFIX);
         final KubernetesStateHandleStore<CompletedCheckpoint> stateHandleStore =
-                new KubernetesStateHandleStore<>(
+                new KubernetesCheckpointStateHandleStore(
+                        KubernetesCheckpointStoreUtil.INSTANCE,
                         kubeClient,
                         configMapName,
                         stateStorage,
