@@ -26,6 +26,7 @@ package org.apache.flink.core.fs;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.Public;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.configuration.IllegalConfigurationException;
@@ -57,6 +58,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
@@ -230,6 +232,9 @@ public abstract class FileSystem implements IFileSystem {
 
     /** Cache for file systems, by scheme + authority. */
     private static final HashMap<FSKey, FileSystem> CACHE = new HashMap<>();
+
+    private static ThreadLocal<Map<FSKey, Boolean>> canFsCopyPathsCache =
+            ThreadLocal.withInitial(HashMap::new);
 
     /**
      * Mapping of file system schemes to the corresponding factories, populated in {@link
@@ -406,78 +411,32 @@ public abstract class FileSystem implements IFileSystem {
         return FileSystemSafetyNet.wrapWithSafetyNetWhenActivated(getUnguardedFileSystem(uri));
     }
 
+    /**
+     * Thread locally cached {@link FileSystem#canCopyPaths()}. This saves us from calling {@link
+     * FileSystem#get(URI)} every time we want to check if given URI supports copying paths.
+     */
+    @Internal
+    public static boolean canCopyPaths(URI uri) throws IOException {
+        FSKey key = new FSKey(rewriteURI(uri));
+        Map<FSKey, Boolean> canCopyPathsCache = canFsCopyPathsCache.get();
+        Boolean result = canCopyPathsCache.get(key);
+        if (result != null) {
+            return result;
+        }
+        result = FileSystem.get(uri).canCopyPaths();
+        canCopyPathsCache.put(key, result);
+        return result;
+    }
+
     @Internal
     public static FileSystem getUnguardedFileSystem(final URI fsUri) throws IOException {
         checkNotNull(fsUri, "file system URI");
 
         LOCK.lock();
         try {
-            final URI uri;
+            final URI uri = rewriteAndCheckURI(fsUri);
 
-            if (fsUri.getScheme() != null) {
-                uri = fsUri;
-            } else {
-                // Apply the default fs scheme
-                final URI defaultUri = getDefaultFsUri();
-                URI rewrittenUri = null;
-
-                try {
-                    rewrittenUri =
-                            new URI(
-                                    defaultUri.getScheme(),
-                                    null,
-                                    defaultUri.getHost(),
-                                    defaultUri.getPort(),
-                                    fsUri.getPath(),
-                                    null,
-                                    null);
-                } catch (URISyntaxException e) {
-                    // for local URIs, we make one more try to repair the path by making it absolute
-                    if (defaultUri.getScheme().equals("file")) {
-                        try {
-                            rewrittenUri =
-                                    new URI(
-                                            "file",
-                                            null,
-                                            new Path(new File(fsUri.getPath()).getAbsolutePath())
-                                                    .toUri()
-                                                    .getPath(),
-                                            null);
-                        } catch (URISyntaxException ignored) {
-                            // could not help it...
-                        }
-                    }
-                }
-
-                if (rewrittenUri != null) {
-                    uri = rewrittenUri;
-                } else {
-                    throw new IOException(
-                            "The file system URI '"
-                                    + fsUri
-                                    + "' declares no scheme and cannot be interpreted relative to the default file system URI ("
-                                    + defaultUri
-                                    + ").");
-                }
-            }
-
-            // print a helpful pointer for malformed local URIs (happens a lot to new users)
-            if (uri.getScheme().equals("file")
-                    && uri.getAuthority() != null
-                    && !uri.getAuthority().isEmpty()) {
-                String supposedUri = "file:///" + uri.getAuthority() + uri.getPath();
-
-                throw new IOException(
-                        "Found local file path with authority '"
-                                + uri.getAuthority()
-                                + "' in path '"
-                                + uri.toString()
-                                + "'. Hint: Did you forget a slash? (correct path would be '"
-                                + supposedUri
-                                + "')");
-            }
-
-            final FSKey key = new FSKey(uri.getScheme(), uri.getAuthority());
+            final FSKey key = new FSKey(uri);
 
             // See if there is a file system object in the cache
             {
@@ -551,6 +510,73 @@ public abstract class FileSystem implements IFileSystem {
         } finally {
             LOCK.unlock();
         }
+    }
+
+    private static URI rewriteAndCheckURI(URI fsUri) throws IOException {
+        URI uri = rewriteURI(fsUri);
+        // print a helpful pointer for malformed local URIs (happens a lot to new users)
+        if (uri.getScheme().equals("file")
+                && uri.getAuthority() != null
+                && !uri.getAuthority().isEmpty()) {
+            String supposedUri = "file:///" + uri.getAuthority() + uri.getPath();
+
+            throw new IOException(
+                    "Found local file path with authority '"
+                            + uri.getAuthority()
+                            + "' in path '"
+                            + uri.toString()
+                            + "'. Hint: Did you forget a slash? (correct path would be '"
+                            + supposedUri
+                            + "')");
+        }
+        return uri;
+    }
+
+    private static URI rewriteURI(URI fsUri) throws IOException {
+        if (fsUri.getScheme() != null) {
+            return fsUri;
+        }
+        // Apply the default fs scheme
+        final URI defaultUri = getDefaultFsUri();
+        URI rewrittenUri = null;
+
+        try {
+            rewrittenUri =
+                    new URI(
+                            defaultUri.getScheme(),
+                            null,
+                            defaultUri.getHost(),
+                            defaultUri.getPort(),
+                            fsUri.getPath(),
+                            null,
+                            null);
+        } catch (URISyntaxException e) {
+            // for local URIs, we make one more try to repair the path by making it absolute
+            if (defaultUri.getScheme().equals("file")) {
+                try {
+                    rewrittenUri =
+                            new URI(
+                                    "file",
+                                    null,
+                                    new Path(new File(fsUri.getPath()).getAbsolutePath())
+                                            .toUri()
+                                            .getPath(),
+                                    null);
+                } catch (URISyntaxException ignored) {
+                    // could not help it...
+                }
+            }
+        }
+
+        if (rewrittenUri != null) {
+            return rewrittenUri;
+        }
+        throw new IOException(
+                "The file system URI '"
+                        + fsUri
+                        + "' declares no scheme and cannot be interpreted relative to the default file system URI ("
+                        + defaultUri
+                        + ").");
     }
 
     /**
@@ -1004,15 +1030,15 @@ public abstract class FileSystem implements IFileSystem {
         /** The authority of the file system. */
         @Nullable private final String authority;
 
-        /**
-         * Creates a file system key from a given scheme and an authority.
-         *
-         * @param scheme The scheme of the file system
-         * @param authority The authority of the file system
-         */
+        @VisibleForTesting
         public FSKey(String scheme, @Nullable String authority) {
             this.scheme = checkNotNull(scheme, "scheme");
             this.authority = authority;
+        }
+
+        public FSKey(URI uri) {
+            this.scheme = checkNotNull(uri.getScheme(), "scheme");
+            this.authority = uri.getAuthority();
         }
 
         @Override

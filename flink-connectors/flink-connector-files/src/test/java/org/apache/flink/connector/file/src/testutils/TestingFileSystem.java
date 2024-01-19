@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.ArrayList;
@@ -149,11 +148,8 @@ public class TestingFileSystem extends FileSystem {
         fsMap.remove(key);
     }
 
-    private static Object createFsKey(String scheme) throws Exception {
-        final Class<?> fsKeyClass = Class.forName("org.apache.flink.core.fs.FileSystem$FSKey");
-        final Constructor<?> ctor = fsKeyClass.getConstructor(String.class, String.class);
-        ctor.setAccessible(true);
-        return ctor.newInstance(scheme, null);
+    private static Object createFsKey(String scheme) {
+        return new FSKey(scheme, null);
     }
 
     @SuppressWarnings("unchecked")
