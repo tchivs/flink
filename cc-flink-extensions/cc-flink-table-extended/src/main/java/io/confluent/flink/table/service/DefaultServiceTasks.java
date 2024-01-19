@@ -116,9 +116,9 @@ class DefaultServiceTasks implements ServiceTasks {
         }
         applyPublicConfig(tableEnvironment, publicConfig, service);
 
-        final Configuration privateConfig = Configuration.fromMap(privateOptions);
         final Map<String, String> sqlSecretsConf =
-                privateConfig.get(ServiceTasksOptions.SQL_SECRETS);
+                publicConfig.get(ServiceTasksOptions.SQL_SECRETS);
+        final Configuration privateConfig = Configuration.fromMap(privateOptions);
         applyPrivateConfig(tableEnvironment, privateConfig, sqlSecretsConf, service);
 
         tableEnvironment.getConfig().addConfiguration(publicConfig);
