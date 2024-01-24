@@ -50,4 +50,34 @@ final class TypeFailureEnricherUtils {
         }
         return Optional.empty();
     }
+
+    /**
+     * Checks whether a throwable chain contains a specific type of exception and returns it.
+     *
+     * <p>Unlike {@link ExceptionUtils#findThrowable(Throwable, Class)} this method checks by class
+     * name and not by class object. This is intended to be used when the Throwable is loaded by a
+     * different classloader than the class object.
+     *
+     * @param throwable the throwable chain to check.
+     * @param searchType the type of exception to search for in the chain.
+     * @return Optional throwable of the requested type if available, otherwise empty
+     */
+    public static <T extends Throwable> Optional<T> findThrowableByName(
+            Throwable throwable, Class<T> searchType) {
+        if (throwable == null || searchType == null) {
+            return Optional.empty();
+        }
+        // Canonical name is the same as used in an import statement
+        final String searchName = searchType.getCanonicalName();
+        Throwable t = throwable;
+        while (t != null) {
+            if (searchName.equals(t.getClass().getName())) {
+                return Optional.of(searchType.cast(t));
+            } else {
+                t = t.getCause();
+            }
+        }
+
+        return Optional.empty();
+    }
 }

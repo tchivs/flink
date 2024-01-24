@@ -75,28 +75,56 @@ public class TypeFailureEnricher implements FailureEnricher {
                                             ? Type.SYSTEM
                                             : Type.USER);
         },
-        forThrowable(TableException.class, Type.USER),
-        forThrowable(ArithmeticException.class, Type.USER),
+        forSystemThrowable(TableException.class, Type.USER),
+        forSystemThrowable(ArithmeticException.class, Type.USER),
         // Kafka exceptions.
-        forThrowable(TimeoutException.class, Type.USER),
-        forThrowable(UnknownTopicOrPartitionException.class, Type.USER),
+        forUserThrowable(TimeoutException.class, Type.USER),
+        forUserThrowable(UnknownTopicOrPartitionException.class, Type.USER),
         // Cast exceptions.
-        forThrowable(NumberFormatException.class, Type.USER),
-        forThrowable(DateTimeException.class, Type.USER),
+        forSystemThrowable(NumberFormatException.class, Type.USER),
+        forSystemThrowable(DateTimeException.class, Type.USER),
         // Authorization exceptions coming from Kafka.
-        forThrowable(TransactionalIdAuthorizationException.class, Type.USER),
-        forThrowable(TopicAuthorizationException.class, Type.USER),
+        forUserThrowable(TransactionalIdAuthorizationException.class, Type.USER),
+        forUserThrowable(TopicAuthorizationException.class, Type.USER),
         // User Secret error message.
         forPredicate(TypeFailureEnricherUtils::isUserSecretErrorMessage, Type.USER),
         // System exceptions.
-        forThrowable(FlinkException.class, Type.SYSTEM),
+        forSystemThrowable(FlinkException.class, Type.SYSTEM),
         forPredicate(ExceptionUtils::isJvmFatalOrOutOfMemoryError, Type.SYSTEM),
         // Catch all.
         throwable -> Optional.of(Type.UNKNOWN)
     };
 
-    private static TypeClassifier forThrowable(Class<? extends Throwable> clazz, Type type) {
+    /**
+     * Helper method to return a Type for a given {@link Throwable} class. Only to be used for all
+     * System Throwable classes originating from Flink core and loggers.
+     *
+     * <p>For everything else, use {@link #forUserThrowable(Class, Type)} as each plugin is loaded
+     * through its own classloader. Two class objects are the same only if they are loaded by the
+     * same class loader!
+     *
+     * @param clazz Throwable class
+     * @param type Type to return if the Throwable is an instance of the given class
+     * @return TypeClassifier
+     */
+    private static TypeClassifier forSystemThrowable(Class<? extends Throwable> clazz, Type type) {
         return throwable -> ExceptionUtils.findThrowable(throwable, clazz).map(ignored -> type);
+    }
+
+    /**
+     * Helper method to return a Type for a given {@link Throwable} class. To be used for all User
+     * Throwable classes like Connectors, Filesystems etc.
+     *
+     * <p>TypeFailureEnricher, as every other plugin is loaded through its own classloader. Two
+     * class objects are the same only if they are loaded by the same class loader so check by name!
+     *
+     * @param clazz Throwable class
+     * @param type Type to return if the Throwable have the canonical name of the given class
+     * @return TypeClassifier
+     */
+    private static TypeClassifier forUserThrowable(Class<? extends Throwable> clazz, Type type) {
+        return throwable ->
+                TypeFailureEnricherUtils.findThrowableByName(throwable, clazz).map(ignored -> type);
     }
 
     private static TypeClassifier forPredicate(Predicate<Throwable> predicate, Type type) {
