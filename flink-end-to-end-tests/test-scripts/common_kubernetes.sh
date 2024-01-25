@@ -90,21 +90,6 @@ function setup_kubernetes_for_linux {
     sudo sysctl fs.protected_regular=0
 }
 
-function retry_download {
-    if [[ "$#" != 1 ]]; then
-       echo "Fatal error: No parameter or too many parameters passed: $@"
-       exit 1;
-    fi
-
-    local download_url download_command
-    download_url="$1"
-    download_command="wget -nv ${download_url}"
-    if ! retry_times ${RETRY_COUNT} ${RETRY_BACKOFF_TIME} "${download_command}"; then
-      echo "ERROR: Download failed repeatedly after ${RETRY_COUNT} tries. Aborting..."
-      exit 1
-    fi
-}
-
 function check_kubernetes_status {
     minikube status
     return $?
