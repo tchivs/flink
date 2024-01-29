@@ -343,6 +343,9 @@ public class KubernetesUtils {
 
         return new DefaultCompletedCheckpointStore<>(
                 maxNumberOfCheckpointsToRetain,
+                configuration.get(
+                        org.apache.flink.configuration.JobManagerConfluentOptions
+                                .RETAIN_JOB_HA_CP_STORE_ON_TERMINATION),
                 stateHandleStore,
                 KubernetesCheckpointStoreUtil.INSTANCE,
                 checkpoints,

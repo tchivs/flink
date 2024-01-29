@@ -20,8 +20,8 @@ package org.apache.flink.kubernetes.kubeclient.resources;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.kubernetes.configuration.KubernetesLeaderElectionConfiguration;
-import org.apache.flink.util.ExecutorUtils;
 import org.apache.flink.kubernetes.utils.KubernetesUtils;
+import org.apache.flink.util.ExecutorUtils;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 import org.apache.flink.util.concurrent.FutureUtils;
 

@@ -474,6 +474,11 @@ public class KubernetesStateHandleStore<T extends Serializable>
      */
     @Override
     public boolean releaseAndTryRemove(String key) throws Exception {
+        return releaseAndTryRemove(true, key);
+    }
+
+    @Override
+    public boolean releaseAndTryRemove(boolean deleteCheckpointPath, String key) throws Exception {
         checkNotNull(key, "Key in ConfigMap.");
         final AtomicReference<RetrievableStateHandle<T>> stateHandleRefer = new AtomicReference<>();
         final AtomicBoolean stateHandleDoesNotExist = new AtomicBoolean(false);
@@ -500,7 +505,9 @@ public class KubernetesStateHandleStore<T extends Serializable>
                                     // Remove entry from the config map as we can't recover from
                                     // this (the serialization would fail on the retry as well).
                                     Objects.requireNonNull(configMap.getData().remove(key));
-                                    onDelete(key, configMap.getData());
+                                    if (deleteCheckpointPath) {
+                                        onDelete(key, configMap.getData());
+                                    }
                                 }
                                 return Optional.of(configMap);
                             } else {
@@ -519,7 +526,9 @@ public class KubernetesStateHandleStore<T extends Serializable>
                                                 // transaction" by removing the entry from the
                                                 // ConfigMap.
                                                 configMap.getData().remove(key);
-                                                onDelete(key, configMap.getData());
+                                                if (deleteCheckpointPath) {
+                                                    onDelete(key, configMap.getData());
+                                                }
                                                 return Optional.of(configMap);
                                             });
                                 } catch (Exception e) {

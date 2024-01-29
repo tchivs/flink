@@ -242,9 +242,7 @@ class KubernetesLeaderElectorITCase {
                 new TestingLeaderCallbackHandler(UUID.randomUUID().toString());
         final KubernetesLeaderElectionConfiguration leaderConfig =
                 new KubernetesLeaderElectionConfiguration(
-                        configMapName,
-                        leaderCallbackHandler.getLockIdentity(),
-                        configuration);
+                        configMapName, leaderCallbackHandler.getLockIdentity(), configuration);
 
         try (FlinkKubeClient kubeClient =
                 kubeClientFactory.fromConfiguration(configuration, "testing")) {
@@ -261,8 +259,10 @@ class KubernetesLeaderElectorITCase {
                                         assertThat(configMap.getLabels())
                                                 .hasSize(4)
                                                 .containsEntry(
-                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_KEY,
-                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY)
+                                                        org.apache.flink.kubernetes.utils.Constants
+                                                                .LABEL_CONFIGMAP_TYPE_KEY,
+                                                        org.apache.flink.kubernetes.utils.Constants
+                                                                .LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY)
                                                 .containsEntry(
                                                         ConfluentConstants
                                                                 .CONFLUENT_CLUSTER_ID_LABEL_KEY,
