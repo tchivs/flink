@@ -18,6 +18,7 @@
 
 package org.apache.flink.kubernetes.utils;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.resources.ExternalResource;
 import org.apache.flink.client.program.PackagedProgramUtils;
 import org.apache.flink.configuration.ConfigOption;
@@ -200,6 +201,7 @@ public class KubernetesUtils {
     public static Map<String, String> getConfigMapLabels(String clusterId, String type) {
         final Map<String, String> labels = new HashMap<>(getCommonLabels(clusterId));
         labels.put(Constants.LABEL_CONFIGMAP_TYPE_KEY, type);
+        labels.put(ConfluentConstants.CONFLUENT_CLUSTER_ID_LABEL_KEY, clusterId);
         return Collections.unmodifiableMap(labels);
     }
 
@@ -562,7 +564,7 @@ public class KubernetesUtils {
      * @throws FlinkException if the config map could not be created
      */
     public static void createConfigMapIfItDoesNotExist(
-            FlinkKubeClient flinkKubeClient, String configMapName, String clusterId)
+            FlinkKubeClient flinkKubeClient, String configMapName, String clusterId, JobID jobID)
             throws FlinkException {
 
         int attempt = 0;
@@ -575,8 +577,10 @@ public class KubernetesUtils {
                                 .withNewMetadata()
                                 .withName(configMapName)
                                 .withLabels(
-                                        getConfigMapLabels(
-                                                clusterId, LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY))
+                                        getJobConfigMapLabels(
+                                                clusterId,
+                                                LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY,
+                                                jobID))
                                 .endMetadata()
                                 .build());
 
@@ -596,6 +600,14 @@ public class KubernetesUtils {
                     String.format("Could not create the config map %s.", configMapName),
                     lastException);
         }
+    }
+
+    private static Map<String, String> getJobConfigMapLabels(
+            String clusterId, String type, JobID jobId) {
+        final Map<String, String> labels = new HashMap<>(getCommonLabels(clusterId));
+        labels.putAll(getConfigMapLabels(clusterId, type));
+        labels.put(ConfluentConstants.CONFLUENT_JOB_ID_LABEL_KEY, jobId.toHexString());
+        return Collections.unmodifiableMap(labels);
     }
 
     public static String encodeLeaderInformation(LeaderInformation leaderInformation) {

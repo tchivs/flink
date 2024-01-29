@@ -25,6 +25,7 @@ import org.apache.flink.kubernetes.configuration.KubernetesHighAvailabilityOptio
 import org.apache.flink.kubernetes.configuration.KubernetesLeaderElectionConfiguration;
 import org.apache.flink.kubernetes.kubeclient.FlinkKubeClient;
 import org.apache.flink.kubernetes.kubeclient.FlinkKubeClientFactory;
+import org.apache.flink.kubernetes.utils.ConfluentConstants;
 
 import io.fabric8.kubernetes.client.NamespacedKubernetesClient;
 import org.junit.jupiter.api.AfterEach;
@@ -258,10 +259,14 @@ class KubernetesLeaderElectorITCase {
                         .hasValueSatisfying(
                                 configMap ->
                                         assertThat(configMap.getLabels())
-                                                .hasSize(3)
+                                                .hasSize(4)
                                                 .containsEntry(
                                                         org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_KEY,
-                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY));
+                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY)
+                                                .containsEntry(
+                                                        ConfluentConstants
+                                                                .CONFLUENT_CLUSTER_ID_LABEL_KEY,
+                                                        leaderConfig.getClusterId()));
             } finally {
                 leaderElector.stop();
             }
