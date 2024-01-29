@@ -7,10 +7,9 @@ package io.confluent.flink.jobgraph.v3;
 import org.apache.flink.annotation.VisibleForTesting;
 
 import io.confluent.flink.jobgraph.GeneratorUtils;
-import io.confluent.flink.jobgraph.JobGraphGenerator;
 import io.confluent.flink.jobgraph.JobGraphWrapper;
 import io.confluent.flink.table.utils.ClassifiedException;
-import io.confluent.flink.table.utils.ClassifiedException.ExceptionClass;
+import io.confluent.flink.table.utils.ClassifiedException.ExceptionKind;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** CompiledPlan-based {@link JobGraphGenerator} implementation. */
+/** CompiledPlan-based {@link JobGraphGeneratorV3} implementation. */
 public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 {
 
     private static final Logger LOGGER =
@@ -42,10 +41,12 @@ public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 
         } catch (Exception e) {
             final ClassifiedException classified =
                     ClassifiedException.of(e, ClassifiedException.VALID_CAUSES);
-            if (classified.getExceptionClass() == ExceptionClass.PLANNING_USER) {
-                throw new RuntimeException(classified.getMessage());
+            if (classified.getKind() == ExceptionKind.USER) {
+                throw new RuntimeException(classified.getSensitiveMessage());
             } else {
-                LOGGER.error("Internal error occurred during JobGraph generation.", e);
+                LOGGER.error(
+                        "Internal error occurred during JobGraph generation.",
+                        classified.getLogException());
                 throw new RuntimeException("Internal error occurred.");
             }
         }

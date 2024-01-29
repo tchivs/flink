@@ -16,8 +16,9 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 
 import io.confluent.flink.table.service.ServiceTasks.Service;
-import io.confluent.flink.table.utils.ClassifiedException.ExceptionClass;
+import io.confluent.flink.table.utils.ClassifiedException.ExceptionKind;
 import io.confluent.flink.table.utils.ClassifiedExceptionTest.InvalidCatalog.ExceptionType;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -209,7 +210,15 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
                                         + "\n"
-                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it."));
+                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it."),
+                // ---
+                TestSpec.test("removal of sensitive string literals")
+                        .executeSql("SELECT * FROM `not_exist`")
+                        .expectLogError(
+                                ExceptionKind.USER,
+                                "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
+                                        + "\n"
+                                        + "Caused by: Table (or view) '<<removed>>' does not exist or you do not have permission to access it."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -228,18 +237,46 @@ public class ClassifiedExceptionTest {
             final ClassifiedException classified =
                     ClassifiedException.of((Exception) t, testSpec.allowedCauses);
             switch (testSpec.matchCondition) {
-                case EXACT:
-                    assertThat(classified.getMessage()).isEqualTo(testSpec.expectedError);
+                case SENSITIVE_MESSAGE_EXACT:
+                    assertThat(classified.getSensitiveMessage()).isEqualTo(testSpec.expectedError);
                     break;
-                case CONTAIN:
-                    assertThat(classified.getMessage()).contains(testSpec.expectedError);
+                case SENSITIVE_MESSAGE_CONTAIN:
+                    assertThat(classified.getSensitiveMessage()).contains(testSpec.expectedError);
+                    break;
+                case LOG_MESSAGE_CONTAIN:
+                    assertThat(classified.getLogMessage()).contains(testSpec.expectedError);
                     break;
             }
             if (testSpec.unexpectedError != null) {
-                assertThat(classified.getMessage()).doesNotContain(testSpec.unexpectedError);
+                assertThat(classified.getSensitiveMessage())
+                        .doesNotContain(testSpec.unexpectedError);
             }
-            assertThat(classified.getExceptionClass()).isEqualTo(testSpec.expectedClass);
+            assertThat(classified.getKind()).isEqualTo(testSpec.expectedKind);
         }
+    }
+
+    @Test
+    void testLogException() {
+        final ValidationException e =
+                new ValidationException(
+                        "Error with 'sensitive' field of 'Bob''s message'.",
+                        new TableException("Error in table '' or 'Alice''s or Bob''s table'."));
+        final ClassifiedException classified =
+                ClassifiedException.of(e, ClassifiedException.VALID_CAUSES);
+        assertThat(classified.getKind()).isEqualTo(ExceptionKind.USER);
+        assertThat(classified.getLogMessage())
+                .isEqualTo(
+                        "Error with '<<removed>>' field of '<<removed>>'.\n\n"
+                                + "Caused by: Error in table '<<removed>>' or '<<removed>>'.");
+
+        final Exception cleanedException = classified.getLogException();
+        assertThat(cleanedException.getMessage())
+                .isEqualTo(
+                        "org.apache.flink.table.api.ValidationException: Error with '<<removed>>' field of '<<removed>>'.");
+        assertThat(cleanedException.getCause().getMessage())
+                .isEqualTo(
+                        "org.apache.flink.table.api.TableException: Error in table '<<removed>>' or '<<removed>>'.");
+        assertThat(cleanedException.getStackTrace()).isEqualTo(e.getStackTrace());
     }
 
     private static class TestSpec {
@@ -250,13 +287,14 @@ public class ClassifiedExceptionTest {
         final Set<Class<? extends Exception>> allowedCauses = new HashSet<>();
 
         String expectedError;
-        ExceptionClass expectedClass;
+        ExceptionKind expectedKind;
         @Nullable String unexpectedError;
         MatchCondition matchCondition;
 
         enum MatchCondition {
-            EXACT,
-            CONTAIN
+            SENSITIVE_MESSAGE_EXACT,
+            SENSITIVE_MESSAGE_CONTAIN,
+            LOG_MESSAGE_CONTAIN
         }
 
         private TestSpec(String description) {
@@ -280,22 +318,29 @@ public class ClassifiedExceptionTest {
 
         TestSpec expectUserError(String expectedError) {
             this.expectedError = expectedError;
-            this.expectedClass = ExceptionClass.PLANNING_USER;
-            this.matchCondition = MatchCondition.CONTAIN;
+            this.expectedKind = ExceptionKind.USER;
+            this.matchCondition = MatchCondition.SENSITIVE_MESSAGE_CONTAIN;
             return this;
         }
 
         TestSpec expectExactUserError(String expectedError) {
             this.expectedError = expectedError;
-            this.expectedClass = ExceptionClass.PLANNING_USER;
-            this.matchCondition = MatchCondition.EXACT;
+            this.expectedKind = ExceptionKind.USER;
+            this.matchCondition = MatchCondition.SENSITIVE_MESSAGE_EXACT;
             return this;
         }
 
         TestSpec expectSystemError(String expectedError) {
             this.expectedError = expectedError;
-            this.expectedClass = ExceptionClass.PLANNING_SYSTEM;
-            this.matchCondition = MatchCondition.CONTAIN;
+            this.expectedKind = ExceptionKind.INTERNAL;
+            this.matchCondition = MatchCondition.SENSITIVE_MESSAGE_CONTAIN;
+            return this;
+        }
+
+        TestSpec expectLogError(ExceptionKind expectedKind, String expectedError) {
+            this.expectedError = expectedError;
+            this.expectedKind = expectedKind;
+            this.matchCondition = MatchCondition.LOG_MESSAGE_CONTAIN;
             return this;
         }
 
