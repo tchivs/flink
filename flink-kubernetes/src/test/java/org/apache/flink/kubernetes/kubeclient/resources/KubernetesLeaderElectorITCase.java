@@ -232,4 +232,41 @@ class KubernetesLeaderElectorITCase {
                     .eventuallySucceeds();
         }
     }
+
+    @Test
+    void testClusterConfigMapLabelsAreSet() throws Exception {
+        final Configuration configuration = kubernetesExtension.getConfiguration();
+
+        final TestingLeaderCallbackHandler leaderCallbackHandler =
+                new TestingLeaderCallbackHandler(UUID.randomUUID().toString());
+        final KubernetesLeaderElectionConfiguration leaderConfig =
+                new KubernetesLeaderElectionConfiguration(
+                        configMapName,
+                        leaderCallbackHandler.getLockIdentity(),
+                        configuration);
+
+        try (FlinkKubeClient kubeClient =
+                kubeClientFactory.fromConfiguration(configuration, "testing")) {
+            final KubernetesLeaderElector leaderElector =
+                    kubeClient.createLeaderElector(leaderConfig, leaderCallbackHandler);
+            try {
+                leaderElector.run();
+
+                TestingLeaderCallbackHandler.waitUntilNewLeaderAppears();
+
+                assertThat(kubeClient.getConfigMap(configMapName))
+                        .hasValueSatisfying(
+                                configMap ->
+                                        assertThat(configMap.getLabels())
+                                                .hasSize(3)
+                                                .containsEntry(
+                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_KEY,
+                                                        org.apache.flink.kubernetes.utils.Constants.LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY));
+            } finally {
+                leaderElector.stop();
+            }
+        } finally {
+            kubernetesExtension.getFlinkKubeClient().deleteConfigMap(configMapName).get();
+        }
+    }
 }
