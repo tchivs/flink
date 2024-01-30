@@ -7,9 +7,16 @@ package io.confluent.flink.table.modules.remoteudf;
 import org.apache.flink.util.IOUtils;
 
 import com.google.protobuf.ByteString;
-
-import java.util.ArrayList;
-import java.util.List;
+import io.confluent.secure.compute.gateway.v1.CreateInstanceRequest;
+import io.confluent.secure.compute.gateway.v1.CreateInstanceResponse;
+import io.confluent.secure.compute.gateway.v1.DeleteInstanceRequest;
+import io.confluent.secure.compute.gateway.v1.DeleteInstanceResponse;
+import io.confluent.secure.compute.gateway.v1.Error;
+import io.confluent.secure.compute.gateway.v1.FunctionInstanceEntryPoint;
+import io.confluent.secure.compute.gateway.v1.FunctionInstanceMetadata;
+import io.confluent.secure.compute.gateway.v1.FunctionInstanceSpec;
+import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
+import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;
 
 /**
  * This class encapsulates the runtime for interacting with remote UDFs, e.g. to call the remote
@@ -19,18 +26,18 @@ public class RemoteUdfRuntime implements AutoCloseable {
     private RemoteUdfRuntime(
             RemoteUdfSerialization remoteUdfSerialization,
             RemoteUdfGatewayConnection remoteUdfGatewayConnection,
-            List<String> functionInstanceIds) {
+            String functionInstanceName) {
         this.remoteUdfSerialization = remoteUdfSerialization;
         this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
-        this.functionInstanceIds = functionInstanceIds;
+        this.functionInstanceName = functionInstanceName;
     }
 
     /** Serialization methods. */
     private final RemoteUdfSerialization remoteUdfSerialization;
     /** Connection to the UDF remote service gateway. */
     private final RemoteUdfGatewayConnection remoteUdfGatewayConnection;
-    /** List of IDs for function that were create by and are known to this runtime. */
-    private final List<String> functionInstanceIds;
+    /** The id of the function that was created by and is known to this runtime. */
+    private final String functionInstanceName;
 
     /**
      * Calls the remote UDF.
@@ -40,14 +47,13 @@ public class RemoteUdfRuntime implements AutoCloseable {
      * @throws Exception on any error, e.g. from the connection or from the UDF code invocation.
      */
     public Object callRemoteUdf(Object[] args) throws Exception {
-        String functionInstanceId = functionInstanceIds.get(0);
         ByteString serializedArguments = remoteUdfSerialization.serializeArguments(args);
-        UdfGatewayOuterClass.InvokeResponse invokeResponse =
+        InvokeFunctionResponse invokeResponse =
                 remoteUdfGatewayConnection
                         .getUdfGateway()
-                        .invoke(
-                                UdfGatewayOuterClass.InvokeRequest.newBuilder()
-                                        .setFuncInstanceId(functionInstanceId)
+                        .invokeFunction(
+                                InvokeFunctionRequest.newBuilder()
+                                        .setFuncInstanceName(functionInstanceName)
                                         .setPayload(serializedArguments)
                                         .build());
 
@@ -66,7 +72,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
      */
     public static RemoteUdfRuntime open(String udfGatewayTarget, RemoteUdfSpec remoteUdfSpec)
             throws Exception {
-
+        // TODO: FRT-321 Replace this with UDFTask call to apiServer
         RemoteUdfSerialization remoteUdfSerialization =
                 new RemoteUdfSerialization(
                         remoteUdfSpec.createReturnTypeSerializer(),
@@ -75,26 +81,33 @@ public class RemoteUdfRuntime implements AutoCloseable {
         RemoteUdfGatewayConnection remoteUdfGatewayConnection =
                 RemoteUdfGatewayConnection.open(udfGatewayTarget);
         try {
-            UdfGatewayOuterClass.CreateInstancesResponse createInstancesResponse =
-                    remoteUdfGatewayConnection
-                            .getUdfGateway()
-                            .createInstances(
-                                    // Create one instance of the specified function
-                                    UdfGatewayOuterClass.CreateInstancesRequest.newBuilder()
-                                            .setFuncId(remoteUdfSpec.getFunctionId())
-                                            .setPayload(
+            FunctionInstanceSpec functionSpec =
+                    FunctionInstanceSpec.newBuilder()
+                            .setEntryPoint(
+                                    FunctionInstanceEntryPoint.newBuilder()
+                                            .setOpenPayload(
                                                     remoteUdfSerialization.serializeRemoteUdfSpec(
                                                             remoteUdfSpec))
-                                            .setNumInstances(1)
+                                            .build())
+                            .build();
+            CreateInstanceResponse createInstancesResponse =
+                    remoteUdfGatewayConnection
+                            .getUdfGateway()
+                            .createInstance(
+                                    // Create one instance of the specified function
+                                    CreateInstanceRequest.newBuilder()
+                                            .setMetadata(
+                                                    FunctionInstanceMetadata.newBuilder()
+                                                            .setName(remoteUdfSpec.getFunctionId()))
+                                            .setSpec(functionSpec)
                                             .build());
 
             checkAndHandleError(createInstancesResponse);
 
-            List<String> functionInstanceIds =
-                    new ArrayList<>(createInstancesResponse.getFuncInstanceIdsList());
-
             return new RemoteUdfRuntime(
-                    remoteUdfSerialization, remoteUdfGatewayConnection, functionInstanceIds);
+                    remoteUdfSerialization,
+                    remoteUdfGatewayConnection,
+                    remoteUdfSpec.getFunctionId());
         } catch (Exception ex) {
             // Cleanup on exception.
             IOUtils.closeQuietly(remoteUdfGatewayConnection);
@@ -109,12 +122,15 @@ public class RemoteUdfRuntime implements AutoCloseable {
      */
     @Override
     public void close() throws Exception {
-        UdfGatewayOuterClass.DeleteInstancesResponse deleteInstancesResponse =
+        DeleteInstanceResponse deleteInstancesResponse =
                 remoteUdfGatewayConnection
                         .getUdfGateway()
-                        .deleteInstances(
-                                UdfGatewayOuterClass.DeleteInstancesRequest.newBuilder()
-                                        .addAllFuncInstanceIds(functionInstanceIds)
+                        .deleteInstance(
+                                DeleteInstanceRequest.newBuilder()
+                                        .setMetadata(
+                                                FunctionInstanceMetadata.newBuilder()
+                                                        .setName(functionInstanceName)
+                                                        .build())
                                         .build());
 
         checkAndHandleError(deleteInstancesResponse);
@@ -122,29 +138,29 @@ public class RemoteUdfRuntime implements AutoCloseable {
         remoteUdfGatewayConnection.close();
     }
 
-    private static void checkAndHandleError(UdfGatewayOuterClass.InvokeResponse response)
+    private static void checkAndHandleError(InvokeFunctionResponse response)
             throws RemoteUdfException {
         if (response.hasError()) {
             throwForError(response.getError());
         }
     }
 
-    private static void checkAndHandleError(UdfGatewayOuterClass.DeleteInstancesResponse response)
+    private static void checkAndHandleError(DeleteInstanceResponse response)
             throws RemoteUdfException {
         if (response.hasError()) {
             throwForError(response.getError());
         }
     }
 
-    private static void checkAndHandleError(UdfGatewayOuterClass.CreateInstancesResponse response)
+    private static void checkAndHandleError(CreateInstanceResponse response)
             throws RemoteUdfException {
         if (response.hasError()) {
             throwForError(response.getError());
         }
     }
 
-    private static void throwForError(UdfGatewayOuterClass.Error error) throws RemoteUdfException {
+    private static void throwForError(Error error) throws RemoteUdfException {
         throw new RemoteUdfException(
-                error.getMessage(), error.getCode(), error.getPayload().toByteArray());
+                error.getMessage(), error.getCode(), error.getMessageBytes().toByteArray());
     }
 }

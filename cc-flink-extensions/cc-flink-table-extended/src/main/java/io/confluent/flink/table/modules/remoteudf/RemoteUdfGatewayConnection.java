@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
@@ -20,12 +21,12 @@ public class RemoteUdfGatewayConnection implements Closeable {
     private ManagedChannel channel;
 
     /** Gateway to invoke remote UDFs. */
-    private UdfGatewayGrpc.UdfGatewayBlockingStub udfGateway;
+    private SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway;
 
     private RemoteUdfGatewayConnection(
             String udfGatewayTarget,
             ManagedChannel channel,
-            UdfGatewayGrpc.UdfGatewayBlockingStub udfGateway) {
+            SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway) {
         this.udfGatewayTarget = udfGatewayTarget;
         this.channel = channel;
         this.udfGateway = udfGateway;
@@ -44,8 +45,8 @@ public class RemoteUdfGatewayConnection implements Closeable {
                 Preconditions.checkNotNull(
                         ManagedChannelBuilder.forTarget(udfGatewayTarget).usePlaintext().build());
 
-        UdfGatewayGrpc.UdfGatewayBlockingStub gateway =
-                Preconditions.checkNotNull(UdfGatewayGrpc.newBlockingStub(channel));
+        SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub gateway =
+                Preconditions.checkNotNull(SecureComputeGatewayGrpc.newBlockingStub(channel));
 
         return new RemoteUdfGatewayConnection(udfGatewayTarget, channel, gateway);
     }
@@ -56,7 +57,7 @@ public class RemoteUdfGatewayConnection implements Closeable {
         channel.shutdownNow();
     }
 
-    public UdfGatewayGrpc.UdfGatewayBlockingStub getUdfGateway() {
+    public SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub getUdfGateway() {
         return udfGateway;
     }
 

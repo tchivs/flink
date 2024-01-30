@@ -19,6 +19,14 @@ import org.apache.flink.util.CloseableIterator;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
+import io.confluent.secure.compute.gateway.v1.CreateInstanceRequest;
+import io.confluent.secure.compute.gateway.v1.CreateInstanceResponse;
+import io.confluent.secure.compute.gateway.v1.DeleteInstanceRequest;
+import io.confluent.secure.compute.gateway.v1.DeleteInstanceResponse;
+import io.confluent.secure.compute.gateway.v1.Error;
+import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
+import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;
+import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -33,7 +41,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
@@ -190,21 +197,77 @@ public class RemoteUdfITCase extends AbstractTestBase {
     }
 
     /** Mock implementation of the UDF gateway. */
-    private static class TestUdfGateway extends UdfGatewayGrpc.UdfGatewayImplBase {
-
+    private static class TestUdfGateway
+            extends SecureComputeGatewayGrpc.SecureComputeGatewayImplBase {
         static final String IDENTIFY_FUNCTION_ID = "IdentityFunction";
         final Map<String, RemoteUdfSpec> instanceToFuncIds = new HashMap<>();
 
+        // TODO: FRT-321 Replace createInstance and deleteInstance with UDFTask calls to apiServer
         @Override
-        public void invoke(
-                UdfGatewayOuterClass.InvokeRequest request,
-                StreamObserver<UdfGatewayOuterClass.InvokeResponse> responseObserver) {
-
-            UdfGatewayOuterClass.InvokeResponse.Builder builder =
-                    UdfGatewayOuterClass.InvokeResponse.newBuilder();
+        public void createInstance(
+                CreateInstanceRequest request,
+                StreamObserver<CreateInstanceResponse> responseObserver) {
 
             try {
-                RemoteUdfSpec remoteUdfSpec = instanceToFuncIds.get(request.getFuncInstanceId());
+                CreateInstanceResponse.Builder builder = CreateInstanceResponse.newBuilder();
+
+                if (IDENTIFY_FUNCTION_ID.equals(request.getMetadata().getName())) {
+                    DataInputDeserializer in =
+                            new DataInputDeserializer(
+                                    request.getSpec()
+                                            .getEntryPoint()
+                                            .getOpenPayload()
+                                            .asReadOnlyByteBuffer());
+
+                    RemoteUdfSpec udfSpec =
+                            RemoteUdfSpec.deserialize(
+                                    in, Thread.currentThread().getContextClassLoader());
+
+                    instanceToFuncIds.put(IDENTIFY_FUNCTION_ID, udfSpec);
+                } else {
+                    builder.setError(
+                            Error.newBuilder()
+                                    .setCode(1)
+                                    .setMessage(
+                                            "Unknown function id: "
+                                                    + request.getMetadata().getName())
+                                    .build());
+                }
+                responseObserver.onNext(builder.build());
+                responseObserver.onCompleted();
+            } catch (Exception ex) {
+                responseObserver.onError(ex);
+            }
+        }
+
+        @Override
+        public void deleteInstance(
+                DeleteInstanceRequest request,
+                StreamObserver<DeleteInstanceResponse> responseObserver) {
+
+            DeleteInstanceResponse.Builder builder = DeleteInstanceResponse.newBuilder();
+            String functionNameToDelete = request.getMetadata().getName();
+            if (instanceToFuncIds.remove(functionNameToDelete) == null) {
+                builder.setError(
+                        Error.newBuilder()
+                                .setCode(1)
+                                .setMessage("Function not found: " + functionNameToDelete)
+                                .build());
+            }
+
+            responseObserver.onNext(builder.build());
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void invokeFunction(
+                InvokeFunctionRequest request,
+                StreamObserver<InvokeFunctionResponse> responseObserver) {
+
+            InvokeFunctionResponse.Builder builder = InvokeFunctionResponse.newBuilder();
+
+            try {
+                RemoteUdfSpec remoteUdfSpec = instanceToFuncIds.get(request.getFuncInstanceName());
 
                 if (remoteUdfSpec != null) {
                     List<TypeSerializer<Object>> argumentSerializers =
@@ -220,81 +283,12 @@ public class RemoteUdfITCase extends AbstractTestBase {
                             serialization.serializeReturnValue(
                                     BinaryStringData.fromString(Arrays.asList(args).toString())));
                 } else {
-                    throw new Exception("Unknown instance: " + request.getFuncInstanceId());
+                    throw new Exception(
+                            "Unknown Function instance: " + request.getFuncInstanceName());
                 }
             } catch (Exception ex) {
-                builder.setError(
-                        UdfGatewayOuterClass.Error.newBuilder()
-                                .setCode(1)
-                                .setMessage(ex.getMessage())
-                                .build());
+                builder.setError(Error.newBuilder().setCode(1).setMessage(ex.getMessage()).build());
             }
-            responseObserver.onNext(builder.build());
-            responseObserver.onCompleted();
-        }
-
-        @Override
-        public void createInstances(
-                UdfGatewayOuterClass.CreateInstancesRequest request,
-                StreamObserver<UdfGatewayOuterClass.CreateInstancesResponse> responseObserver) {
-
-            try {
-                UdfGatewayOuterClass.CreateInstancesResponse.Builder builder =
-                        UdfGatewayOuterClass.CreateInstancesResponse.newBuilder();
-
-                if (IDENTIFY_FUNCTION_ID.equals(request.getFuncId())) {
-
-                    DataInputDeserializer in =
-                            new DataInputDeserializer(request.getPayload().asReadOnlyByteBuffer());
-
-                    RemoteUdfSpec udfSpec =
-                            RemoteUdfSpec.deserialize(
-                                    in, Thread.currentThread().getContextClassLoader());
-
-                    List<String> newInstanceIds = new ArrayList<>(request.getNumInstances());
-                    for (int i = 0; i < request.getNumInstances(); ++i) {
-                        String uuid = UUID.randomUUID().toString();
-                        newInstanceIds.add(uuid);
-                        instanceToFuncIds.put(uuid, udfSpec);
-                    }
-                    builder.addAllFuncInstanceIds(newInstanceIds);
-                } else {
-                    builder.setError(
-                            UdfGatewayOuterClass.Error.newBuilder()
-                                    .setCode(1)
-                                    .setMessage("Unknown function id: " + request.getFuncId())
-                                    .build());
-                }
-
-                responseObserver.onNext(builder.build());
-                responseObserver.onCompleted();
-            } catch (Exception ex) {
-                responseObserver.onError(ex);
-            }
-        }
-
-        @Override
-        public void deleteInstances(
-                UdfGatewayOuterClass.DeleteInstancesRequest request,
-                StreamObserver<UdfGatewayOuterClass.DeleteInstancesResponse> responseObserver) {
-
-            List<String> error = new ArrayList<>(0);
-            for (String instanceIdToDelete : request.getFuncInstanceIdsList()) {
-                if (instanceToFuncIds.remove(instanceIdToDelete) == null) {
-                    error.add(instanceIdToDelete);
-                }
-            }
-
-            UdfGatewayOuterClass.DeleteInstancesResponse.Builder builder =
-                    UdfGatewayOuterClass.DeleteInstancesResponse.newBuilder();
-            if (!error.isEmpty()) {
-                builder.setError(
-                        UdfGatewayOuterClass.Error.newBuilder()
-                                .setCode(1)
-                                .setMessage(error.toString())
-                                .build());
-            }
-
             responseObserver.onNext(builder.build());
             responseObserver.onCompleted();
         }
