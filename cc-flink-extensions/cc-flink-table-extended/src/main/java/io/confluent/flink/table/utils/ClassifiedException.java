@@ -164,7 +164,7 @@ public final class ClassifiedException {
                 nonLoggingException.exceptionKind,
                 nonLoggingException.sensitiveMessage,
                 cleanMessage(nonLoggingException.sensitiveMessage),
-                cleanException(e));
+                CleanedException.of(e));
     }
 
     /** Utility method to pretty print a chain of causes. */
@@ -723,34 +723,11 @@ public final class ClassifiedException {
 
     private static final String REMOVED = "<<removed>>";
 
-    private static String cleanMessage(@Nullable String userMessage) {
+    static String cleanMessage(@Nullable String userMessage) {
         if (userMessage == null) {
             return "";
         }
         // Remove literals (i.e. enclosed in single quotes such as "'Bob''s literal'"
         return userMessage.replaceAll("'([^']*'')*[^']*'", String.format("'%s'", REMOVED));
-    }
-
-    private static Exception cleanException(Throwable sensitiveOrigin) {
-        if (sensitiveOrigin == null) {
-            return null;
-        }
-        return new CleanedException(sensitiveOrigin);
-    }
-
-    /**
-     * Stack of exceptions with cleaned messages. The original exception class is written into the
-     * message, the original stack trace is kept.
-     */
-    private static class CleanedException extends Exception {
-        CleanedException(Throwable sensitiveOrigin) {
-            super(
-                    String.format(
-                            "%s: %s",
-                            sensitiveOrigin.getClass().getName(),
-                            cleanMessage(sensitiveOrigin.getMessage())),
-                    cleanException(sensitiveOrigin.getCause()));
-            setStackTrace(sensitiveOrigin.getStackTrace());
-        }
     }
 }
