@@ -62,7 +62,7 @@ blocks:
           commands:
             # Cache restore maven
             - cache restore "$CACHE_PREFIX"-maven-cache
-            - ./tools/ci/compile.sh || exit $?
+            - ./tools/ci/compile_ci.sh || exit $?
             - ./tools/azure-pipelines/create_build_artifact.sh
             - tar -czf FlinkCompileArtifact.tar.gz -C $FLINK_ARTIFACT_DIR .
             - artifact push workflow FlinkCompileArtifact.tar.gz --force
@@ -144,7 +144,7 @@ blocks:
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache
             - ./tools/azure-pipelines/cache_docker_images.sh load
-            - (PROFILE="-Pfast -Pskip-webui-build" ./tools/ci/compile.sh > /tmp/e2e-compile-step-${group}.log 2>&1) && COMPILE_FAILS=0 || COMPILE_FAILS=1
+            - (PROFILE="-Pfast -Pskip-webui-build" ./tools/ci/compile_ci.sh > /tmp/e2e-compile-step-${group}.log 2>&1) && COMPILE_FAILS=0 || COMPILE_FAILS=1
             - artifact push job /tmp/e2e-compile-step-${group}.log
             - if [ "$COMPILE_FAILS" == "1" ]; then echo "Compile steps fail. Check logs in artifacts."; exit 1; fi
             - FLINK_DIR=$(pwd)/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
