@@ -41,6 +41,7 @@ Copyright 2023 Confluent Inc.
 		<module>cc-flink-state-backend-extended</module>
 		<module>cc-flink-kubernetes-extended</module>
 		<module>cc-flink-runtime-extensions</module>
+		<module>cc-flink-remote-udfs</module>
 	</modules>
 
 	<dependencyManagement>

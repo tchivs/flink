@@ -1531,6 +1531,7 @@ under the License.
 							<patterns>
 								<pattern>Copyright 2022 Confluent Inc.</pattern>
 								<pattern>Copyright 2023 Confluent Inc.</pattern>
+								<pattern>Copyright 2024 Confluent Inc.</pattern>
 							</patterns>
 						</license>
 					</licenses>

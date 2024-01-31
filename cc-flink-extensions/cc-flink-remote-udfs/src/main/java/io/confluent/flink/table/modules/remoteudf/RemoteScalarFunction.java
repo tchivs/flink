@@ -15,7 +15,6 @@ import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.inference.strategies.AnyArgumentBridgeToInternalTypeStrategy;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 
-import io.confluent.flink.table.service.ServiceTasksOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.logical;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.varyingSequence;
 
@@ -51,7 +51,7 @@ public class RemoteScalarFunction extends ScalarFunction implements SpecializedF
 
     public RemoteScalarFunction(Map<String, String> config) {
         LOG.info("RemoteScalarFunction config: {}", config);
-        String udfGatewayTarget = config.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key());
+        String udfGatewayTarget = config.get(CONFLUENT_REMOTE_UDF_TARGET.key());
 
         if (udfGatewayTarget != null && !udfGatewayTarget.isEmpty()) {
             this.udfGatewayTarget = udfGatewayTarget;

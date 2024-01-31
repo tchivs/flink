@@ -144,12 +144,6 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent remote UDFs.");
 
-    public static final ConfigOption<String> CONFLUENT_REMOTE_UDF_TARGET =
-            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.target")
-                    .stringType()
-                    .defaultValue("")
-                    .withDescription("The target for the remote Udf endpoint.");
-
     public static final ConfigOption<Boolean> CONFLUENT_OTLP_FUNCTIONS_ENABLED =
             ConfigOptions.key(PRIVATE_PREFIX + "otlp.enabled")
                     .booleanType()

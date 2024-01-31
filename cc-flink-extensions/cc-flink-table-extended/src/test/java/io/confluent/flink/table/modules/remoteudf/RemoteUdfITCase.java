@@ -42,10 +42,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED;
-import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

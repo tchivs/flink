@@ -90,19 +90,9 @@ Copyright 2023 Confluent Inc.
 		</dependency>
 
 		<dependency>
-			<groupId>io.confluent.secure.compute</groupId>
-			<artifactId>secure-compute-gateway-api</artifactId>
-			<version>${secure-gateway-api.version}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>javax.annotation</groupId>
-					<artifactId>javax.annotation-api</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>build.buf.protoc-gen-validate</groupId>
-					<artifactId>pgv-java-stub</artifactId>
-				</exclusion>
-			</exclusions>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-remote-udfs</artifactId>
+			<version>${project.version}</version>
 		</dependency>
 
 		<!-- otlp proto dependency is only required for OTLP functions declared in

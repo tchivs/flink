@@ -74,6 +74,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
 import static org.apache.flink.configuration.ConfigurationUtils.canBePrefixMap;
 import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapKey;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.IDLE_STATE_RETENTION;
@@ -249,8 +250,8 @@ class DefaultServiceTasks implements ServiceTasks {
             // Forward the target address of the remote gateway (or proxy) to the udf.
             Map<String, String> remoteUdfConfig = new HashMap<>();
             remoteUdfConfig.put(
-                    ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET.key(),
-                    privateConfig.getString(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TARGET));
+                    CONFLUENT_REMOTE_UDF_TARGET.key(),
+                    privateConfig.getString(CONFLUENT_REMOTE_UDF_TARGET));
             tableEnvironment.loadModule("remote_udf", new RemoteUdfModule(remoteUdfConfig));
         }
     }

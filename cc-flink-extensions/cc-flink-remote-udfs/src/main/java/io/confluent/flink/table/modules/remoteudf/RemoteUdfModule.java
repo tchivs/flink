@@ -4,6 +4,8 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
@@ -17,6 +19,12 @@ import java.util.stream.Stream;
 
 /** Module for Remote UFDs. */
 public class RemoteUdfModule implements Module {
+    public static final ConfigOption<String> CONFLUENT_REMOTE_UDF_TARGET =
+            ConfigOptions.key("confluent.remote-udf.target")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription("The target for the remote Udf endpoint.");
+
     private final Map<String, FunctionDefinition> normalizedFunctions;
 
     public RemoteUdfModule(Map<String, String> config) {
