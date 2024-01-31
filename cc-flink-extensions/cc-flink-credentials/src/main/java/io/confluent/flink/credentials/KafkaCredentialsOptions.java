@@ -50,6 +50,31 @@ public class KafkaCredentialsOptions {
                     .defaultValue(Duration.ofSeconds(3).toMillis())
                     .withDescription("How long to allow a token exchange before it is timed out");
 
+    public static final ConfigOption<String> AUTH_DATAPLANE_SERVICE_HOST =
+            ConfigOptions.key("confluent.auth.dataplane.service.host")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The host of the auth dataplane service");
+
+    public static final ConfigOption<Integer> AUTH_DATAPLANE_SERVICE_PORT =
+            ConfigOptions.key("confluent.auth.dataplane.service.port")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("The port of the auth dataplane service");
+
+    public static final ConfigOption<Long> AUTH_DATAPLANE_SERVICE_DEADLINE_MS =
+            ConfigOptions.key("confluent.auth.dataplane.service.deadline.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(5).toMillis())
+                    .withDescription("The deadline when calling to the auth dataplane service");
+
+    public static final ConfigOption<Boolean> AUTH_DATAPLANE_ENABLED =
+            ConfigOptions.key("confluent.auth.dataplane.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to use the dataplane auth or fallback to control plane");
+
     public static final ConfigOption<Boolean> DPAT_ENABLED =
             ConfigOptions.key("confluent.kafka.credential.dpat.enabled")
                     .booleanType()

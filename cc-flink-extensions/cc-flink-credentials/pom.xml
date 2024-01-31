@@ -37,6 +37,7 @@ under the License.
 		<grpc.version>1.53.0</grpc.version>
 		<bouncycastle.version>1.73</bouncycastle.version>
 		<flinkcredential.version>0.686.0</flinkcredential.version>
+		<confluent.auth.dataplan.version>0.112.0</confluent.auth.dataplan.version>
 	</properties>
 
 	<dependencyManagement>
@@ -95,6 +96,12 @@ under the License.
 		</dependency>
 
 		<dependency>
+			<groupId>io.confluent.auth.dataplane</groupId>
+			<artifactId>auth-dataplane</artifactId>
+			<version>${confluent.auth.dataplan.version}</version>
+		</dependency>
+
+		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>okhttp</artifactId>
 			<version>${okhttp.version}</version>
@@ -103,6 +110,13 @@ under the License.
 		<dependency>
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-testing</artifactId>
+			<version>${grpc.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-protobuf</artifactId>
 			<version>${grpc.version}</version>
 			<scope>test</scope>
 		</dependency>

@@ -31,8 +31,11 @@ import java.net.URL;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static io.confluent.flink.credentials.TokenExchangerUtil.getIdentityPoolPrincipals;
+import static io.confluent.flink.credentials.TokenExchangerUtil.getServiceAccountPrincipal;
+import static io.confluent.flink.credentials.TokenExchangerUtil.getUserPrincipal;
 
 /**
  * Gets the static credentials and does a token exchange for a DPAT token from cc-flow-service and
@@ -145,21 +148,9 @@ public class TokenExchangerImpl implements TokenExchanger {
      */
     ObjectNode buildObjectNode(JobCredentialsMetadata jobCredentialsMetadata) {
 
-        Optional<String> serviceAccount =
-                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "sa-").findFirst();
-        Optional<String> user =
-                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "u-").findFirst();
-        List<String> identityPools =
-                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "pool-")
-                        .collect(Collectors.toList());
-        // Required for users, who will pass in a list containing user resource id + group mappings
-        // Group mappings are a special type of identity pool that are prefixed instead by `group-`
-        // See
-        // https://confluentinc.atlassian.net/wiki/spaces/SECENG/pages/3168567337/Instances+of+manual+pool-+prefix+checking#Dependencies
-        List<String> groupMappings =
-                filterByPrefix(jobCredentialsMetadata.getPrincipals(), "group-")
-                        .collect(Collectors.toList());
-        identityPools.addAll(groupMappings);
+        Optional<String> serviceAccount = getServiceAccountPrincipal(jobCredentialsMetadata);
+        Optional<String> user = getUserPrincipal(jobCredentialsMetadata);
+        List<String> identityPools = getIdentityPoolPrincipals(jobCredentialsMetadata);
 
         return serviceAccount
                 .map(
