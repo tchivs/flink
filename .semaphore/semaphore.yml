@@ -144,8 +144,10 @@ blocks:
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache
             - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache
             - ./tools/azure-pipelines/cache_docker_images.sh load
-            - PROFILE="-Pfast -Pskip-webui-build" ./tools/ci/compile.sh
-            - FLINK_DIR=`pwd`/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
+            - (PROFILE="-Pfast -Pskip-webui-build" ./tools/ci/compile.sh > /tmp/e2e-compile-step-${group}.log 2>&1) && COMPILE_FAILS=0 || COMPILE_FAILS=1
+            - artifact push job /tmp/e2e-compile-step-${group}.log
+            - if [ "$COMPILE_FAILS" == "1" ]; then echo "Compile steps fail. Check logs in artifacts."; exit 1; fi
+            - FLINK_DIR=$(pwd)/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
             - ./tools/azure-pipelines/cache_docker_images.sh save
             - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
             - artifact push job flink_debug_files_"$group".tar.gz
