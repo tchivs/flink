@@ -129,6 +129,11 @@ blocks:
             - sudo sysctl kernel.dmesg_restrict=0
             - curl -LO https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/minikube-linux-amd64-1-28-0
             - sudo install minikube-linux-amd64-1-28-0 /usr/local/bin/minikube
+            # openssl requirements
+            - curl -O https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - sudo apt-get install -y libapr1
+            - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - checkout
             - mkdir -p $MAVEN_LOCAL_CACHE
             - mkdir -p $E2E_CACHE_FOLDER
