@@ -81,6 +81,33 @@ public class ClassifiedExceptionTest {
                                         + "number-of-rows\n"
                                         + "rows-per-second"),
                 // ---
+                TestSpec.test("remove confluent specific table options")
+                        .executeSql(
+                                "CREATE TABLE t (i INT) \n"
+                                        + "WITH (\n"
+                                        + "'changelog.mode'='append',\n"
+                                        + "'confluent.kafka.bootstrap-servers'='SASL_SSL://pkc-kod82.us-west-2.aws.stag.cpdev.cloud:9092',\n"
+                                        + "'confluent.kafka.consumer-group-id'='0043fab0-253c-49aa-a26d-5a7ea0c5a808_903',\n"
+                                        + "'confluent.kafka.logical-cluster-id'='lkc-q9jgvd',\n"
+                                        + "'connector'='confluent',\n"
+                                        + "'key.format'='avro-registry',\n"
+                                        + "'key.avro-registry.confluent.schema-id'='100010',\n"
+                                        + "'value.avro-registry.confluent.logical-cluster-id'='lsrc-7z6xd1',\n"
+                                        + "'value.avro-registry.confluent.url'='https://psrc-y13pj.us-west-2.aws.stag.cpdev.cloud',\n"
+                                        + "'value.format'='avro-registry',\n"
+                                        + "'invalid' = 'option')")
+                        .executeSql("SELECT * FROM t")
+                        .expectUserError(
+                                "Unable to create a source for reading table 'default_catalog.default_database.t'.\n"
+                                        + "\n"
+                                        + "Table options are:\n"
+                                        + "\n"
+                                        + "'changelog.mode'='append'\n"
+                                        + "'connector'='confluent'\n"
+                                        + "'invalid'='option'\n"
+                                        + "'key.format'='avro-registry'\n"
+                                        + "'value.format'='avro-registry'"),
+                // ---
                 TestSpec.test("cause by chain but ignore top-level")
                         .executeSql("CREATE TABLE t (i INT)")
                         .expectUserError(

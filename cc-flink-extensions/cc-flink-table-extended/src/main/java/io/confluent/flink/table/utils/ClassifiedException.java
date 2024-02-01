@@ -13,6 +13,7 @@ import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
 import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.operations.AlterSchemaConverter;
@@ -294,6 +295,16 @@ public final class ClassifiedException {
                                             + "\t3. There might be multiple catalogs with the same name.",
                                     catalogIdentifier);
                         }));
+
+        // Remove all confluent specific table options
+        putClassifiedException(
+                CodeLocation.inClass(FactoryUtil.class, ValidationException.class),
+                Handler.custom(
+                        "Table options are:",
+                        ExceptionKind.USER,
+                        (e, validCauses) ->
+                                buildMessageWithCauses(e, validCauses)
+                                        .map(s -> s.replaceAll("'[^']*confluent[^']+'=.*\n", ""))));
 
         putClassifiedException(
                 CodeLocation.inClass(ParserImpl.class, IllegalArgumentException.class),
