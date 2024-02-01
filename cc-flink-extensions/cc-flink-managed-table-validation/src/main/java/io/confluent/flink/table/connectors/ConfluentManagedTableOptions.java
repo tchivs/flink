@@ -342,13 +342,13 @@ public class ConfluentManagedTableOptions {
             ConfigOptions.key(PRIVATE_PREFIX + "org")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Confluent Cloud Organization.");
+                    .withDescription("Confluent Cloud Organization for the table.");
 
     public static final ConfigOption<String> CONFLUENT_CLOUD_ENV =
             ConfigOptions.key(PRIVATE_PREFIX + "env")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Confluent Cloud Environment.");
+                    .withDescription("Confluent Cloud Environment for the table.");
 
     public static final ConfigOption<String> CONFLUENT_API_CLIENT_BASE_PATH =
             ConfigOptions.key(PRIVATE_PREFIX + "api-client-path")
