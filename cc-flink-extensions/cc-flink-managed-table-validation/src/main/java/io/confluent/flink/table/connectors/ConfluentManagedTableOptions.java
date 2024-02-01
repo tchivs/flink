@@ -328,6 +328,34 @@ public class ConfluentManagedTableOptions {
                             "Properties for advanced configuration or custom credentials.");
 
     // --------------------------------------------------------------------------------------------
+    // PRIVATE - CONFLUENT TABLE STORE SPECIFIC - SET BY METASTORE
+    // --------------------------------------------------------------------------------------------
+
+    public static final ConfigOption<Boolean> CONFLUENT_CTS_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "cts-enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Indicates if Confluent Table Store is enabled for the table.");
+
+    public static final ConfigOption<String> CONFLUENT_CLOUD_ORG =
+            ConfigOptions.key(PRIVATE_PREFIX + "org")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Confluent Cloud Organization.");
+
+    public static final ConfigOption<String> CONFLUENT_CLOUD_ENV =
+            ConfigOptions.key(PRIVATE_PREFIX + "env")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Confluent Cloud Environment.");
+
+    public static final ConfigOption<String> CONFLUENT_API_CLIENT_BASE_PATH =
+            ConfigOptions.key(PRIVATE_PREFIX + "api-client-path")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("API server connection path.");
+
+    // --------------------------------------------------------------------------------------------
     // PRIVATE - RUNTIME SPECIFIC - SET BY SQL SERVICE
     // --------------------------------------------------------------------------------------------
 
