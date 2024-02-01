@@ -335,7 +335,8 @@ public class ConfluentManagedTableOptions {
             ConfigOptions.key(PRIVATE_PREFIX + "cts-enabled")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Indicates if Confluent Table Store is enabled for the table.");
+                    .withDescription(
+                            "Indicates if Confluent Table Store is enabled for the table.");
 
     public static final ConfigOption<String> CONFLUENT_CLOUD_ORG =
             ConfigOptions.key(PRIVATE_PREFIX + "org")
