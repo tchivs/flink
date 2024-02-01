@@ -19,6 +19,7 @@
 package org.apache.flink.table.planner.plan.nodes.exec.stream;
 
 import org.apache.flink.FlinkVersion;
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
@@ -279,5 +280,15 @@ public class StreamExecSink extends CommonExecSink implements StreamExecNode<Obj
         materializeTransform.setStateKeySelector(keySelector);
         materializeTransform.setStateKeyType(keySelector.getProducedType());
         return materializeTransform;
+    }
+
+    @Confluent
+    public ChangelogMode getInputChangelogMode() {
+        return inputChangelogMode;
+    }
+
+    @Confluent
+    public int[] getInputUpsertKey() {
+        return inputUpsertKey;
     }
 }

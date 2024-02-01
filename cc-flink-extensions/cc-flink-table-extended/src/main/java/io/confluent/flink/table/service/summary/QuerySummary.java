@@ -5,7 +5,10 @@
 package io.confluent.flink.table.service.summary;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
+import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
+import org.apache.flink.types.RowKind;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -29,30 +32,13 @@ import java.util.stream.Collectors;
 @Confluent
 public class QuerySummary {
 
-    private final Set<QueryProperty> queryProperties;
-    private final List<NodeSummary> nodeSummaries;
+    private final Set<QueryProperty> queryProperties = EnumSet.noneOf(QueryProperty.class);
+    private final List<NodeSummary> nodeSummaries = new ArrayList<>();
+    private int[] foregroundSinkUpsertKeys = new int[0];
 
     // Derived from nodeSummaries and cached
     private Set<NodeKind> nodeKinds;
     private Set<ExpressionKind> expressionKinds;
-
-    private QuerySummary(Set<QueryProperty> queryProperties, List<NodeSummary> nodeSummaries) {
-        this.queryProperties = queryProperties;
-        this.nodeSummaries = nodeSummaries;
-    }
-
-    public static QuerySummary summarize(
-            boolean isForeground, List<FlinkPhysicalRel> physicalGraph) {
-        final Set<QueryProperty> queryProperties =
-                QueryProperty.extract(isForeground, physicalGraph);
-
-        final List<NodeSummary> nodeSummaries =
-                physicalGraph.stream()
-                        .map(QuerySummary::summarizeNode)
-                        .collect(Collectors.toList());
-
-        return new QuerySummary(queryProperties, nodeSummaries);
-    }
 
     public Set<QueryProperty> getProperties() {
         return queryProperties;
@@ -86,6 +72,57 @@ public class QuerySummary {
         final List<T> tagValues = new ArrayList<>();
         nodeSummaries.forEach(n -> collectNodeTagValues(tagValues, n, tag, type));
         return tagValues;
+    }
+
+    public int[] getForegroundSinkUpsertKeys() {
+        return foregroundSinkUpsertKeys;
+    }
+
+    public void ingestPhysicalGraph(boolean isForeground, List<FlinkPhysicalRel> physicalGraph) {
+        physicalGraph.stream().map(QuerySummary::summarizeNode).forEach(nodeSummaries::add);
+
+        // Foreground / background sinks
+        if (isForeground) {
+            queryProperties.add(QueryProperty.FOREGROUND);
+            queryProperties.add(QueryProperty.SINGLE_SINK);
+        } else {
+            queryProperties.add(QueryProperty.BACKGROUND);
+            if (physicalGraph.size() == 1) {
+                queryProperties.add(QueryProperty.SINGLE_SINK);
+            } else {
+                queryProperties.add(QueryProperty.MULTI_SINK);
+            }
+        }
+
+        // Bounded / unbounded
+        final boolean atLeastOneUnbounded =
+                getNodeTagValues(NodeTag.BOUNDED, Boolean.class).contains(Boolean.FALSE);
+        if (atLeastOneUnbounded) {
+            queryProperties.add(QueryProperty.UNBOUNDED);
+        } else {
+            queryProperties.add(QueryProperty.BOUNDED);
+        }
+    }
+
+    public void ingestExecNodeGraph(ExecNodeGraph execNodeGraph) {
+        // Append-only / updating sink inputs
+        final boolean isAppendOnly =
+                execNodeGraph.getRootNodes().stream()
+                        .map(StreamExecSink.class::cast)
+                        .map(StreamExecSink::getInputChangelogMode)
+                        .allMatch(mode -> mode.containsOnly(RowKind.INSERT));
+        if (isAppendOnly) {
+            queryProperties.add(QueryProperty.APPEND_ONLY);
+        } else {
+            queryProperties.add(QueryProperty.UPDATING);
+        }
+
+        // Upsert keys
+        if (queryProperties.contains(QueryProperty.FOREGROUND)) {
+            final StreamExecSink foregroundSink =
+                    (StreamExecSink) execNodeGraph.getRootNodes().get(0);
+            foregroundSinkUpsertKeys = foregroundSink.getInputUpsertKey();
+        }
     }
 
     private static void collectNodeKinds(Set<NodeKind> set, NodeSummary node) {

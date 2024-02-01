@@ -12,14 +12,11 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
-import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
-import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 
-import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
@@ -63,14 +60,14 @@ public class DefaultServiceTasksTest {
         final Map<String, String> privateOptions =
                 Collections.singletonMap("confluent.specific", "option");
 
-        createConfluentCatalogTable(
+        ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv,
                 "source",
                 schema,
                 Collections.singletonMap("connector", "datagen"),
                 privateOptions);
 
-        createConfluentCatalogTable(
+        ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv,
                 "sink",
                 schema,
@@ -134,7 +131,8 @@ public class DefaultServiceTasksTest {
         options.put("connector", "values");
         options.put("readable-metadata", "m_virtual:STRING,m_persisted:STRING");
 
-        createConfluentCatalogTable(tableEnv, "source", schema, options, Collections.emptyMap());
+        ResultPlanUtils.createConfluentCatalogTable(
+                tableEnv, "source", schema, options, Collections.emptyMap());
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery("SELECT * FROM source").getQueryOperation();
@@ -172,7 +170,7 @@ public class DefaultServiceTasksTest {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        createConfluentCatalogTable(
+        ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv,
                 "source",
                 Schema.newBuilder()
@@ -356,23 +354,6 @@ public class DefaultServiceTasksTest {
                 .hasMessageContaining("Catalog name '<UNKNOWN>' is not allowed.");
     }
 
-    private static void createConfluentCatalogTable(
-            TableEnvironment tableEnv,
-            String name,
-            Schema schema,
-            Map<String, String> publicOptions,
-            Map<String, String> privateOptions)
-            throws Exception {
-        final Catalog catalog =
-                tableEnv.getCatalog(tableEnv.getCurrentCatalog())
-                        .orElseThrow(IllegalArgumentException::new);
-        catalog.createTable(
-                new ObjectPath(tableEnv.getCurrentDatabase(), name),
-                new ConfluentCatalogTable(
-                        schema, null, Collections.emptyList(), publicOptions, privateOptions),
-                false);
-    }
-
     @Test
     void testShowCreateTable() throws Exception {
         final TableEnvironment tableEnv =
@@ -385,7 +366,7 @@ public class DefaultServiceTasksTest {
         publicOptions.put("scan.startup.mode", "earliest-offset");
         publicOptions.put("value.format", "raw");
 
-        createConfluentCatalogTable(
+        ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv,
                 "source",
                 Schema.newBuilder()

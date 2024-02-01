@@ -5,12 +5,16 @@
 package io.confluent.flink.table.service.summary;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalCalc;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalTableSourceScan;
+import org.apache.flink.table.planner.plan.schema.TableSourceTable;
+import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +32,10 @@ public enum NodeTag {
     EXPRESSIONS(Set.class),
 
     /** {@link DynamicTableSourceFactory#factoryIdentifier()}. */
-    SOURCE_CONNECTOR(String.class);
+    SOURCE_CONNECTOR(String.class),
+
+    /** {@link ScanTableSource.ScanRuntimeProvider#isBounded()}. */
+    BOUNDED(Boolean.class);
 
     private final Class<?> type;
 
@@ -68,16 +75,19 @@ public enum NodeTag {
                 NodeKind.SOURCE_SCAN,
                 (rel, tags) -> {
                     final StreamPhysicalTableSourceScan scan = (StreamPhysicalTableSourceScan) rel;
-                    tags.put(
-                            NodeTag.TABLE_IDENTIFIER,
-                            scan.tableSourceTable().contextResolvedTable().getIdentifier());
+                    final TableSourceTable table = scan.tableSourceTable();
+                    final ContextResolvedTable contextTable = table.contextResolvedTable();
+                    final ScanTableSource scanTableSource = (ScanTableSource) table.tableSource();
+
+                    tags.put(NodeTag.TABLE_IDENTIFIER, contextTable.getIdentifier());
                     tags.put(
                             NodeTag.SOURCE_CONNECTOR,
-                            scan.tableSourceTable()
-                                    .contextResolvedTable()
-                                    .getTable()
-                                    .getOptions()
-                                    .get(FactoryUtil.CONNECTOR.key()));
+                            contextTable.getTable().getOptions().get(FactoryUtil.CONNECTOR.key()));
+                    tags.put(
+                            NodeTag.BOUNDED,
+                            scanTableSource
+                                    .getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE)
+                                    .isBounded());
                 });
 
         return map;
