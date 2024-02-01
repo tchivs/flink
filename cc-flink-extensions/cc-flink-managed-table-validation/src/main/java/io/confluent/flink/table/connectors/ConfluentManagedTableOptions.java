@@ -350,12 +350,6 @@ public class ConfluentManagedTableOptions {
                     .noDefaultValue()
                     .withDescription("Confluent Cloud Environment for the table.");
 
-    public static final ConfigOption<String> CONFLUENT_API_CLIENT_BASE_PATH =
-            ConfigOptions.key(PRIVATE_PREFIX + "api-client-path")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("API server connection path.");
-
     // --------------------------------------------------------------------------------------------
     // PRIVATE - RUNTIME SPECIFIC - SET BY SQL SERVICE
     // --------------------------------------------------------------------------------------------

@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_API_CLIENT_BASE_PATH;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_CLOUD_ENV;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_CLOUD_ORG;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_CTS_ENABLED;
@@ -127,7 +126,6 @@ public class ConfluentManagedTableFactory
         options.add(CONFLUENT_CTS_ENABLED);
         options.add(CONFLUENT_CLOUD_ORG);
         options.add(CONFLUENT_CLOUD_ENV);
-        options.add(CONFLUENT_API_CLIENT_BASE_PATH);
         return options;
     }
 
