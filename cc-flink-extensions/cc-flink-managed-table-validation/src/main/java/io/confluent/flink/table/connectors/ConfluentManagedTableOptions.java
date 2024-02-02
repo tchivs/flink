@@ -328,6 +328,22 @@ public class ConfluentManagedTableOptions {
                             "Properties for advanced configuration or custom credentials.");
 
     // --------------------------------------------------------------------------------------------
+    // PRIVATE - CONFLUENT TABLE STORE SPECIFIC - SET BY METASTORE
+    // --------------------------------------------------------------------------------------------
+
+    public static final ConfigOption<String> CONFLUENT_CLOUD_ORG =
+            ConfigOptions.key(PRIVATE_PREFIX + "org")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Confluent Cloud Organization for the table.");
+
+    public static final ConfigOption<String> CONFLUENT_CLOUD_ENV =
+            ConfigOptions.key(PRIVATE_PREFIX + "env")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Confluent Cloud Environment for the table.");
+
+    // --------------------------------------------------------------------------------------------
     // PRIVATE - RUNTIME SPECIFIC - SET BY SQL SERVICE
     // --------------------------------------------------------------------------------------------
 

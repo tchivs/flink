@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CHANGELOG_MODE;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_CLOUD_ENV;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_CLOUD_ORG;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_BOOTSTRAP_SERVERS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CLIENT_ID_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_KAFKA_CONSUMER_GROUP_ID;
@@ -119,6 +121,9 @@ public class ConfluentManagedTableFactory
         options.add(CONFLUENT_KAFKA_TRANSACTIONAL_ID_PREFIX);
         options.add(CONFLUENT_SOURCE_WATERMARK_VERSION);
         options.add(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW);
+        // Confluent Table Store specific options
+        options.add(CONFLUENT_CLOUD_ORG);
+        options.add(CONFLUENT_CLOUD_ENV);
         return options;
     }
 
