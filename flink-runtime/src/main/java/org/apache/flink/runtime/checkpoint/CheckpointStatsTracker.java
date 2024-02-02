@@ -115,7 +115,7 @@ public class CheckpointStatsTracker {
      */
     public CheckpointStatsTracker(
             int numRememberedCheckpoints, MetricGroup metricGroup, JobID jobID) {
-        this(numRememberedCheckpoints, metricGroup, new JobID(), Integer.MAX_VALUE);
+        this(numRememberedCheckpoints, metricGroup, jobID, Integer.MAX_VALUE);
     }
 
     CheckpointStatsTracker(
