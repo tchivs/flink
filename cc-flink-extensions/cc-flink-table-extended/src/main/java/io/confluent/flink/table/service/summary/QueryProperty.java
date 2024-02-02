@@ -5,39 +5,37 @@
 package io.confluent.flink.table.service.summary;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
 
 /** Global characteristics of a query. */
 @Confluent
 public enum QueryProperty {
+    /** Contains only a single sink (i.e. from INSERT INTO or result serving SELECT) */
     SINGLE_SINK,
+
+    /** Contains multiple sinks (i.e. using EXECUTE STATEMENT SET) */
     MULTI_SINK,
+
+    /** SELECT statement with result serving sink attached. */
     FOREGROUND,
-    BACKGROUND;
 
-    // --------------------------------------------------------------------------------------------
-    // Logic for QueryProperty extraction
-    // --------------------------------------------------------------------------------------------
+    /** INSERT INTO or EXECUTE STATEMENT SET. */
+    BACKGROUND,
 
-    static Set<QueryProperty> extract(boolean isForeground, List<FlinkPhysicalRel> physicalGraph) {
-        final Set<QueryProperty> queryProperties = EnumSet.noneOf(QueryProperty.class);
+    /** All scan sources are bounded, thus, the query itself is bounded. */
+    BOUNDED,
 
-        if (isForeground) {
-            queryProperties.add(QueryProperty.FOREGROUND);
-            queryProperties.add(QueryProperty.SINGLE_SINK);
-        } else {
-            queryProperties.add(QueryProperty.BACKGROUND);
-            if (physicalGraph.size() == 1) {
-                queryProperties.add(QueryProperty.SINGLE_SINK);
-            } else {
-                queryProperties.add(QueryProperty.MULTI_SINK);
-            }
-        }
+    /** There is at least one scan source that is not bounded. */
+    UNBOUNDED,
 
-        return queryProperties;
-    }
+    /**
+     * Sinks (regardless of INSERT INTO, result serving SELECT, or EXECUTE STATEMENT SET) will only
+     * receive insert only changes. Independent of what the connector is able to digest.
+     */
+    APPEND_ONLY,
+
+    /**
+     * Sinks (regardless of INSERT INTO, result serving SELECT, or EXECUTE STATEMENT SET) will
+     * receive updating results. Either retract, upsert, or both (in case of statement set).
+     */
+    UPDATING
 }

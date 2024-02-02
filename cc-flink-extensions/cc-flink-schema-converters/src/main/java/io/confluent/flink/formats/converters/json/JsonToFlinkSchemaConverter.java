@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.json;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
@@ -129,17 +130,18 @@ public class JsonToFlinkSchemaConverter {
         final Schema toTranslate;
         if (schema instanceof ReferenceSchema) {
             final Schema referredSchema = ((ReferenceSchema) schema).getReferredSchema();
-            if (cycleContext.seenSchemas.contains(referredSchema)) {
-                throw new IllegalArgumentException("Cyclic schemas are not supported.");
+            if (cycleContext.seenSchemas.contains(referredSchema.toString())) {
+                throw new ValidationException("Cyclic schemas are not supported.");
             }
-            cycleContext.seenSchemas.add(referredSchema);
+            cycleContext.seenSchemas.add(referredSchema.toString());
             toTranslate = referredSchema;
         } else {
             toTranslate = schema;
         }
         final LogicalType result = toFlinkSchema(toTranslate, isOptional, cycleContext);
         if (schema instanceof ReferenceSchema) {
-            cycleContext.seenSchemas.remove(((ReferenceSchema) schema).getReferredSchema());
+            cycleContext.seenSchemas.remove(
+                    ((ReferenceSchema) schema).getReferredSchema().toString());
         }
         return result;
     }
@@ -172,7 +174,7 @@ public class JsonToFlinkSchemaConverter {
                         return new DoubleType(isOptional);
                     case CONNECT_TYPE_BYTES: // decimal logical type
                         if (!CONNECT_TYPE_DECIMAL.equals(title)) {
-                            throw new IllegalArgumentException("Expected decimal type");
+                            throw new ValidationException("Expected decimal type");
                         }
                         @SuppressWarnings("unchecked")
                         final Map<String, Object> properties =
@@ -190,7 +192,7 @@ public class JsonToFlinkSchemaConverter {
                                         .orElse(DecimalType.DEFAULT_PRECISION);
                         return new DecimalType(isOptional, precision, scale);
                     default:
-                        throw new IllegalArgumentException("Unsupported type " + type);
+                        throw new ValidationException("Unsupported type " + type);
                 }
             }
         } else if (schema instanceof StringSchema) {
@@ -208,7 +210,7 @@ public class JsonToFlinkSchemaConverter {
                 return fromAllOfSchema(combinedSchema, isOptional, cycleContext);
             } else if (criterion != CombinedSchema.ONE_CRITERION
                     && criterion != CombinedSchema.ANY_CRITERION) {
-                throw new IllegalArgumentException("Unsupported criterion: " + criterion);
+                throw new ValidationException("Unsupported criterion: " + criterion);
             }
             if (combinedSchema.getSubschemas().size() == 2) {
                 boolean foundNullSchema = false;
@@ -245,7 +247,7 @@ public class JsonToFlinkSchemaConverter {
             ArraySchema arraySchema = (ArraySchema) schema;
             org.everit.json.schema.Schema itemsSchema = arraySchema.getAllItemSchema();
             if (itemsSchema == null) {
-                throw new IllegalArgumentException("Array schema did not specify the items type");
+                throw new ValidationException("Array schema did not specify the items type");
             }
             String type = (String) arraySchema.getUnprocessedProperties().get(CONNECT_TYPE_PROP);
             if (CONNECT_TYPE_MAP.equals(type) && itemsSchema instanceof ObjectSchema) {
@@ -305,7 +307,7 @@ public class JsonToFlinkSchemaConverter {
                                                             subSchema,
                                                             isFieldOptional,
                                                             cycleContext),
-                                                    schema.getDescription());
+                                                    subSchema.getDescription());
                                         })
                                 .collect(Collectors.toList());
                 return new RowType(isOptional, rowFields);
@@ -314,8 +316,7 @@ public class JsonToFlinkSchemaConverter {
             return toFlinkSchemaWithCycleDetection(
                     ((ReferenceSchema) schema).getReferredSchema(), isOptional, cycleContext);
         } else {
-            throw new IllegalArgumentException(
-                    "Unsupported schema type " + schema.getClass().getName());
+            throw new ValidationException("Unsupported schema type " + schema.getClass().getName());
         }
     }
 
@@ -344,6 +345,6 @@ public class JsonToFlinkSchemaConverter {
 
     private static final class CycleContext {
 
-        private final Set<Schema> seenSchemas = new HashSet<>();
+        private final Set<String> seenSchemas = new HashSet<>();
     }
 }

@@ -13,11 +13,7 @@ import org.everit.json.schema.ObjectSchema.Builder;
 import org.everit.json.schema.ReferenceSchema;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.StringSchema;
-import org.everit.json.schema.loader.SchemaLoader;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 
-import java.io.StringReader;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -68,12 +64,11 @@ public class CombinedSchemaUtils {
                 // the CONNECT_INDEX_PROP shenanigans
                 final String fieldName = property.getKey();
                 final Schema schema = property.getValue();
-                JSONObject rawSchema =
-                        new JSONObject(new JSONTokener(new StringReader(schema.toString())));
-                final Schema.Builder<?> schemaBuilder =
-                        SchemaLoader.builder().schemaJson(rawSchema).build().load();
-                schemaBuilder.unprocessedProperties.put(CONNECT_INDEX_PROP, idx++);
-                builder.addPropertySchema(fieldName, schemaBuilder.build());
+                final ReferenceSchema.Builder referenceBuilder = ReferenceSchema.builder();
+                referenceBuilder.unprocessedProperties.put(CONNECT_INDEX_PROP, idx++);
+                final ReferenceSchema referenceSchema = referenceBuilder.build();
+                referenceSchema.setReferredSchema(schema);
+                builder.addPropertySchema(fieldName, referenceSchema);
             }
             required.entrySet().stream()
                     .filter(Entry::getValue)
@@ -81,7 +76,7 @@ public class CombinedSchemaUtils {
             return builder.build();
         } else if (combinedSubschema != null) {
             // Any combined subschema takes precedence over primitive subschemas
-            return combinedSchema;
+            return combinedSubschema;
         } else if (constSchema != null) {
             if (stringSchema != null) {
                 // Ignore the const, return the string

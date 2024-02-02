@@ -518,7 +518,8 @@ class DefaultServiceTasks implements ServiceTasks {
 
         final List<FlinkPhysicalRel> physicalGraph = optimize(planner, modifyOperations);
 
-        final QuerySummary querySummary = QuerySummary.summarize(isForeground, physicalGraph);
+        final QuerySummary querySummary = new QuerySummary();
+        querySummary.ingestPhysicalGraph(isForeground, physicalGraph);
 
         final SerdeContext serdeContext = planner.createSerdeContext();
 
@@ -533,6 +534,9 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         final ExecNodeGraph graph = translate(planner, physicalGraph);
+        // It would be great to base the summary purely on the
+        // physical graph but currently this is not possible.
+        querySummary.ingestExecNodeGraph(graph);
 
         graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
 

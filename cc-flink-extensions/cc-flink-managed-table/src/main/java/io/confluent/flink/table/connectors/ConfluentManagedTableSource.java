@@ -97,6 +97,12 @@ public class ConfluentManagedTableSource
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
 
+    /**
+     * Cache for {@link #getScanRuntimeProvider(ScanContext)} that might be called multiple times.
+     * The cache is cleaned whenever a new ability is applied.
+     */
+    private ScanRuntimeProvider cachedScanProvider = null;
+
     /** Data type that describes the final output of the source. */
     private DataType producedDataType;
 
@@ -141,6 +147,10 @@ public class ConfluentManagedTableSource
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
+        if (cachedScanProvider != null) {
+            return cachedScanProvider;
+        }
+
         final DeserializationSchema<RowData> keyDeserialization =
                 createDeserialization(
                         context, keyDecodingFormat, parameters.keyProjection, parameters.keyPrefix);
@@ -155,30 +165,36 @@ public class ConfluentManagedTableSource
         final KafkaSource<RowData> kafkaSource =
                 createKafkaSource(keyDeserialization, valueDeserialization, producedTypeInfo);
 
-        return new DataStreamScanProvider() {
-            @Override
-            public DataStream<RowData> produceDataStream(
-                    ProviderContext providerContext, StreamExecutionEnvironment execEnv) {
-                DataStreamSource<RowData> sourceStream =
-                        execEnv.fromSource(
-                                kafkaSource,
-                                getWatermarkStrategy(),
-                                "KafkaSource-" + parameters.tableIdentifier);
-                providerContext.generateUid(KAFKA_TRANSFORMATION).ifPresent(sourceStream::uid);
-                return sourceStream;
-            }
+        cachedScanProvider =
+                new DataStreamScanProvider() {
+                    @Override
+                    public DataStream<RowData> produceDataStream(
+                            ProviderContext providerContext, StreamExecutionEnvironment execEnv) {
+                        DataStreamSource<RowData> sourceStream =
+                                execEnv.fromSource(
+                                        kafkaSource,
+                                        getWatermarkStrategy(),
+                                        "KafkaSource-" + parameters.tableIdentifier);
+                        providerContext
+                                .generateUid(KAFKA_TRANSFORMATION)
+                                .ifPresent(sourceStream::uid);
+                        return sourceStream;
+                    }
 
-            @Override
-            public boolean isBounded() {
-                return kafkaSource.getBoundedness() == Boundedness.BOUNDED;
-            }
-        };
+                    @Override
+                    public boolean isBounded() {
+                        return kafkaSource.getBoundedness() == Boundedness.BOUNDED;
+                    }
+                };
+
+        return cachedScanProvider;
     }
 
     @Override
     public DynamicTableSource copy() {
         final ConfluentManagedTableSource copy =
                 new ConfluentManagedTableSource(parameters, keyDecodingFormat, valueDecodingFormat);
+        copy.cachedScanProvider = cachedScanProvider;
         copy.producedDataType = producedDataType;
         copy.metadataKeys = metadataKeys;
         copy.watermarkStrategy = watermarkStrategy;
@@ -216,6 +232,8 @@ public class ConfluentManagedTableSource
 
     @Override
     public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        cachedScanProvider = null;
+
         // separate connector and format metadata
         final List<String> formatMetadataKeys =
                 metadataKeys.stream()
@@ -248,8 +266,10 @@ public class ConfluentManagedTableSource
     // --------------------------------------------------------------------------------------------
 
     @Override
-    public void applyWatermark(WatermarkStrategy<RowData> watermarkStrategy) {
-        this.watermarkStrategy = watermarkStrategy;
+    public void applyWatermark(WatermarkStrategy<RowData> strategy) {
+        cachedScanProvider = null;
+
+        watermarkStrategy = strategy;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -258,7 +278,9 @@ public class ConfluentManagedTableSource
 
     @Override
     public void applySourceWatermark() {
-        this.applySourceWatermark = true;
+        cachedScanProvider = null;
+
+        applySourceWatermark = true;
     }
 
     // --------------------------------------------------------------------------------------------
