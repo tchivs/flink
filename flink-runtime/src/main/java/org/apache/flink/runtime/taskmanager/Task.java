@@ -84,6 +84,8 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FatalExitExceptionHandler;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.MdcUtils;
+import org.apache.flink.util.MdcUtils.MdcCloseable;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.SerializedValue;
 import org.apache.flink.util.TaskManagerExceptionUtils;
@@ -558,7 +560,7 @@ public class Task
     /** The core work method that bootstraps the task and executes its code. */
     @Override
     public void run() {
-        try {
+        try (MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobId))) {
             doRun();
         } finally {
             terminationFuture.complete(executionState);
@@ -1239,7 +1241,8 @@ public class Task
                                         invokable,
                                         executingThread,
                                         taskNameWithSubtask,
-                                        taskCancellationInterval);
+                                        taskCancellationInterval,
+                                        jobId);
 
                         Thread interruptingThread =
                                 new Thread(
@@ -1261,7 +1264,8 @@ public class Task
                                             taskInfo,
                                             executingThread,
                                             taskManagerActions,
-                                            taskCancellationTimeout);
+                                            taskCancellationTimeout,
+                                            jobId);
 
                             Thread watchDogThread =
                                     new Thread(
@@ -1656,7 +1660,7 @@ public class Task
 
         @Override
         public void run() {
-            try {
+            try (MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobId))) {
                 // the user-defined cancel method may throw errors.
                 // we need do continue despite that
                 try {
@@ -1703,23 +1707,27 @@ public class Task
         /** The interval in which we interrupt. */
         private final long interruptIntervalMillis;
 
+        private final JobID jobID;
+
         TaskInterrupter(
                 Logger log,
                 TaskInvokable task,
                 Thread executorThread,
                 String taskName,
-                long interruptIntervalMillis) {
+                long interruptIntervalMillis,
+                JobID jobID) {
 
             this.log = log;
             this.task = task;
             this.executorThread = executorThread;
             this.taskName = taskName;
             this.interruptIntervalMillis = interruptIntervalMillis;
+            this.jobID = jobID;
         }
 
         @Override
         public void run() {
-            try {
+            try (MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobID))) {
                 // we initially wait for one interval
                 // in most cases, the threads go away immediately (by the cancellation thread)
                 // and we need not actually do anything
@@ -1760,11 +1768,14 @@ public class Task
 
         private final TaskInfo taskInfo;
 
+        private final JobID jobID;
+
         TaskCancelerWatchDog(
                 TaskInfo taskInfo,
                 Thread executorThread,
                 TaskManagerActions taskManager,
-                long timeoutMillis) {
+                long timeoutMillis,
+                JobID jobID) {
 
             checkArgument(timeoutMillis > 0);
 
@@ -1772,11 +1783,12 @@ public class Task
             this.executorThread = executorThread;
             this.taskManager = taskManager;
             this.timeoutMillis = timeoutMillis;
+            this.jobID = jobID;
         }
 
         @Override
         public void run() {
-            try {
+            try (MdcCloseable ign = MdcUtils.withContext(MdcUtils.asContextData(jobID))) {
                 Deadline timeout = Deadline.fromNow(Duration.ofMillis(timeoutMillis));
                 while (executorThread.isAlive() && timeout.hasTimeLeft()) {
                     try {
