@@ -41,6 +41,13 @@ public class JobManagerConfluentOptions {
                     .withDescription(
                             "Static base directory from which WebUI files are served. This is similar to 'web.tmpdir', but avoids safety precautions in the ClusterEntrypoint where a random directory is injected.");
 
+    public static final ConfigOption<Boolean> ENABLE_RESOURCE_WAIT_TIMEOUT =
+            key("jobmanager.adaptive-scheduler.enable-resource-wait-timeout")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Controls whether the resource-wait-timeout is applied or not.");
+
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
     }

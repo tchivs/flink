@@ -282,7 +282,8 @@ public final class DefaultSlotPoolServiceSchedulerFactory
         }
     }
 
-    private static AdaptiveSchedulerFactory getAdaptiveSchedulerFactoryFromConfiguration(
+    @VisibleForTesting
+    static AdaptiveSchedulerFactory getAdaptiveSchedulerFactoryFromConfiguration(
             Configuration configuration) {
         Duration allocationTimeoutDefault = JobManagerOptions.RESOURCE_WAIT_TIMEOUT.defaultValue();
         Duration stabilizationTimeoutDefault =
@@ -294,9 +295,19 @@ public final class DefaultSlotPoolServiceSchedulerFactory
             stabilizationTimeoutDefault = Duration.ZERO;
         }
 
+        final boolean useResourceWaitTimeout =
+                configuration.get(
+                        org.apache.flink.configuration.JobManagerConfluentOptions
+                                .ENABLE_RESOURCE_WAIT_TIMEOUT);
+
+        if (!useResourceWaitTimeout) {
+            allocationTimeoutDefault = Duration.ofMillis(-1);
+        }
+
         final Duration initialResourceAllocationTimeout =
                 configuration
                         .getOptional(JobManagerOptions.RESOURCE_WAIT_TIMEOUT)
+                        .filter(i -> useResourceWaitTimeout)
                         .orElse(allocationTimeoutDefault);
 
         final Duration resourceStabilizationTimeout =
