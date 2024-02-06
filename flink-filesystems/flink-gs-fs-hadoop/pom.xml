@@ -142,10 +142,48 @@ under the License.
 			</exclusions>
 		</dependency>
 
-
 		<dependency>
 			<groupId>com.google.cloud.bigdataoss</groupId>
 			<artifactId>util-hadoop</artifactId>
+			<version>${fs.gs.connector.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+			<exclusions>
+				<!-- the following conflict with flink-fs-hadoop-shaded so exclude here -->
+				<exclusion>
+					<groupId>commons-logging</groupId>
+					<artifactId>commons-logging</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.commons</groupId>
+					<artifactId>commons-lang3</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.google.guava</groupId>
+					<artifactId>guava</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.google.errorprone</groupId>
+					<artifactId>error_prone_annotations</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.checkerframework</groupId>
+					<artifactId>checker-compat-qual</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>animal-sniffer-annotations</artifactId>
+				</exclusion>
+				<!-- exclude dependency because of its GPLv2 license, see https://github.com/apache/flink/pull/15599#issuecomment-850241316 -->
+				<exclusion>
+					<groupId>javax.annotation</groupId>
+					<artifactId>javax.annotation-api</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<dependency>
+			<groupId>com.google.cloud.bigdataoss</groupId>
+			<artifactId>gcsio</artifactId>
 			<version>${fs.gs.connector.version}</version>
 			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
