@@ -36,7 +36,7 @@ flink-deploy: show-maven
 ifeq ($(CI),true)
 	@echo "VERSION FOUND: $(FLINK_VERSION)"
 ifneq ($(RELEASE_BRANCH),$(_empty))
-	./tools/ci/compile.sh || exit $?
+	./tools/ci/compile_ci.sh || exit $?
 	ln -s build-target flink
 	tar -chf confluent-flink.tar.gz flink
 	make mvn-push-nanoversion-tag
