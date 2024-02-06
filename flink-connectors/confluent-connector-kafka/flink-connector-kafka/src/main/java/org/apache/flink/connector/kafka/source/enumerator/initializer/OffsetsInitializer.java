@@ -18,6 +18,7 @@
 
 package org.apache.flink.connector.kafka.source.enumerator.initializer;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.split.KafkaPartitionSplit;
@@ -42,6 +43,26 @@ import java.util.Map;
  */
 @PublicEvolving
 public interface OffsetsInitializer extends Serializable {
+
+    /**
+     * Opens the offset initializer. This lifecycle method will be called before {@link
+     * #getPartitionOffsets(Collection, PartitionOffsetsRetriever)} calls are made.
+     *
+     * <p>Implementations may override this method to initialize any resources required for
+     * determining partition offsets. For example, connections to any external services that needs
+     * to be consulted for offset queries may be created here.
+     */
+    @Confluent
+    default void open() {}
+
+    /**
+     * Closes the offset initializer. This lifecycle method will be called after this {@link
+     * OffsetsInitializer} will no longer be used.
+     *
+     * <p>Any resources created in the {@link #open()} method should be cleaned up here.
+     */
+    @Confluent
+    default void close() {}
 
     /**
      * Get the initial offsets for the given Kafka partitions. These offsets will be used as either

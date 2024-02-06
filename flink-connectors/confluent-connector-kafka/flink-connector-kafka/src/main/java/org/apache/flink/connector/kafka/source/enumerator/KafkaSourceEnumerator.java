@@ -167,6 +167,8 @@ public class KafkaSourceEnumerator
                     consumerGroupId);
             context.callAsync(this::getSubscribedTopicPartitions, this::checkPartitionChanges);
         }
+        startingOffsetInitializer.open();
+        stoppingOffsetInitializer.open();
     }
 
     @Override
@@ -203,6 +205,8 @@ public class KafkaSourceEnumerator
         if (adminClient != null) {
             adminClient.close();
         }
+        startingOffsetInitializer.close();
+        stoppingOffsetInitializer.close();
     }
 
     // ----------------- private methods -------------------
