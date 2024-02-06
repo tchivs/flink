@@ -17,13 +17,15 @@ public class ManuallyTriggeredScheduledExecutorServiceConfluent
     @Override
     public Future<?> submit(Runnable task) {
         CompletableFuture<?> future = new CompletableFuture<>();
-        synchronized (queuedRunnables) {
-            queuedRunnables.addLast(
-                    () -> {
+        execute(
+                () -> {
+                    try {
                         task.run();
                         future.complete(null);
-                    });
-        }
+                    } catch (Throwable t) {
+                        future.completeExceptionally(t);
+                    }
+                });
         return future;
     }
 }
