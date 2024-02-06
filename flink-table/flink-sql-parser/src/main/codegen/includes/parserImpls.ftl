@@ -1308,6 +1308,48 @@ SqlNodeList TableProperties():
     {  return new SqlNodeList(proList, span.end(this)); }
 }
 
+SqlNumericLiteral IntoBuckets(SqlParserPos startPos) :
+{
+    SqlNumericLiteral bucketCount;
+}
+{
+    <INTO> { bucketCount = UnsignedNumericLiteral();
+        if (!bucketCount.isInteger()) {
+            throw SqlUtil.newContextException(getPos(),
+                ParserResource.RESOURCE.bucketCountMustBePositiveInteger());
+        }
+    } <BUCKETS>
+    {
+        return bucketCount;
+    }
+}
+
+SqlDistribution SqlDistribution(SqlParserPos startPos) :
+{
+    String distributionKind = null;
+    SqlNumericLiteral bucketCount = null;
+    SqlNodeList bucketColumns = SqlNodeList.EMPTY;
+    SqlDistribution distribution = null;
+}
+{
+    (
+        bucketCount = IntoBuckets(getPos())
+        |
+        (
+            <BY> (
+                <HASH> { distributionKind = "HASH"; }
+                | <RANGE> { distributionKind = "RANGE"; }
+                | { distributionKind = null; }
+        )
+            { bucketColumns = ParenthesizedSimpleIdentifierList(); }
+            [ bucketCount = IntoBuckets(getPos()) ]
+        )
+    )
+    {
+        return new SqlDistribution(startPos, distributionKind, bucketColumns, bucketCount);
+    }
+}
+
 SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
 {
     final SqlParserPos startPos = s.pos();
@@ -1321,6 +1363,10 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
     SqlNode asQuery = null;
 
     SqlNodeList propertyList = SqlNodeList.EMPTY;
+    String distributionKind = null;
+    SqlNumericLiteral bucketCount = null;
+    SqlNodeList bucketColumns = SqlNodeList.EMPTY;
+    SqlDistribution distribution = null;
     SqlNodeList partitionColumns = SqlNodeList.EMPTY;
     SqlParserPos pos = startPos;
 }
@@ -1349,6 +1395,11 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
         comment = SqlLiteral.createCharString(p, getPos());
     }]
     [
+        <DISTRIBUTED>
+        distribution = SqlDistribution(getPos())
+    ]
+
+    [
         <PARTITIONED> <BY>
         partitionColumns = ParenthesizedSimpleIdentifierList()
     ]
@@ -1365,6 +1416,7 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
                 columnList,
                 constraints,
                 propertyList,
+                distribution,
                 partitionColumns,
                 watermark,
                 comment,
@@ -1382,6 +1434,7 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
                     columnList,
                     constraints,
                     propertyList,
+                    distribution,
                     partitionColumns,
                     watermark,
                     comment,
@@ -1395,6 +1448,7 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
                     columnList,
                     constraints,
                     propertyList,
+                    distribution,
                     partitionColumns,
                     watermark,
                     comment,
@@ -1410,6 +1464,7 @@ SqlCreate SqlCreateTable(Span s, boolean replace, boolean isTemporary) :
             columnList,
             constraints,
             propertyList,
+            distribution,
             partitionColumns,
             watermark,
             comment,
@@ -1463,6 +1518,8 @@ SqlTableLikeOption SqlTableLikeOption():
     |
         <CONSTRAINTS> { featureOption = FeatureOption.CONSTRAINTS;}
     |
+        <DISTRIBUTION> { featureOption = FeatureOption.DISTRIBUTION;}
+    |
         <GENERATED> { featureOption = FeatureOption.GENERATED;}
     |
         <METADATA> { featureOption = FeatureOption.METADATA;}
@@ -1510,6 +1567,10 @@ SqlNode SqlReplaceTable() :
     List<SqlTableConstraint> constraints = new ArrayList<SqlTableConstraint>();
     SqlWatermark watermark = null;
     SqlNodeList columnList = SqlNodeList.EMPTY;
+    String distributionKind = null;
+    SqlNumericLiteral bucketCount = null;
+    SqlNodeList bucketColumns = SqlNodeList.EMPTY;
+    SqlDistribution distribution = null;
     SqlNodeList partitionColumns = SqlNodeList.EMPTY;
     boolean ifNotExists = false;
 }
@@ -1542,6 +1603,10 @@ SqlNode SqlReplaceTable() :
         comment = SqlLiteral.createCharString(p, getPos());
     }]
     [
+        <DISTRIBUTED>
+        distribution = SqlDistribution(getPos())
+    ]
+    [
         <PARTITIONED> <BY>
         partitionColumns = ParenthesizedSimpleIdentifierList()
     ]
@@ -1557,6 +1622,7 @@ SqlNode SqlReplaceTable() :
             columnList,
             constraints,
             propertyList,
+            distribution,
             partitionColumns,
             watermark,
             comment,
