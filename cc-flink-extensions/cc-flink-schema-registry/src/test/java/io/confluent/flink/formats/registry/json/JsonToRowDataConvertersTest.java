@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ShortNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import io.confluent.flink.formats.converters.json.JsonToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.json.JsonToRowDataConverters.JsonToRowDataConverter;
 import io.confluent.kafka.schemaregistry.json.JsonSchema;
@@ -339,6 +340,46 @@ class JsonToRowDataConvertersTest {
         expected.setField(1, (short) 12);
         expected.setField(3, 123);
         assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
+    void testComplexAuditLogging() throws Exception {
+        String schemaString =
+                "{\n"
+                        + "  \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n"
+                        + "  \"title\": \"Event\",\n"
+                        + "  \"type\": \"object\",\n"
+                        + "  \"properties\": {\n"
+                        + "     \"ip\": {\n"
+                        + "        \"type\": \"string\",\n"
+                        + "        \"description\": \"IPv4 or IPv6 address.\",\n"
+                        + "        \"anyOf\": [\n"
+                        + "            {\n"
+                        + "                \"format\": \"ipv4\"\n"
+                        + "            },\n"
+                        + "            {\n"
+                        + "                \"format\": \"ipv6\"\n"
+                        + "            }\n"
+                        + "        ]\n"
+                        + "     }\n"
+                        + "  }\n"
+                        + "}\n";
+
+        JsonSchema jsonSchema = new JsonSchema(schemaString);
+        ObjectSchema schema = (ObjectSchema) jsonSchema.rawSchema();
+        final LogicalType flinkSchema = JsonToFlinkSchemaConverter.toFlinkSchema(schema);
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(schema, flinkSchema);
+
+        final ObjectNode obj = JsonNodeFactory.instance.objectNode();
+        obj.set("ip", TextNode.valueOf("192.168.0.1"));
+
+        final GenericRowData expected = new GenericRowData(1);
+        final GenericRowData nested = new GenericRowData(2);
+        nested.setField(0, StringData.fromString("192.168.0.1"));
+        expected.setField(0, nested);
+
+        assertThat(converter.convert(obj)).isEqualTo(expected);
     }
 
     public static <K, V> Map<K, V> mapOf(K key1, V value1, K key2, V value2) {

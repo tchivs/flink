@@ -26,17 +26,25 @@ class ConverterUtils {
      *
      * <p>The method extracts the non-null schema.
      */
-    static Schema extractNonNullableSchema(Schema readSchema) {
+    static Schema extractNonNullableSchemaFromOneOf(Schema readSchema) {
         final Schema nonNullableSchema;
         if (readSchema instanceof CombinedSchema
-                && ((CombinedSchema) readSchema).getSubschemas().size() == 2) {
+                && ((CombinedSchema) readSchema).getSubschemas().size() == 2
+                && ((CombinedSchema) readSchema).getCriterion() == CombinedSchema.ONE_CRITERION) {
             Schema notNullSchema = null;
+            boolean nullSchemaFound = false;
             for (Schema subSchema : ((CombinedSchema) readSchema).getSubschemas()) {
-                if (!subSchema.equals(NullSchema.INSTANCE)) {
+                if (subSchema.equals(NullSchema.INSTANCE)) {
+                    nullSchemaFound = true;
+                } else {
                     notNullSchema = subSchema;
                 }
             }
-            nonNullableSchema = notNullSchema;
+            if (nullSchemaFound) {
+                nonNullableSchema = notNullSchema;
+            } else {
+                nonNullableSchema = readSchema;
+            }
         } else {
             nonNullableSchema = readSchema;
         }

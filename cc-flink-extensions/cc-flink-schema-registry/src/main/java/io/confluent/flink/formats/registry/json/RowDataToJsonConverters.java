@@ -66,7 +66,8 @@ public class RowDataToJsonConverters {
     public static RowDataToJsonConverter createConverter(LogicalType type, Schema targetSchema) {
 
         if (type.isNullable()) {
-            final Schema nonNullType = ConverterUtils.extractNonNullableSchema(targetSchema);
+            final Schema nonNullType =
+                    ConverterUtils.extractNonNullableSchemaFromOneOf(targetSchema);
             final RowDataToJsonConverter converter = createConverterNotNull(type, nonNullType);
 
             // wrap into nullable converter

@@ -74,7 +74,8 @@ public class JsonToRowDataConverters {
     public static JsonToRowDataConverter createConverter(
             Schema readSchema, LogicalType targetType) {
         if (targetType.isNullable()) {
-            final Schema nonNullableSchema = ConverterUtils.extractNonNullableSchema(readSchema);
+            final Schema nonNullableSchema =
+                    ConverterUtils.extractNonNullableSchemaFromOneOf(readSchema);
             final JsonToRowDataConverter nonNullConverter =
                     createNonNullConverterWithReferenceSchema(nonNullableSchema, targetType);
             return new JsonToRowDataConverter() {
