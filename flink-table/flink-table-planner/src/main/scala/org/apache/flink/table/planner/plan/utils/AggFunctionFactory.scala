@@ -25,7 +25,7 @@ import org.apache.flink.table.planner.functions.aggfunctions.SumWithRetractAggFu
 import org.apache.flink.table.planner.functions.bridging.BridgingSqlAggFunction
 import org.apache.flink.table.planner.functions.sql.{SqlFirstLastValueAggFunction, SqlListAggFunction}
 import org.apache.flink.table.planner.functions.utils.AggSqlFunction
-import org.apache.flink.table.runtime.functions.aggregate.{BuiltInAggregateFunction, CollectAggFunction, FirstValueAggFunction, FirstValueWithRetractAggFunction, JsonArrayAggFunction, JsonObjectAggFunction, LagAggFunction, LastValueAggFunction, LastValueWithRetractAggFunction, ListAggWithRetractAggFunction, ListAggWsWithRetractAggFunction, MaxWithRetractAggFunction, MinWithRetractAggFunction}
+import org.apache.flink.table.runtime.functions.aggregate.{ArrayAggFunction, BuiltInAggregateFunction, CollectAggFunction, FirstValueAggFunction, FirstValueWithRetractAggFunction, JsonArrayAggFunction, JsonObjectAggFunction, LagAggFunction, LastValueAggFunction, LastValueWithRetractAggFunction, ListAggWithRetractAggFunction, ListAggWsWithRetractAggFunction, MaxWithRetractAggFunction, MinWithRetractAggFunction}
 import org.apache.flink.table.runtime.functions.aggregate.BatchApproxCountDistinctAggFunctions._
 import org.apache.flink.table.types.logical._
 import org.apache.flink.table.types.logical.LogicalTypeRoot._
@@ -145,6 +145,9 @@ class AggFunctionFactory(
 
       case a: SqlAggFunction if a.getKind == SqlKind.COLLECT =>
         createCollectAggFunction(argTypes)
+
+      case a: SqlAggFunction if a.getKind == SqlKind.ARRAY_AGG =>
+        createArrayAggFunction(argTypes, call.ignoreNulls)
 
       case fn: SqlAggFunction if fn.getKind == SqlKind.JSON_OBJECTAGG =>
         val onNull = fn.asInstanceOf[SqlJsonObjectAggAggFunction].getNullClause
@@ -619,5 +622,11 @@ class AggFunctionFactory(
 
   private def createCollectAggFunction(argTypes: Array[LogicalType]): UserDefinedFunction = {
     new CollectAggFunction(argTypes(0))
+  }
+
+  private def createArrayAggFunction(
+      types: Array[LogicalType],
+      ignoreNulls: Boolean): UserDefinedFunction = {
+    new ArrayAggFunction(types(0), ignoreNulls)
   }
 }
