@@ -53,7 +53,8 @@ import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
+import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
+import io.confluent.flink.table.modules.remoteudf.UdfUtil;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
 import io.confluent.flink.table.service.local.LocalExecution;
@@ -75,6 +76,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
 import static org.apache.flink.configuration.ConfigurationUtils.canBePrefixMap;
 import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapKey;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.IDLE_STATE_RETENTION;
@@ -252,7 +254,19 @@ class DefaultServiceTasks implements ServiceTasks {
             remoteUdfConfig.put(
                     CONFLUENT_REMOTE_UDF_TARGET.key(),
                     privateConfig.getString(CONFLUENT_REMOTE_UDF_TARGET));
-            tableEnvironment.loadModule("remote_udf", new RemoteUdfModule(remoteUdfConfig));
+            privateConfig
+                    .toMap()
+                    .forEach(
+                            (k, v) -> {
+                                if (k.startsWith(FUNCTIONS_PREFIX)) {
+                                    remoteUdfConfig.put(k, v);
+                                }
+                            });
+            final List<ConfiguredRemoteScalarFunction> functions =
+                    UdfUtil.extractUdfs(remoteUdfConfig);
+            for (ConfiguredRemoteScalarFunction function : functions) {
+                tableEnvironment.createTemporaryFunction(function.getPath(), function);
+            }
         }
     }
 

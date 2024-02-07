@@ -10,12 +10,12 @@ import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
 import java.util.AbstractMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** Module for Remote UFDs. */
 public class RemoteUdfModule implements Module {
@@ -27,12 +27,21 @@ public class RemoteUdfModule implements Module {
 
     private final Map<String, FunctionDefinition> normalizedFunctions;
 
-    public RemoteUdfModule(Map<String, String> config) {
+    public RemoteUdfModule(List<ConfiguredRemoteScalarFunction> functions) {
+        // Register all the UDFs as system function under the name for
+        // testing purposes.
         normalizedFunctions =
-                Stream.of(
-                                new AbstractMap.SimpleEntry<>(
-                                        RemoteScalarFunction.NAME,
-                                        new RemoteScalarFunction(config)))
+                functions.stream()
+                        .map(
+                                rf ->
+                                        new AbstractMap.SimpleEntry<>(
+                                                "SYSTEM_"
+                                                        + rf.getFunctionCatalog().toUpperCase()
+                                                        + "_"
+                                                        + rf.getFunctionDatabase().toUpperCase()
+                                                        + "_"
+                                                        + rf.getFunctionName().toUpperCase(),
+                                                rf))
                         .collect(
                                 Collectors.toMap(
                                         AbstractMap.SimpleEntry::getKey,

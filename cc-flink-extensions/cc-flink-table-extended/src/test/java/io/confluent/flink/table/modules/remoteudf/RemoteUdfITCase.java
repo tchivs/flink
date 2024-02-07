@@ -8,15 +8,31 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.CatalogView;
+import org.apache.flink.table.catalog.GenericInMemoryCatalog;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.data.binary.BinaryStringData;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.Preconditions;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
+
+import io.confluent.flink.table.catalog.CatalogInfo;
+import io.confluent.flink.table.catalog.ConfluentCatalogTable;
+import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
+import io.confluent.flink.table.infoschema.InfoSchemaTables;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
 import io.confluent.secure.compute.gateway.v1.CreateInstanceRequest;
@@ -41,8 +57,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ARGUMENT_TYPES_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALOG_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ID_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED;
@@ -65,12 +93,33 @@ public class RemoteUdfITCase extends AbstractTestBase {
     }
 
     static TableEnvironment getSqlServiceTableEnvironment(
-            boolean udfsEnabled, boolean gatewayConfigured) {
+            boolean udfsEnabled,
+            boolean gatewayConfigured,
+            boolean catalogCreated,
+            String functionId) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_REMOTE_UDF_ENABLED.key(), String.valueOf(udfsEnabled));
         confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), gatewayConfigured ? SERVER_TARGET : "");
+
+        if (catalogCreated) {
+            createCatalog(tableEnv);
+        }
+        if (udfsEnabled) {
+            registerUdf(
+                    confMap,
+                    new TestFunc[] {
+                        new TestFunc(
+                                "remote1",
+                                ImmutableList.of(
+                                        new String[] {"INT", "STRING", "INT"},
+                                        new String[] {"INT"}),
+                                ImmutableList.of("STRING", "INT"),
+                                functionId),
+                        new TestFunc("remote2", new String[] {"STRING"}, "STRING", functionId)
+                    });
+        }
         INSTANCE.configureEnvironment(
                 tableEnv, Collections.emptyMap(), confMap, ServiceTasks.Service.SQL_SERVICE);
         return tableEnv;
@@ -84,6 +133,16 @@ public class RemoteUdfITCase extends AbstractTestBase {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), SERVER_TARGET);
 
+        registerUdf(
+                confMap,
+                new TestFunc[] {
+                    new TestFunc(
+                            "remote1",
+                            ImmutableList.of(
+                                    new String[] {"INT", "STRING", "INT"}, new String[] {"INT"}),
+                            ImmutableList.of("STRING", "INT")),
+                    new TestFunc("remote2", new String[] {"STRING"}, "STRING")
+                });
         INSTANCE.configureEnvironment(
                 tableEnv,
                 Collections.emptyMap(),
@@ -92,13 +151,29 @@ public class RemoteUdfITCase extends AbstractTestBase {
         return tableEnv;
     }
 
+    private static void createCatalog(final TableEnvironment tableEnv) {
+        tableEnv.registerCatalog(
+                "cat1",
+                new TestCatalog(
+                        CatalogInfo.of("env-1", "cat1"),
+                        Collections.singletonList(DatabaseInfo.of("lkc-1", "db1"))));
+    }
+
     @Test
     public void testNumberOfBuiltinFunctions() {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), SERVER_TARGET);
-        final RemoteUdfModule remoteUdfModule = new RemoteUdfModule(confMap);
-        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(1);
-        assertThat(remoteUdfModule.getFunctionDefinition("CALL_REMOTE_SCALAR")).isPresent();
+        registerUdf(
+                confMap,
+                new TestFunc[] {
+                    new TestFunc("remote1", new String[] {"INT", "STRING", "INT"}, "STRING"),
+                    new TestFunc("remote2", new String[] {"STRING"}, "STRING")
+                });
+        List<ConfiguredRemoteScalarFunction> functions = UdfUtil.extractUdfs(confMap);
+        final RemoteUdfModule remoteUdfModule = new RemoteUdfModule(functions);
+        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(2);
+        assertThat(remoteUdfModule.getFunctionDefinition("SYSTEM_CAT1_DB1_REMOTE1")).isPresent();
+        assertThat(remoteUdfModule.getFunctionDefinition("SYSTEM_CAT1_DB1_REMOTE2")).isPresent();
     }
 
     @Test
@@ -108,32 +183,44 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
         final ForegroundJobResultPlan plan =
                 ResultPlanUtils.foregroundJobCustomConfig(
-                        tableEnv,
-                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
+                        tableEnv, "SELECT cat1.db1.remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
     @Test
     public void testRemoteUdfsEnabled() throws Exception {
         // SQL service controls remote UDFs using config params
-        final TableEnvironment tableEnv = getSqlServiceTableEnvironment(true, true);
+        final TableEnvironment tableEnv =
+                getSqlServiceTableEnvironment(
+                        true, true, false, TestUdfGateway.IDENTITY_FUNCTION_ID);
 
         final ForegroundJobResultPlan plan =
                 ResultPlanUtils.foregroundJobCustomConfig(
-                        tableEnv,
-                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')");
+                        tableEnv, "SELECT cat1.db1.remote2('payload')");
+        assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
+    }
+
+    @Test
+    public void testRemoteUdfsEnabled_useCatalogDb() throws Exception {
+        // SQL service controls remote UDFs using config params
+        final TableEnvironment tableEnv =
+                getSqlServiceTableEnvironment(
+                        true, true, true, TestUdfGateway.IDENTITY_FUNCTION_ID);
+        tableEnv.executeSql("USE CATALOG cat1");
+        tableEnv.executeSql("USE db1");
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
     @Test
     public void testRemoteUdfsDisabled() {
-        final TableEnvironment tableEnv = getSqlServiceTableEnvironment(false, false);
-        assertThatThrownBy(
-                        () ->
-                                tableEnv.executeSql(
-                                        "SELECT CALL_REMOTE_SCALAR('handler', 'function', 'STRING', 'payload')"))
+        final TableEnvironment tableEnv =
+                getSqlServiceTableEnvironment(
+                        false, false, false, TestUdfGateway.IDENTITY_FUNCTION_ID);
+        assertThatThrownBy(() -> tableEnv.executeSql("SELECT remote2('payload')"))
                 .message()
-                .contains("No match found for function signature CALL_REMOTE_SCALAR");
+                .contains("No match found for function signature remote2");
     }
 
     //    TODO: reactivate after demo hack is removed.
@@ -155,16 +242,47 @@ public class RemoteUdfITCase extends AbstractTestBase {
 
     @Test
     public void testRemoteUdfGateway() throws Exception {
-        testRemoteUdfGatewayInternal(TestUdfGateway.IDENTIFY_FUNCTION_ID, "funName");
+        testRemoteUdfGatewayInternal(TestUdfGateway.IDENTITY_FUNCTION_ID, false);
     }
 
     @Test
     public void testRemoteUdfGatewayFailOnPersistentError() {
-        assertThatThrownBy(() -> testRemoteUdfGatewayInternal("NoSuchHandler", "NoFunc"))
+        assertThatThrownBy(() -> testRemoteUdfGatewayInternal("NoSuchHandler", false))
                 .hasStackTraceContaining("errorCode 1: Unknown function id: NoSuchHandler");
     }
 
-    private void testRemoteUdfGatewayInternal(String testHandlerName, String testFunName)
+    @Test
+    public void testRemoteUdfGateway_jss() throws Exception {
+        testRemoteUdfGatewayInternal(TestUdfGateway.IDENTITY_FUNCTION_ID, true);
+    }
+
+    private static void registerUdf(Map<String, String> udfConf, TestFunc[] funcs) {
+        for (TestFunc func : funcs) {
+            Preconditions.checkState(func.argTypes.size() == func.returnType.size());
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_CATALOG_FIELD, "cat1");
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_DATABASE_FIELD, "db1");
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_NAME_FIELD, func.name);
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_ID_FIELD, func.functionId);
+            udfConf.put(
+                    FUNCTIONS_PREFIX + func.name + "." + FUNCTION_CLASS_NAME_FIELD,
+                    "io.confluent.blah1");
+            for (int i = 0; i < func.argTypes.size(); i++) {
+                udfConf.put(
+                        FUNCTIONS_PREFIX
+                                + func.name
+                                + "."
+                                + FUNCTION_ARGUMENT_TYPES_FIELD
+                                + "."
+                                + i,
+                        String.join(";", func.argTypes.get(i)));
+                udfConf.put(
+                        FUNCTIONS_PREFIX + func.name + "." + FUNCTION_RETURN_TYPE_FIELD + "." + i,
+                        func.returnType.get(i));
+            }
+        }
+    }
+
+    private void testRemoteUdfGatewayInternal(String testHandlerName, boolean jss)
             throws Exception {
         Server server = null;
         try {
@@ -175,12 +293,11 @@ public class RemoteUdfITCase extends AbstractTestBase {
                             .build()
                             .start();
 
-            final TableEnvironment tEnv = getSqlServiceTableEnvironment(true, true);
-            TableResult result =
-                    tEnv.executeSql(
-                            String.format(
-                                    "SELECT CALL_REMOTE_SCALAR('%s', '%s', 'STRING', 1, 'test', 4);",
-                                    testHandlerName, testFunName));
+            final TableEnvironment tEnv =
+                    jss
+                            ? getJssTableEnvironment()
+                            : getSqlServiceTableEnvironment(true, true, false, testHandlerName);
+            TableResult result = tEnv.executeSql("SELECT cat1.db1.remote1(1, 'test', 4);");
             final List<Row> results = new ArrayList<>();
             try (CloseableIterator<Row> collect = result.collect()) {
                 collect.forEachRemaining(results::add);
@@ -188,6 +305,16 @@ public class RemoteUdfITCase extends AbstractTestBase {
             Assertions.assertEquals(1, results.size());
             Row row = results.get(0);
             Assertions.assertEquals("[1, test, 4]", row.getField(0));
+            Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
+
+            TableResult result2 = tEnv.executeSql("SELECT cat1.db1.remote1(1);");
+            final List<Row> results2 = new ArrayList<>();
+            try (CloseableIterator<Row> collect = result2.collect()) {
+                collect.forEachRemaining(results2::add);
+            }
+            Assertions.assertEquals(1, results2.size());
+            Row row2 = results2.get(0);
+            Assertions.assertEquals(42, row2.getField(0));
             Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
         } finally {
             if (server != null) {
@@ -199,7 +326,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
     /** Mock implementation of the UDF gateway. */
     private static class TestUdfGateway
             extends SecureComputeGatewayGrpc.SecureComputeGatewayImplBase {
-        static final String IDENTIFY_FUNCTION_ID = "IdentityFunction";
+        static final String IDENTITY_FUNCTION_ID = "IdentityFunction";
+        static final String IDENTITY_FUNCTION2_ID = "IdentityFunction2";
         final Map<String, RemoteUdfSpec> instanceToFuncIds = new HashMap<>();
 
         // TODO: FRT-321 Replace createInstance and deleteInstance with UDFTask calls to apiServer
@@ -211,7 +339,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
             try {
                 CreateInstanceResponse.Builder builder = CreateInstanceResponse.newBuilder();
 
-                if (IDENTIFY_FUNCTION_ID.equals(request.getMetadata().getName())) {
+                if (IDENTITY_FUNCTION_ID.equals(request.getMetadata().getName())) {
                     DataInputDeserializer in =
                             new DataInputDeserializer(
                                     request.getSpec()
@@ -223,7 +351,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
                             RemoteUdfSpec.deserialize(
                                     in, Thread.currentThread().getContextClassLoader());
 
-                    instanceToFuncIds.put(IDENTIFY_FUNCTION_ID, udfSpec);
+                    instanceToFuncIds.put(IDENTITY_FUNCTION_ID, udfSpec);
                 } else {
                     builder.setError(
                             Error.newBuilder()
@@ -279,9 +407,24 @@ public class RemoteUdfITCase extends AbstractTestBase {
                     Object[] args = new Object[argumentSerializers.size()];
                     serialization.deserializeArguments(
                             request.getPayload().asReadOnlyByteBuffer(), args);
-                    builder.setPayload(
-                            serialization.serializeReturnValue(
-                                    BinaryStringData.fromString(Arrays.asList(args).toString())));
+                    if (remoteUdfSpec
+                            .getReturnType()
+                            .getLogicalType()
+                            .is(DataTypes.STRING().getLogicalType().getTypeRoot())) {
+                        builder.setPayload(
+                                serialization.serializeReturnValue(
+                                        BinaryStringData.fromString(
+                                                Arrays.asList(args).toString())));
+                    } else if (remoteUdfSpec
+                            .getReturnType()
+                            .getLogicalType()
+                            .is(DataTypes.INT().getLogicalType().getTypeRoot())) {
+                        builder.setPayload(serialization.serializeReturnValue(42));
+                    } else {
+                        throw new Exception(
+                                "Unknown return type "
+                                        + remoteUdfSpec.getReturnType().getLogicalType());
+                    }
                 } else {
                     throw new Exception(
                             "Unknown Function instance: " + request.getFuncInstanceName());
@@ -291,6 +434,124 @@ public class RemoteUdfITCase extends AbstractTestBase {
             }
             responseObserver.onNext(builder.build());
             responseObserver.onCompleted();
+        }
+    }
+
+    /** Test utility class. */
+    public static class TestFunc {
+        final String name;
+        final List<String[]> argTypes;
+        final List<String> returnType;
+        final String functionId;
+
+        public TestFunc(String name, List<String[]> argTypes, List<String> returnType) {
+            this(name, argTypes, returnType, TestUdfGateway.IDENTITY_FUNCTION_ID);
+        }
+
+        public TestFunc(String name, String[] argTypes, String returnType) {
+            this(
+                    name,
+                    Collections.singletonList(argTypes),
+                    Collections.singletonList(returnType),
+                    TestUdfGateway.IDENTITY_FUNCTION_ID);
+        }
+
+        public TestFunc(String name, String[] argTypes, String returnType, String functionId) {
+            this(
+                    name,
+                    Collections.singletonList(argTypes),
+                    Collections.singletonList(returnType),
+                    functionId);
+        }
+
+        public TestFunc(
+                String name, List<String[]> argTypes, List<String> returnType, String functionId) {
+            this.name = name;
+            this.argTypes = argTypes;
+            this.returnType = returnType;
+            this.functionId = functionId;
+        }
+    }
+
+    /** A test catalog for registering the UDFs. */
+    public static class TestCatalog extends GenericInMemoryCatalog implements Catalog {
+
+        private final CatalogInfo catalogInfo;
+        private final List<DatabaseInfo> databaseInfos;
+
+        public TestCatalog(CatalogInfo catalogInfo, List<DatabaseInfo> databaseInfos) {
+            super(catalogInfo.getName(), "ignored");
+            this.catalogInfo = catalogInfo;
+            this.databaseInfos = databaseInfos;
+        }
+
+        @Override
+        public String getDefaultDatabase() {
+            return null;
+        }
+
+        @Override
+        public boolean databaseExists(String databaseName) {
+            return listDatabases().contains(databaseName);
+        }
+
+        @Override
+        public List<String> listDatabases() {
+            return listDatabaseInfos().stream()
+                    .flatMap(i -> Stream.of(i.getId(), i.getName()))
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        public List<String> listViews(String databaseName) throws DatabaseNotExistException {
+            // Include INFORMATION_SCHEMA views
+            return Stream.of(
+                            InfoSchemaTables.listViewsByName(databaseName).stream(),
+                            InfoSchemaTables.listViewsById(databaseName).stream(),
+                            super.listViews(databaseName).stream())
+                    .flatMap(Function.identity())
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        public CatalogBaseTable getTable(ObjectPath tablePath) throws TableNotExistException {
+            // Include INFORMATION_SCHEMA tables
+            final Optional<CatalogView> infoSchemaById =
+                    InfoSchemaTables.getViewById(catalogInfo, tablePath);
+            if (infoSchemaById.isPresent()) {
+                return infoSchemaById.get();
+            }
+            final Optional<CatalogView> infoSchemaByName =
+                    InfoSchemaTables.getViewByName(catalogInfo, tablePath);
+            if (infoSchemaByName.isPresent()) {
+                return infoSchemaByName.get();
+            }
+
+            final CatalogBaseTable baseTable = super.getTable(tablePath);
+            if (baseTable.getTableKind() == CatalogBaseTable.TableKind.VIEW) {
+                return baseTable;
+            }
+            // Make sure we always return ConfluentCatalogTable
+            final CatalogTable table = (CatalogTable) baseTable;
+            return new ConfluentCatalogTable(
+                    table.getUnresolvedSchema(),
+                    table.getComment(),
+                    null,
+                    table.getPartitionKeys(),
+                    table.getOptions(),
+                    Collections.emptyMap());
+        }
+
+        public List<DatabaseInfo> listDatabaseInfos() {
+            // Add INFORMATION_SCHEMA to databases
+            return Stream.concat(
+                            databaseInfos.stream(),
+                            Stream.of(InfoSchemaTables.INFORMATION_SCHEMA_DATABASE_INFO))
+                    .collect(Collectors.toList());
+        }
+
+        public CatalogInfo getCatalogInfo() {
+            return catalogInfo;
         }
     }
 }
