@@ -77,7 +77,7 @@ public class ConfluentManagedTableUtils {
     public static void validateDynamicTableParameters(
             String tableIdentifier,
             List<String> primaryKeys,
-            List<String> partitionKeys,
+            List<String> bucketKeys,
             List<String> physicalColumns,
             ReadableConfig options,
             @Nullable Format keyFormat,
@@ -87,7 +87,7 @@ public class ConfluentManagedTableUtils {
                 null,
                 tableIdentifier,
                 primaryKeys,
-                partitionKeys,
+                bucketKeys,
                 physicalColumns,
                 options,
                 keyFormat,
@@ -99,13 +99,13 @@ public class ConfluentManagedTableUtils {
             @Nullable ReadableConfig sessionConfig,
             String tableIdentifier,
             List<String> primaryKeys,
-            List<String> partitionKeys,
+            List<String> bucketKeys,
             List<String> physicalColumns,
             ReadableConfig options,
             @Nullable Format keyFormat,
             Format valueFormat,
             @Nullable DataType physicalDataType) {
-        final List<String> keyFields = createKeyFields(primaryKeys, partitionKeys);
+        final List<String> keyFields = createKeyFields(primaryKeys, bucketKeys);
 
         // The table mode is the overall mode of the table including the format.
         // If the format is insert-only, it's the connector that does the heavy lifting.
@@ -547,7 +547,7 @@ public class ConfluentManagedTableUtils {
                             if (pos < 0) {
                                 throw new ValidationException(
                                         String.format(
-                                                "Could not find the field '%s' in the table schema for usage in PARTITIONED BY clause. "
+                                                "Could not find the field '%s' in the table schema for usage in DISTRIBUTED BY clause. "
                                                         + "A key field must be a regular, physical column. "
                                                         + "The following columns can be selected:\n"
                                                         + "%s",
@@ -557,7 +557,7 @@ public class ConfluentManagedTableUtils {
                             if (!keyField.startsWith(keyPrefix)) {
                                 throw new ValidationException(
                                         String.format(
-                                                "All fields in PARTITIONED BY must be prefixed with '%s' when option '%s' "
+                                                "All fields in DISTRIBUTED BY must be prefixed with '%s' when option '%s' "
                                                         + "is set but field '%s' is not prefixed.",
                                                 keyPrefix, KEY_FIELDS_PREFIX.key(), keyField));
                             }
@@ -567,23 +567,23 @@ public class ConfluentManagedTableUtils {
     }
 
     private static @Nullable List<String> createKeyFields(
-            List<String> primaryKeys, List<String> partitionKeys) {
-        if (!partitionKeys.isEmpty()) {
+            List<String> primaryKeys, List<String> bucketKeys) {
+        if (!bucketKeys.isEmpty()) {
             final Set<String> duplicateColumns =
-                    partitionKeys.stream()
-                            .filter(name -> Collections.frequency(partitionKeys, name) > 1)
+                    bucketKeys.stream()
+                            .filter(name -> Collections.frequency(bucketKeys, name) > 1)
                             .collect(Collectors.toSet());
             if (!duplicateColumns.isEmpty()) {
                 throw new ValidationException(
                         String.format(
-                                "PARTITIONED BY clause must not contain duplicate columns. Found: %s",
+                                "DISTRIBUTED BY clause must not contain duplicate columns. Found: %s",
                                 duplicateColumns));
             }
 
-            return partitionKeys;
+            return bucketKeys;
         }
 
-        // regardless of the mode, it makes sense to partition by primary key such that efficient
+        // regardless of the mode, it makes sense to distribute by primary key such that efficient
         // point lookups can be implemented
         if (!primaryKeys.isEmpty()) {
             return primaryKeys;
@@ -597,13 +597,13 @@ public class ConfluentManagedTableUtils {
             ManagedChangelogMode tableMode,
             List<String> primaryKeys,
             @Nullable Format keyDecodingFormat,
-            @Nullable List<String> partitionKeys) {
+            @Nullable List<String> bucketKeys) {
         final CleanupPolicy cleanupPolicy = options.get(KAFKA_CLEANUP_POLICY);
         final boolean isCompacted =
                 cleanupPolicy == CleanupPolicy.DELETE_COMPACT
                         || cleanupPolicy == CleanupPolicy.COMPACT;
         final boolean isUpsertLike = tableMode == ManagedChangelogMode.UPSERT || isCompacted;
-        final boolean hasKeys = partitionKeys != null && partitionKeys.size() > 0;
+        final boolean hasKeys = bucketKeys != null && !bucketKeys.isEmpty();
         if (keyDecodingFormat == null) {
             if (isUpsertLike) {
                 throw new ValidationException(
@@ -614,7 +614,7 @@ public class ConfluentManagedTableUtils {
             if (hasKeys) {
                 throw new ValidationException(
                         String.format(
-                                "PARTITIONED BY and PRIMARY KEY clauses require a key format '%s'.",
+                                "DISTRIBUTED BY and PRIMARY KEY clauses require a key format '%s'.",
                                 KEY_FORMAT.key()));
             }
         } else {
@@ -622,7 +622,7 @@ public class ConfluentManagedTableUtils {
                 throw new ValidationException(
                         String.format(
                                 "A key format '%s' requires the declaration of one or more of key fields "
-                                        + "using PARTITIONED BY (or PRIMARY KEY if applicable).",
+                                        + "using DISTRIBUTED BY (or PRIMARY KEY if applicable).",
                                 KEY_FORMAT.key()));
             }
             final ChangelogMode keyFormatMode = keyDecodingFormat.getChangelogMode();
@@ -635,22 +635,22 @@ public class ConfluentManagedTableUtils {
             }
             final Set<String> primaryKeySet = new HashSet<>(primaryKeys);
             if (!primaryKeySet.isEmpty()) {
-                if (!primaryKeySet.containsAll(partitionKeys)) {
+                if (!primaryKeySet.containsAll(bucketKeys)) {
                     throw new ValidationException(
                             String.format(
-                                    "Key fields in PARTITIONED BY must fully contain primary key columns %s "
+                                    "Key fields in DISTRIBUTED BY must fully contain primary key columns %s "
                                             + "if a primary key is defined.",
                                     primaryKeySet));
                 }
-                final Set<String> partitionKeySet = new HashSet<>(partitionKeys);
+                final Set<String> bucketKeySet = new HashSet<>(bucketKeys);
                 // Even if the table mode is not upsert, if compaction is enabled it behaves similar
                 // to upsert. Therefore, we must guard the changelog by not allowing custom
-                // partitioning in case upsert is enabled later.
-                if (isUpsertLike && !primaryKeySet.equals(partitionKeySet)) {
+                // distribution in case upsert is enabled later.
+                if (isUpsertLike && !primaryKeySet.equals(bucketKeySet)) {
                     throw new ValidationException(
                             String.format(
-                                    "A custom PARTITIONED BY clause is not allowed if upserts or "
-                                            + "compaction are enabled. The partitioning key must "
+                                    "A custom DISTRIBUTED BY clause is not allowed if upserts or "
+                                            + "compaction are enabled. The distribution key must "
                                             + "be equal to the primary key %s.",
                                     primaryKeySet));
                 }

@@ -90,7 +90,7 @@ public class ResultPlanUtils {
         catalog.createTable(
                 new ObjectPath(tableEnv.getCurrentDatabase(), name),
                 new ConfluentCatalogTable(
-                        schema, null, Collections.emptyList(), publicOptions, privateOptions),
+                        schema, null, null, Collections.emptyList(), publicOptions, privateOptions),
                 false);
     }
 }

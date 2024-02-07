@@ -97,7 +97,7 @@ public class ConfluentManagedTableValidator {
     public static Map<String, String> validateCreateTableOptions(
             String tableIdentifier,
             List<String> primaryKeys,
-            List<String> partitionKeys,
+            List<String> bucketKeys,
             List<String> physicalColumns,
             Map<String, String> newOptions) {
         // Validate that the key space contains only supported public options (both from
@@ -114,11 +114,11 @@ public class ConfluentManagedTableValidator {
         helper.validate();
 
         final Configuration validatedOptions = helper.getOptions();
-        final boolean hasPrimaryKey = primaryKeys.size() > 0;
-        final boolean hasPartitionKey = partitionKeys.size() > 0;
+        final boolean hasPrimaryKey = !primaryKeys.isEmpty();
+        final boolean hasBucketKey = !bucketKeys.isEmpty();
 
         enrichChangelogMode(validatedOptions, hasPrimaryKey);
-        enrichKeyFormat(validatedOptions, hasPrimaryKey, hasPartitionKey);
+        enrichKeyFormat(validatedOptions, hasPrimaryKey, hasBucketKey);
 
         // Rediscover formats with enriched options
         final Format keyFormat = helper.getOptionalFormat(KEY_FORMAT).orElse(null);
@@ -134,7 +134,7 @@ public class ConfluentManagedTableValidator {
         validateDynamicTableParameters(
                 tableIdentifier,
                 primaryKeys,
-                partitionKeys,
+                bucketKeys,
                 physicalColumns,
                 validatedOptions,
                 keyFormat,
@@ -165,13 +165,13 @@ public class ConfluentManagedTableValidator {
     public static Map<String, String> validateAlterTableOptions(
             String tableIdentifier,
             List<String> primaryKeys,
-            List<String> partitionKeys,
+            List<String> bucketKeys,
             List<String> physicalColumns,
             Map<String, String> oldOptions,
             Map<String, String> newOptions) {
         final Map<String, String> validatedOptions =
                 validateCreateTableOptions(
-                        tableIdentifier, primaryKeys, partitionKeys, physicalColumns, newOptions);
+                        tableIdentifier, primaryKeys, bucketKeys, physicalColumns, newOptions);
         final Set<String> immutableKeys =
                 ConfluentManagedTableOptions.PUBLIC_IMMUTABLE_OPTIONS.stream()
                         .map(ConfigOption::key)
@@ -205,9 +205,9 @@ public class ConfluentManagedTableValidator {
     }
 
     private static void enrichKeyFormat(
-            Configuration validatedOptions, boolean hasPrimaryKey, boolean hasPartitionKey) {
+            Configuration validatedOptions, boolean hasPrimaryKey, boolean hasBucketKey) {
         if (validatedOptions.getOptional(KEY_FORMAT).isPresent()
-                || (!hasPrimaryKey && !hasPartitionKey)) {
+                || (!hasPrimaryKey && !hasBucketKey)) {
             return;
         }
         validatedOptions.set(KEY_FORMAT, PublicAvroRegistryFormat.IDENTIFIER);

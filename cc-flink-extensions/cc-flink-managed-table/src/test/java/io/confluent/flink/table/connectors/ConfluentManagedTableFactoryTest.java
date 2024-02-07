@@ -12,6 +12,7 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -191,7 +192,7 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testWithoutPartitionKeys() {
+        void testWithoutBucketKeys() {
             final Map<String, String> options = getComplexOptions();
             options.remove("key.format");
 
@@ -199,24 +200,24 @@ public class ConfluentManagedTableFactoryTest {
                     createTableSource(SCHEMA_WITHOUT_PK, options, Collections.emptyList());
             final DynamicTableParameters parameters = source.getParameters();
             assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.RETRACT);
-            // no partition keys set
+            // no bucket keys set
             assertThat(parameters.keyProjection).isEmpty();
         }
 
         @Test
-        void testWithImplicitPartitionKeys() {
+        void testWithImplicitBucketKeys() {
             final Map<String, String> options = getComplexOptions();
 
             final ConfluentManagedTableSource source =
                     createTableSource(SCHEMA_WITH_PK, options, Collections.emptyList());
             final DynamicTableParameters parameters = source.getParameters();
             assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.RETRACT);
-            // partition keys are derived from primary key
+            // bucket keys are derived from primary key
             assertThat(parameters.keyProjection).containsExactly(1, 4);
         }
 
         @Test
-        void testInvalidKeyFormatWithPartitionKey() {
+        void testInvalidKeyFormatWithBucketKey() {
             testError(
                     SCHEMA_WITHOUT_PK,
                     (options, keys) -> {
@@ -224,7 +225,7 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                         keys.add(KEY_K2);
                     },
-                    "PARTITIONED BY and PRIMARY KEY clauses require a key format 'key.format'.");
+                    "DISTRIBUTED BY and PRIMARY KEY clauses require a key format 'key.format'.");
         }
 
         @Test
@@ -242,18 +243,18 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testMissingPartitionKeys() {
+        void testMissingBucketKeys() {
             testError(
                     SCHEMA_WITHOUT_PK,
                     (options, keys) -> {
-                        // no partition keys but a key format
+                        // no bucket keys but a key format
                     },
                     "A key format 'key.format' requires the declaration of one or more of key "
-                            + "fields using PARTITIONED BY (or PRIMARY KEY if applicable).");
+                            + "fields using DISTRIBUTED BY (or PRIMARY KEY if applicable).");
         }
 
         @Test
-        void testInvalidPartitionKeyPrefix() {
+        void testInvalidBucketKeyPrefix() {
             testError(
                     SCHEMA_WITHOUT_PK,
                     (options, keys) -> {
@@ -261,16 +262,16 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                         keys.add(KEY_K2);
                     },
-                    "All fields in PARTITIONED BY must be prefixed with '_' when "
+                    "All fields in DISTRIBUTED BY must be prefixed with '_' when "
                             + "option 'key.fields-prefix' is set but field 'key_k1' is not prefixed.");
         }
 
         @Test
-        void testInvalidPartitionKey() {
+        void testInvalidBucketKey() {
             testError(
                     SCHEMA_WITH_PK,
                     (options, keys) -> keys.add("invalid"),
-                    "Key fields in PARTITIONED BY must fully contain primary key columns [key_k1, key_k2] "
+                    "Key fields in DISTRIBUTED BY must fully contain primary key columns [key_k1, key_k2] "
                             + "if a primary key is defined.");
         }
 
@@ -287,7 +288,7 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testDuplicatePartitionKey() {
+        void testDuplicateBucketKey() {
             testError(
                     SCHEMA_WITHOUT_PK,
                     (options, keys) -> {
@@ -297,7 +298,7 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                         keys.add(KEY_K1);
                     },
-                    "PARTITIONED BY clause must not contain duplicate columns. Found: [key_k1]");
+                    "DISTRIBUTED BY clause must not contain duplicate columns. Found: [key_k1]");
         }
 
         @Test
@@ -362,14 +363,14 @@ public class ConfluentManagedTableFactoryTest {
     class UpsertTests {
 
         @Test
-        void testWithImplicitPartitionKeys() {
+        void testWithImplicitBucketKeys() {
             final Map<String, String> options = getComplexOptions();
             options.put("changelog.mode", "upsert");
 
             final Consumer<DynamicTableParameters> testParameters =
                     (parameters) -> {
                         assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.UPSERT);
-                        // key projection is inserted implicitly although no partition keys are set
+                        // key projection is inserted implicitly although no bucket keys are set
                         assertThat(parameters.keyProjection).containsExactly(1, 4);
                     };
 
@@ -427,7 +428,7 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testInvalidAdditionalPartitionKey() {
+        void testInvalidAdditionalBucketKey() {
             testError(
                     SCHEMA_WITH_PK,
                     (options, keys) -> {
@@ -437,7 +438,7 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K2);
                         keys.add(NAME);
                     },
-                    "Key fields in PARTITIONED BY must fully contain primary key columns [key_k1, key_k2]"
+                    "Key fields in DISTRIBUTED BY must fully contain primary key columns [key_k1, key_k2]"
                             + " if a primary key is defined.");
         }
 
@@ -456,7 +457,7 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testInvalidCustomPartitioningWithCompaction() {
+        void testInvalidCustomDistributionWithCompaction() {
             testError(
                     SCHEMA_WITH_PK,
                     (options, keys) -> {
@@ -464,8 +465,8 @@ public class ConfluentManagedTableFactoryTest {
                         options.put("kafka.cleanup-policy", "compact");
                         keys.add(KEY_K1);
                     },
-                    "A custom PARTITIONED BY clause is not allowed if upserts or compaction "
-                            + "are enabled. The partitioning key must be equal to the primary "
+                    "A custom DISTRIBUTED BY clause is not allowed if upserts or compaction "
+                            + "are enabled. The distribution key must be equal to the primary "
                             + "key [key_k1, key_k2].");
         }
     }
@@ -481,7 +482,7 @@ public class ConfluentManagedTableFactoryTest {
             final Consumer<DynamicTableParameters> testParameters =
                     (parameters) -> {
                         assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.APPEND);
-                        // according to partition keys
+                        // according to bucket keys
                         assertThat(parameters.keyProjection).containsExactly(1, 4);
                     };
 
@@ -498,7 +499,7 @@ public class ConfluentManagedTableFactoryTest {
         }
 
         @Test
-        void testWithoutPartitionKeys() {
+        void testWithoutBucketKeys() {
             final Map<String, String> options = getComplexOptions();
             options.put("changelog.mode", "append");
             options.remove("key.format");
@@ -507,12 +508,12 @@ public class ConfluentManagedTableFactoryTest {
                     createTableSource(SCHEMA_WITHOUT_PK, options, Collections.emptyList());
             final DynamicTableParameters parameters = source.getParameters();
             assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.APPEND);
-            // no partition keys set
+            // no bucket keys set
             assertThat(parameters.keyProjection).isEmpty();
         }
 
         @Test
-        void testWithImplicitPartitionKeys() {
+        void testWithImplicitBucketKeys() {
             final Map<String, String> options = getComplexOptions();
             options.put("changelog.mode", "append");
 
@@ -520,12 +521,12 @@ public class ConfluentManagedTableFactoryTest {
                     createTableSource(SCHEMA_WITH_PK, options, Collections.emptyList());
             final DynamicTableParameters parameters = source.getParameters();
             assertThat(parameters.tableMode).isEqualTo(ManagedChangelogMode.APPEND);
-            // partition keys are derived from primary key
+            // bucket keys are derived from primary key
             assertThat(parameters.keyProjection).containsExactly(1, 4);
         }
 
         @Test
-        void testInvalidKeyFormatWithPartitionKey() {
+        void testInvalidKeyFormatWithBucketKey() {
             testError(
                     SCHEMA_WITHOUT_PK,
                     (options, keys) -> {
@@ -534,11 +535,11 @@ public class ConfluentManagedTableFactoryTest {
                         keys.add(KEY_K1);
                         keys.add(KEY_K2);
                     },
-                    "PARTITIONED BY and PRIMARY KEY clauses require a key format 'key.format'.");
+                    "DISTRIBUTED BY and PRIMARY KEY clauses require a key format 'key.format'.");
         }
 
         @Test
-        void testInvalidCustomPartitioningWithCompaction() {
+        void testInvalidCustomDistributionWithCompaction() {
             testError(
                     SCHEMA_WITH_PK,
                     (options, keys) -> {
@@ -546,8 +547,8 @@ public class ConfluentManagedTableFactoryTest {
                         options.put("kafka.cleanup-policy", "compact");
                         keys.add(KEY_K1);
                     },
-                    "A custom PARTITIONED BY clause is not allowed if upserts or compaction "
-                            + "are enabled. The partitioning key must be equal to the primary "
+                    "A custom DISTRIBUTED BY clause is not allowed if upserts or compaction "
+                            + "are enabled. The distribution key must be equal to the primary "
                             + "key [key_k1, key_k2].");
         }
     }
@@ -583,39 +584,40 @@ public class ConfluentManagedTableFactoryTest {
     }
 
     private static ConfluentManagedTableSource createTableSource(
-            ResolvedSchema schema, Map<String, String> options, List<String> partitionKeys) {
+            ResolvedSchema schema, Map<String, String> options, List<String> bucketKeys) {
         final ConfluentManagedTableFactory factory = new ConfluentManagedTableFactory();
         final DynamicTableFactory.Context context =
-                createFactoryContext(schema, partitionKeys, options);
+                createFactoryContext(schema, bucketKeys, options);
         return (ConfluentManagedTableSource) factory.createDynamicTableSource(context);
     }
 
     private static ConfluentManagedTableSink createTableSink(
-            ResolvedSchema schema, Map<String, String> options, List<String> partitionKeys) {
+            ResolvedSchema schema, Map<String, String> options, List<String> bucketKeys) {
         final ConfluentManagedTableFactory factory = new ConfluentManagedTableFactory();
         final DynamicTableFactory.Context context =
-                createFactoryContext(schema, partitionKeys, options);
+                createFactoryContext(schema, bucketKeys, options);
         return (ConfluentManagedTableSink) factory.createDynamicTableSink(context);
     }
 
     private static DynamicTableFactory.Context createFactoryContext(
-            ResolvedSchema schema, List<String> partitionKeys, Map<String, String> options) {
-        return createFactoryContext(schema, partitionKeys, options, new Configuration());
+            ResolvedSchema schema, List<String> bucketKeys, Map<String, String> options) {
+        return createFactoryContext(schema, bucketKeys, options, new Configuration());
     }
 
     private static DynamicTableFactory.Context createFactoryContext(
             ResolvedSchema schema,
-            List<String> partitionKeys,
+            List<String> bucketKeys,
             Map<String, String> options,
             Configuration sessionConfig) {
         return new FactoryUtil.DefaultDynamicTableContext(
                 FactoryMocks.IDENTIFIER,
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(schema).build(),
-                                "mock context",
-                                partitionKeys,
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(Schema.newBuilder().fromResolvedSchema(schema).build())
+                                .comment("mock context")
+                                .distribution(TableDistribution.ofHash(bucketKeys, null))
+                                .options(options)
+                                .build(),
                         schema),
                 Collections.emptyMap(),
                 sessionConfig,
@@ -628,9 +630,9 @@ public class ConfluentManagedTableFactoryTest {
             BiConsumer<Map<String, String>, List<String>> mutations,
             String error) {
         final Map<String, String> options = getComplexOptions();
-        final List<String> partitionKeys = new ArrayList<>();
-        mutations.accept(options, partitionKeys);
-        assertThatThrownBy(() -> createTableSource(schema, options, partitionKeys))
+        final List<String> bucketKeys = new ArrayList<>();
+        mutations.accept(options, bucketKeys);
+        assertThatThrownBy(() -> createTableSource(schema, options, bucketKeys))
                 .hasMessageContaining(error);
     }
 }

@@ -527,6 +527,7 @@ public class InfoSchemaExecutionTest {
             return new ConfluentCatalogTable(
                     table.getUnresolvedSchema(),
                     table.getComment(),
+                    table.getDistribution().orElse(null),
                     table.getPartitionKeys(),
                     table.getOptions(),
                     Collections.emptyMap());

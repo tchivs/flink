@@ -9,6 +9,7 @@ import org.apache.flink.table.api.CompiledPlan;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.TableDistribution;
 
 import javax.annotation.Nullable;
 
@@ -34,6 +35,7 @@ public class ConfluentCatalogTable implements CatalogTable {
 
     private final Schema schema;
     private final @Nullable String comment;
+    private final @Nullable TableDistribution distribution;
     private final List<String> partitionKeys;
     private final Map<String, String> publicOptions;
     private final Map<String, String> privateOptions;
@@ -43,11 +45,13 @@ public class ConfluentCatalogTable implements CatalogTable {
     public ConfluentCatalogTable(
             Schema schema,
             @Nullable String comment,
+            @Nullable TableDistribution distribution,
             List<String> partitionKeys,
             Map<String, String> publicOptions,
             Map<String, String> privateOptions) {
         this.schema = checkNotNull(schema, "Schema must not be null.");
         this.comment = comment;
+        this.distribution = distribution;
         this.partitionKeys = checkNotNull(partitionKeys, "Partition keys must not be null.");
         this.publicOptions = checkNotNull(publicOptions, "Public options must not be null.");
         this.privateOptions = checkNotNull(privateOptions, "Private options must not be null.");
@@ -94,6 +98,11 @@ public class ConfluentCatalogTable implements CatalogTable {
     }
 
     @Override
+    public Optional<TableDistribution> getDistribution() {
+        return Optional.ofNullable(distribution);
+    }
+
+    @Override
     public Map<String, String> getOptions() {
         return exposedOptions;
     }
@@ -101,12 +110,13 @@ public class ConfluentCatalogTable implements CatalogTable {
     @Override
     public CatalogBaseTable copy() {
         return new ConfluentCatalogTable(
-                schema, comment, partitionKeys, publicOptions, privateOptions);
+                schema, comment, distribution, partitionKeys, publicOptions, privateOptions);
     }
 
     @Override
     public CatalogTable copy(Map<String, String> options) {
-        return new ConfluentCatalogTable(schema, comment, partitionKeys, options, privateOptions);
+        return new ConfluentCatalogTable(
+                schema, comment, distribution, partitionKeys, options, privateOptions);
     }
 
     @Override
@@ -136,6 +146,7 @@ public class ConfluentCatalogTable implements CatalogTable {
         final ConfluentCatalogTable that = (ConfluentCatalogTable) o;
         return schema.equals(that.schema)
                 && Objects.equals(comment, that.comment)
+                && Objects.equals(distribution, that.distribution)
                 && partitionKeys.equals(that.partitionKeys)
                 && publicOptions.equals(that.publicOptions)
                 && privateOptions.equals(that.privateOptions)
@@ -145,6 +156,12 @@ public class ConfluentCatalogTable implements CatalogTable {
     @Override
     public int hashCode() {
         return Objects.hash(
-                schema, comment, partitionKeys, publicOptions, privateOptions, exposedOptions);
+                schema,
+                comment,
+                distribution,
+                partitionKeys,
+                publicOptions,
+                privateOptions,
+                exposedOptions);
     }
 }

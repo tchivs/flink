@@ -12,11 +12,13 @@ import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.sink.KafkaSinkBuilder;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.format.EncodingFormat;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.sink.SinkV2Provider;
+import org.apache.flink.table.connector.sink.abilities.SupportsBucketing;
 import org.apache.flink.table.connector.sink.abilities.SupportsPartitioning;
 import org.apache.flink.table.connector.sink.abilities.SupportsWritingMetadata;
 import org.apache.flink.table.data.ArrayData;
@@ -38,15 +40,20 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /** {@link DynamicTableSink} for Confluent-native tables. */
 @Confluent
 public class ConfluentManagedTableSink
-        implements DynamicTableSink, SupportsWritingMetadata, SupportsPartitioning {
+        implements DynamicTableSink,
+                SupportsWritingMetadata,
+                SupportsPartitioning,
+                SupportsBucketing {
 
     // --------------------------------------------------------------------------------------------
     // Immutable attributes
@@ -60,6 +67,11 @@ public class ConfluentManagedTableSink
 
     /** Format for encoding values to Kafka. */
     private final EncodingFormat<SerializationSchema<RowData>> valueEncodingFormat;
+
+    /** Enables SQL syntax "DISTRIBUTED BY HASH(col1, col2)" and "DISTRIBUTED BY (col1, col2)". */
+    private static final Set<TableDistribution.Kind> SUPPORTED_BUCKETING_ALGORITHMS =
+            new HashSet<>(
+                    Arrays.asList(TableDistribution.Kind.HASH, TableDistribution.Kind.UNKNOWN));
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -134,6 +146,18 @@ public class ConfluentManagedTableSink
     public void applyStaticPartition(Map<String, String> partition) {
         // Currently, this information is unused, but
         // we need to implement the interface to enable PARTITIONED BY syntax
+    }
+
+    @Override
+    public Set<TableDistribution.Kind> listAlgorithms() {
+        return SUPPORTED_BUCKETING_ALGORITHMS;
+    }
+
+    @Override
+    public boolean requiresBucketCount() {
+        // The bucket count is either provided by the user or should have been
+        // filled with a default value by upper layers.
+        return true;
     }
 
     @Override

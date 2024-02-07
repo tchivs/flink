@@ -83,7 +83,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
             // Properties:
             // - metadata is passed end-to-end
             // - "op" in header is not visible
-            // - partitioning is based on entire value
+            // - distribution is based on entire value
             //   (i.e. USD is split across partitions but retractions are correct)
             testPartitions(
                     "test",
@@ -149,7 +149,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
         }
 
         @Test
-        void testPartitionedBy() throws Exception {
+        void testDistributedBy() throws Exception {
             final String tableSchema =
                     "(\n"
                             + "metadata_partition INT METADATA FROM 'partition' VIRTUAL,\n"
@@ -157,7 +157,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                             + "physical_name STRING,\n"
                             + "physical_sum INT\n"
                             + ")\n"
-                            + "PARTITIONED BY (physical_name)";
+                            + "DISTRIBUTED BY (physical_name) INTO 4 BUCKETS";
             final String tableTopic = createTopic("t");
             createTable(
                     tableTopic,
@@ -304,7 +304,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
         }
 
         @Test
-        void testPartitionedBy() throws Exception {
+        void testDistributedBy() throws Exception {
             final String tableSchema =
                     "(\n"
                             + "metadata_partition INT METADATA FROM 'partition' VIRTUAL,\n"
@@ -312,7 +312,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                             + "physical_name STRING,\n"
                             + "physical_price INT\n"
                             + ")\n"
-                            + "PARTITIONED BY (physical_name)";
+                            + "DISTRIBUTED BY (physical_name) INTO 4 BUCKETS";
             final String tableTopic = createTopic("t");
             createTable(
                     tableTopic,
@@ -410,7 +410,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
         }
 
         @Test
-        void testStaticPartitions() throws Exception {
+        void testLegacyPartitions() throws Exception {
             final String tableSchema =
                     "(\n"
                             + "metadata_partition INT METADATA FROM 'partition' VIRTUAL,\n"
@@ -456,7 +456,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                             + "physical_name STRING,\n"
                             + "physical_sum INT\n"
                             + ")\n"
-                            + "PARTITIONED BY (physical_name)";
+                            + "DISTRIBUTED BY (physical_name) INTO 4 BUCKETS";
             createTable(
                     tableTopic,
                     "sink",
@@ -479,7 +479,7 @@ public class ConfluentManagedTableITCase extends ConfluentManagedTableTestBase {
                             + "$rowtime TIMESTAMP_LTZ(3) NOT NULL METADATA VIRTUAL,\n"
                             + "WATERMARK FOR $rowtime AS SOURCE_WATERMARK()\n"
                             + ")\n"
-                            + "PARTITIONED BY (physical_name)";
+                            + "DISTRIBUTED BY (physical_name) INTO 4 BUCKETS";
             createTable(
                     tableTopic,
                     "source",

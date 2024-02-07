@@ -10,6 +10,7 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.types.DataType;
@@ -217,7 +218,10 @@ public class ConfluentManagedTableValidatorTest {
                             .getPrimaryKey()
                             .map(UniqueConstraint::getColumns)
                             .orElse(Collections.emptyList()),
-                    catalogTable.getPartitionKeys(),
+                    catalogTable
+                            .getDistribution()
+                            .map(TableDistribution::getBucketKeys)
+                            .orElseGet(catalogTable::getPartitionKeys),
                     DataType.getFieldNames(
                             catalogTable.getResolvedSchema().toPhysicalRowDataType()),
                     catalogTable.getOptions());

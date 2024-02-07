@@ -33,7 +33,7 @@ public class ConfluentManagedTableOptions {
                     .durationType()
                     .defaultValue(Duration.ZERO)
                     .withDescription(
-                            "If a table's partition does not receive any elements within the given interval, it will be "
+                            "If a table's bucket does not receive any elements within the given interval, it will be "
                                     + "marked as temporarily idle. This allows downstream tasks to advance their "
                                     + "watermarks without the need to wait for watermarks from all inputs. The "
                                     + "default value is 0 which means that idle detection is disabled.");

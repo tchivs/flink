@@ -479,6 +479,7 @@ public class InfoSchemaTables {
         return new ConfluentCatalogTable(
                 table.schema,
                 "SYSTEM",
+                null,
                 Collections.emptyList(),
                 Collections.singletonMap("connector", InfoSchemaTableFactory.IDENTIFIER),
                 Collections.emptyMap());
