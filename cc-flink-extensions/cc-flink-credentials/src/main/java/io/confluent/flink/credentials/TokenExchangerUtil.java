@@ -20,8 +20,7 @@ import java.util.stream.Stream;
 
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_DATAPLANE_ENABLED;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_DATAPLANE_SERVICE_DEADLINE_MS;
-import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_DATAPLANE_SERVICE_HOST;
-import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_DATAPLANE_SERVICE_PORT;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_DATAPLANE_SERVICE_TARGET;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.AUTH_SERVICE_SERVER;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.TOKEN_EXCHANGE_TIMEOUT_MS;
 
@@ -61,9 +60,9 @@ public class TokenExchangerUtil {
         if (configuration.getBoolean(AUTH_DATAPLANE_ENABLED)) {
             LOG.info("Using dataplane auth token exchanger.");
             Channel authDataplaneChannel =
-                    ManagedChannelBuilder.forAddress(
-                                    configuration.getString(AUTH_DATAPLANE_SERVICE_HOST),
-                                    configuration.getInteger(AUTH_DATAPLANE_SERVICE_PORT))
+                    ManagedChannelBuilder.forTarget(
+                                    configuration.getString(AUTH_DATAPLANE_SERVICE_TARGET))
+                            .defaultLoadBalancingPolicy("round_robin")
                             .usePlaintext()
                             .build();
             AuthDataplaneServiceGrpc.AuthDataplaneServiceBlockingStub authDataplaneService =

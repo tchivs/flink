@@ -50,17 +50,11 @@ public class KafkaCredentialsOptions {
                     .defaultValue(Duration.ofSeconds(3).toMillis())
                     .withDescription("How long to allow a token exchange before it is timed out");
 
-    public static final ConfigOption<String> AUTH_DATAPLANE_SERVICE_HOST =
-            ConfigOptions.key("confluent.auth.dataplane.service.host")
+    public static final ConfigOption<String> AUTH_DATAPLANE_SERVICE_TARGET =
+            ConfigOptions.key("confluent.auth.dataplane.service.target")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The host of the auth dataplane service");
-
-    public static final ConfigOption<Integer> AUTH_DATAPLANE_SERVICE_PORT =
-            ConfigOptions.key("confluent.auth.dataplane.service.port")
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription("The port of the auth dataplane service");
+                    .withDescription("The host:port of the auth dataplane service");
 
     public static final ConfigOption<Long> AUTH_DATAPLANE_SERVICE_DEADLINE_MS =
             ConfigOptions.key("confluent.auth.dataplane.service.deadline.ms")
