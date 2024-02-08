@@ -28,7 +28,6 @@ import org.apache.calcite.sql.parser.SqlParserFixture;
 import org.apache.calcite.sql.parser.SqlParserTest;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
-import org.hamcrest.TypeSafeDiagnosingMatcher;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -1247,7 +1246,7 @@ class FlinkSqlParserImplTest extends SqlParserTest {
                         + "  'connector' = 'kafka',\n"
                         + "  'kafka.topic' = 'log.test'\n"
                         + ")";
-        sql(sql3).ok(expectParsed).node(validated(expectValidated));
+        sql(sql3).ok(expectParsed).node(FlinkSqlParserTestUtils.validated(expectValidated));
     }
 
     @Test
@@ -1349,7 +1348,7 @@ class FlinkSqlParserImplTest extends SqlParserTest {
                         + "  'connector' = 'kafka',\n"
                         + "  'kafka.topic' = 'log.test'\n"
                         + ")";
-        sql(sql3).ok(expectParsed).node(validated(expectValidated));
+        sql(sql3).ok(expectParsed).node(FlinkSqlParserTestUtils.validated(expectValidated));
     }
 
     @Test
@@ -2926,36 +2925,6 @@ class FlinkSqlParserImplTest extends SqlParserTest {
     @Test
     void testTruncateTable() {
         sql("truncate table t1").ok("TRUNCATE TABLE `T1`");
-    }
-
-    public static BaseMatcher<SqlNode> validated(String validatedSql) {
-        return new TypeSafeDiagnosingMatcher<SqlNode>() {
-            @Override
-            protected boolean matchesSafely(SqlNode item, Description mismatchDescription) {
-                if (item instanceof ExtendedSqlNode) {
-                    try {
-                        ((ExtendedSqlNode) item).validate();
-                    } catch (SqlValidateException e) {
-                        mismatchDescription.appendText(
-                                "Could not validate the node. Exception: \n");
-                        mismatchDescription.appendValue(e);
-                    }
-
-                    String actual = item.toSqlString(null, true).getSql();
-                    return actual.equals(validatedSql);
-                }
-                mismatchDescription.appendText(
-                        "This matcher can be applied only to ExtendedSqlNode.");
-                return false;
-            }
-
-            @Override
-            public void describeTo(Description description) {
-                description.appendText(
-                        "The validated node string representation should be equal to: \n");
-                description.appendText(validatedSql);
-            }
-        };
     }
 
     /** Matcher that invokes the #validate() of the {@link ExtendedSqlNode} instance. * */
