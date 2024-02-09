@@ -59,6 +59,7 @@ public class ScalaSuffixChecker {
     private static final Set<String> EXCLUDED_MODULES =
             new HashSet<>(
                     Arrays.asList(
+                            "cc-flink-udf-adapter",
                             "flink-integration-impl",
                             "cc-flink-managed-table",
                             "cc-flink-managed-table-validation",
