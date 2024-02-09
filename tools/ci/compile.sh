@@ -79,6 +79,10 @@ if [ $EXIT_CODE != 0 ]; then
     exit $EXIT_CODE
 fi
 
+if [[ ${PROFILE} == *"-Dfast"* || ${PROFILE} == *"-Pfast"* ]]; then
+  exit $EXIT_CODE
+fi
+
 echo "============ Checking Javadocs ============"
 
 javadoc_output=/tmp/javadoc.out
