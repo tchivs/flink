@@ -55,6 +55,29 @@ global_job_config:
       - . vault-sem-get-secret ci-reporting
       - export PROFILE="-Pjdk11"
 blocks:
+  - name: pre-compile-checks
+    dependencies: []
+    task:
+      jobs:
+        - name: pre-compile-checks
+          commands:
+            # Cache restore maven
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - source tools/ci/maven-utils.sh
+            - run_mvn org.apache.rat:apache-rat-plugin:check -N
+            - run_mvn checkstyle:check spotless:check -T1C
+  - name: packaging-licensing-checks
+    dependencies: []
+    task:
+      jobs:
+        - name: packaging-licensing-checks
+          commands:
+            # Cache restore maven
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            # skip checks from pre-compile-checks
+            - export PROFILE="${PROFILE} -Drat.skip -Dcheckstyle.skip -Dspotless.skip"
+            - ./tools/ci/compile_ci.sh || exit $?
+            - if [ -n "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CACHE_PREFIX"-maven-cache ${MAVEN_LOCAL_CACHE}; fi
   - name: compile_ci
     dependencies: []
     task:
@@ -63,11 +86,11 @@ blocks:
           commands:
             # Cache restore maven
             - cache restore "$CACHE_PREFIX"-maven-cache
-            - ./tools/ci/compile_ci.sh || exit $?
+            - source tools/ci/maven-utils.sh
+            - run_mvn test-compile -Dflink.markBundledAsOptional=false -Dfast
             - ./tools/azure-pipelines/create_build_artifact.sh
             - tar -czf FlinkCompileArtifact.tar.gz -C $FLINK_ARTIFACT_DIR .
             - artifact push workflow FlinkCompileArtifact.tar.gz --force
-            - if [ -n "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CACHE_PREFIX"-maven-cache ${MAVEN_LOCAL_CACHE}; fi
 
   - name: tests
     dependencies: [compile_ci]
@@ -171,7 +194,7 @@ blocks:
     # Release after compile, in parallel to tests.
     # This is an accelerant while we work to meet EA deadlines pre-produciton.
     # This will be reverted here --> https://confluentinc.atlassian.net/browse/TIF-158
-    dependencies: [compile_ci]
+    dependencies: [pre-compile-checks, packaging-licensing-checks]
     task:
       jobs:
         - name: release
