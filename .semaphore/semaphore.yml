@@ -113,7 +113,6 @@ blocks:
             - sudo apt-get install -y libapr1
             - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
-            - checkout
             - artifact pull workflow FlinkCompileArtifact.tar.gz
             - mkdir -p $FLINK_ARTIFACT_DIR
             - tar -xzf FlinkCompileArtifact.tar.gz -C $FLINK_ARTIFACT_DIR
@@ -158,7 +157,6 @@ blocks:
             - sudo apt-get install -y libapr1
             - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
-            - checkout
             - mkdir -p $MAVEN_LOCAL_CACHE
             - mkdir -p $E2E_CACHE_FOLDER
             - mkdir -p $E2E_TARBALL_CACHE
