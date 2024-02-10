@@ -139,7 +139,7 @@ blocks:
         - name: e2e-tests
           matrix:
             - env_var: group
-              values: ["1", "2"]
+              values: ["1", "2", "3", "4"]
             - env_var: SYSTEM_JOBTIMEOUT
               values: ["310"]
           commands:
