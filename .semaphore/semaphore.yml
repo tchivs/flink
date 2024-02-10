@@ -53,7 +53,7 @@ global_job_config:
       # Configure maven to use CFLT mirrors and repository - !!!DO NOT REMOVE THIS LINE UNTIL inc_rcca-15715-code-artifact-returning-intermittent-403-error resolved!!!!
       - . vault-sem-get-secret maven-settings-no-cloudfront
       - . vault-sem-get-secret ci-reporting
-      - export PROFILE="-Pjdk11"
+      - export PROFILE="-Pjdk11 -Dflink.forkCountUnitTest=8 -Dflink.forkCountITCase=4"
 blocks:
   - name: pre-compile-checks
     dependencies: []
