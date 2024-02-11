@@ -192,7 +192,7 @@ blocks:
     # Release after compile, in parallel to tests.
     # This is an accelerant while we work to meet EA deadlines pre-produciton.
     # This will be reverted here --> https://confluentinc.atlassian.net/browse/TIF-158
-    dependencies: [pre-compile-checks, packaging-licensing-checks]
+    dependencies: []
     task:
       jobs:
         - name: release
