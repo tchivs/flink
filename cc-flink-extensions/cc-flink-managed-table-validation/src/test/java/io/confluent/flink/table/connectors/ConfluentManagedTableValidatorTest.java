@@ -122,7 +122,6 @@ public class ConfluentManagedTableValidatorTest {
                 .containsEntry("changelog.mode", "append")
                 .containsEntry("kafka.cleanup-policy", "delete")
                 .containsEntry("kafka.max-message-size", "2097164 bytes")
-                .containsEntry("kafka.partitions", "6")
                 .containsEntry("kafka.retention.size", "0 bytes")
                 .hasEntrySatisfying(
                         "kafka.retention.time",
@@ -161,7 +160,7 @@ public class ConfluentManagedTableValidatorTest {
     void testImmutableOptions() {
         final Map<String, String> oldOptions = testCreateTableOptions("CREATE TABLE t (i INT)");
         final Map<String, String> newOptions = new HashMap<>(oldOptions);
-        newOptions.put("kafka.partitions", "100");
+        newOptions.put("kafka.retention.time", "0");
 
         assertThatThrownBy(
                         () ->
@@ -177,7 +176,7 @@ public class ConfluentManagedTableValidatorTest {
                                 + "\n"
                                 + "Unsupported options:\n"
                                 + "\n"
-                                + "kafka.partitions");
+                                + "kafka.retention.time");
     }
 
     @Test

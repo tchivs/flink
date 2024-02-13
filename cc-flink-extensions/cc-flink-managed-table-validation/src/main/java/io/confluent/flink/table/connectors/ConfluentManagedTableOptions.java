@@ -227,10 +227,17 @@ public class ConfluentManagedTableOptions {
                     .defaultValue(CleanupPolicy.DELETE)
                     .withDescription("Translates to Kafka's log.cleanup.policy.");
 
+    /**
+     * Replaced by DISTRIBUTED INTO n BUCKETS.
+     *
+     * <p>This option can be dropped once we drop support for pre-GA resources that could
+     * potentially be passed into ALTER TABLE.
+     */
+    @Deprecated
     public static final ConfigOption<Integer> KAFKA_PARTITIONS =
             ConfigOptions.key("kafka.partitions")
                     .intType()
-                    .defaultValue(6)
+                    .noDefaultValue()
                     .withDescription("Translates to Kafka's num.partitions.");
 
     public static final ConfigOption<Duration> KAFKA_RETENTION_TIME =
@@ -256,7 +263,6 @@ public class ConfluentManagedTableOptions {
     private static Set<ConfigOption<?>> initPublicCreationOptions() {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(KAFKA_CLEANUP_POLICY);
-        options.add(KAFKA_PARTITIONS);
         options.add(KAFKA_RETENTION_TIME);
         options.add(KAFKA_RETENTION_SIZE);
         options.add(KAFKA_MAX_MESSAGE_SIZE);
@@ -277,6 +283,18 @@ public class ConfluentManagedTableOptions {
         options.add(KAFKA_RETENTION_TIME);
         options.add(KAFKA_RETENTION_SIZE);
         options.add(KAFKA_MAX_MESSAGE_SIZE);
+        return Collections.unmodifiableSet(options);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // PUBLIC - LEGACY
+    // --------------------------------------------------------------------------------------------
+
+    public static final Set<ConfigOption<?>> PUBLIC_LEGACY_OPTIONS = initPublicLegacyOptions();
+
+    private static Set<ConfigOption<?>> initPublicLegacyOptions() {
+        final Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(KAFKA_PARTITIONS);
         return Collections.unmodifiableSet(options);
     }
 

@@ -52,6 +52,7 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.PUBLIC_CREATION_OPTIONS;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.PUBLIC_LEGACY_OPTIONS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_MODE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_SPECIFIC_OFFSETS;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_TIMESTAMP_MILLIS;
@@ -126,6 +127,8 @@ public class ConfluentManagedTableFactory
         // Confluent Table Store specific options
         options.add(CONFLUENT_CLOUD_ORG);
         options.add(CONFLUENT_CLOUD_ENV);
+        // Legacy
+        options.addAll(PUBLIC_LEGACY_OPTIONS);
         return options;
     }
 

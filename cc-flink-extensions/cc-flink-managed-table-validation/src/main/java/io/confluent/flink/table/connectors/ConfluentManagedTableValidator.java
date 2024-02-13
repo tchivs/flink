@@ -246,6 +246,7 @@ public class ConfluentManagedTableValidator {
             options.add(ConfluentManagedTableOptions.CONNECTOR);
             options.addAll(ConfluentManagedTableOptions.PUBLIC_RUNTIME_OPTIONS);
             options.addAll(ConfluentManagedTableOptions.PUBLIC_CREATION_OPTIONS);
+            options.addAll(ConfluentManagedTableOptions.PUBLIC_LEGACY_OPTIONS);
             return options;
         }
     }
