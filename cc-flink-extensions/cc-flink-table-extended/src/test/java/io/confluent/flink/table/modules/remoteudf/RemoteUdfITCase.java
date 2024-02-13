@@ -68,9 +68,10 @@ import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ARGUME
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALOG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
-import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ID_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_ID_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_VERSION_ID_FIELD;
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasks.INSTANCE;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED;
@@ -95,15 +96,14 @@ public class RemoteUdfITCase extends AbstractTestBase {
     static TableEnvironment getSqlServiceTableEnvironment(
             boolean udfsEnabled,
             boolean gatewayConfigured,
-            boolean catalogCreated,
+            boolean createCatalog,
             String functionId) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_REMOTE_UDF_ENABLED.key(), String.valueOf(udfsEnabled));
         confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), gatewayConfigured ? SERVER_TARGET : "");
-
-        if (catalogCreated) {
+        if (createCatalog) {
             createCatalog(tableEnv);
         }
         if (udfsEnabled) {
@@ -117,7 +117,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
                                         new String[] {"INT"}),
                                 ImmutableList.of("STRING", "INT"),
                                 functionId),
-                        new TestFunc("remote2", new String[] {"STRING"}, "STRING", functionId)
+                        new TestFunc("remote2", new String[] {"STRING"}, "STRING", functionId),
+                        new TestFunc("remote3", new String[] {}, "STRING", functionId)
                     });
         }
         INSTANCE.configureEnvironment(
@@ -141,7 +142,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
                             ImmutableList.of(
                                     new String[] {"INT", "STRING", "INT"}, new String[] {"INT"}),
                             ImmutableList.of("STRING", "INT")),
-                    new TestFunc("remote2", new String[] {"STRING"}, "STRING")
+                    new TestFunc("remote2", new String[] {"STRING"}, "STRING"),
+                    new TestFunc("remote3", new String[] {}, "STRING")
                 });
         INSTANCE.configureEnvironment(
                 tableEnv,
@@ -262,7 +264,9 @@ public class RemoteUdfITCase extends AbstractTestBase {
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_CATALOG_FIELD, "cat1");
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_DATABASE_FIELD, "db1");
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_NAME_FIELD, func.name);
-            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_ID_FIELD, func.functionId);
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + PLUGIN_ID_FIELD, func.functionId);
+            udfConf.put(
+                    FUNCTIONS_PREFIX + func.name + "." + PLUGIN_VERSION_ID_FIELD, func.functionId);
             udfConf.put(
                     FUNCTIONS_PREFIX + func.name + "." + FUNCTION_CLASS_NAME_FIELD,
                     "io.confluent.blah1");
@@ -315,6 +319,16 @@ public class RemoteUdfITCase extends AbstractTestBase {
             Assertions.assertEquals(1, results2.size());
             Row row2 = results2.get(0);
             Assertions.assertEquals(42, row2.getField(0));
+            Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
+
+            TableResult result3 = tEnv.executeSql("SELECT cat1.db1.remote3();");
+            final List<Row> results3 = new ArrayList<>();
+            try (CloseableIterator<Row> collect = result3.collect()) {
+                collect.forEachRemaining(results3::add);
+            }
+            Assertions.assertEquals(1, results3.size());
+            Row row3 = results3.get(0);
+            Assertions.assertEquals("[]", row3.getField(0));
             Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
         } finally {
             if (server != null) {

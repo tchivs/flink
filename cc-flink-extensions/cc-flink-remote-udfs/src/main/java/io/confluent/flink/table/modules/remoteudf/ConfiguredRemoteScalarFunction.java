@@ -21,6 +21,7 @@ import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,13 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     private final Map<String, String> config;
     private final List<ConfiguredFunctionSpec> configuredFunctionSpecs;
 
+    // Useful for the planner so that it does't need to provide a config which is only required
+    // during runtime
+    public ConfiguredRemoteScalarFunction(List<ConfiguredFunctionSpec> configuredFunctionSpecs) {
+        this(Collections.emptyMap(), configuredFunctionSpecs);
+    }
+
+    // If used at runtime, must provide a config
     public ConfiguredRemoteScalarFunction(
             Map<String, String> config, List<ConfiguredFunctionSpec> configuredFunctionSpecs) {
         this.config = config;
@@ -57,6 +65,10 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     public String getFunctionDatabase() {
         Preconditions.checkState(!configuredFunctionSpecs.isEmpty());
         return configuredFunctionSpecs.get(0).getDatabase();
+    }
+
+    public List<ConfiguredFunctionSpec> getConfiguredFunctionSpecs() {
+        return configuredFunctionSpecs;
     }
 
     public String getPath() {
@@ -119,5 +131,10 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean isDeterministic() {
+        return false;
     }
 }

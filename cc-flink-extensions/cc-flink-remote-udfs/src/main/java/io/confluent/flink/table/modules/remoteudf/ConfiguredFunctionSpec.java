@@ -22,7 +22,8 @@ public class ConfiguredFunctionSpec implements Serializable {
     private static final String ARGUMENT_TYPE_DELIMITER = ";";
     private final String argumentTypes;
     private final String returnType;
-    private final String functionId;
+    private final String pluginId;
+    private final String pluginVersionId;
     private final String className;
     private final String catalog;
     private final String database;
@@ -34,32 +35,43 @@ public class ConfiguredFunctionSpec implements Serializable {
             String name,
             String argumentTypes,
             String returnType,
-            String functionId,
+            String pluginId,
+            String pluginVersionId,
             String className) {
         this.catalog = catalog;
         this.database = database;
         this.name = name;
         this.argumentTypes = argumentTypes;
         this.returnType = returnType;
-        this.functionId = functionId;
+        this.pluginId = pluginId;
+        this.pluginVersionId = pluginVersionId;
         this.className = className;
     }
 
     public RemoteUdfSpec createRemoteUdfSpec(DataTypeFactory typeFactory) {
         return new RemoteUdfSpec(
-                functionId, className, getReturnType(typeFactory), getArgumentTypes(typeFactory));
+                pluginId, className, getReturnType(typeFactory), getArgumentTypes(typeFactory));
     }
 
     public List<DataType> getArgumentTypes(DataTypeFactory typeFactory) {
         DataType[] inputTypes =
                 Arrays.stream(argumentTypes.split(ARGUMENT_TYPE_DELIMITER))
+                        .filter(strType -> !strType.isEmpty())
                         .map(typeFactory::createDataType)
                         .toArray(DataType[]::new);
         return Stream.of(inputTypes).collect(Collectors.toList());
     }
 
+    public String getArgumentTypes() {
+        return argumentTypes;
+    }
+
     public DataType getReturnType(DataTypeFactory typeFactory) {
         return typeFactory.createDataType(returnType);
+    }
+
+    public String getReturnType() {
+        return returnType;
     }
 
     public String getCatalog() {
@@ -74,6 +86,18 @@ public class ConfiguredFunctionSpec implements Serializable {
         return name;
     }
 
+    public String getPluginId() {
+        return pluginId;
+    }
+
+    public String getPluginVersionId() {
+        return pluginVersionId;
+    }
+
+    public String getClassName() {
+        return className;
+    }
+
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -85,7 +109,8 @@ public class ConfiguredFunctionSpec implements Serializable {
         private String name;
         private final List<String> argumentTypes = new ArrayList<>();
         private final List<String> returnTypes = new ArrayList<>();
-        private String functionId;
+        private String pluginId;
+        private String pluginVersionId;
         private String className;
 
         public Builder addArgumentTypes(String argumentTypes) {
@@ -119,8 +144,13 @@ public class ConfiguredFunctionSpec implements Serializable {
             return this;
         }
 
-        public Builder setFunctionId(String functionId) {
-            this.functionId = functionId;
+        public Builder setPluginId(String pluginId) {
+            this.pluginId = pluginId;
+            return this;
+        }
+
+        public Builder setPluginVersionId(String pluginVersionId) {
+            this.pluginVersionId = pluginVersionId;
             return this;
         }
 
@@ -135,9 +165,12 @@ public class ConfiguredFunctionSpec implements Serializable {
             Preconditions.checkNotNull(name);
             Preconditions.checkNotNull(argumentTypes);
             Preconditions.checkNotNull(returnTypes);
-            Preconditions.checkNotNull(functionId);
+            Preconditions.checkNotNull(pluginId);
+            Preconditions.checkNotNull(pluginVersionId);
             Preconditions.checkNotNull(className);
-            Preconditions.checkState(argumentTypes.size() == returnTypes.size());
+            Preconditions.checkState(
+                    argumentTypes.size() == returnTypes.size(),
+                    "Args and results should be equal in size");
             List<ConfiguredFunctionSpec> result = new ArrayList<>();
             for (int i = 0; i < returnTypes.size(); i++) {
                 result.add(
@@ -147,7 +180,8 @@ public class ConfiguredFunctionSpec implements Serializable {
                                 name,
                                 argumentTypes.get(i),
                                 returnTypes.get(i),
-                                functionId,
+                                pluginId,
+                                pluginVersionId,
                                 className));
             }
             return result;
