@@ -115,8 +115,10 @@ public class ClassifiedExceptionTest {
                 TestSpec.test("unknown current catalog")
                         .executeSql("USE CATALOG bad_cat")
                         .expectExactUserError(
-                                "A catalog with name 'bad_cat' does not exist, or "
-                                        + "you have no permissions to access it."),
+                                "A catalog with name or id 'bad_cat' cannot be resolved. Possible reasons:\n"
+                                        + "\t1. You might not have permissions to access it.\n"
+                                        + "\t2. The catalog might not exist.\n"
+                                        + "\t3. There might be multiple catalogs with the same name."),
                 // ---
                 TestSpec.test("window group by on non rowtime column")
                         .executeSql(

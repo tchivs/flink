@@ -223,6 +223,9 @@ public final class ClassifiedException {
     private static final Pattern TABLE_NOT_FOUND_PATTERN =
             Pattern.compile("Object '(.*)' not found.*");
 
+    private static final Pattern CATALOG_NOT_FOUND =
+            Pattern.compile("A catalog with name \\[(.*)] does not exist\\.");
+
     static {
         classifiedExceptions = new HashMap<>();
 
@@ -277,17 +280,20 @@ public final class ClassifiedException {
                 Handler.rewriteMessage(
                         "catalog with name",
                         ExceptionKind.USER,
-                        message ->
-                                // from:
-                                // "A catalog with name [%s] does not exist."
-                                // to:
-                                // "A catalog with name '%s' does not exist, or you have no
-                                // permissions to access it."
-                                message.replace(
-                                                "does not exist",
-                                                "does not exist, or you have no permissions to access it")
-                                        .replace('[', '\'')
-                                        .replace(']', '\'')));
+                        message -> {
+                            final Matcher matcher = CATALOG_NOT_FOUND.matcher(message);
+                            if (!matcher.matches()) {
+                                throw new IllegalStateException(
+                                        "The pattern should've been matched.");
+                            }
+                            final String catalogIdentifier = matcher.group(1);
+                            return String.format(
+                                    "A catalog with name or id '%s' cannot be resolved. Possible reasons:\n"
+                                            + "\t1. You might not have permissions to access it.\n"
+                                            + "\t2. The catalog might not exist.\n"
+                                            + "\t3. There might be multiple catalogs with the same name.",
+                                    catalogIdentifier);
+                        }));
 
         putClassifiedException(
                 CodeLocation.inClass(ParserImpl.class, IllegalArgumentException.class),
