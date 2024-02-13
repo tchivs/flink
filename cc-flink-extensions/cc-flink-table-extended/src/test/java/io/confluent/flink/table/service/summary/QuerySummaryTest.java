@@ -10,15 +10,20 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.functions.ScalarFunction;
 
+import io.confluent.flink.table.modules.remoteudf.ConfiguredFunctionSpec;
+import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,14 +31,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Confluent
 public class QuerySummaryTest {
 
+    private static final List<ConfiguredFunctionSpec> UDF_SPECS =
+            ConfiguredFunctionSpec.newBuilder()
+                    .setCatalog("a")
+                    .setDatabase("b")
+                    .setName("c")
+                    .setPluginId("plugin")
+                    .setPluginVersionId("v")
+                    .setClassName("io.confluent.Foo")
+                    .addArgumentTypes(Collections.singletonList("INT"))
+                    .addArgumentTypes(Collections.singletonList("STRING"))
+                    .addReturnType("INT")
+                    .addReturnType("STRING")
+                    .build();
+
+    private static final List<ConfiguredFunctionSpec> UDF_SPECS2 =
+            ConfiguredFunctionSpec.newBuilder()
+                    .setCatalog("a")
+                    .setDatabase("b")
+                    .setName("d")
+                    .setPluginId("plugin")
+                    .setPluginVersionId("v")
+                    .setClassName("io.confluent.Foo")
+                    .addArgumentTypes(Collections.singletonList("INT"))
+                    .addReturnType("INT")
+                    .build();
+
     @Test
     void testSummary() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction("a.b.c", new ConfiguredRemoteScalarFunction(UDF_SPECS));
 
         final QuerySummary querySummary =
                 assertProperties(
                         env,
-                        "SELECT uid, LOWER(name) "
+                        "SELECT a.b.c(uid), LOWER(name) "
                                 + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
                         QueryProperty.FOREGROUND,
                         QueryProperty.SINGLE_SINK);
@@ -43,6 +75,11 @@ public class QuerySummaryTest {
 
         assertThat(querySummary.getExpressionKinds())
                 .containsExactlyInAnyOrder(ExpressionKind.INPUT_REF, ExpressionKind.OTHER);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(1);
+        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("a.b.c");
+        assertThat(querySummary.getUdfCalls().iterator().next().getResourceConfigs().size())
+                .isGreaterThan(0);
 
         final NodeSummary sinkSummary = querySummary.getNodes().get(0);
         assertThat(sinkSummary).extracting(NodeSummary::getKind).isEqualTo(NodeKind.SINK);
@@ -103,6 +140,78 @@ public class QuerySummaryTest {
                 .isEqualTo(new int[] {0, 2});
     }
 
+    @Test
+    void testUdfUnused() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction("a.b.c", new ConfiguredRemoteScalarFunction(UDF_SPECS));
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT uid, LOWER(name) "
+                                + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(0);
+    }
+
+    @Test
+    void testNonUdfUsed() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporarySystemFunction("func", MyScalarFunction.class);
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT func(uid), LOWER(name) "
+                                + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(0);
+    }
+
+    @Test
+    void testUdfNested() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction("a.b.c", new ConfiguredRemoteScalarFunction(UDF_SPECS));
+        env.createTemporaryFunction("a.b.d", new ConfiguredRemoteScalarFunction(UDF_SPECS2));
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT a.b.c(a.b.d(uid)), a.b.d(uid), LOWER(name) "
+                                + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(2);
+        List<String> names =
+                querySummary.getUdfCalls().stream()
+                        .map(call -> call.getPath())
+                        .collect(Collectors.toList());
+        assertThat(names).containsExactlyInAnyOrder("a.b.c", "a.b.d");
+    }
+
+    @Test
+    void testUdfRequiresNonUdf() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction("func", new ConfiguredRemoteScalarFunction(UDF_SPECS));
+        env.createTemporarySystemFunction("system_func", MyScalarFunction.class);
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT func(system_func(uid)), LOWER(name) "
+                                + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(1);
+        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("a.b.c");
+    }
+
     private static void createTable(TableEnvironment env, String name, Boundedness boundedness)
             throws Exception {
         final Map<String, String> options = new HashMap<>();
@@ -128,5 +237,12 @@ public class QuerySummaryTest {
         final QuerySummary querySummary = plan.getQuerySummary();
         assertThat(querySummary.getProperties()).contains(properties);
         return querySummary;
+    }
+
+    /** Test function. */
+    public static class MyScalarFunction extends ScalarFunction {
+        public int eval(int num) {
+            return num + 1;
+        }
     }
 }

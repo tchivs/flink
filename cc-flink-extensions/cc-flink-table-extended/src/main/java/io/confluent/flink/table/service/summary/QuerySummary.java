@@ -13,6 +13,7 @@ import org.apache.flink.types.RowKind;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,7 @@ public class QuerySummary {
     // Derived from nodeSummaries and cached
     private Set<NodeKind> nodeKinds;
     private Set<ExpressionKind> expressionKinds;
+    private Set<UdfCall> udfCalls;
 
     public Set<QueryProperty> getProperties() {
         return queryProperties;
@@ -66,6 +68,14 @@ public class QuerySummary {
             nodeSummaries.forEach(n -> collectExpressionKinds(expressionKinds, n));
         }
         return expressionKinds;
+    }
+
+    public Set<UdfCall> getUdfCalls() {
+        if (udfCalls == null) {
+            udfCalls = new HashSet<>();
+            nodeSummaries.forEach(n -> collectUdfCalls(udfCalls, n));
+        }
+        return udfCalls;
     }
 
     public <T> List<T> getNodeTagValues(NodeTag tag, Class<T> type) {
@@ -134,6 +144,15 @@ public class QuerySummary {
     private static void collectExpressionKinds(Set<ExpressionKind> set, NodeSummary node) {
         node.getInputs().forEach(i -> collectExpressionKinds(set, i));
         final Set<ExpressionKind> expressions = node.getTag(NodeTag.EXPRESSIONS, Set.class);
+        if (expressions != null) {
+            set.addAll(expressions);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void collectUdfCalls(Set<UdfCall> set, NodeSummary node) {
+        node.getInputs().forEach(i -> collectUdfCalls(set, i));
+        final Set<UdfCall> expressions = node.getTag(NodeTag.UDF_CALLS, Set.class);
         if (expressions != null) {
             set.addAll(expressions);
         }

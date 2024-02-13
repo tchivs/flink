@@ -35,7 +35,10 @@ public enum NodeTag {
     SOURCE_CONNECTOR(String.class),
 
     /** {@link ScanTableSource.ScanRuntimeProvider#isBounded()}. */
-    BOUNDED(Boolean.class);
+    BOUNDED(Boolean.class),
+
+    /** {@link UdfCall}s within the SQL expressions. */
+    UDF_CALLS(Set.class);
 
     private final Class<?> type;
 
@@ -68,6 +71,11 @@ public enum NodeTag {
                     final ExpressionKind.Extractor extractor = new ExpressionKind.Extractor();
                     calc.getProgram().getExprList().forEach(e -> e.accept(extractor));
                     tags.put(NodeTag.EXPRESSIONS, extractor.kinds);
+
+                    // Extract UDF metadata
+                    tags.put(
+                            NodeTag.UDF_CALLS,
+                            UdfCall.getUdfCalls(calc.getProgram().getExprList()));
                 });
 
         addNodeTagExtraction(
