@@ -57,4 +57,27 @@ public class AlgorithmOptions {
                             "Whether to use the LargeRecordHandler when spilling. If a record will not fit into the sorting"
                                     + " buffer. The record will be spilled on disk and the sorting will continue with only the key."
                                     + " The record itself will be read afterwards when merging.");
+
+    public static final ConfigOption<MemorySize> GLOBAL_AGG_BUFFER_SIZE =
+            ConfigOptions.key("taskmanager.runtime.aggregation.global.buffer-size")
+                    .memoryType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Maximum size of the buffer used by Global Aggregation."
+                                    + "The buffer holds records for aggregation in memory and is flushed to state on: "
+                                    + "1) checkpoints, 2) watermarks, or 3) when it is full."
+                                    + "If it's too big, and watermarks are not progressing and/or the window "
+                                    + "is big enough, there will be too much work to be done during the checkpoint sync phase."
+                                    + "That might lead to checkpoint timeouts. "
+                                    + "If it's too small, aggregation efficiency will be lower.");
+
+    public static final ConfigOption<Integer> GLOBAL_AGG_MAX_BUFFERED_RECORDS =
+            ConfigOptions.key("taskmanager.runtime.aggregation.global.max-buffered-records")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Maximum number of records to buffer in Global Aggregation."
+                                    + "see "
+                                    + GLOBAL_AGG_BUFFER_SIZE.key()
+                                    + " for more details.");
 }
