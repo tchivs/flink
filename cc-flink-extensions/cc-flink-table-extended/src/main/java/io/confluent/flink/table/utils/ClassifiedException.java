@@ -5,6 +5,7 @@
 package io.confluent.flink.table.utils;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.sql.parser.error.SqlValidateException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.TableNotExistException;
@@ -22,6 +23,7 @@ import org.apache.flink.table.planner.plan.schema.CatalogSourceTable;
 import org.apache.flink.util.OptionalUtils;
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.table.service.ServiceTasksOptions;
 import org.apache.calcite.plan.volcano.VolcanoRuleCall;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.runtime.CalciteResource;
@@ -40,6 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -122,7 +125,10 @@ public final class ClassifiedException {
     }
 
     /** Classifies the given exception. */
-    public static ClassifiedException of(Exception e, Set<Class<? extends Exception>> validCauses) {
+    public static ClassifiedException of(
+            Exception e,
+            Set<Class<? extends Exception>> validCauses,
+            ReadableConfig publicOptions) {
         final StackTraceElement stackTrace = getCauseFromStackTrace(e.getStackTrace());
 
         final Optional<ClassifiedException> classifiedUserException =
@@ -131,7 +137,8 @@ public final class ClassifiedException {
                         classifyBasedOnCodeLocation(
                                 new CodeLocation(e.getClass(), stackTrace.getClassName(), null),
                                 e,
-                                validCauses),
+                                validCauses,
+                                publicOptions),
                         // handler by declaring class and method
                         () ->
                                 classifyBasedOnCodeLocation(
@@ -140,11 +147,15 @@ public final class ClassifiedException {
                                                 stackTrace.getClassName(),
                                                 stackTrace.getMethodName()),
                                         e,
-                                        validCauses),
+                                        validCauses,
+                                        publicOptions),
                         // handler by exception class
                         () ->
                                 classifyBasedOnCodeLocation(
-                                        new CodeLocation(e.getClass(), null, null), e, validCauses),
+                                        new CodeLocation(e.getClass(), null, null),
+                                        e,
+                                        validCauses,
+                                        publicOptions),
                         () -> {
                             // If not specified with a custom rule above,
                             // valid causes are always user exceptions for invalid statements.
@@ -302,7 +313,7 @@ public final class ClassifiedException {
                 Handler.custom(
                         "Table options are:",
                         ExceptionKind.USER,
-                        (e, validCauses) ->
+                        (e, validCauses, publicOptions) ->
                                 buildMessageWithCauses(e, validCauses)
                                         .map(s -> s.replaceAll("'[^']*confluent[^']+'=.*\n", ""))));
 
@@ -342,11 +353,31 @@ public final class ClassifiedException {
                                 + "Use ALTER TABLE MODIFY for custom watermarks."));
 
         putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.rewriteMessage(
+                        "A current catalog has not been set.",
+                        ExceptionKind.USER,
+                        msg ->
+                                msg.replace(
+                                        "A current catalog has not been set.",
+                                        "A current, valid catalog has not been set.")));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.rewriteMessage(
+                        "A current database has not been set.",
+                        ExceptionKind.USER,
+                        msg ->
+                                msg.replace(
+                                        "A current database has not been set.",
+                                        "A current, valid database has not been set.")));
+
+        putClassifiedException(
                 CodeLocation.ofClass(CalciteContextException.class),
                 Handler.custom(
                         null,
                         ExceptionKind.USER,
-                        (e, validCauses) -> {
+                        (e, validCauses, publicOptions) -> {
                             final StringBuilder message = new StringBuilder();
                             message.append("SQL validation failed. ");
                             final CalciteContextException context = (CalciteContextException) e;
@@ -371,7 +402,8 @@ public final class ClassifiedException {
                             }
 
                             final ClassifiedException classifiedCause =
-                                    ClassifiedException.of((Exception) e.getCause(), validCauses);
+                                    ClassifiedException.of(
+                                            (Exception) e.getCause(), validCauses, publicOptions);
                             if (classifiedCause.exceptionKind == ExceptionKind.USER) {
                                 message.append("\n\nCaused by: ")
                                         .append(classifiedCause.sensitiveMessage);
@@ -381,19 +413,25 @@ public final class ClassifiedException {
 
         putClassifiedException(
                 CodeLocation.ofClass(SqlValidatorException.class),
-                Handler.rewriteMessageFromException(
+                Handler.rewriteMessageOnPattern(
                         TABLE_NOT_FOUND_PATTERN,
                         ExceptionKind.USER,
-                        ex -> {
-                            final Matcher matcher =
-                                    TABLE_NOT_FOUND_PATTERN.matcher(ex.getMessage());
+                        (msg, publicOptions) -> {
+                            final Matcher matcher = TABLE_NOT_FOUND_PATTERN.matcher(msg);
                             if (!matcher.matches()) {
                                 throw new IllegalStateException(
                                         "The pattern should've been matched.");
                             }
                             return String.format(
-                                    "Table (or view) '%s' does not exist or you do not have permission to access it.",
-                                    matcher.group(1));
+                                    "Table (or view) '%s' does not exist or you do not have permission to access it.\n"
+                                            + "Using current catalog '%s' and current database '%s'.",
+                                    matcher.group(1),
+                                    publicOptions
+                                            .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
+                                            .orElse(""),
+                                    publicOptions
+                                            .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
+                                            .orElse(""));
                         }));
 
         // Don't expose internal errors during failed validation
@@ -402,12 +440,13 @@ public final class ClassifiedException {
                 Handler.custom(
                         "SQL validation failed.",
                         ExceptionKind.USER,
-                        (e, validCauses) -> {
+                        (e, validCauses, publicOptions) -> {
                             if (!(e.getCause() instanceof Exception)) {
                                 return Optional.empty();
                             }
                             final ClassifiedException classifiedCause =
-                                    ClassifiedException.of((Exception) e.getCause(), validCauses);
+                                    ClassifiedException.of(
+                                            (Exception) e.getCause(), validCauses, publicOptions);
                             if (classifiedCause.exceptionKind == ExceptionKind.USER) {
                                 return Optional.of(classifiedCause.sensitiveMessage);
                             }
@@ -473,7 +512,10 @@ public final class ClassifiedException {
     }
 
     private static Optional<ClassifiedException> classifyBasedOnCodeLocation(
-            CodeLocation codeLocation, Exception e, Set<Class<? extends Exception>> validCauses) {
+            CodeLocation codeLocation,
+            Exception e,
+            Set<Class<? extends Exception>> validCauses,
+            ReadableConfig publicOptions) {
 
         final List<Handler> possibleHandlers = classifiedExceptions.get(codeLocation);
 
@@ -486,12 +528,17 @@ public final class ClassifiedException {
                 .findFirst()
                 .map(
                         matchingHandler ->
-                                classifyExceptionWithHandler(matchingHandler, e, validCauses));
+                                classifyExceptionWithHandler(
+                                        matchingHandler, e, validCauses, publicOptions));
     }
 
     private static ClassifiedException classifyExceptionWithHandler(
-            Handler handler, Exception e, Set<Class<? extends Exception>> validCauses) {
-        final Optional<String> message = handler.messageProvider.apply(e, validCauses);
+            Handler handler,
+            Exception e,
+            Set<Class<? extends Exception>> validCauses,
+            ReadableConfig publicOptions) {
+        final Optional<String> message =
+                handler.messageProvider.apply(e, validCauses, publicOptions);
         return message.map(s -> new ClassifiedException(handler.exceptionKind, s))
                 .orElseGet(() -> classifyAsSystemException(e));
     }
@@ -627,7 +674,7 @@ public final class ClassifiedException {
                     onMessagePart,
                     null,
                     exceptionKind,
-                    (e, validCauses) -> Optional.of(e.getMessage()));
+                    (e, validCauses, publicOptions) -> Optional.of(e.getMessage()));
         }
 
         /** Classify exception and rewrite error message. */
@@ -639,7 +686,10 @@ public final class ClassifiedException {
         static Handler rewriteMessage(
                 @Nullable String onMessagePart, ExceptionKind exceptionKind, String message) {
             return new Handler(
-                    onMessagePart, null, exceptionKind, (e, validCauses) -> Optional.of(message));
+                    onMessagePart,
+                    null,
+                    exceptionKind,
+                    (e, validCauses, publicOptions) -> Optional.of(message));
         }
 
         /** Classify exception and rewrite error message using a function. */
@@ -651,22 +701,37 @@ public final class ClassifiedException {
                     onMessagePart,
                     null,
                     exceptionKind,
-                    (e, validCauses) -> {
+                    (e, validCauses, publicOptions) -> {
                         final String originalMessage = e.getMessage();
                         return Optional.of(rewriteMessage.apply(originalMessage));
                     });
         }
 
+        static Handler rewriteMessage(
+                @Nullable String onMessagePart,
+                ExceptionKind exceptionKind,
+                BiFunction<String, ReadableConfig, String> rewriteMessage) {
+            return new Handler(
+                    onMessagePart,
+                    null,
+                    exceptionKind,
+                    (e, validCauses, publicOptions) -> {
+                        final String originalMessage = e.getMessage();
+                        return Optional.of(rewriteMessage.apply(originalMessage, publicOptions));
+                    });
+        }
+
         /** Classify exception and rewrite error message using a function. */
-        static Handler rewriteMessageFromException(
+        static Handler rewriteMessageOnPattern(
                 @Nullable Pattern onMessageRegex,
                 ExceptionKind exceptionKind,
-                Function<Exception, String> rewriteMessage) {
+                BiFunction<String, ReadableConfig, String> rewriteMessage) {
             return new Handler(
                     null,
                     onMessageRegex,
                     exceptionKind,
-                    (e, validCauses) -> Optional.of(rewriteMessage.apply(e)));
+                    (e, validCauses, publicOptions) ->
+                            Optional.of(rewriteMessage.apply(e.getMessage(), publicOptions)));
         }
 
         /** Classify exception and skip the top-level error message. */
@@ -676,7 +741,7 @@ public final class ClassifiedException {
                     onMessagePart,
                     null,
                     exceptionKind,
-                    (e, validCauses) -> {
+                    (e, validCauses, publicOptions) -> {
                         if (e.getCause() instanceof Exception) {
                             return ClassifiedException.buildMessageWithCauses(
                                     (Exception) e.getCause(), validCauses);
@@ -696,7 +761,10 @@ public final class ClassifiedException {
 
     private interface MessageProvider {
 
-        Optional<String> apply(Exception e, Set<Class<? extends Exception>> validCauses);
+        Optional<String> apply(
+                Exception e,
+                Set<Class<? extends Exception>> validCauses,
+                ReadableConfig publicOptions);
     }
 
     private static List<String> collectCauses(

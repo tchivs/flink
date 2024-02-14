@@ -162,7 +162,9 @@ class DefaultServiceTasks implements ServiceTasks {
                                     throw new ValidationException(
                                             String.format("Catalog name '%s' is not allowed.", v));
                                 }
-                                tableEnvironment.useCatalog(v);
+                                if (tableEnvironment.getCatalog(v).isPresent()) {
+                                    tableEnvironment.useCatalog(v);
+                                }
                             });
             publicConfig
                     .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
@@ -173,7 +175,12 @@ class DefaultServiceTasks implements ServiceTasks {
                                     throw new ValidationException(
                                             String.format("Database name '%s' is not allowed.", v));
                                 }
-                                tableEnvironment.useDatabase(v);
+                                if (tableEnvironment
+                                        .getCatalog(tableEnvironment.getCurrentCatalog())
+                                        .map(cat -> cat.databaseExists(v))
+                                        .orElse(false)) {
+                                    tableEnvironment.useDatabase(v);
+                                }
                             });
         }
 

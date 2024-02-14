@@ -5,6 +5,7 @@
 package io.confluent.flink.jobgraph.v3;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.configuration.Configuration;
 
 import io.confluent.flink.jobgraph.GeneratorUtils;
 import io.confluent.flink.jobgraph.JobGraphWrapper;
@@ -40,7 +41,8 @@ public class CompiledPlanJobGraphGeneratorV3Impl implements JobGraphGeneratorV3 
             return GeneratorUtils.generateJobGraph(arguments, allOptions);
         } catch (Exception e) {
             final ClassifiedException classified =
-                    ClassifiedException.of(e, ClassifiedException.VALID_CAUSES);
+                    ClassifiedException.of(
+                            e, ClassifiedException.VALID_CAUSES, new Configuration());
             if (classified.getKind() == ExceptionKind.USER) {
                 throw new RuntimeException(classified.getSensitiveMessage());
             } else {

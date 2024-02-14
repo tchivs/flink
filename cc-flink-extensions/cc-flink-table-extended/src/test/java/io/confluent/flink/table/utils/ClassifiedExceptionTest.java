@@ -5,6 +5,7 @@
 package io.confluent.flink.table.utils;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableException;
@@ -239,7 +240,23 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
                                         + "\n"
-                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it."),
+                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it.\n"
+                                        + "Using current catalog '' and current database ''."),
+
+                // ---
+                TestSpec.test("alter a table when no database is set")
+                        .setupTableEnvironment(env -> env.useDatabase(null))
+                        .executeSql("ALTER TABLE t ADD (b INT)")
+                        .expectExactUserError(
+                                "A current, valid database has not been set. Please use a fully qualified identifier (such as 'my_database.my_table' or 'my_catalog.my_database.my_table') or set a current database using 'USE my_database'."),
+
+                // ---
+                TestSpec.test("alter a table when no catalog is set")
+                        .setupTableEnvironment(env -> env.useCatalog(null))
+                        .executeSql("ALTER TABLE t ADD (b INT)")
+                        .expectExactUserError(
+                                "A current, valid catalog has not been set. Please use a fully qualified identifier (such as 'my_catalog.my_database.my_table') or set a current catalog using 'USE CATALOG my_catalog'."),
+
                 // ---
                 TestSpec.test("removal of sensitive string literals")
                         .executeSql("SELECT * FROM `not_exist`")
@@ -264,7 +281,8 @@ public class ClassifiedExceptionTest {
         } catch (Throwable t) {
             assertThat(t).isInstanceOf(Exception.class);
             final ClassifiedException classified =
-                    ClassifiedException.of((Exception) t, testSpec.allowedCauses);
+                    ClassifiedException.of(
+                            (Exception) t, testSpec.allowedCauses, new Configuration());
             switch (testSpec.matchCondition) {
                 case SENSITIVE_MESSAGE_EXACT:
                     assertThat(classified.getSensitiveMessage()).isEqualTo(testSpec.expectedError);
@@ -291,7 +309,7 @@ public class ClassifiedExceptionTest {
                         "Error with 'sensitive' field of 'Bob''s message'.",
                         new TableException("Error in table '' or 'Alice''s or Bob''s table'."));
         final ClassifiedException classified =
-                ClassifiedException.of(e, ClassifiedException.VALID_CAUSES);
+                ClassifiedException.of(e, ClassifiedException.VALID_CAUSES, new Configuration());
         assertThat(classified.getKind()).isEqualTo(ExceptionKind.USER);
         assertThat(classified.getLogMessage())
                 .isEqualTo(
