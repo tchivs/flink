@@ -273,9 +273,6 @@ public class ConfluentRocksDBOptionsFactory implements ConfigurableRocksDBOption
                 "avoid_unnecessary_blocking_io",
                 (opts, val) -> opts.setAvoidUnnecessaryBlockingIO(asBoolean(val)));
         map.put(
-                "base_background_compactions",
-                (opts, val) -> opts.setBaseBackgroundCompactions(asInt(val)));
-        map.put(
                 "best_efforts_recovery",
                 (opts, val) -> opts.setBestEffortsRecovery(asBoolean(val)));
         map.put(
@@ -337,15 +334,8 @@ public class ConfluentRocksDBOptionsFactory implements ConfigurableRocksDBOption
         map.put(
                 "max_write_batch_group_size_bytes",
                 (opts, val) -> opts.setMaxWriteBatchGroupSizeBytes(asLong(val)));
-        map.put(
-                "new_table_reader_for_compaction_inputs",
-                (opts, val) -> opts.setNewTableReaderForCompactionInputs(asBoolean(val)));
-        map.put(
-                "newtable_reader_for_compaction_inputs",
-                (opts, val) -> opts.setNewTableReaderForCompactionInputs(asBoolean(val)));
         map.put("paranoid_checks", (opts, val) -> opts.setParanoidChecks(asBoolean(val)));
         map.put("persist_stats_to_disk", (opts, val) -> opts.setPersistStatsToDisk(asBoolean(val)));
-        map.put("preserve_deletes", (opts, val) -> opts.setPreserveDeletes(asBoolean(val)));
         map.put(
                 "random_access_max_buffer_size",
                 (opts, val) -> opts.setRandomAccessMaxBufferSize(asLong(val)));
