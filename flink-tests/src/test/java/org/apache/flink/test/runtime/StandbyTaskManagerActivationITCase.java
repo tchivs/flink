@@ -260,7 +260,7 @@ public class StandbyTaskManagerActivationITCase {
         config.set(TaskManagerOptions.TASK_HEAP_MEMORY, MemorySize.parse("128m"));
         config.set(TaskManagerOptions.CPU_CORES, 1.0);
         config.set(TaskManagerConfluentOptions.STANDBY_MODE, true);
-        config.set(TaskManagerOptions.HOST, LOCALHOST);
+        config.set(TaskManagerConfluentOptions.STANDBY_HOST, LOCALHOST);
         TaskExecutorResourceUtils.adjustForLocalExecution(config);
 
         // Removing HA_MODE to guarantee that TaskManager never find JobManager with this

@@ -34,6 +34,13 @@ public class TaskManagerConfluentOptions {
                     .withDescription(
                             "The external RPC port where the TaskManager standby activation endpoint is exposed.");
 
+    public static final ConfigOption<String> STANDBY_HOST =
+            key("taskmanager.standby-host")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The host where the TaskManager standby activation endpoint is exposed.");
+
     // ------------------------------------------------------------------------
 
     /** Not intended to be instantiated. */

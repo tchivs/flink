@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.AkkaOptions;
+import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JMXServerOptions;
@@ -314,34 +315,20 @@ public class TaskManagerRunner implements FatalErrorHandler {
             return;
         }
 
-        if (!configuration.contains(TaskManagerOptions.HOST)) {
-            throw new FlinkException(
-                    String.format(
-                            "%s option is mandatory when %s is enabled",
-                            TaskManagerOptions.HOST.key(),
-                            TaskManagerConfluentOptions.STANDBY_MODE.key()));
-        }
-
         CompletableFuture<Void> activationFuture;
         synchronized (lock) {
             // This RPC System won't be restarted after the activation. So all configurations like
             // TMP_DIRS that are required for its start are impossible to override from JM.
             rpcSystem = RpcSystem.load(configuration);
+            // use STANDBY_HOST as the host for the standby rpc service
+            final String standbyHost = getStandbyConfig(TaskManagerConfluentOptions.STANDBY_HOST);
             // use STANDBY_RPC_PORT as the rpc port for the standby rpc service
             final int standbyRpcPort =
-                    configuration
-                            .getOptional(TaskManagerConfluentOptions.STANDBY_RPC_PORT)
-                            .orElseThrow(
-                                    () ->
-                                            new IllegalConfigurationException(
-                                                    String.format(
-                                                            "Option %s must be set.",
-                                                            TaskManagerConfluentOptions
-                                                                    .STANDBY_RPC_PORT
-                                                                    .key())));
+                    getStandbyConfig(TaskManagerConfluentOptions.STANDBY_RPC_PORT);
             final Configuration standbyConfiguration =
                     new Configuration(configuration)
-                            .set(TaskManagerOptions.RPC_PORT, String.valueOf(standbyRpcPort));
+                            .set(TaskManagerOptions.RPC_PORT, String.valueOf(standbyRpcPort))
+                            .set(TaskManagerOptions.HOST, standbyHost);
 
             standbyRpcService = createRpcService(standbyConfiguration, null, rpcSystem);
             standbyTaskManager = new StandbyTaskManager(standbyRpcService);
@@ -352,6 +339,15 @@ public class TaskManagerRunner implements FatalErrorHandler {
         }
 
         activationFuture.get();
+    }
+
+    private <T> T getStandbyConfig(ConfigOption<T> option) {
+        return configuration
+                .getOptional(option)
+                .orElseThrow(
+                        () ->
+                                new IllegalConfigurationException(
+                                        String.format("Option %s must be set.", option.key())));
     }
 
     public void close() throws Exception {

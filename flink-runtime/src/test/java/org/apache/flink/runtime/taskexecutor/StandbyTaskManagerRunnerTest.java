@@ -11,7 +11,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.TaskManagerConfluentOptions;
-import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.blob.BlobCacheService;
@@ -30,12 +29,16 @@ import org.apache.flink.util.function.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.apache.flink.runtime.testutils.CommonTestUtils.waitUntilCondition;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 /** Tests for the {@link TaskManagerRunner} with STANDBY_MODE option. */
 @Confluent
@@ -51,11 +54,18 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
         }
     }
 
-    @Test
-    public void testStandbySetupFailsIfStandbyRpcPortIsNotSet() throws Exception {
+    @ParameterizedTest
+    @MethodSource("standbySetupFailsIfNotAllOptionsConfiguredArguments")
+    public void testStandbySetupFailsIfNotAllOptionsConfigured(ConfigOption<?> configuredOption)
+            throws Exception {
         // given: Configured TaskManager in standby mode.
         final Configuration configuration =
                 createConfiguration().set(TaskManagerConfluentOptions.STANDBY_MODE, true);
+        if (configuredOption.equals(TaskManagerConfluentOptions.STANDBY_HOST)) {
+            configuration.set(TaskManagerConfluentOptions.STANDBY_HOST, "localhost");
+        } else if (configuredOption.equals(TaskManagerConfluentOptions.STANDBY_RPC_PORT)) {
+            configuration.set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0);
+        }
 
         // when: Start the TaskManagerRunner.
         DataCollectorExecutorServiceFactory taskExecutorServiceFactory =
@@ -68,12 +78,20 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
                 .isInstanceOf(IllegalConfigurationException.class);
     }
 
+    private static Stream<ConfigOption<?>> standbySetupFailsIfNotAllOptionsConfiguredArguments() {
+        return Stream.of(
+                TaskManagerConfluentOptions.STANDBY_HOST,
+                TaskManagerConfluentOptions.STANDBY_RPC_PORT);
+    }
+
     @Test
     public void testTakingOverStandbyTaskManagers() throws Exception {
         // given: Configured TaskManager in standby mode.
+        final String standbyHost = "standbyhost";
         final Configuration configuration =
                 createConfiguration()
                         .set(TaskManagerConfluentOptions.STANDBY_MODE, true)
+                        .set(TaskManagerConfluentOptions.STANDBY_HOST, standbyHost)
                         .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0);
 
         // and: The one config that should be overridden and one should stay untouched.
@@ -131,12 +149,12 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
         assertEquals(
                 "UNTOUCHED_ORIGINAL_VALUE",
                 taskExecutorServiceFactory.lastReceivedConfig.get(untouchedKey));
+        assertNotEquals(standbyHost, taskExecutorServiceFactory.lastRpcService.getAddress());
     }
 
     private static Configuration createConfiguration() {
         final Configuration configuration = new Configuration();
         configuration.setString(JobManagerOptions.ADDRESS, "localhost");
-        configuration.setString(TaskManagerOptions.HOST, "localhost");
         return TaskExecutorResourceUtils.adjustForLocalExecution(configuration);
     }
 
@@ -165,6 +183,7 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
 
         private final AtomicInteger callCounter = new AtomicInteger();
         private volatile Configuration lastReceivedConfig;
+        private volatile RpcService lastRpcService;
 
         @Override
         public TaskManagerRunner.TaskExecutorService createTaskExecutor(
@@ -182,6 +201,7 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
                 DelegationTokenReceiverRepository delegationTokenReceiverRepository) {
             callCounter.incrementAndGet();
             lastReceivedConfig = configuration;
+            lastRpcService = rpcService;
             return TestingTaskExecutorService.newBuilder().setStartRunnable(() -> {}).build();
         }
     }
