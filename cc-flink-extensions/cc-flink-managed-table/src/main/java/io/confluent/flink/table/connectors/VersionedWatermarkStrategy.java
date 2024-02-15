@@ -26,16 +26,19 @@ import static io.confluent.flink.table.connectors.HistogramWatermarkGenerator.DE
  */
 @Confluent
 public class VersionedWatermarkStrategy {
+    private static final String DEFAULT_WATERMARK_ALIGNMENT_GROUP = "__default__";
+    private static final Duration DEFAULT_ALLOWED_WATERMARK_ALIGNMENT_DRIFT = Duration.ofMinutes(1);
 
     /** Maps a version to a concrete implementation. */
     public static WatermarkStrategy<RowData> forOptions(WatermarkOptions options) {
-        final WatermarkStrategy<RowData> strategy;
+        WatermarkStrategy<RowData> strategy;
         switch (options.version) {
             case V0:
                 // Fallback in case something is wrong with the default implementation.
                 strategy = WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10));
                 break;
             case V1:
+            case V2:
                 strategy =
                         WatermarkStrategy.forGenerator(
                                 ctx ->
@@ -52,6 +55,12 @@ public class VersionedWatermarkStrategy {
                 break;
             default:
                 throw new IllegalArgumentException("Unknown watermark generator version.");
+        }
+        if (options.version == ConfluentManagedTableOptions.SourceWatermarkVersion.V2) {
+            strategy =
+                    strategy.withWatermarkAlignment(
+                            DEFAULT_WATERMARK_ALIGNMENT_GROUP,
+                            DEFAULT_ALLOWED_WATERMARK_ALIGNMENT_DRIFT);
         }
         if (options.idleTimeout.isZero() || options.idleTimeout.isNegative()) {
             return strategy;
