@@ -25,6 +25,8 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.accumulators.StringifiedAccumulatorResult;
+import org.apache.flink.runtime.blob.BlobWriter;
+import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.checkpoint.JobManagerTaskRestore;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
@@ -52,6 +54,7 @@ import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorOperatorEventGateway;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
+import org.apache.flink.types.Either;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -569,13 +572,22 @@ public class Execution
                     getAssignedResourceLocation(),
                     slot.getAllocationId());
 
+            final Either<SerializedValue<JobManagerTaskRestore>, PermanentBlobKey>
+                    maybeOffloadedTaskRestore =
+                            taskRestore == null
+                                    ? null
+                                    : BlobWriter.serializeAndTryOffload(
+                                            taskRestore,
+                                            vertex.getJobId(),
+                                            vertex.getExecutionGraphAccessor().getBlobWriter());
+
             final TaskDeploymentDescriptor deployment =
                     vertex.getExecutionGraphAccessor()
                             .getTaskDeploymentDescriptorFactory()
                             .createDeploymentDescriptor(
                                     this,
                                     slot.getAllocationId(),
-                                    taskRestore,
+                                    maybeOffloadedTaskRestore,
                                     producedPartitions.values());
 
             // null taskRestore to let it be GC'ed
@@ -595,6 +607,13 @@ public class Execution
                     .thenCompose(Function.identity())
                     .whenCompleteAsync(
                             (ack, failure) -> {
+                                if (maybeOffloadedTaskRestore != null
+                                        && maybeOffloadedTaskRestore.isRight()) {
+                                    vertex.getExecutionGraphAccessor()
+                                            .deleteBlobs(
+                                                    Collections.singletonList(
+                                                            maybeOffloadedTaskRestore.right()));
+                                }
                                 if (failure == null) {
                                     vertex.notifyCompletedDeployment(this);
                                 } else {
