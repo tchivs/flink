@@ -39,7 +39,8 @@ public class TypeFailureEnricher implements FailureEnricher {
     private static final String KEY_TYPE = "TYPE";
     private static final String KEY_MSG = "USER_ERROR_MSG";
     private static final Set<String> ALLOWED_KEYS =
-            Stream.of(KEY_TYPE, KEY_MSG).collect(Collectors.toSet());
+            Stream.of(KEY_TYPE, KEY_MSG, FailureEnricher.KEY_JOB_CANNOT_RESTART)
+                    .collect(Collectors.toSet());
     private static final String SERIALIZE_MESSAGE = "serializ";
     // Copy of org.apache.flink.runtime.io.network.api.serialization.NonSpanningWrapper;
     private static final String BROKEN_SERIALIZATION_ERROR_MESSAGE =
@@ -150,9 +151,15 @@ public class TypeFailureEnricher implements FailureEnricher {
         }
         final Map<String, String> labels = new HashMap<>();
         for (TypeClassifier classifier : TYPE_CLASSIFIERS) {
-            final Optional<String> maybeType = classifier.classify(cause).map(Type::name);
+            final Optional<Type> maybeType = classifier.classify(cause);
             if (maybeType.isPresent()) {
-                labels.put(KEY_TYPE, maybeType.get());
+                Type type = maybeType.get();
+                labels.put(KEY_TYPE, type.name());
+                // This is a first simple approach to preventing restart loop. For now, we consider
+                // all user errors as unrecoverable and add the corresponding marker label.
+                if (Type.USER.equals(type)) {
+                    labels.put(FailureEnricher.KEY_JOB_CANNOT_RESTART, "");
+                }
                 break;
             }
         }

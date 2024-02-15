@@ -1215,8 +1215,9 @@ public class AdaptiveScheduler
     }
 
     @Override
-    public FailureResult howToHandleFailure(Throwable failure) {
-        if (ExecutionFailureHandler.isUnrecoverableError(failure)) {
+    public FailureResult howToHandleFailure(
+            Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+        if (ExecutionFailureHandler.isUnrecoverableError(failure, failureLabels)) {
             return FailureResult.canNotRestart(
                     new JobException("The failure is not recoverable", failure));
         }

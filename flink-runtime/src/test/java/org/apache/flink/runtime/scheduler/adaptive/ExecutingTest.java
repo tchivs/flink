@@ -92,6 +92,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -194,7 +195,7 @@ public class ExecutingTest extends TestLogger {
                         assertThat(failingArguments.getExecutionGraph(), notNullValue());
                         assertThat(failingArguments.getFailureCause().getMessage(), is(failureMsg));
                     }));
-            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
+            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
             exec.handleGlobalFailure(
                     new RuntimeException(failureMsg), FailureEnricherUtils.EMPTY_FAILURE_LABELS);
         }
@@ -208,7 +209,7 @@ public class ExecutingTest extends TestLogger {
             ctx.setExpectRestarting(
                     (restartingArguments ->
                             assertThat(restartingArguments.getBackoffTime(), is(duration))));
-            ctx.setHowToHandleFailure((f) -> FailureResult.canRestart(f, duration));
+            ctx.setHowToHandleFailure((f, l) -> FailureResult.canRestart(f, duration));
             exec.handleGlobalFailure(
                     new RuntimeException("Recoverable error"),
                     FailureEnricherUtils.EMPTY_FAILURE_LABELS);
@@ -288,7 +289,7 @@ public class ExecutingTest extends TestLogger {
                             .setExecutionGraph(returnsFailedStateExecutionGraph)
                             .build(ctx);
 
-            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
+            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
             ctx.setExpectFailing(assertNonNull());
 
             Exception exception = new RuntimeException();
@@ -315,7 +316,7 @@ public class ExecutingTest extends TestLogger {
                             .setExecutionGraph(returnsFailedStateExecutionGraph)
                             .build(ctx);
             ctx.setHowToHandleFailure(
-                    (failure) -> FailureResult.canRestart(failure, Duration.ZERO));
+                    (failure, label) -> FailureResult.canRestart(failure, Duration.ZERO));
             ctx.setExpectRestarting(assertNonNull());
 
             Exception exception = new RuntimeException();
@@ -543,7 +544,8 @@ public class ExecutingTest extends TestLogger {
         private final StateValidator<CancellingArguments> cancellingStateValidator =
                 new StateValidator<>("cancelling");
 
-        private Function<Throwable, FailureResult> howToHandleFailure;
+        private BiFunction<Throwable, CompletableFuture<Map<String, String>>, FailureResult>
+                howToHandleFailure;
         private Supplier<Boolean> canScaleUp = () -> false;
         private StateValidator<StopWithSavepointArguments> stopWithSavepointValidator =
                 new StateValidator<>("stopWithSavepoint");
@@ -566,7 +568,9 @@ public class ExecutingTest extends TestLogger {
             stopWithSavepointValidator.expectInput(asserter);
         }
 
-        public void setHowToHandleFailure(Function<Throwable, FailureResult> function) {
+        public void setHowToHandleFailure(
+                BiFunction<Throwable, CompletableFuture<Map<String, String>>, FailureResult>
+                        function) {
             this.howToHandleFailure = function;
         }
 
@@ -589,8 +593,9 @@ public class ExecutingTest extends TestLogger {
         }
 
         @Override
-        public FailureResult howToHandleFailure(Throwable failure) {
-            return howToHandleFailure.apply(failure);
+        public FailureResult howToHandleFailure(
+                Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+            return howToHandleFailure.apply(failure, failureLabels);
         }
 
         @Override
