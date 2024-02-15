@@ -22,7 +22,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.CommitterContext;
-import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -63,7 +63,7 @@ import static org.apache.flink.streaming.connectors.kafka.credentials.KafkaClien
  */
 @PublicEvolving
 public class KafkaSink<IN>
-        implements StatefulSink<IN, KafkaWriterState>,
+        implements StatefulSinkWithGlobalState<IN, KafkaWriterState, TransactionIdRangeState>,
                 TwoPhaseCommittingSink<IN, KafkaCommittable> {
 
     private final DeliveryGuarantee deliveryGuarantee;
@@ -131,13 +131,16 @@ public class KafkaSink<IN>
                 context,
                 recordSerializer,
                 context.asSerializationSchemaInitializationContext(),
-                Collections.emptyList());
+                Collections.emptyList(),
+                null);
     }
 
-    @Internal
     @Override
-    public KafkaWriter<IN> restoreWriter(
-            InitContext context, Collection<KafkaWriterState> recoveredState) throws IOException {
+    public StatefulSinkWriter<IN, KafkaWriterState, TransactionIdRangeState> restoreWriter(
+            InitContext context,
+            Collection<KafkaWriterState> recoveredWriterState,
+            TransactionIdRangeState recoveredGlobalState)
+            throws IOException {
         addCredentialsToProperties(context.getJobId(), kafkaProducerConfig);
         maybeAddClientIdToProperties(context.getSubtaskId(), kafkaProducerConfig);
 
@@ -148,13 +151,19 @@ public class KafkaSink<IN>
                 context,
                 recordSerializer,
                 context.asSerializationSchemaInitializationContext(),
-                recoveredState);
+                recoveredWriterState,
+                recoveredGlobalState);
     }
 
     @Internal
     @Override
     public SimpleVersionedSerializer<KafkaWriterState> getWriterStateSerializer() {
         return new KafkaWriterStateSerializer();
+    }
+
+    @Override
+    public SimpleVersionedSerializer<TransactionIdRangeState> getGlobalStateSerializer() {
+        return new TransactionIdRangeStateSerializer();
     }
 
     @VisibleForTesting

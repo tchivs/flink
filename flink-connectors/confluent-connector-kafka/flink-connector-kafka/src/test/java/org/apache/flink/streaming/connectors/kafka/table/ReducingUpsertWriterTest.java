@@ -21,7 +21,7 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.SinkWriter;
-import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -151,7 +151,7 @@ public class ReducingUpsertWriterTest {
     @Test
     public void testWriteData() throws Exception {
         final MockedSinkWriter writer = new MockedSinkWriter();
-        final ReducingUpsertWriter<?> bufferedWriter = createBufferedWriter(writer);
+        final ReducingUpsertWriter<?, ?> bufferedWriter = createBufferedWriter(writer);
 
         // write 4 records which doesn't trigger batch size
         writeData(bufferedWriter, new ReusableIterator(0, 4));
@@ -218,7 +218,7 @@ public class ReducingUpsertWriterTest {
     @Test
     public void testFlushDataWhenCheckpointing() throws Exception {
         final MockedSinkWriter writer = new MockedSinkWriter();
-        final ReducingUpsertWriter<?> bufferedWriter = createBufferedWriter(writer);
+        final ReducingUpsertWriter<?, ?> bufferedWriter = createBufferedWriter(writer);
         // write all data, there should be 3 records are still buffered
         writeData(bufferedWriter, new ReusableIterator(0, 4));
         // snapshot should flush the buffer
@@ -266,7 +266,7 @@ public class ReducingUpsertWriterTest {
     @Test
     public void testWriteDataWithNullTimestamp() throws Exception {
         final MockedSinkWriter writer = new MockedSinkWriter();
-        final ReducingUpsertWriter<?> bufferedWriter = createBufferedWriter(writer);
+        final ReducingUpsertWriter<?, ?> bufferedWriter = createBufferedWriter(writer);
 
         bufferedWriter.write(
                 GenericRowData.ofKind(
@@ -322,7 +322,7 @@ public class ReducingUpsertWriterTest {
         }
     }
 
-    private void writeData(ReducingUpsertWriter<?> writer, Iterator<RowData> iterator)
+    private void writeData(ReducingUpsertWriter<?, ?> writer, Iterator<RowData> iterator)
             throws Exception {
         while (iterator.hasNext()) {
             RowData next = iterator.next();
@@ -344,7 +344,7 @@ public class ReducingUpsertWriterTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ReducingUpsertWriter<?> createBufferedWriter(MockedSinkWriter sinkWriter) {
+    private ReducingUpsertWriter<?, ?> createBufferedWriter(MockedSinkWriter sinkWriter) {
         TypeInformation<RowData> typeInformation =
                 (TypeInformation<RowData>)
                         new SinkRuntimeProviderContext(false)
@@ -372,7 +372,7 @@ public class ReducingUpsertWriterTest {
     }
 
     private static class MockedSinkWriter
-            implements StatefulSink.StatefulSinkWriter<RowData, Void> {
+            implements StatefulSinkWithGlobalState.StatefulSinkWriter<RowData, Void, Void> {
 
         boolean flushed = false;
 
@@ -405,6 +405,11 @@ public class ReducingUpsertWriterTest {
 
         @Override
         public List<Void> snapshotState(long checkpointId) throws IOException {
+            return null;
+        }
+
+        @Override
+        public Void snapshotGlobalState(long checkpointId) throws IOException {
             return null;
         }
     }

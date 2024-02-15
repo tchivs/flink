@@ -28,7 +28,7 @@ public class TransactionIdFactoryTest extends TestLogger {
 
     @Test
     public void testBuildTransactionalId() {
-        final String expected = "prefix-0-2";
+        final String expected = "prefix_0_2";
         assertThat(TransactionalIdFactory.buildTransactionalId("prefix", 0, 2L))
                 .isEqualTo(expected);
     }

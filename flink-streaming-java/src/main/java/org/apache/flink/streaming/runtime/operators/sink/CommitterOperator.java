@@ -21,6 +21,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeutils.base.array.BytePrimitiveArraySerializer;
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.api.connector.sink2.RestoredSubtaskCommittablesTracker;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -43,7 +44,9 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import static org.apache.flink.util.IOUtils.closeAll;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -115,10 +118,28 @@ class CommitterOperator<CommT> extends AbstractStreamOperator<CommittableMessage
                                 getRuntimeContext().getIndexOfThisSubtask(),
                                 getRuntimeContext().getNumberOfParallelSubtasks()));
         if (context.isRestored()) {
-            committableCollectorState.get().forEach(cc -> committableCollector.merge(cc));
+            final Set<Integer> restoredSubtaskIds = new HashSet<>();
+            committableCollectorState
+                    .get()
+                    .forEach(
+                            cc -> {
+                                committableCollector.merge(cc);
+                                restoredSubtaskIds.add(cc.getSubtaskId());
+                            });
             lastCompletedCheckpointId = context.getRestoredCheckpointId().getAsLong();
+
+            if (committer instanceof RestoredSubtaskCommittablesTracker) {
+                ((RestoredSubtaskCommittablesTracker<CommT>) committer)
+                        .preCommitRestoredSubtaskCommittables(restoredSubtaskIds);
+            }
+
             // try to re-commit recovered transactions as quickly as possible
             commitAndEmitCheckpoints();
+
+            if (committer instanceof RestoredSubtaskCommittablesTracker) {
+                ((RestoredSubtaskCommittablesTracker<CommT>) committer)
+                        .postCommitRestoredSubtaskCommittables();
+            }
         }
     }
 

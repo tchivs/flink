@@ -21,12 +21,14 @@ import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for serializing and deserialzing {@link KafkaCommittableV1} with {@link
+ * Tests for serializing and deserializing {@link ConfluentKafkaCommittableV1} with {@link
  * KafkaCommittableSerializer}.
  */
 public class KafkaCommittableSerializerTest extends TestLogger {
@@ -35,11 +37,39 @@ public class KafkaCommittableSerializerTest extends TestLogger {
 
     @Test
     public void testCommittableSerDe() throws IOException {
-        final String transactionalId = "test-id";
-        final short epoch = 5;
-        final KafkaCommittableV1 committable =
-                new KafkaCommittableV1(1L, epoch, transactionalId, null);
+        final ConfluentKafkaCommittableV1 committable =
+                ConfluentKafkaCommittableV1.of("txn-prefix", 0, 3);
         final byte[] serialized = SERIALIZER.serialize(committable);
-        assertThat(SERIALIZER.deserialize(1, serialized)).isEqualTo(committable);
+        assertThat(SERIALIZER.deserialize(ConfluentKafkaCommittableV1.VERSION, serialized))
+                .isEqualTo(committable);
+    }
+
+    @Test
+    public void testV1BackwardsCompatibility() throws IOException {
+        final String transactionalId =
+                TransactionalIdFactory.buildTransactionalId("txn-prefix", 0, 3);
+        final long producerId = 1L;
+        final short epoch = 5;
+        final KafkaCommittableV1 committableV1 =
+                new KafkaCommittableV1(producerId, epoch, transactionalId, null);
+        final byte[] serialized = serializeV1(committableV1);
+        assertThat(SERIALIZER.deserialize(KafkaCommittableV1.VERSION, serialized))
+                .isEqualTo(committableV1);
+    }
+
+    /**
+     * Serialization for historical binary formats.
+     *
+     * <p>Moved here from {@link KafkaCommittableSerializer} after a version is retired.
+     */
+    private static byte[] serializeV1(KafkaCommittableV1 committableV1) throws IOException {
+        try (final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                final DataOutputStream out = new DataOutputStream(baos)) {
+            out.writeShort(committableV1.getEpoch());
+            out.writeLong(committableV1.getProducerId());
+            out.writeUTF(committableV1.getTransactionalId());
+            out.flush();
+            return baos.toByteArray();
+        }
     }
 }

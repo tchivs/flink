@@ -43,6 +43,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -315,10 +316,11 @@ public class KafkaWriterITCase {
 
     private void triggerProducerException(KafkaWriter<Integer> writer, Properties properties)
             throws IOException {
-        final String transactionalId = writer.getCurrentProducer().getTransactionalId();
+        final ConfluentKafkaCommittableV1 transactionalId =
+                (ConfluentKafkaCommittableV1) writer.getCurrentProducer().getAssignedCommittable();
 
-        try (FlinkKafkaInternalProducer<byte[], byte[]> producer =
-                new FlinkKafkaInternalProducer<>(properties, transactionalId)) {
+        try (TwoPhaseCommitProducer<byte[], byte[]> producer =
+                new TwoPhaseCommitProducer<>(properties, transactionalId)) {
             producer.initTransactions();
             producer.beginTransaction();
             producer.send(new ProducerRecord<byte[], byte[]>(topic, "1".getBytes()));
@@ -473,7 +475,11 @@ public class KafkaWriterITCase {
     /**
      * Tests that open transactions are automatically aborted on close such that successive writes
      * succeed.
+     *
+     * <p>TODO can only re-enable this once we update ITcases to use a ccloud Kafka broker image
+     * that contains the internal 2PC server-side changes
      */
+    @Disabled
     @Test
     void testAbortOnClose() throws Exception {
         Properties properties = getKafkaClientConfiguration();
@@ -493,9 +499,9 @@ public class KafkaWriterITCase {
             // manually commit here, which would only succeed if the first transaction was aborted
             assertThat(committables).hasSize(1);
             final KafkaCommittable committable = committables.stream().findFirst().get();
-            String transactionalId = committable.getTransactionalId();
-            try (FlinkKafkaInternalProducer<byte[], byte[]> producer =
-                    new FlinkKafkaInternalProducer<>(properties, transactionalId)) {
+            try (TwoPhaseCommitProducer<byte[], byte[]> producer =
+                    new TwoPhaseCommitProducer<>(
+                            properties, (ConfluentKafkaCommittableV1) committable)) {
                 producer.resumePreparedTransaction(committable);
                 producer.commitTransaction();
             }
@@ -541,7 +547,8 @@ public class KafkaWriterITCase {
                 new SinkInitContext(sinkWriterMetricGroup, timeService, metadataConsumer),
                 new DummyRecordSerializer(),
                 new DummySchemaContext(),
-                Collections.emptyList());
+                Collections.emptyList(),
+                null);
     }
 
     private KafkaWriter<Integer> createWriterWithConfiguration(
@@ -553,7 +560,8 @@ public class KafkaWriterITCase {
                 sinkInitContext,
                 new DummyRecordSerializer(),
                 new DummySchemaContext(),
-                Collections.emptyList());
+                Collections.emptyList(),
+                null);
     }
 
     private static Properties getKafkaClientConfiguration() {

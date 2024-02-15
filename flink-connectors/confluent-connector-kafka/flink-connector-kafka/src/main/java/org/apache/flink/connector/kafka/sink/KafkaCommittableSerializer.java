@@ -29,18 +29,22 @@ class KafkaCommittableSerializer implements SimpleVersionedSerializer<KafkaCommi
 
     @Override
     public int getVersion() {
-        return 1;
+        return ConfluentKafkaCommittableV1.VERSION;
     }
 
     @Override
     public byte[] serialize(KafkaCommittable state) throws IOException {
-        final KafkaCommittableV1 committableV1 = KafkaCommittableV1.tryCast(state);
+        final ConfluentKafkaCommittableV1 committableV2 =
+                ConfluentKafkaCommittableV1.tryCast(state);
 
         try (final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 final DataOutputStream out = new DataOutputStream(baos)) {
-            out.writeShort(committableV1.getEpoch());
-            out.writeLong(committableV1.getProducerId());
-            out.writeUTF(committableV1.getTransactionalId());
+            out.writeUTF(committableV2.getTransactionalId());
+            out.writeUTF(committableV2.getTransactionalIdPrefix());
+            out.writeInt(committableV2.getSubtaskId());
+            out.writeInt(committableV2.getTransactionIdInPool());
+            out.writeInt(committableV2.getIdPoolRangeStartId());
+            out.writeInt(committableV2.getIdPoolRangeEndIdExclusive());
             out.flush();
             return baos.toByteArray();
         }
@@ -50,10 +54,29 @@ class KafkaCommittableSerializer implements SimpleVersionedSerializer<KafkaCommi
     public KafkaCommittable deserialize(int version, byte[] serialized) throws IOException {
         try (final ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
                 final DataInputStream in = new DataInputStream(bais)) {
-            final short epoch = in.readShort();
-            final long producerId = in.readLong();
-            final String transactionalId = in.readUTF();
-            return new KafkaCommittableV1(producerId, epoch, transactionalId, null);
+            switch (version) {
+                case ConfluentKafkaCommittableV1.VERSION:
+                    final String transactionIdString = in.readUTF();
+                    final String transactionIdPrefix = in.readUTF();
+                    final int subtaskId = in.readInt();
+                    final int transactionIdInPool = in.readInt();
+                    final int idPoolRangeStartId = in.readInt();
+                    final int idPoolRangeEndIdExclusive = in.readInt();
+                    return ConfluentKafkaCommittableV1.fromRestoredState(
+                            transactionIdString,
+                            transactionIdPrefix,
+                            subtaskId,
+                            transactionIdInPool,
+                            idPoolRangeStartId,
+                            idPoolRangeEndIdExclusive);
+                case KafkaCommittableV1.VERSION:
+                    final short epoch = in.readShort();
+                    final long producerId = in.readLong();
+                    final String transactionalId = in.readUTF();
+                    return new KafkaCommittableV1(producerId, epoch, transactionalId, null);
+                default:
+                    throw new RuntimeException("Unexpected KafkaCommittable version: " + version);
+            }
         }
     }
 }

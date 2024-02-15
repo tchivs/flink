@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 
@@ -38,31 +37,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith({TestLoggerExtension.class})
 public class KafkaCommitterTest {
 
-    private static final int PRODUCER_ID = 0;
-    private static final short EPOCH = 0;
-    private static final String TRANSACTIONAL_ID = "transactionalId";
+    private static final ConfluentKafkaCommittableV1 COMMITTABLE =
+            ConfluentKafkaCommittableV1.of("test-prefix", 0, 9);
 
     /** Causes a network error by inactive broker and tests that a retry will happen. */
     @Test
-    public void testRetryCommittableOnRetriableError() throws IOException, InterruptedException {
+    public void testRetryRecoveredCommittableOnRetriableError()
+            throws IOException, InterruptedException {
         Properties properties = getProperties();
-        try (final KafkaCommitter committer = new KafkaCommitter(properties);
-                FlinkKafkaInternalProducer<Object, Object> producer =
-                        new FlinkKafkaInternalProducer<>(properties, TRANSACTIONAL_ID);
-                Recyclable<FlinkKafkaInternalProducer<Object, Object>> recyclable =
-                        new Recyclable<>(producer, p -> {})) {
-            final KafkaCommittable committable =
-                    new KafkaCommittableV1(PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable);
+        try (final KafkaCommitter committer = new KafkaCommitter(properties)) {
             final MockCommitRequest<KafkaCommittable> request =
-                    new MockCommitRequest<>(committable);
+                    new MockCommitRequest<>(COMMITTABLE);
 
-            producer.resumePreparedTransaction(committable);
             committer.commit(Collections.singletonList(request));
 
             assertThat(request.getNumberOfRetries()).isEqualTo(1);
-            assertThat(recyclable.isRecycled()).isFalse();
-            // FLINK-25531: force the producer to close immediately, else it would take 1 hour
-            producer.close(Duration.ZERO);
         }
     }
 
@@ -70,15 +59,15 @@ public class KafkaCommitterTest {
     public void testFailJobOnUnknownFatalError() throws IOException, InterruptedException {
         Properties properties = getProperties();
         try (final KafkaCommitter committer = new KafkaCommitter(properties);
-                FlinkKafkaInternalProducer<Object, Object> producer =
-                        new FlinkKafkaInternalProducer<>(properties, TRANSACTIONAL_ID);
-                Recyclable<FlinkKafkaInternalProducer<Object, Object>> recyclable =
+                TwoPhaseCommitProducer<Object, Object> producer =
+                        new TwoPhaseCommitProducer<>(properties, COMMITTABLE);
+                Recyclable<TwoPhaseCommitProducer<Object, Object>> recyclable =
                         new Recyclable<>(producer, p -> {})) {
             // will fail because transaction not started
             final MockCommitRequest<KafkaCommittable> request =
                     new MockCommitRequest<>(
-                            new KafkaCommittableV1(
-                                    PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
+                            ConfluentKafkaCommittableV1.applyRecyclableProducer(
+                                    COMMITTABLE, recyclable));
             committer.commit(Collections.singletonList(request));
             assertThat(request.getFailedWithUnknownReason())
                     .isInstanceOf(IllegalStateException.class);
@@ -91,8 +80,8 @@ public class KafkaCommitterTest {
     @Test
     public void testKafkaCommitterClosesProducer() throws IOException, InterruptedException {
         Properties properties = getProperties();
-        FlinkKafkaInternalProducer<Object, Object> producer =
-                new FlinkKafkaInternalProducer(properties, TRANSACTIONAL_ID) {
+        TwoPhaseCommitProducer<Object, Object> producer =
+                new TwoPhaseCommitProducer(properties, COMMITTABLE) {
                     @Override
                     public void commitTransaction() throws ProducerFencedException {}
 
@@ -103,12 +92,12 @@ public class KafkaCommitterTest {
                     public void close() {}
                 };
         try (final KafkaCommitter committer = new KafkaCommitter(properties);
-                Recyclable<FlinkKafkaInternalProducer<Object, Object>> recyclable =
+                Recyclable<TwoPhaseCommitProducer<Object, Object>> recyclable =
                         new Recyclable<>(producer, p -> {})) {
             final MockCommitRequest<KafkaCommittable> request =
                     new MockCommitRequest<>(
-                            new KafkaCommittableV1(
-                                    PRODUCER_ID, EPOCH, TRANSACTIONAL_ID, recyclable));
+                            ConfluentKafkaCommittableV1.applyRecyclableProducer(
+                                    COMMITTABLE, recyclable));
 
             committer.commit(Collections.singletonList(request));
             assertThat(recyclable.isRecycled()).isTrue();

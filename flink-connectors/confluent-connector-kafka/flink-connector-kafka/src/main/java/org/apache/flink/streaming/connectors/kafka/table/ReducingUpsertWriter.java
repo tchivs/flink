@@ -19,7 +19,7 @@ package org.apache.flink.streaming.connectors.kafka.table;
 
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.connector.sink2.SinkWriter;
-import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -39,10 +39,12 @@ import static org.apache.flink.types.RowKind.UPDATE_AFTER;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-class ReducingUpsertWriter<WriterState>
-        implements StatefulSink.StatefulSinkWriter<RowData, WriterState> {
+class ReducingUpsertWriter<WriterState, GlobalState>
+        implements StatefulSinkWithGlobalState.StatefulSinkWriter<
+                RowData, WriterState, GlobalState> {
 
-    private final StatefulSink.StatefulSinkWriter<RowData, WriterState> wrappedWriter;
+    private final StatefulSinkWithGlobalState.StatefulSinkWriter<RowData, WriterState, GlobalState>
+            wrappedWriter;
     private final WrappedContext wrappedContext = new WrappedContext();
     private final int batchMaxRowNums;
     private final Function<RowData, RowData> valueCopyFunction;
@@ -55,7 +57,8 @@ class ReducingUpsertWriter<WriterState>
     private long lastFlush = System.currentTimeMillis();
 
     ReducingUpsertWriter(
-            StatefulSink.StatefulSinkWriter<RowData, WriterState> wrappedWriter,
+            StatefulSinkWithGlobalState.StatefulSinkWriter<RowData, WriterState, GlobalState>
+                    wrappedWriter,
             DataType physicalDataType,
             int[] keyProjection,
             SinkBufferFlushMode bufferFlushMode,
@@ -94,6 +97,11 @@ class ReducingUpsertWriter<WriterState>
     @Override
     public List<WriterState> snapshotState(long checkpointId) throws IOException {
         return wrappedWriter.snapshotState(checkpointId);
+    }
+
+    @Override
+    public GlobalState snapshotGlobalState(long checkpointId) throws IOException {
+        return wrappedWriter.snapshotGlobalState(checkpointId);
     }
 
     @Override

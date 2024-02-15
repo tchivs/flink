@@ -78,8 +78,10 @@ public class GlobalStatefulSinkWriterStateHandler<InputT, WriterStateT, GlobalSt
         // restore writer with writer states + global state
         final List<WriterStateT> deserializedWriterStates =
                 CollectionUtil.iterableToList(writerState.get());
+        final List<GlobalStateT> deserializedUnionGlobalState =
+                CollectionUtil.iterableToList(globalState.get());
         final GlobalStateT deserializedGlobalState =
-                CollectionUtil.iterableToList(globalState.get()).get(0);
+                deserializedUnionGlobalState.isEmpty() ? null : deserializedUnionGlobalState.get(0);
         sinkWriter =
                 sink.restoreWriter(initContext, deserializedWriterStates, deserializedGlobalState);
 

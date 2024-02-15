@@ -99,10 +99,7 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V>
     @Override
     public KafkaCommittable prepareTransaction(Consumer<InternalKafkaProducer<K, V>> recycler) {
         return new KafkaCommittableV1(
-                getProducerId(),
-                getEpoch(),
-                getTransactionalId(),
-                new Recyclable<>(this, recycler));
+                getProducerId(), getEpoch(), transactionalId, new Recyclable<>(this, recycler));
     }
 
     @Override
@@ -162,9 +159,9 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V>
         return closed;
     }
 
-    @Nullable
-    public String getTransactionalId() {
-        return transactionalId;
+    @Override
+    public KafkaCommittable getAssignedCommittable() {
+        return new KafkaCommittableV1(getProducerId(), getEpoch(), transactionalId, null);
     }
 
     public short getEpoch() {
@@ -179,11 +176,10 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V>
         return (long) getField(producerIdAndEpoch, "producerId");
     }
 
-    public void initTransactionId(String transactionalId) {
-        if (!transactionalId.equals(this.transactionalId)) {
-            setTransactionId(transactionalId);
-            initTransactions();
-        }
+    @Override
+    public boolean initAndAbortOngoingTransaction() {
+        initTransactions();
+        return getEpoch() != 0;
     }
 
     public void setTransactionId(String transactionalId) {
@@ -324,11 +320,10 @@ class FlinkKafkaInternalProducer<K, V> extends KafkaProducer<K, V>
 
         Object transactionManager = getTransactionManager();
         synchronized (transactionManager) {
-            Object topicPartitionBookkeeper =
-                    getField(transactionManager, "topicPartitionBookkeeper");
+            Object txnPartitionMap = getField(transactionManager, "txnPartitionMap");
 
             transitionTransactionManagerStateTo(transactionManager, "INITIALIZING");
-            invoke(topicPartitionBookkeeper, "reset");
+            invoke(txnPartitionMap, "reset");
 
             setField(
                     transactionManager,

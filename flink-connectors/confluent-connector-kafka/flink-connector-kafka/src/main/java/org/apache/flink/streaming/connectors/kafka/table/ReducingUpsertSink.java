@@ -19,7 +19,7 @@ package org.apache.flink.streaming.connectors.kafka.table;
 
 import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.api.connector.sink.SinkWriter;
-import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -35,16 +35,17 @@ import java.util.Collection;
  * <p>The sink provides eventual consistency guarantees without the need of a two-phase protocol
  * because the updates are idempotent therefore duplicates have no effect.
  */
-class ReducingUpsertSink<WriterState> implements StatefulSink<RowData, WriterState> {
+class ReducingUpsertSink<WriterState, GlobalState>
+        implements StatefulSinkWithGlobalState<RowData, WriterState, GlobalState> {
 
-    private final StatefulSink<RowData, WriterState> wrappedSink;
+    private final StatefulSinkWithGlobalState<RowData, WriterState, GlobalState> wrappedSink;
     private final DataType physicalDataType;
     private final int[] keyProjection;
     private final SinkBufferFlushMode bufferFlushMode;
     private final SerializableFunction<RowData, RowData> valueCopyFunction;
 
     ReducingUpsertSink(
-            StatefulSink<RowData, WriterState> wrappedSink,
+            StatefulSinkWithGlobalState<RowData, WriterState, GlobalState> wrappedSink,
             DataType physicalDataType,
             int[] keyProjection,
             SinkBufferFlushMode bufferFlushMode,
@@ -57,9 +58,9 @@ class ReducingUpsertSink<WriterState> implements StatefulSink<RowData, WriterSta
     }
 
     @Override
-    public StatefulSinkWriter<RowData, WriterState> createWriter(InitContext context)
+    public StatefulSinkWriter<RowData, WriterState, GlobalState> createWriter(InitContext context)
             throws IOException {
-        final StatefulSinkWriter<RowData, WriterState> wrapperWriter =
+        final StatefulSinkWriter<RowData, WriterState, GlobalState> wrapperWriter =
                 wrappedSink.createWriter(context);
         return new ReducingUpsertWriter<>(
                 wrapperWriter,
@@ -71,10 +72,13 @@ class ReducingUpsertSink<WriterState> implements StatefulSink<RowData, WriterSta
     }
 
     @Override
-    public StatefulSinkWriter<RowData, WriterState> restoreWriter(
-            InitContext context, Collection<WriterState> recoveredState) throws IOException {
-        final StatefulSinkWriter<RowData, WriterState> wrapperWriter =
-                wrappedSink.restoreWriter(context, recoveredState);
+    public StatefulSinkWriter<RowData, WriterState, GlobalState> restoreWriter(
+            InitContext context,
+            Collection<WriterState> recoveredState,
+            GlobalState recoveredGlobalState)
+            throws IOException {
+        final StatefulSinkWriter<RowData, WriterState, GlobalState> wrapperWriter =
+                wrappedSink.restoreWriter(context, recoveredState, recoveredGlobalState);
         return new ReducingUpsertWriter<>(
                 wrapperWriter,
                 physicalDataType,
@@ -87,5 +91,10 @@ class ReducingUpsertSink<WriterState> implements StatefulSink<RowData, WriterSta
     @Override
     public SimpleVersionedSerializer<WriterState> getWriterStateSerializer() {
         return wrappedSink.getWriterStateSerializer();
+    }
+
+    @Override
+    public SimpleVersionedSerializer<GlobalState> getGlobalStateSerializer() {
+        return wrappedSink.getGlobalStateSerializer();
     }
 }

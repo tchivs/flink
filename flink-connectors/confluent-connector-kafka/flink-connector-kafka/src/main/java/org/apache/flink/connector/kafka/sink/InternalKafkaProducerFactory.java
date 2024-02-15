@@ -6,6 +6,8 @@ package org.apache.flink.connector.kafka.sink;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 
+import javax.annotation.Nullable;
+
 import java.util.Properties;
 import java.util.function.Consumer;
 
@@ -18,7 +20,7 @@ public abstract class InternalKafkaProducerFactory<K, V, PT extends InternalKafk
     private final Consumer<InternalKafkaProducer<K, V>> closerRegistry;
     private final Consumer<InternalKafkaProducer<K, V>> kafkaMetricsInitializer;
 
-    InternalKafkaProducerFactory(
+    public InternalKafkaProducerFactory(
             Properties baseKafkaClientProperties,
             Consumer<InternalKafkaProducer<K, V>> closerRegistry,
             Consumer<InternalKafkaProducer<K, V>> kafkaMetricsInitializer) {
@@ -27,23 +29,29 @@ public abstract class InternalKafkaProducerFactory<K, V, PT extends InternalKafk
         this.kafkaMetricsInitializer = checkNotNull(kafkaMetricsInitializer);
     }
 
-    public PT createTransactional(String transactionalId) {
+    public final PT createTransactional(
+            String transactionalIdPrefix, int subtaskId, int transactionIdInPool) {
+        final ConfluentKafkaCommittableV1 committable =
+                ConfluentKafkaCommittableV1.of(
+                        transactionalIdPrefix, subtaskId, transactionIdInPool);
         final Properties resolvedProps = new Properties();
         resolvedProps.putAll(baseKafkaClientProperties);
-        resolvedProps.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
+        resolvedProps.setProperty(
+                ProducerConfig.TRANSACTIONAL_ID_CONFIG, committable.getTransactionalId());
 
-        final PT transactionalProducer = createProducerInstance(resolvedProps);
+        final PT transactionalProducer = createProducerInstance(resolvedProps, committable);
         closerRegistry.accept(transactionalProducer);
         kafkaMetricsInitializer.accept(transactionalProducer);
         return transactionalProducer;
     }
 
-    public PT createNonTransactional() {
-        final PT nonTransactionalProducer = createProducerInstance(baseKafkaClientProperties);
+    public final PT createNonTransactional() {
+        final PT nonTransactionalProducer = createProducerInstance(baseKafkaClientProperties, null);
         closerRegistry.accept(nonTransactionalProducer);
         kafkaMetricsInitializer.accept(nonTransactionalProducer);
         return nonTransactionalProducer;
     }
 
-    protected abstract PT createProducerInstance(Properties resolvedProperties);
+    protected abstract PT createProducerInstance(
+            Properties resolvedProperties, @Nullable ConfluentKafkaCommittableV1 committable);
 }

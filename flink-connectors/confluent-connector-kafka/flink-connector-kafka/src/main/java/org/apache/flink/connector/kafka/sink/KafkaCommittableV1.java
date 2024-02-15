@@ -28,6 +28,8 @@ import java.util.Optional;
  */
 class KafkaCommittableV1 implements KafkaCommittable {
 
+    public static final int VERSION = 1;
+
     private final long producerId;
     private final short epoch;
     private final String transactionalId;
@@ -50,6 +52,11 @@ class KafkaCommittableV1 implements KafkaCommittable {
         this.epoch = epoch;
         this.transactionalId = transactionalId;
         this.producer = producer;
+    }
+
+    @Override
+    public int getVersion() {
+        return VERSION;
     }
 
     public long getProducerId() {

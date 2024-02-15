@@ -18,6 +18,8 @@ import java.util.Optional;
 @Confluent
 public interface KafkaCommittable {
 
+    int getVersion();
+
     String getTransactionalId();
 
     Optional<Recyclable<? extends InternalKafkaProducer<?, ?>>> getProducer();

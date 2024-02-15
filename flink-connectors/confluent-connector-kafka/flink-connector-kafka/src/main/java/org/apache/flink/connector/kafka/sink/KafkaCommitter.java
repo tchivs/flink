@@ -18,6 +18,7 @@
 package org.apache.flink.connector.kafka.sink;
 
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.api.connector.sink2.RestoredSubtaskCommittablesTracker;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.errors.InvalidTxnStateException;
@@ -27,20 +28,22 @@ import org.apache.kafka.common.errors.UnknownProducerIdException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Committer implementation for {@link KafkaSink}
  *
  * <p>The committer is responsible to finalize the Kafka transactions by committing them.
  */
-class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
+class KafkaCommitter
+        implements RestoredSubtaskCommittablesTracker<KafkaCommittable>,
+                Committer<KafkaCommittable>,
+                Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaCommitter.class);
     public static final String UNKNOWN_PRODUCER_ID_ERROR_MESSAGE =
@@ -49,10 +52,34 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
 
     private final Properties kafkaProducerConfig;
 
-    @Nullable private FlinkKafkaInternalProducer<?, ?> recoveryProducer;
+    private PreviousActiveCommittableRangeAborter previousActiveCommittableRangeAborter;
 
     KafkaCommitter(Properties kafkaProducerConfig) {
         this.kafkaProducerConfig = kafkaProducerConfig;
+    }
+
+    public void preCommitRestoredSubtaskCommittables(Set<Integer> restoredSubtaskIds) {
+        if (!restoredSubtaskIds.isEmpty()) {
+            previousActiveCommittableRangeAborter =
+                    new PreviousActiveCommittableRangeAborter(
+                            restoredSubtaskIds,
+                            committableToAbort -> {
+                                try (final TwoPhaseCommitProducer<?, ?> abortingProducer =
+                                        new TwoPhaseCommitProducer<>(
+                                                kafkaProducerConfig, committableToAbort)) {
+                                    abortingProducer.initAndAbortOngoingTransaction();
+                                }
+                            });
+        }
+    }
+
+    public void postCommitRestoredSubtaskCommittables() {
+        if (previousActiveCommittableRangeAborter != null) {
+            previousActiveCommittableRangeAborter
+                    .abortNonCheckpointedCommittablesWithinActiveRange();
+            // dereference for GC; this will no longer be needed for rest of the execution
+            previousActiveCommittableRangeAborter = null;
+        }
     }
 
     @Override
@@ -61,22 +88,41 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
         for (CommitRequest<KafkaCommittable> request : requests) {
             final KafkaCommittable committable = request.getCommittable();
             final String transactionalId = committable.getTransactionalId();
+
+            // if this is a commit for restored committables, track it
+            if (committable.getVersion() == ConfluentKafkaCommittableV1.VERSION
+                    && previousActiveCommittableRangeAborter != null) {
+                previousActiveCommittableRangeAborter.trackRestoredCommittable(
+                        ConfluentKafkaCommittableV1.tryCast(committable));
+            }
+
             LOG.debug("Committing Kafka transaction {}", transactionalId);
             Optional<Recyclable<? extends InternalKafkaProducer<?, ?>>> recyclable =
                     committable.getProducer();
-            InternalKafkaProducer<?, ?> producer;
+            // if there isn't a recyclable producer bundled with the committable,
+            // then this means this committable was a restored one instead of a
+            // fresh committable being passed from the writer operator
+            final boolean isRecoveredCommittable = !recyclable.isPresent();
+            InternalKafkaProducer<?, ?> producer = null;
             try {
                 producer =
-                        recyclable
-                                .<InternalKafkaProducer<?, ?>>map(Recyclable::getObject)
-                                .orElseGet(() -> getRecoveryProducer(committable));
+                        isRecoveredCommittable
+                                ? getRecoveryProducer(committable)
+                                : recyclable.get().getObject();
                 producer.commitTransaction();
                 producer.flush();
-                recyclable.ifPresent(Recyclable::close);
+                if (isRecoveredCommittable) {
+                    producer.close();
+                } else {
+                    recyclable.get().close();
+                }
             } catch (RetriableException e) {
                 LOG.warn(
                         "Encountered retriable exception while committing {}.", transactionalId, e);
                 request.retryLater();
+                if (isRecoveredCommittable && producer != null) {
+                    producer.close();
+                }
             } catch (ProducerFencedException e) {
                 // initTransaction has been called on this transaction before
                 LOG.error(
@@ -91,7 +137,11 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
                         ProducerConfig.TRANSACTION_TIMEOUT_CONFIG,
                         kafkaProducerConfig.getProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG),
                         e);
-                recyclable.ifPresent(Recyclable::close);
+                if (isRecoveredCommittable && producer != null) {
+                    producer.close();
+                } else {
+                    recyclable.get().close();
+                }
                 request.signalFailedWithKnownReason(e);
             } catch (InvalidTxnStateException e) {
                 // This exception only occurs when aborting after a commit or vice versa.
@@ -101,44 +151,62 @@ class KafkaCommitter implements Committer<KafkaCommittable>, Closeable {
                                 + "Most likely the transaction has been aborted for some reason. Please check the Kafka logs for more details.",
                         request,
                         e);
-                recyclable.ifPresent(Recyclable::close);
+                if (isRecoveredCommittable && producer != null) {
+                    producer.close();
+                } else {
+                    recyclable.get().close();
+                }
                 request.signalFailedWithKnownReason(e);
             } catch (UnknownProducerIdException e) {
                 LOG.error(
                         "Unable to commit transaction ({}) " + UNKNOWN_PRODUCER_ID_ERROR_MESSAGE,
                         request,
                         e);
-                recyclable.ifPresent(Recyclable::close);
+                if (isRecoveredCommittable && producer != null) {
+                    producer.close();
+                } else {
+                    recyclable.get().close();
+                }
                 request.signalFailedWithKnownReason(e);
             } catch (Exception e) {
                 LOG.error(
                         "Transaction ({}) encountered error and data has been potentially lost.",
                         request,
                         e);
-                recyclable.ifPresent(Recyclable::close);
+                if (isRecoveredCommittable && producer != null) {
+                    producer.close();
+                } else {
+                    recyclable.get().close();
+                }
                 request.signalFailedWithUnknownReason(e);
             }
         }
     }
 
     @Override
-    public void close() {
-        if (recoveryProducer != null) {
-            recoveryProducer.close();
-        }
+    public void close() throws IOException {
+        previousActiveCommittableRangeAborter = null;
     }
 
     /**
      * Creates a producer that can commit into the same transaction as the upstream producer that
-     * was serialized into {@link KafkaCommittableV1}.
+     * was serialized into {@link KafkaCommittable}.
      */
-    private FlinkKafkaInternalProducer<?, ?> getRecoveryProducer(KafkaCommittable committable) {
-        if (recoveryProducer == null) {
-            recoveryProducer =
-                    new FlinkKafkaInternalProducer<>(
-                            kafkaProducerConfig, committable.getTransactionalId());
-        } else {
-            recoveryProducer.setTransactionId(committable.getTransactionalId());
+    private InternalKafkaProducer<?, ?> getRecoveryProducer(KafkaCommittable committable) {
+        InternalKafkaProducer<?, ?> recoveryProducer;
+        switch (committable.getVersion()) {
+            case ConfluentKafkaCommittableV1.VERSION:
+                recoveryProducer =
+                        new TwoPhaseCommitProducer<>(
+                                kafkaProducerConfig, (ConfluentKafkaCommittableV1) committable);
+                break;
+            case KafkaCommittableV1.VERSION:
+                recoveryProducer =
+                        new FlinkKafkaInternalProducer<>(
+                                kafkaProducerConfig, committable.getTransactionalId());
+                break;
+            default:
+                throw new RuntimeException("Unexpected KafkaCommittable version: " + committable);
         }
         recoveryProducer.resumePreparedTransaction(committable);
         return recoveryProducer;

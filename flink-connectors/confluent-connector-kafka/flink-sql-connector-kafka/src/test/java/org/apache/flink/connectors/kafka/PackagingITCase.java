@@ -34,7 +34,7 @@ class PackagingITCase {
         final Path jar = ResourceTestUtils.getResource(".*/flink-sql-connector-kafka[^/]*\\.jar");
 
         PackagingTestUtils.assertJarContainsOnlyFilesMatching(
-                jar, Arrays.asList("org/apache/flink/", "META-INF/"));
+                jar, Arrays.asList("org/apache/flink/", "io/confluent/", "META-INF/"));
         PackagingTestUtils.assertJarContainsServiceEntry(jar, Factory.class);
     }
 }

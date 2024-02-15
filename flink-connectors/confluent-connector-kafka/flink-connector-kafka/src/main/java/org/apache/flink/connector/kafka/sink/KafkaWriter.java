@@ -22,7 +22,7 @@ import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.connector.sink2.Sink;
-import org.apache.flink.api.connector.sink2.StatefulSink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWithGlobalState;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.MetricUtil;
@@ -67,7 +67,8 @@ import static org.apache.flink.util.Preconditions.checkState;
  * @param <IN> The type of the input elements.
  */
 class KafkaWriter<IN>
-        implements StatefulSink.StatefulSinkWriter<IN, KafkaWriterState>,
+        implements StatefulSinkWithGlobalState.StatefulSinkWriter<
+                        IN, KafkaWriterState, TransactionIdRangeState>,
                 TwoPhaseCommittingSink.PrecommittingSinkWriter<IN, KafkaCommittable> {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaWriter.class);
@@ -77,7 +78,6 @@ class KafkaWriter<IN>
     private static final String KEY_DISABLE_METRICS = "flink.disable-metrics";
     private static final String KEY_REGISTER_METRICS = "register.producer.metrics";
     private static final String KAFKA_PRODUCER_METRICS = "producer-metrics";
-
     private final DeliveryGuarantee deliveryGuarantee;
     private final KafkaRecordSerializationSchema<IN> recordSerializer;
     private final Callback deliveryCallback;
@@ -94,11 +94,11 @@ class KafkaWriter<IN>
     // Number of outgoing bytes at the latest metric sync
     private long latestOutgoingByteTotal;
     private Metric byteOutMetric;
-    private final JavaReflectionProducerFactory<byte[], byte[]> producerFactory;
-    private final IncreasingIdsProducerPool<byte[], byte[]> transactionalProducerPool;
+    private final InternalKafkaProducerFactory<byte[], byte[], ?> producerFactory;
+    private final TransactionalProducerPool<byte[], byte[]> transactionalProducerPool;
+    private final TransactionIdRangeState currentTransactionsIdRange;
     private InternalKafkaProducer<byte[], byte[]> currentProducer;
     private final KafkaWriterState kafkaWriterState;
-    // producer pool only used for exactly once
     private final Deque<AutoCloseable> producerCloseables = new ArrayDeque<>();
     private boolean closed = false;
     private long lastSync = System.currentTimeMillis();
@@ -125,7 +125,8 @@ class KafkaWriter<IN>
             Sink.InitContext sinkInitContext,
             KafkaRecordSerializationSchema<IN> recordSerializer,
             SerializationSchema.InitializationContext schemaContext,
-            Collection<KafkaWriterState> recoveredStates) {
+            Collection<KafkaWriterState> recoveredStates,
+            @Nullable TransactionIdRangeState recoveredTransactionIdRangeState) {
         this.deliveryGuarantee = checkNotNull(deliveryGuarantee, "deliveryGuarantee");
         this.recordSerializer = checkNotNull(recordSerializer, "recordSerializer");
         checkNotNull(sinkInitContext, "sinkInitContext");
@@ -156,30 +157,58 @@ class KafkaWriter<IN>
             throw new FlinkRuntimeException("Cannot initialize schema.", e);
         }
 
-        // TODO: replace producerFactory and transactionalProducerPool
-        // with proper non-Java reflection producers and fixed-size TID pooling
+        // use the alternate range of transaction ids for this execution; previous execution's range
+        // will be committed by KafkaCommitter
+        this.currentTransactionsIdRange =
+                TransactionIdRangeState.alternateRangeForCurrentExecution(
+                        recoveredTransactionIdRangeState,
+                        sinkInitContext.getNumberOfParallelSubtasks());
+
+        if (recoveredTransactionIdRangeState == null) {
+            LOG.info(
+                    "No transaction ID range restored from previous execution. Using range {} for new execution of subtask {}.",
+                    this.currentTransactionsIdRange,
+                    sinkInitContext.getSubtaskId());
+        } else {
+            LOG.info(
+                    "Previous execution transaction ID range: {}. Using range {} for new execution of subtask {}.",
+                    recoveredTransactionIdRangeState,
+                    this.currentTransactionsIdRange,
+                    sinkInitContext.getSubtaskId());
+        }
+
         this.producerFactory =
-                new JavaReflectionProducerFactory<>(
+                new TwoPhaseCommitProducerFactory<>(
                         kafkaProducerConfig, producerCloseables::add, this::initKafkaMetrics);
         this.transactionalProducerPool =
-                new IncreasingIdsProducerPool<>(
-                        transactionalIdPrefix, this.producerFactory, sinkInitContext);
+                new FixedSizeProducerPool<>(
+                        this.currentTransactionsIdRange,
+                        transactionalIdPrefix,
+                        sinkInitContext.getSubtaskId(),
+                        this.producerFactory);
 
         this.kafkaWriterState = new KafkaWriterState(transactionalIdPrefix);
 
         if (deliveryGuarantee == DeliveryGuarantee.EXACTLY_ONCE) {
-            long lastCheckpointId =
-                    sinkInitContext
-                            .getRestoredCheckpointId()
-                            .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+            final boolean wasRestoredFromCheckpoint =
+                    sinkInitContext.getRestoredCheckpointId().isPresent();
+            final long lastCheckpointId =
+                    wasRestoredFromCheckpoint
+                            ? sinkInitContext.getRestoredCheckpointId().getAsLong()
+                            : CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1;
+
+            LOG.info(
+                    "Aborting potential lingering transactions within range of {} for subtask {} (and any other subtask with index offset by {}, in case of downscaling scenarios) in previous executions.",
+                    this.currentTransactionsIdRange,
+                    sinkInitContext.getSubtaskId(),
+                    sinkInitContext.getNumberOfParallelSubtasks());
             try (TransactionAborter transactionAborter =
-                    new IncreasingIdsTransactionAborter(
+                    new FixedSizePoolTransactionAborter(
                             transactionalIdPrefix,
                             sinkInitContext.getSubtaskId(),
-                            sinkInitContext.getNumberOfParallelSubtasks(),
-                            recoveredStates.stream().findFirst().orElse(null),
-                            this.producerFactory,
-                            lastCheckpointId + 1)) {
+                            recoveredTransactionIdRangeState,
+                            this.currentTransactionsIdRange,
+                            this.producerFactory)) {
                 transactionAborter.abortLingeringTransactions();
             }
             this.currentProducer = transactionalProducerPool.getForCheckpoint(lastCheckpointId + 1);
@@ -248,6 +277,11 @@ class KafkaWriter<IN>
     }
 
     @Override
+    public TransactionIdRangeState snapshotGlobalState(long checkpointId) throws IOException {
+        return currentTransactionsIdRange;
+    }
+
+    @Override
     public void close() throws Exception {
         closed = true;
         LOG.debug("Closing writer with {}", currentProducer);
@@ -267,7 +301,8 @@ class KafkaWriter<IN>
                 currentProducer.abortTransaction();
             } catch (ProducerFencedException e) {
                 LOG.debug(
-                        "Producer {} fenced while aborting", currentProducer.getTransactionalId());
+                        "Producer {} fenced while aborting",
+                        currentProducer.getAssignedCommittable().getTransactionalId());
             }
         }
     }

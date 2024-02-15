@@ -71,7 +71,8 @@ class FlinkKafkaInternalProducerITCase {
                 new FlinkKafkaInternalProducer<>(getProperties(), "dummy")) {
             int numTransactions = 20;
             for (int i = 1; i <= numTransactions; i++) {
-                reuse.initTransactionId(transactionIdPrefix + i);
+                reuse.setTransactionId(transactionIdPrefix + i);
+                reuse.initAndAbortOngoingTransaction();
                 reuse.beginTransaction();
                 reuse.send(new ProducerRecord<>(topic, "test-value-" + i));
                 if (i % 2 == 0) {

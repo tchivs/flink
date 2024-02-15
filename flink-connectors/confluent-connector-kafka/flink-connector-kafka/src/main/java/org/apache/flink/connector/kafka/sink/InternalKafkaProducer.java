@@ -21,9 +21,11 @@ import java.util.function.Consumer;
 @Confluent
 public interface InternalKafkaProducer<K, V> extends Producer<K, V> {
 
-    String getTransactionalId();
+    KafkaCommittable getAssignedCommittable();
 
     KafkaCommittable prepareTransaction(Consumer<InternalKafkaProducer<K, V>> recycler);
+
+    boolean initAndAbortOngoingTransaction();
 
     void resumePreparedTransaction(KafkaCommittable restoredCommittable);
 

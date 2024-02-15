@@ -17,25 +17,25 @@
 
 package org.apache.flink.connector.kafka.sink;
 
-class TransactionalIdFactory {
-    private static final String TRANSACTIONAL_ID_DELIMITER = "-";
+/** Transactional id generator. */
+public class TransactionalIdFactory {
+    private static final String TRANSACTIONAL_ID_DELIMITER = "_";
 
     /**
      * Constructs a transactionalId with the following format {@code
-     * transactionalIdPrefix-subtaskId-checkpointOffset}.
+     * transactionalIdPrefix_subtaskId_transactionIdInPool}.
      *
      * @param transactionalIdPrefix prefix for the id
      * @param subtaskId describing the subtask which is opening the transaction
-     * @param checkpointOffset an always incrementing number usually capturing the number of
-     *     checkpoints taken by the subtask
+     * @param transactionIdInPool id of the transaction within the fixed size pool.
      * @return transactionalId
      */
     public static String buildTransactionalId(
-            String transactionalIdPrefix, int subtaskId, long checkpointOffset) {
+            String transactionalIdPrefix, int subtaskId, long transactionIdInPool) {
         return transactionalIdPrefix
                 + TRANSACTIONAL_ID_DELIMITER
                 + subtaskId
                 + TRANSACTIONAL_ID_DELIMITER
-                + checkpointOffset;
+                + transactionIdInPool;
     }
 }

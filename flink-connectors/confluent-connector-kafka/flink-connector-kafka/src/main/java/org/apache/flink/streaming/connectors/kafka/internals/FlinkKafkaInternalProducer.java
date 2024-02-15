@@ -37,6 +37,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.ProducerFencedException;
 import org.apache.kafka.common.requests.FindCoordinatorRequest;
 import org.slf4j.Logger;
@@ -89,6 +90,19 @@ public class FlinkKafkaInternalProducer<K, V> implements Producer<K, V> {
             ensureNotClosed();
             kafkaProducer.initTransactions();
         }
+    }
+
+    @Override
+    public void initTransactions(boolean keepPreparedTransaction) {
+        synchronized (producerClosingLock) {
+            ensureNotClosed();
+            kafkaProducer.initTransactions(keepPreparedTransaction);
+        }
+    }
+
+    @Override
+    public Uuid clientInstanceId(Duration duration) {
+        return kafkaProducer.clientInstanceId(duration);
     }
 
     @Override
@@ -213,15 +227,14 @@ public class FlinkKafkaInternalProducer<K, V> implements Producer<K, V> {
 
             Object transactionManager = getField(kafkaProducer, "transactionManager");
             synchronized (transactionManager) {
-                Object topicPartitionBookkeeper =
-                        getField(transactionManager, "topicPartitionBookkeeper");
+                Object txnPartitionMap = getField(transactionManager, "txnPartitionMap");
 
                 invoke(
                         transactionManager,
                         "transitionTo",
                         getEnum(
                                 "org.apache.kafka.clients.producer.internals.TransactionManager$State.INITIALIZING"));
-                invoke(topicPartitionBookkeeper, "reset");
+                invoke(txnPartitionMap, "reset");
 
                 setField(
                         transactionManager,
