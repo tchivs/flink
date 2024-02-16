@@ -1,7 +1,7 @@
 *	@confluentinc/flink
 
 cc-flink-extensions/cc-flink-table-extended	@confluentinc/flink-sql
-cc-flink-extensions/cc-flink-managed-table	@confluentinc/flink-sql
-cc-flink-extensions/cc-flink-managed-table-validation	@confluentinc/flink-sql
+cc-flink-extensions/cc-flink-managed-table	@confluentinc/flink-sql @confluentinc/flink-storage
+cc-flink-extensions/cc-flink-managed-table-validation	@confluentinc/flink-sql @confluentinc/flink-storage
 cc-flink-extensions/cc-flink-schema-converters	@confluentinc/flink-sql
 cc-flink-extensions/cc-flink-schema-registry	@confluentinc/flink-sql
