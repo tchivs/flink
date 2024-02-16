@@ -24,6 +24,8 @@ import java.util.Set;
 @Confluent
 public class ConfluentManagedTableOptions {
 
+    private static final String DEFAULT_API_SERVER_BASE_PATH = "http://apiserver.fcp-system";
+
     // --------------------------------------------------------------------------------------------
     // PUBLIC - GLOBAL FOR ALL TABLES VIA SET COMMAND
     // --------------------------------------------------------------------------------------------
@@ -359,6 +361,29 @@ public class ConfluentManagedTableOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Confluent Cloud Environment for the table.");
+
+    public static final ConfigOption<String> CONFLUENT_KAFKA_TOPIC_ID =
+            ConfigOptions.key(PRIVATE_PREFIX + "kafka.topic-id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Unique identifier for the underlying Kafka topic.");
+
+    // --------------------------------------------------------------------------------------------
+    // PRIVATE - CONFLUENT TABLE STORE SPECIFIC - SET BY SERVICES OTHER THAN METASTORE
+    // --------------------------------------------------------------------------------------------
+
+    public static final ConfigOption<Boolean> CONFLUENT_CTS_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "cts.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Indicates whether Confluent Table Store is enabled for this table.");
+
+    public static final ConfigOption<String> CONFLUENT_API_SERVER_BASE_PATH =
+            ConfigOptions.key(PRIVATE_PREFIX + "api-server-base-path")
+                    .stringType()
+                    .defaultValue(DEFAULT_API_SERVER_BASE_PATH)
+                    .withDescription("Host name for Confluent APIServer.");
 
     // --------------------------------------------------------------------------------------------
     // PRIVATE - RUNTIME SPECIFIC - SET BY SQL SERVICE
