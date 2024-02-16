@@ -1,0 +1,39 @@
+/*
+ * Copyright 2024 Confluent Inc.
+ */
+
+syntax = "proto3";
+
+option go_package = "github.com/confluentinc/flink/udf/extractor";
+option java_package = "io.confluent.flink.udf.extractor";
+
+enum ErrorCode {
+  UNKNOWN = 0;
+  GENERAL_FAILED_EXTRACTION = 1;
+  USER_CODE_NOT_FOUND = 2;
+  NOT_SCALAR_FUNCTION = 3;
+  NO_PUBLIC_NO_ARG_CONSTRUCTOR = 4;
+  TYPE_EXTRACTION_ERROR = 5;
+  BAD_SIGNATURE_TYPE = 6;
+}
+
+message Error {
+  ErrorCode code = 1;
+  string error_message = 2;
+}
+
+message ExtractionRequest {
+  string plugin_id = 1;
+  string plugin_version_id = 2;
+  string class_name = 3;
+}
+
+message Signature {
+  repeated string argumentTypes = 1;
+  string returnType = 2;
+}
+
+message ExtractionResponse {
+  Error error = 1;
+  repeated Signature signatures = 2;
+}

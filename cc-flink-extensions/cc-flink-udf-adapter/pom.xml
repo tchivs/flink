@@ -19,6 +19,7 @@ Copyright 2024 Confluent Inc.
 
 	<properties>
 		<secure.compute.runtime.version>0.0.1-42</secure.compute.runtime.version>
+		<japicmp.skip>true</japicmp.skip>
 	</properties>
 
 
@@ -27,6 +28,7 @@ Copyright 2024 Confluent Inc.
 			<groupId>io.confluent.secure.compute</groupId>
 			<artifactId>function-runtime-java-core</artifactId>
 			<version>${secure.compute.runtime.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
 				<exclusion>
 					<groupId>io.grpc</groupId>
@@ -40,6 +42,7 @@ Copyright 2024 Confluent Inc.
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-table-extended_${scala.binary.version}</artifactId>
 			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
 				<exclusion>
 					<artifactId>grpc-netty-shaded</artifactId>
@@ -67,20 +70,24 @@ Copyright 2024 Confluent Inc.
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-table-common</artifactId>
 			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-table-runtime</artifactId>
 			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+			<version>${protoc.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 
 		<!-- Test Dependencies -->
-		<dependency>
-			<artifactId>protobuf-java</artifactId>
-			<groupId>com.google.protobuf</groupId>
-			<version>${protoc.version}</version>
-			<scope>test</scope>
-		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -91,6 +98,28 @@ Copyright 2024 Confluent Inc.
 				<configuration>
 					<suppressionsLocation combine.self="override">/tools/maven/suppressions-extensions.xml</suppressionsLocation>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.xolstice.maven.plugins</groupId>
+				<artifactId>protobuf-maven-plugin</artifactId>
+				<version>0.6.1</version>
+				<configuration>
+					<protocArtifact>
+						com.google.protobuf:protoc:${protoc.version}:exe:${os.detected.classifier}
+					</protocArtifact>
+					<pluginId>grpc-java</pluginId>
+					<pluginArtifact>
+						io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
+					</pluginArtifact>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>compile</goal>
+							<goal>compile-custom</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -105,9 +134,17 @@ Copyright 2024 Confluent Inc.
 						<configuration>
 							<artifactSet>
 								<includes>
-									<!-- Include all dependencies to be packaged here -->
+									<include>org.apache.flink:*</include>
+									<include>com.google.protobuf:*</include>
+									<include>io.confluent.flink:*</include>
 								</includes>
 							</artifactSet>
+							<relocations>
+								<relocation>
+									<pattern>com.google.protobuf</pattern>
+									<shadedPattern>io.confluent.flink.shaded.com.google.protobuf</shadedPattern>
+								</relocation>
+							</relocations>
 							<filters>
 								<filter>
 									<!-- Do not copy the signatures in the META-INF folder.
