@@ -46,6 +46,7 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
     private String region;
     private String accessKey;
     private String secretKey;
+    private boolean isCredentialsRequired;
 
     @Override
     public void init(Configuration configuration) {
@@ -70,13 +71,18 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
                             + GlobalConfiguration.HIDDEN_CONTENT
                             + " (sensitive information)");
         }
+
+        isCredentialsRequired =
+                configuration.getBoolean(
+                        String.format("%s.credentials-required", serviceConfigPrefix()), true);
     }
 
     @Override
     public boolean delegationTokensRequired() {
-        if (StringUtils.isNullOrWhitespaceOnly(region)
-                || StringUtils.isNullOrWhitespaceOnly(accessKey)
-                || StringUtils.isNullOrWhitespaceOnly(secretKey)) {
+        if (isCredentialsRequired
+                && (StringUtils.isNullOrWhitespaceOnly(region)
+                        || StringUtils.isNullOrWhitespaceOnly(accessKey)
+                        || StringUtils.isNullOrWhitespaceOnly(secretKey))) {
             LOG.debug("Not obtaining session credentials because not all configurations are set");
             return false;
         }

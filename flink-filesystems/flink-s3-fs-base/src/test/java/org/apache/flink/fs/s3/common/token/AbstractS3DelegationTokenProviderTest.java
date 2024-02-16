@@ -21,11 +21,14 @@ package org.apache.flink.fs.s3.common.token;
 import org.apache.flink.configuration.Configuration;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.apache.flink.core.security.token.DelegationTokenProvider.CONFIG_PREFIX;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Tests for {@link AbstractS3DelegationTokenProvider}. */
 public class AbstractS3DelegationTokenProviderTest {
@@ -47,20 +50,53 @@ public class AbstractS3DelegationTokenProviderTest {
                 };
     }
 
-    @Test
-    public void delegationTokensRequiredShouldReturnFalseWithoutCredentials() {
-        provider.init(new Configuration());
-        assertFalse(provider.delegationTokensRequired());
-    }
-
-    @Test
-    public void delegationTokensRequiredShouldReturnTrueWithCredentials() {
+    @ParameterizedTest
+    @MethodSource("delegationTokensRequiredArguments")
+    public void delegationTokensRequired(
+            String region,
+            String accessKey,
+            String secretKey,
+            Boolean isCredentialsRequired,
+            boolean expectedResult) {
         Configuration configuration = new Configuration();
-        configuration.setString(CONFIG_PREFIX + ".s3.region", REGION);
-        configuration.setString(CONFIG_PREFIX + ".s3.access-key", ACCESS_KEY_ID);
-        configuration.setString(CONFIG_PREFIX + ".s3.secret-key", SECRET_ACCESS_KEY);
+
+        if (region != null) {
+            configuration.setString(CONFIG_PREFIX + ".s3.region", region);
+        }
+        if (accessKey != null) {
+            configuration.setString(CONFIG_PREFIX + ".s3.access-key", accessKey);
+        }
+        if (secretKey != null) {
+            configuration.setString(CONFIG_PREFIX + ".s3.secret-key", secretKey);
+        }
+        if (isCredentialsRequired != null) {
+            configuration.setBoolean(
+                    CONFIG_PREFIX + ".s3.credentials-required", isCredentialsRequired);
+        }
         provider.init(configuration);
 
-        assertTrue(provider.delegationTokensRequired());
+        assertEquals(provider.delegationTokensRequired(), expectedResult);
+    }
+
+    public static Stream<Arguments> delegationTokensRequiredArguments() {
+        return Stream.of(
+                Arguments.of(null, null, null, null, false),
+                Arguments.of(null, null, null, true, false),
+                Arguments.of(null, null, null, false, true),
+                Arguments.of(REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, null, true),
+                Arguments.of(REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, true, true),
+                Arguments.of(REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, false, true),
+                Arguments.of(REGION, ACCESS_KEY_ID, null, null, false),
+                Arguments.of(REGION, ACCESS_KEY_ID, null, true, false),
+                Arguments.of(REGION, ACCESS_KEY_ID, null, false, true),
+                Arguments.of(REGION, null, SECRET_ACCESS_KEY, null, false),
+                Arguments.of(REGION, null, SECRET_ACCESS_KEY, true, false),
+                Arguments.of(REGION, null, SECRET_ACCESS_KEY, false, true),
+                Arguments.of(REGION, null, null, null, false),
+                Arguments.of(REGION, null, null, true, false),
+                Arguments.of(REGION, null, null, false, true),
+                Arguments.of(null, null, SECRET_ACCESS_KEY, null, false),
+                Arguments.of(null, null, SECRET_ACCESS_KEY, true, false),
+                Arguments.of(null, null, SECRET_ACCESS_KEY, false, true));
     }
 }
