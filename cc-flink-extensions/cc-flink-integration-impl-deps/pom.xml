@@ -126,7 +126,7 @@ Copyright 2023 Confluent Inc.
 			<groupId>com.github.knaufk</groupId>
 			<artifactId>flink-faker</artifactId>
 			<!-- This is our internally published version of Faker -->
-			<version>0.5.3-2</version>
+			<version>0.12.0</version>
 			<scope>runtime</scope>
 			<exclusions>
 				<exclusion>
