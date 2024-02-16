@@ -22,6 +22,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.split.KafkaPartitionSplit;
+import org.apache.flink.metrics.MetricGroup;
 
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsOptions;
@@ -51,15 +52,18 @@ public interface OffsetsInitializer extends Serializable {
      * <p>Implementations may override this method to initialize any resources required for
      * determining partition offsets. For example, connections to any external services that needs
      * to be consulted for offset queries may be created here.
+     *
+     * @param initializationContext initialization context for the offset initializer.
      */
     @Confluent
-    default void open() {}
+    default void open(InitializationContext initializationContext) {}
 
     /**
      * Closes the offset initializer. This lifecycle method will be called after this {@link
      * OffsetsInitializer} will no longer be used.
      *
-     * <p>Any resources created in the {@link #open()} method should be cleaned up here.
+     * <p>Any resources created in the {@link #open(InitializationContext)} method should be cleaned
+     * up here.
      */
     @Confluent
     default void close() {}
@@ -115,6 +119,21 @@ public interface OffsetsInitializer extends Serializable {
         /** List offsets matching a timestamp for the specified partitions. */
         Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes(
                 Map<TopicPartition, Long> timestampsToSearch);
+    }
+
+    /** Initialization context for the {@link OffsetsInitializer}. */
+    @Confluent
+    @PublicEvolving
+    interface InitializationContext {
+
+        /**
+         * Returns the metric group for the offsets initializer instance.
+         *
+         * <p>Instances of this class can be used to register new metrics with Flink and to create a
+         * nested hierarchy based on the group names. See {@link MetricGroup} for more information
+         * for the metrics system.
+         */
+        MetricGroup getMetricGroup();
     }
 
     // --------------- factory methods ---------------

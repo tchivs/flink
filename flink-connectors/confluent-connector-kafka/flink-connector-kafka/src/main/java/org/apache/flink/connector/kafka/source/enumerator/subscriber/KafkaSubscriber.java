@@ -18,7 +18,9 @@
 
 package org.apache.flink.connector.kafka.source.enumerator.subscriber;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.metrics.MetricGroup;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.common.TopicPartition;
@@ -44,12 +46,50 @@ import java.util.regex.Pattern;
 public interface KafkaSubscriber extends Serializable {
 
     /**
+     * Opens the subscriber. This lifecycle method will be called before {@link
+     * #getSubscribedTopicPartitions(AdminClient)} calls are made.
+     *
+     * <p>Implementations may override this method to initialize any additional resources (beyond
+     * the Kafka {@link AdminClient}) required for discovering topic partitions. For example,
+     * connections to any external services that needs to be contacted may be created here.
+     *
+     * @param initializationContext initialization context for the subscriber.
+     */
+    @Confluent
+    default void open(InitializationContext initializationContext) {}
+
+    /**
      * Get a set of subscribed {@link TopicPartition}s.
      *
      * @param adminClient The admin client used to retrieve subscribed topic partitions.
      * @return A set of subscribed {@link TopicPartition}s
      */
     Set<TopicPartition> getSubscribedTopicPartitions(AdminClient adminClient);
+
+    /**
+     * Closes the subscriber. This lifecycle method will be called after this {@link
+     * KafkaSubscriber} will no longer be used.
+     *
+     * <p>Any resources created in the {@link #open(InitializationContext)} method should be cleaned
+     * up here.
+     */
+    @Confluent
+    default void close() {}
+
+    /** Initialization context for the {@link KafkaSubscriber}. */
+    @Confluent
+    @PublicEvolving
+    interface InitializationContext {
+
+        /**
+         * Returns the metric group for the subscriber instance.
+         *
+         * <p>Instances of this class can be used to register new metrics with Flink and to create a
+         * nested hierarchy based on the group names. See {@link MetricGroup} for more information
+         * for the metrics system.
+         */
+        MetricGroup getMetricGroup();
+    }
 
     // ----------------- factory methods --------------
 

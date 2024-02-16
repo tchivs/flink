@@ -28,6 +28,7 @@ import org.apache.flink.connector.kafka.source.KafkaSourceOptions;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.connector.kafka.source.enumerator.subscriber.KafkaSubscriber;
 import org.apache.flink.connector.kafka.source.split.KafkaPartitionSplit;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.kafka.clients.admin.AdminClient;
@@ -62,6 +63,13 @@ import java.util.stream.Collectors;
 public class KafkaSourceEnumerator
         implements SplitEnumerator<KafkaPartitionSplit, KafkaSourceEnumState> {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaSourceEnumerator.class);
+
+    private static final String SUBSCRIBER_METRIC_GROUP = "KafkaSubscriber";
+    private static final String STARTING_OFFSETS_INITIALIZER_METRIC_GROUP =
+            "StartingOffsetsInitializer";
+    private static final String STOPPING_OFFSETS_INITIALIZER_METRIC_GROUP =
+            "StoppingOffsetsInitializer";
+
     private final KafkaSubscriber subscriber;
     private final OffsetsInitializer startingOffsetInitializer;
     private final OffsetsInitializer stoppingOffsetInitializer;
@@ -167,8 +175,15 @@ public class KafkaSourceEnumerator
                     consumerGroupId);
             context.callAsync(this::getSubscribedTopicPartitions, this::checkPartitionChanges);
         }
-        startingOffsetInitializer.open();
-        stoppingOffsetInitializer.open();
+        subscriber.open(
+                new KafkaSubscriberInitContext(
+                        context.metricGroup().addGroup(SUBSCRIBER_METRIC_GROUP)));
+        startingOffsetInitializer.open(
+                new OffsetsInitializerInitContext(
+                        context.metricGroup().addGroup(STARTING_OFFSETS_INITIALIZER_METRIC_GROUP)));
+        stoppingOffsetInitializer.open(
+                new OffsetsInitializerInitContext(
+                        context.metricGroup().addGroup(STOPPING_OFFSETS_INITIALIZER_METRIC_GROUP)));
     }
 
     @Override
@@ -205,6 +220,7 @@ public class KafkaSourceEnumerator
         if (adminClient != null) {
             adminClient.close();
         }
+        subscriber.close();
         startingOffsetInitializer.close();
         stoppingOffsetInitializer.close();
     }
@@ -455,6 +471,34 @@ public class KafkaSourceEnumerator
     }
 
     // --------------- private class ---------------
+
+    static class OffsetsInitializerInitContext implements OffsetsInitializer.InitializationContext {
+
+        private final MetricGroup offsetsInitializerMetricGroup;
+
+        private OffsetsInitializerInitContext(MetricGroup offsetsInitializerMetricGroup) {
+            this.offsetsInitializerMetricGroup = offsetsInitializerMetricGroup;
+        }
+
+        @Override
+        public MetricGroup getMetricGroup() {
+            return offsetsInitializerMetricGroup;
+        }
+    }
+
+    static class KafkaSubscriberInitContext implements KafkaSubscriber.InitializationContext {
+
+        private final MetricGroup subscriberMetricGroup;
+
+        private KafkaSubscriberInitContext(MetricGroup subscriberMetricGroup) {
+            this.subscriberMetricGroup = subscriberMetricGroup;
+        }
+
+        @Override
+        public MetricGroup getMetricGroup() {
+            return subscriberMetricGroup;
+        }
+    }
 
     /** A container class to hold the newly added partitions and removed partitions. */
     @VisibleForTesting
