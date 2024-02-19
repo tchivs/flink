@@ -582,7 +582,7 @@ public class ConfluentManagedTableOptions {
         /** Initial moving histogram of observed delays from the maximum seen timestamp. */
         V1,
 
-        /** Histogram with enabled watermark alignment. */
+        /** Same as V1 but with enabled watermark alignment. */
         V2
     }
 
