@@ -93,13 +93,17 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
     public ObtainedDelegationTokens obtainDelegationTokens() throws Exception {
         LOG.info("Obtaining session credentials token with access key: {}", accessKey);
 
-        AWSSecurityTokenService stsClient =
-                AWSSecurityTokenServiceClientBuilder.standard()
-                        .withRegion(region)
-                        .withCredentials(
-                                new AWSStaticCredentialsProvider(
-                                        new BasicAWSCredentials(accessKey, secretKey)))
-                        .build();
+        AWSSecurityTokenServiceClientBuilder builder =
+                AWSSecurityTokenServiceClientBuilder.standard();
+
+        if (isCredentialsRequired) {
+            builder.withRegion(region)
+                    .withCredentials(
+                            new AWSStaticCredentialsProvider(
+                                    new BasicAWSCredentials(accessKey, secretKey)));
+        }
+
+        AWSSecurityTokenService stsClient = builder.build();
         GetSessionTokenResult sessionTokenResult = stsClient.getSessionToken();
         Credentials credentials = sessionTokenResult.getCredentials();
         LOG.info(
