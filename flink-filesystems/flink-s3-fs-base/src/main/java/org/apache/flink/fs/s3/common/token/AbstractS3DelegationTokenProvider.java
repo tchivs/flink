@@ -31,10 +31,16 @@ import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.services.securitytoken.model.Credentials;
 import com.amazonaws.services.securitytoken.model.GetSessionTokenResult;
+import com.amazonaws.util.EC2MetadataUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** Delegation token provider for S3 filesystems. */
 @Internal
@@ -96,16 +102,41 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
         AWSSecurityTokenServiceClientBuilder builder =
                 AWSSecurityTokenServiceClientBuilder.standard();
 
+        final Credentials credentials;
         if (isCredentialsRequired) {
             builder.withRegion(region)
                     .withCredentials(
                             new AWSStaticCredentialsProvider(
                                     new BasicAWSCredentials(accessKey, secretKey)));
-        }
 
-        AWSSecurityTokenService stsClient = builder.build();
-        GetSessionTokenResult sessionTokenResult = stsClient.getSessionToken();
-        Credentials credentials = sessionTokenResult.getCredentials();
+            AWSSecurityTokenService stsClient = builder.build();
+            GetSessionTokenResult sessionTokenResult = stsClient.getSessionToken();
+            credentials = sessionTokenResult.getCredentials();
+        } else {
+            List<EC2MetadataUtils.IAMSecurityCredential> iamSecurityCredentials =
+                    EC2MetadataUtils.getIAMSecurityCredentials().entrySet().stream()
+                            .filter(entry -> entry.getKey().contains("cc-flink-"))
+                            .map(Map.Entry::getValue)
+                            .collect(Collectors.toList());
+
+            if (iamSecurityCredentials.size() != 1) {
+                throw new RuntimeException(
+                        "Unable to determine AWS credentials. "
+                                + (iamSecurityCredentials.isEmpty()
+                                        ? "Found no credentials for roles containing 'cc-flink'."
+                                        : "Found credentials for multiple roles containing 'cc-flink'."));
+            }
+
+            EC2MetadataUtils.IAMSecurityCredential iamSecurityCredential =
+                    iamSecurityCredentials.get(0);
+
+            credentials =
+                    new Credentials(
+                            iamSecurityCredential.accessKeyId,
+                            iamSecurityCredential.secretAccessKey,
+                            iamSecurityCredential.token,
+                            Date.from(Instant.parse(iamSecurityCredential.expiration)));
+        }
         LOG.info(
                 "Session credentials obtained successfully with access key: {} expiration: {}",
                 credentials.getAccessKeyId(),
