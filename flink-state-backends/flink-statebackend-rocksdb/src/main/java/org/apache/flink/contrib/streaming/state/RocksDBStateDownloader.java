@@ -76,7 +76,16 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         // Make sure we also react to external close signals.
         closeableRegistry.registerCloseable(internalCloser);
         try {
-            transferAllStateDataToDirectoryAsync(downloadRequests, internalCloser);
+            // We have to wait for all futures to be completed, to make sure in
+            // case of failure that we will clean up all the files
+            FutureUtils.completeAll(
+                            createDownloadRunnables(downloadRequests, internalCloser).stream()
+                                    .map(
+                                            runnable ->
+                                                    CompletableFuture.runAsync(
+                                                            runnable, executorService))
+                                    .collect(Collectors.toList()))
+                    .get();
         } catch (Exception e) {
             downloadRequests.stream()
                     .map(StateHandleDownloadSpec::getDownloadDestination)
@@ -96,21 +105,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 IOUtils.closeQuietly(internalCloser);
             }
         }
-    }
-
-    /** Asynchronously runs the specified download requests on executorService. */
-    private void transferAllStateDataToDirectoryAsync(
-            Collection<StateHandleDownloadSpec> handleWithPaths,
-            CloseableRegistry closeableRegistry)
-            throws Exception {
-        FutureUtils.waitForAll(
-                        createDownloadRunnables(handleWithPaths, closeableRegistry).stream()
-                                .map(
-                                        runnable ->
-                                                CompletableFuture.runAsync(
-                                                        runnable, executorService))
-                                .collect(Collectors.toList()))
-                .get();
     }
 
     private Collection<Runnable> createDownloadRunnables(
