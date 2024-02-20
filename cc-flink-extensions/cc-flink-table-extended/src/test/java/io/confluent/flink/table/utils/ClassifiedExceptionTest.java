@@ -264,7 +264,23 @@ public class ClassifiedExceptionTest {
                                 ExceptionKind.USER,
                                 "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
                                         + "\n"
-                                        + "Caused by: Table (or view) '<<removed>>' does not exist or you do not have permission to access it."));
+                                        + "Caused by: Table (or view) '<<removed>>' does not exist or you do not have permission to access it."),
+                // ---
+                TestSpec.test("error for unsupported RAW type from CREATE TABLE")
+                        .executeSql(
+                                "CREATE TABLE t (r RAW('java.lang.Object', 'xyz')) "
+                                        + "WITH ('connector' = 'datagen')")
+                        .expectExactUserError(
+                                "The use of RAW types is not supported. "
+                                        + "Use standard SQL types to represent 'java.lang.Object' objects. "
+                                        + "Or use BYTES and implement custom serialization logic."),
+                // ---
+                TestSpec.test("error for unsupported RAW type from SELECT")
+                        .executeSql("SELECT CAST('1' AS RAW('java.lang.Object', 'xyz'))")
+                        .expectExactUserError(
+                                "The use of RAW types is not supported. "
+                                        + "Use standard SQL types to represent 'java.lang.Object' objects. "
+                                        + "Or use BYTES and implement custom serialization logic."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")

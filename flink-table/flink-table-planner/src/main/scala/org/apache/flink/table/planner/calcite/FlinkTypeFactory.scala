@@ -17,6 +17,7 @@
  */
 package org.apache.flink.table.planner.calcite
 
+import org.apache.flink.annotation.Confluent
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, NothingTypeInfo, TypeInformation}
 import org.apache.flink.table.api.{DataTypes, TableException, TableSchema, ValidationException}
 import org.apache.flink.table.calcite.ExtendedRelTypeFactory
@@ -379,10 +380,21 @@ class FlinkTypeFactory(
     super.createMultisetType(elementType, maxCardinality)
   }
 
+  @Confluent
   override def createRawType(className: String, serializerString: String): RelDataType = {
-    val rawType = RawType.restore(classLoader, className, serializerString)
-    val rawRelDataType = createFieldTypeFromLogicalType(rawType)
-    canonize(rawRelDataType)
+    // RAW types could potentially lead to remote code execution. Therefore, we disable them here.
+    // This is the best location for a check because it is the entry point coming from the parser.
+    // RAW types might still be used internally (or in the CompiledPlan), but not by users.
+    throw new ValidationException(
+      String.format(
+        "The use of RAW types is not supported. " +
+          "Use standard SQL types to represent '%s' objects. " +
+          "Or use BYTES and implement custom serialization logic.",
+        className
+      ))
+    // val rawType = RawType.restore(classLoader, className, serializerString)
+    // val rawRelDataType = createFieldTypeFromLogicalType(rawType)
+    // canonize(rawRelDataType)
   }
 
   override def createSqlType(typeName: SqlTypeName): RelDataType = {

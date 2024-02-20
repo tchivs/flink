@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.runtime.stream.sql;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 import org.apache.flink.core.fs.Path;
@@ -26,7 +27,9 @@ import org.apache.flink.table.annotation.FunctionHint;
 import org.apache.flink.table.annotation.HintFlag;
 import org.apache.flink.table.annotation.InputGroup;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.TableDescriptor;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
@@ -713,6 +716,7 @@ public class FunctionITCase extends StreamingTestBase {
         assertThat(TestCollectionTableFactory.getResult()).isEqualTo(sourceData);
     }
 
+    @Confluent // Modified due to unsupported RAW types (SQL-955)
     @Test
     public void testComplexScalarFunction() throws Exception {
         final List<Row> sourceData =
@@ -759,16 +763,18 @@ public class FunctionITCase extends StreamingTestBase {
         tEnv().executeSql(
                         "CREATE TABLE SourceTable(i INT, b BYTES) "
                                 + "WITH ('connector' = 'COLLECTION')");
-        tEnv().executeSql(
-                        "CREATE TABLE SinkTable("
-                                + "  i INT, "
-                                + "  s1 STRING, "
-                                + "  s2 STRING, "
-                                + "  d DECIMAL(5, 2),"
-                                + "  r "
-                                + rawType.asSerializableString()
-                                + ") "
-                                + "WITH ('connector' = 'COLLECTION')");
+        tEnv().createTable(
+                        "SinkTable",
+                        TableDescriptor.forConnector("COLLECTION")
+                                .schema(
+                                        Schema.newBuilder()
+                                                .column("i", DataTypes.INT())
+                                                .column("s1", DataTypes.STRING())
+                                                .column("s2", DataTypes.STRING())
+                                                .column("d", DataTypes.DECIMAL(5, 2))
+                                                .column("r", DataTypes.of(rawType))
+                                                .build())
+                                .build());
 
         tEnv().createTemporarySystemFunction("ComplexScalarFunction", ComplexScalarFunction.class);
         tEnv().executeSql(
@@ -860,6 +866,7 @@ public class FunctionITCase extends StreamingTestBase {
         assertThat(actual).isEqualTo(expected);
     }
 
+    @Confluent // Modified due to unsupported RAW types (SQL-955)
     @Test
     public void testRawLiteralScalarFunction() throws Exception {
         final List<Row> sourceData =
@@ -886,21 +893,25 @@ public class FunctionITCase extends StreamingTestBase {
                         DayOfWeek.class,
                         new KryoSerializer<>(DayOfWeek.class, new ExecutionConfig()));
 
-        tEnv().executeSql(
-                        "CREATE TABLE SourceTable("
-                                + "  i INT, "
-                                + "  r "
-                                + rawType.asSerializableString()
-                                + ") "
-                                + "WITH ('connector' = 'COLLECTION')");
-        tEnv().executeSql(
-                        "CREATE TABLE SinkTable("
-                                + "  i INT, "
-                                + "  s STRING, "
-                                + "  r "
-                                + rawType.asSerializableString()
-                                + ") "
-                                + "WITH ('connector' = 'COLLECTION')");
+        tEnv().createTable(
+                        "SourceTable",
+                        TableDescriptor.forConnector("COLLECTION")
+                                .schema(
+                                        Schema.newBuilder()
+                                                .column("i", DataTypes.INT())
+                                                .column("r", DataTypes.of(rawType))
+                                                .build())
+                                .build());
+        tEnv().createTable(
+                        "SinkTable",
+                        TableDescriptor.forConnector("COLLECTION")
+                                .schema(
+                                        Schema.newBuilder()
+                                                .column("i", DataTypes.INT())
+                                                .column("s", DataTypes.STRING())
+                                                .column("r", DataTypes.of(rawType))
+                                                .build())
+                                .build());
 
         tEnv().createTemporarySystemFunction(
                         "RawLiteralScalarFunction", RawLiteralScalarFunction.class);
