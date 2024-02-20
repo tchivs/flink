@@ -26,6 +26,8 @@ import java.util.stream.Stream;
  * <p>Due to historical reasons, the Flink function stack is currently split into a Calcite and a
  * Flink one. Also, the Flink one had multiple iterations. This proxy module aims to hide the mess
  * and also forbid certain functions that we clearly don't want to support (e.g. PRINT).
+ *
+ * <p>NOTE: Check the corresponding test before modifying this class.
  */
 @Confluent
 public class CoreProxyModule implements Module {
@@ -86,7 +88,18 @@ public class CoreProxyModule implements Module {
                 Arrays.asList(
                         "ABS",
                         "ACOS",
+                        "ARRAY_AGG",
+                        "ARRAY_CONCAT",
                         "ARRAY_CONTAINS",
+                        "ARRAY_DISTINCT",
+                        "ARRAY_JOIN",
+                        "ARRAY_MAX",
+                        "ARRAY_POSITION",
+                        "ARRAY_REMOVE",
+                        "ARRAY_REVERSE",
+                        "ARRAY_SLICE",
+                        "ARRAY_SORT",
+                        "ARRAY_UNION",
                         "ASCII",
                         "ASIN",
                         "ATAN",
@@ -167,6 +180,10 @@ public class CoreProxyModule implements Module {
                         "LOWER",
                         "LPAD",
                         "LTRIM",
+                        "MAP_ENTRIES",
+                        "MAP_FROM_ARRAYS",
+                        "MAP_KEYS",
+                        "MAP_VALUES",
                         "MATCH_ROWTIME",
                         "MAX",
                         "MD5",

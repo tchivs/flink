@@ -27,7 +27,12 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Tests for {@link CoreProxyModule}. */
+/**
+ * Tests for {@link CoreProxyModule}.
+ *
+ * <p>NOTE: Check {@link #printAllFunctions()} before modifying this class or {@link
+ * CoreProxyModule}.
+ */
 @Confluent
 public class CoreProxyModuleTest {
 
@@ -83,12 +88,7 @@ public class CoreProxyModuleTest {
 
     @Test
     void changeDetectionTest() {
-        final Stream<String> allFunctions =
-                Stream.concat(
-                        Stream.concat(getCalciteFunctions(), getFlinkFunctions()),
-                        getCalciteOperators());
-
-        assertThat(normalizeList(allFunctions)).containsAll(FLINK_1_17);
+        assertThat(normalizeList(allFunctions())).containsAll(LAST_REVIEW);
     }
 
     /**
@@ -97,15 +97,48 @@ public class CoreProxyModuleTest {
      * <p>Note: Keep in mind that this is still a manual process. Not every function makes sense to
      * expose to users. Also, some {@link SqlOperator}s can't be categorized as "functions" in the
      * traditional sense.
+     *
+     * <p>Steps:
+     *
+     * <p>Step 1: Run {@link #printDiffFunctions()} to figure out what has changed.
+     *
+     * <p>Step 2: Think about what makes sense to expose to users for "SHOW FUNCTIONS", what makes
+     * sense to declare as unsupported, and what doesn't need to be listed but should still be
+     * supported.
+     *
+     * <p>Step 3: Update the lists in {@link CoreProxyModule}.
+     *
+     * <p>Step 4: Update {@link #LAST_REVIEW} with the output of this function.
      */
     @Test
     @Disabled
-    void printFunctions() {
-        System.out.println("Function-style syntax:");
+    void printAllFunctions() {
+        System.out.println("// Function-style syntax:");
         printList(Stream.concat(getCalciteFunctions(), getFlinkFunctions()));
 
-        System.out.println("SQL standard prefix/infix/postfix syntax:");
+        System.out.println("// SQL standard prefix/infix/postfix syntax:");
         printList(getCalciteOperators());
+    }
+
+    @Test
+    @Disabled
+    void printKnownFunctions() {
+        printList(LAST_REVIEW.stream());
+    }
+
+    @Test
+    @Disabled
+    void printDiffFunctions() {
+        printList(allFunctions().filter(f -> !LAST_REVIEW.contains(f)));
+    }
+
+    private static Stream<String> allFunctions() {
+        final Stream<String> allFunctions =
+                Stream.concat(
+                        Stream.concat(getCalciteFunctions(), getFlinkFunctions()),
+                        getCalciteOperators());
+
+        return normalizeList(allFunctions);
     }
 
     private static void printList(Stream<String> stream) {
@@ -142,9 +175,9 @@ public class CoreProxyModuleTest {
     /**
      * Snapshot of functions for {@link #changeDetectionTest()}.
      *
-     * <p>Use {@link #printFunctions()} to regenerate if necessary.
+     * <p>Use {@link #printAllFunctions()} to regenerate if necessary.
      */
-    private static final List<String> FLINK_1_17 =
+    private static final List<String> LAST_REVIEW =
             Arrays.asList(
                     // Function-style syntax:
                     "ABS",
@@ -152,7 +185,18 @@ public class CoreProxyModuleTest {
                     "AGG_DECIMAL_MINUS",
                     "AGG_DECIMAL_PLUS",
                     "APPROX_COUNT_DISTINCT",
+                    "ARRAY_AGG",
+                    "ARRAY_CONCAT",
                     "ARRAY_CONTAINS",
+                    "ARRAY_DISTINCT",
+                    "ARRAY_JOIN",
+                    "ARRAY_MAX",
+                    "ARRAY_POSITION",
+                    "ARRAY_REMOVE",
+                    "ARRAY_REVERSE",
+                    "ARRAY_SLICE",
+                    "ARRAY_SORT",
+                    "ARRAY_UNION",
                     "ASCII",
                     "ASIN",
                     "ATAN",
@@ -248,6 +292,10 @@ public class CoreProxyModuleTest {
                     "LOWER",
                     "LPAD",
                     "LTRIM",
+                    "MAP_ENTRIES",
+                    "MAP_FROM_ARRAYS",
+                    "MAP_KEYS",
+                    "MAP_VALUES",
                     "MATCH_PROCTIME",
                     "MATCH_ROWTIME",
                     "MAX",
@@ -363,6 +411,7 @@ public class CoreProxyModuleTest {
                     "EXCEPT ALL",
                     "EXISTS",
                     "FINAL",
+                    "IGNORE NULLS",
                     "IN",
                     "INTERSECT",
                     "INTERSECT ALL",
@@ -399,9 +448,12 @@ public class CoreProxyModuleTest {
                     "OR",
                     "OVERLAPS",
                     "REINTERPRET",
+                    "RESPECT NULLS",
                     "ROW",
                     "RUNNING",
                     "SIMILAR TO",
+                    "SKIP TO FIRST",
+                    "SKIP TO LAST",
                     "UNION",
                     "UNION ALL",
                     "||");
