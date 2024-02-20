@@ -4,7 +4,7 @@ agent:
   machine:
     type: s1-prod-ubuntu20-04-amd64-2
 execution_time_limit:
-  minutes: 320
+  minutes: 90
 
 auto_cancel:
   running:
