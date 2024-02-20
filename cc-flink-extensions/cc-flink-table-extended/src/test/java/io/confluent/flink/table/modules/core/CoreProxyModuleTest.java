@@ -88,7 +88,7 @@ public class CoreProxyModuleTest {
 
     @Test
     void changeDetectionTest() {
-        assertThat(normalizeList(allFunctions())).containsAll(LAST_REVIEW);
+        assertThat(allFunctions()).containsExactlyInAnyOrderElementsOf(LAST_REVIEW);
     }
 
     /**
@@ -146,7 +146,7 @@ public class CoreProxyModuleTest {
     }
 
     private static Stream<String> normalizeList(Stream<String> stream) {
-        return stream.filter(n -> !n.contains("$")).map(String::toUpperCase).distinct().sorted();
+        return stream.map(String::toUpperCase).distinct().sorted();
     }
 
     private static Stream<String> getCalciteFunctions() {
@@ -180,6 +180,12 @@ public class CoreProxyModuleTest {
     private static final List<String> LAST_REVIEW =
             Arrays.asList(
                     // Function-style syntax:
+                    "$HOP",
+                    "$REPLICATE_ROWS$1",
+                    "$SESSION",
+                    "$SUM0",
+                    "$TUMBLE",
+                    "$UNNEST_ROWS$1",
                     "ABS",
                     "ACOS",
                     "AGG_DECIMAL_MINUS",
@@ -386,6 +392,7 @@ public class CoreProxyModuleTest {
                     "WEEK",
                     "YEAR",
                     // SQL standard prefix/infix/postfix syntax:
+                    "$LITERALCHAIN",
                     "%",
                     "*",
                     "+",
