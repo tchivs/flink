@@ -363,10 +363,13 @@ public class ConfluentManagedTableUtils {
     public static final class WatermarkOptions implements Serializable {
         public final SourceWatermarkVersion version;
         public final boolean emitPerRow;
-        public final Duration idleTimeout;
+
+        public final Optional<Duration> idleTimeout;
 
         public WatermarkOptions(
-                SourceWatermarkVersion version, boolean emitPerRow, Duration idleTimeout) {
+                SourceWatermarkVersion version,
+                boolean emitPerRow,
+                Optional<Duration> idleTimeout) {
             this.version = version;
             this.emitPerRow = emitPerRow;
             this.idleTimeout = idleTimeout;
@@ -488,12 +491,15 @@ public class ConfluentManagedTableUtils {
                                 new WatermarkOptions(
                                         version,
                                         options.get(CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW),
-                                        Optional.ofNullable(sessionConfig)
-                                                .map(c -> c.get(SQL_TABLES_SCAN_IDLE_TIMEOUT))
-                                                .orElse(
-                                                        SQL_TABLES_SCAN_IDLE_TIMEOUT
-                                                                .defaultValue())))
+                                        getIdleTimeout(sessionConfig)))
                 .orElse(null);
+    }
+
+    private static Optional<Duration> getIdleTimeout(@Nullable ReadableConfig sessionConfig) {
+        if (sessionConfig == null) {
+            return Optional.empty();
+        }
+        return sessionConfig.getOptional(SQL_TABLES_SCAN_IDLE_TIMEOUT);
     }
 
     private static int[] createValueFormatProjection(

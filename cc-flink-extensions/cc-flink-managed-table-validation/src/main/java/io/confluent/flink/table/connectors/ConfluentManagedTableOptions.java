@@ -583,7 +583,10 @@ public class ConfluentManagedTableOptions {
         V1,
 
         /** Same as V1 but with enabled watermark alignment. */
-        V2
+        V2,
+
+        /** Same as V2 but also with progressive idleness. */
+        V3
     }
 
     private ConfluentManagedTableOptions() {
