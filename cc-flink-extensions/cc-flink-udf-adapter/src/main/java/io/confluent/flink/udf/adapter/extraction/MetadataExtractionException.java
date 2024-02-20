@@ -4,7 +4,7 @@
 
 package io.confluent.flink.udf.adapter.extraction;
 
-import io.confluent.flink.udf.extractor.Extractor.ErrorCode;
+import io.confluent.flink.udf.extractor.v1.ErrorCode;
 
 /** Exception representing any non platform error which may happen during extraction. */
 public class MetadataExtractionException extends Exception {

@@ -4,8 +4,11 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/confluentinc/flink/udf/extractor";
-option java_package = "io.confluent.flink.udf.extractor";
+option go_package = "github.com/confluentinc/flink/udf/extractor/api/v1;v1";
+option java_package = "io.confluent.flink.udf.extractor.v1";
+option java_multiple_files = true;
+
+package flink.udf.extractor.v1;
 
 enum ErrorCode {
   UNKNOWN = 0;

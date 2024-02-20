@@ -44,6 +44,7 @@ Copyright 2023 Confluent Inc.
 		<module>cc-flink-runtime-extensions</module>
 		<module>cc-flink-remote-udfs</module>
 		<module>cc-flink-udf-adapter</module>
+		<module>cc-flink-udf-adapter-api</module>
 	</modules>
 
 	<dependencyManagement>

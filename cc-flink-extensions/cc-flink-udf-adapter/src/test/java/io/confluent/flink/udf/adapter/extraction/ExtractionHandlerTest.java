@@ -6,7 +6,8 @@ package io.confluent.flink.udf.adapter.extraction;
 
 import io.confluent.flink.udf.adapter.examples.OverloadedSumScalarFunction;
 import io.confluent.flink.udf.adapter.examples.SumScalarFunction;
-import io.confluent.flink.udf.extractor.Extractor;
+import io.confluent.flink.udf.extractor.v1.ExtractionRequest;
+import io.confluent.flink.udf.extractor.v1.ExtractionResponse;
 import org.junit.jupiter.api.Test;
 
 import static io.confluent.flink.udf.adapter.TestUtil.DUMMY_CONTEXT;
@@ -19,7 +20,7 @@ public class ExtractionHandlerTest {
     public void testExtractSumFunction() throws Throwable {
         final ExtractionHandler extractionHandler = new ExtractionHandler();
         extractionHandler.open(new byte[0], DUMMY_CONTEXT);
-        Extractor.ExtractionRequest.Builder request = Extractor.ExtractionRequest.newBuilder();
+        ExtractionRequest.Builder request = ExtractionRequest.newBuilder();
         request.setPluginId("abc")
                 .setPluginVersionId("xyz")
                 .setClassName(SumScalarFunction.class.getName())
@@ -28,7 +29,7 @@ public class ExtractionHandlerTest {
                 extractionHandler.handleRequest(request.build().toByteArray(), DUMMY_CONTEXT);
         extractionHandler.close(new byte[0], DUMMY_CONTEXT);
 
-        Extractor.ExtractionResponse response = Extractor.ExtractionResponse.parseFrom(bytes);
+        ExtractionResponse response = ExtractionResponse.parseFrom(bytes);
         assertThat(response.getSignaturesCount()).isEqualTo(1);
         assertThat(response.getSignatures(0).getArgumentTypesList()).containsExactly("INT", "INT");
         assertThat(response.getSignatures(0).getReturnType()).isEqualTo("INT");
@@ -38,7 +39,7 @@ public class ExtractionHandlerTest {
     public void testOverloadedSumFunction() throws Throwable {
         final ExtractionHandler extractionHandler = new ExtractionHandler();
         extractionHandler.open(new byte[0], DUMMY_CONTEXT);
-        Extractor.ExtractionRequest.Builder request = Extractor.ExtractionRequest.newBuilder();
+        ExtractionRequest.Builder request = ExtractionRequest.newBuilder();
         request.setPluginId("abc")
                 .setPluginVersionId("xyz")
                 .setClassName(OverloadedSumScalarFunction.class.getName())
@@ -47,7 +48,7 @@ public class ExtractionHandlerTest {
                 extractionHandler.handleRequest(request.build().toByteArray(), DUMMY_CONTEXT);
         extractionHandler.close(new byte[0], DUMMY_CONTEXT);
 
-        Extractor.ExtractionResponse response = Extractor.ExtractionResponse.parseFrom(bytes);
+        ExtractionResponse response = ExtractionResponse.parseFrom(bytes);
         assertThat(response.getSignaturesCount()).isEqualTo(3);
         assertThat(response.getSignatures(0).getArgumentTypesList()).containsExactly("INT", "INT");
         assertThat(response.getSignatures(0).getReturnType()).isEqualTo("INT");

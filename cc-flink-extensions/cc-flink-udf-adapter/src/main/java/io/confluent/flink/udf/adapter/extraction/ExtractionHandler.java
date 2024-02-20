@@ -7,9 +7,11 @@ package io.confluent.flink.udf.adapter.extraction;
 import org.apache.flink.table.types.extraction.ConfluentUdfExtractor;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.confluent.flink.udf.extractor.Extractor;
-import io.confluent.flink.udf.extractor.Extractor.ExtractionRequest;
-import io.confluent.flink.udf.extractor.Extractor.ExtractionResponse;
+import io.confluent.flink.udf.extractor.v1.Error;
+import io.confluent.flink.udf.extractor.v1.ErrorCode;
+import io.confluent.flink.udf.extractor.v1.ExtractionRequest;
+import io.confluent.flink.udf.extractor.v1.ExtractionResponse;
+import io.confluent.flink.udf.extractor.v1.Signature;
 import io.confluent.function.runtime.core.Context;
 import io.confluent.function.runtime.core.RequestHandler;
 import io.confluent.function.runtime.core.RequestInvocationException;
@@ -40,7 +42,7 @@ public class ExtractionHandler implements RequestHandler {
                             this.getClass().getClassLoader(), request.getClassName());
             for (ConfluentUdfExtractor.Signature signature : metadata.getSignatures()) {
                 builder.addSignatures(
-                        Extractor.Signature.newBuilder()
+                        Signature.newBuilder()
                                 .addAllArgumentTypes(signature.getSerializedArgumentTypes())
                                 .setReturnType(signature.getSerializedReturnType())
                                 .build());
@@ -48,14 +50,12 @@ public class ExtractionHandler implements RequestHandler {
         } catch (MetadataExtractionException e) {
             LOG.log(Level.WARNING, "An error occurred during extraction", e);
             builder.setError(
-                    Extractor.Error.newBuilder()
-                            .setCode(e.getCode())
-                            .setErrorMessage(e.getMessage()));
+                    Error.newBuilder().setCode(e.getCode()).setErrorMessage(e.getMessage()));
         } catch (Throwable e) {
             LOG.log(Level.SEVERE, "An unknown error occurred during extraction", e);
             builder.setError(
-                    Extractor.Error.newBuilder()
-                            .setCode(Extractor.ErrorCode.UNKNOWN)
+                    Error.newBuilder()
+                            .setCode(ErrorCode.UNKNOWN)
                             .setErrorMessage("An internal error occurred during extraction."));
         }
         ExtractionResponse response = builder.build();

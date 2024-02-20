@@ -16,11 +16,11 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.logging.Logger;
 
-import static io.confluent.flink.udf.extractor.Extractor.ErrorCode.GENERAL_FAILED_EXTRACTION;
-import static io.confluent.flink.udf.extractor.Extractor.ErrorCode.NOT_SCALAR_FUNCTION;
-import static io.confluent.flink.udf.extractor.Extractor.ErrorCode.NO_PUBLIC_NO_ARG_CONSTRUCTOR;
-import static io.confluent.flink.udf.extractor.Extractor.ErrorCode.TYPE_EXTRACTION_ERROR;
-import static io.confluent.flink.udf.extractor.Extractor.ErrorCode.USER_CODE_NOT_FOUND;
+import static io.confluent.flink.udf.extractor.v1.ErrorCode.GENERAL_FAILED_EXTRACTION;
+import static io.confluent.flink.udf.extractor.v1.ErrorCode.NOT_SCALAR_FUNCTION;
+import static io.confluent.flink.udf.extractor.v1.ErrorCode.NO_PUBLIC_NO_ARG_CONSTRUCTOR;
+import static io.confluent.flink.udf.extractor.v1.ErrorCode.TYPE_EXTRACTION_ERROR;
+import static io.confluent.flink.udf.extractor.v1.ErrorCode.USER_CODE_NOT_FOUND;
 
 /**
  * Contains all the logic required to take a class and extract the metadata about it that we want to

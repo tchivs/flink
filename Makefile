@@ -39,6 +39,7 @@ ifneq ($(RELEASE_BRANCH),$(_empty))
 	./tools/ci/compile_ci.sh || exit $?
 	ln -s build-target flink
 	tar -chf confluent-flink.tar.gz flink
+	make generate-udf-protos
 	make mvn-push-nanoversion-tag
 
 	./mvnw -B deploy $(MAVEN_SKIP_CHECKS) \
@@ -125,3 +126,11 @@ MK_INCLUDE_VERSION ?= v0.937.0
 		exit 1; \
 	}
 ### END MK-INCLUDE UPDATE ###
+
+
+.PHONY: generate-udf-protos
+generate-udf-protos:
+	protoc cc-flink-extensions/cc-flink-udf-adapter-api/api/v1/*.proto \
+    --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    --proto_path=.

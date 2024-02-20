@@ -40,6 +40,12 @@ Copyright 2024 Confluent Inc.
 		<!-- Internal dependencies -->
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-udf-adapter-api</artifactId>
+			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-table-extended_${scala.binary.version}</artifactId>
 			<version>${project.version}</version>
 			<optional>${flink.markBundledAsOptional}</optional>
@@ -98,28 +104,6 @@ Copyright 2024 Confluent Inc.
 				<configuration>
 					<suppressionsLocation combine.self="override">/tools/maven/suppressions-extensions.xml</suppressionsLocation>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.xolstice.maven.plugins</groupId>
-				<artifactId>protobuf-maven-plugin</artifactId>
-				<version>0.6.1</version>
-				<configuration>
-					<protocArtifact>
-						com.google.protobuf:protoc:${protoc.version}:exe:${os.detected.classifier}
-					</protocArtifact>
-					<pluginId>grpc-java</pluginId>
-					<pluginArtifact>
-						io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
-					</pluginArtifact>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>compile</goal>
-							<goal>compile-custom</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
