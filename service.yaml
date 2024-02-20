@@ -12,3 +12,5 @@ contact:
 make:
   enable: true
   enable_updates: true
+grpc:
+  enable: true
