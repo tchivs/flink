@@ -118,12 +118,6 @@ Copyright 2023 Confluent Inc.
 		</dependency>
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
-			<artifactId>cc-flink-managed-table</artifactId>
-			<version>${project.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.confluent.flink</groupId>
 			<artifactId>flink-faker</artifactId>
 			<version>0.16.0</version>
 			<scope>runtime</scope>
