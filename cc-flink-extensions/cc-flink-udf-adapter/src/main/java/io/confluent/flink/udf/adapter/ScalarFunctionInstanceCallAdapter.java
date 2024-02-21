@@ -4,7 +4,10 @@
 
 package io.confluent.flink.udf.adapter;
 
-import org.apache.flink.table.functions.FunctionContext;
+import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.functions.ScalarFunction;
 
 import io.confluent.flink.udf.adapter.codegen.ScalarFunctionCallAdapter;
@@ -15,27 +18,28 @@ import io.confluent.flink.udf.adapter.codegen.ScalarFunctionCallAdapter;
  */
 public class ScalarFunctionInstanceCallAdapter {
 
-    /** Instance to invoke. */
-    private final ScalarFunction instance;
-
     /** Instance-agnostic call adapter. */
-    private final ScalarFunctionCallAdapter callAdapter;
+    private final RichMapFunction<RowData, Object> callAdapter;
+
+    private final Configuration tableConfiguration;
 
     public ScalarFunctionInstanceCallAdapter(
-            ScalarFunction instance, ScalarFunctionCallAdapter callAdapter) {
-        this.instance = instance;
+            RichMapFunction<RowData, Object> callAdapter, Configuration tableConfiguration) {
         this.callAdapter = callAdapter;
+        this.tableConfiguration = tableConfiguration;
     }
 
     public Object call(Object[] args) throws Throwable {
-        return callAdapter.call(instance, args);
+        GenericRowData genericRowData = GenericRowData.of(args);
+        return callAdapter.map(genericRowData);
     }
 
     public void open() throws Exception {
-        instance.open(new FunctionContext(null));
+        callAdapter.setRuntimeContext(new UdfRuntimeContext());
+        callAdapter.open(tableConfiguration);
     }
 
     public void close() throws Exception {
-        instance.close();
+        callAdapter.close();
     }
 }

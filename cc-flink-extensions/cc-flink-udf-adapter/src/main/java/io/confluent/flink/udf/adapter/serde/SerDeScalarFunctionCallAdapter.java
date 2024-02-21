@@ -8,11 +8,9 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.functions.ScalarFunction;
-import org.apache.flink.table.functions.UserDefinedFunctionHelper;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfSpec;
 import io.confluent.flink.udf.adapter.ScalarFunctionInstanceCallAdapter;
@@ -62,18 +60,12 @@ public class SerDeScalarFunctionCallAdapter {
                                 .getDeclaredConstructor()
                                 .newInstance();
 
-        Class<?> returnClass = LogicalTypeUtils.toInternalConversionClass(returnLogicalType);
-        List<Class<?>> argumentInternalConversionClasses =
-                argumentLogicalTypes.stream()
-                        .map(LogicalTypeUtils::toInternalConversionClass)
-                        .collect(Collectors.toList());
         ScalarFunctionInstanceCallAdapter instanceCallAdapter =
                 ScalarFunctionAdapterGenerator.generate(
                         instanceId,
                         functionInstance,
-                        UserDefinedFunctionHelper.SCALAR_EVAL,
-                        returnClass,
-                        argumentInternalConversionClasses,
+                        remoteUdfSpec.getArgumentTypes(),
+                        remoteUdfSpec.getReturnType(),
                         classLoader);
 
         TypeSerializer<Object> returnSerializer = InternalSerializers.create(returnLogicalType);
