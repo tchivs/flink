@@ -347,7 +347,12 @@ class MergeTableLikeUtil {
                         new UnresolvedPrimaryKey(
                                 derivedPrimaryKey
                                         .getConstraintName()
-                                        .orElseGet(() -> "PK_" + primaryKeyColumns.hashCode()),
+                                        .orElseGet(
+                                                () ->
+                                                        primaryKeyColumns.stream()
+                                                                .collect(
+                                                                        Collectors.joining(
+                                                                                "_", "PK_", ""))),
                                 primaryKeyColumns);
             }
         }
