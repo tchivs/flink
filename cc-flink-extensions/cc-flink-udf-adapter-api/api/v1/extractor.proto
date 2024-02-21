@@ -4,7 +4,7 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/confluentinc/flink/udf/extractor/api/v1;v1";
+option go_package = "github.com/confluentinc/flink/cc-flink-extensions/cc-flink-udf-adapter-api/api/v1;v1";
 option java_package = "io.confluent.flink.udf.extractor.v1";
 option java_multiple_files = true;
 

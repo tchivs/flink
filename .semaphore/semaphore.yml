@@ -84,6 +84,7 @@ blocks:
       jobs:
         - name: compile_ci
           commands:
+            - make install-protoc install-protoc-gen-go generate-udf-protos
             # Cache restore maven
             - cache restore "$CACHE_PREFIX"-maven-cache
             - source tools/ci/maven-utils.sh

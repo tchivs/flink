@@ -127,10 +127,12 @@ MK_INCLUDE_VERSION ?= v0.937.0
 	}
 ### END MK-INCLUDE UPDATE ###
 
+.PHONY: install-protoc-gen-go
+install-protoc-gen-go: # install dependencies for compling proto files to golang code.
+	GOBIN=$(BIN_PATH) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
 
 .PHONY: generate-udf-protos
 generate-udf-protos:
 	protoc cc-flink-extensions/cc-flink-udf-adapter-api/api/v1/*.proto \
     --go_out=. --go_opt=paths=source_relative \
-    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
     --proto_path=.
