@@ -13,6 +13,7 @@ MAVEN_NANO_VERSION := true
 include ./mk-include/cc-begin.mk
 include ./mk-include/cc-vault.mk
 include ./mk-include/cc-maven.mk
+include ./mk-include/cc-protoc.mk
 include ./mk-include/cc-semver.mk
 include ./mk-include/cc-end.mk
 
