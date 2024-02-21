@@ -350,7 +350,7 @@ public class InfoSchemaExecutionTest {
                         "cat1",
                         "lkc-2",
                         "db2",
-                        "PK_146",
+                        "PK_s",
                         "env-1",
                         "cat1",
                         "lkc-2",
@@ -380,7 +380,7 @@ public class InfoSchemaExecutionTest {
                 "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` "
                         + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
                 row(
-                        "env-1", "cat1", "lkc-2", "db2", "PK_146", "env-1", "cat1", "lkc-2", "db2",
+                        "env-1", "cat1", "lkc-2", "db2", "PK_s", "env-1", "cat1", "lkc-2", "db2",
                         "table3", "s", 1),
                 row(
                         "env-1", "cat1", "lkc-2", "db2", "my_pk", "env-1", "cat1", "lkc-2", "db2",
