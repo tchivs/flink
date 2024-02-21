@@ -6,8 +6,9 @@ package org.apache.flink.contrib.streaming.state.sstmerge;
 
 import org.apache.flink.util.function.RunnableWithException;
 
-import jdk.internal.org.jline.utils.Log;
 import org.rocksdb.ColumnFamilyHandle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -19,6 +20,8 @@ import java.util.function.Function;
  */
 @ThreadSafe
 class CompactionTracker {
+    private static final Logger LOG = LoggerFactory.getLogger(CompactionTracker.class);
+
     private final Function<ColumnFamilyHandle, Long> runningAutoCompactions;
     private final int maxManualCompactions;
     private final int maxAutoCompactions;
@@ -101,7 +104,7 @@ class CompactionTracker {
             try {
                 compaction.run();
             } catch (Exception e) {
-                Log.warn("Unable to compact {} (concurrent compaction?)", compaction, e);
+                LOG.warn("Unable to compact {} (concurrent compaction?)", compaction, e);
             }
             complete();
         } else {
