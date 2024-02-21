@@ -35,8 +35,13 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
         implements SpecializedFunction {
     private static final Logger LOG = LoggerFactory.getLogger(ConfiguredRemoteScalarFunction.class);
 
-    private final Map<String, String> config;
-    private final List<ConfiguredFunctionSpec> configuredFunctionSpecs;
+    private final transient Map<String, String> config;
+    private final transient List<ConfiguredFunctionSpec> configuredFunctionSpecs;
+
+    // Is only used for catalog serialization purposes.  Shouldn't be called in practice.
+    public ConfiguredRemoteScalarFunction() {
+        throw new IllegalStateException("Should only be used for planning");
+    }
 
     // Useful for the planner so that it does't need to provide a config which is only required
     // during runtime

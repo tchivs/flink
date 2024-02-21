@@ -229,8 +229,10 @@ class DefaultServiceTasks implements ServiceTasks {
                         ColumnExpansionStrategy.EXCLUDE_ALIASED_VIRTUAL_METADATA_COLUMNS));
 
         // Job submission service doesn't need to attempt a plan enrichment from catalog.
-        // We fully rely on what has been serialized into the compiled plan.
-        config.set(PLAN_RESTORE_CATALOG_OBJECTS, CatalogPlanRestore.ALL_ENFORCED);
+        // We fully rely on what has been serialized into the compiled plan, except for UDFs,
+        // which we initialize from the job properties and register explicitly.
+        // For this reason, we utilize ALL rather than ALL_ENFORCED.
+        config.set(PLAN_RESTORE_CATALOG_OBJECTS, CatalogPlanRestore.ALL);
 
         // Insert a proxy core module to control which functions get exposed and which ones are
         // forbidden.
