@@ -40,7 +40,6 @@ ifneq ($(RELEASE_BRANCH),$(_empty))
 	./tools/ci/compile_ci.sh || exit $?
 	ln -s build-target flink
 	tar -chf confluent-flink.tar.gz flink
-	$(MAKE) install-protoc generate-udf-protos
 	$(MAKE) mvn-push-nanoversion-tag
 
 	./mvnw -B deploy $(MAVEN_SKIP_CHECKS) \
