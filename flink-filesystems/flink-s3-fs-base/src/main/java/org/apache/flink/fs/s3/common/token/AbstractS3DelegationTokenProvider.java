@@ -85,10 +85,13 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
 
     @Override
     public boolean delegationTokensRequired() {
-        if (isCredentialsRequired
-                && (StringUtils.isNullOrWhitespaceOnly(region)
-                        || StringUtils.isNullOrWhitespaceOnly(accessKey)
-                        || StringUtils.isNullOrWhitespaceOnly(secretKey))) {
+        if (!isCredentialsRequired) {
+            // we only need this provider when running in AWS
+            return EC2MetadataUtils.getInstanceId() != null;
+        }
+        if (StringUtils.isNullOrWhitespaceOnly(region)
+                || StringUtils.isNullOrWhitespaceOnly(accessKey)
+                || StringUtils.isNullOrWhitespaceOnly(secretKey)) {
             LOG.debug("Not obtaining session credentials because not all configurations are set");
             return false;
         }
