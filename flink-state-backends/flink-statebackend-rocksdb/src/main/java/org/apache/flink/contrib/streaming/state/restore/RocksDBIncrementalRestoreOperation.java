@@ -128,6 +128,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
     private final boolean useIngestDbRestoreMode;
 
+    private final boolean useDeleteFilesInRange;
+
     private final boolean asyncCompactAfterRescale;
 
     public RocksDBIncrementalRestoreOperation(
@@ -153,6 +155,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
             Long writeBufferManagerCapacity,
             double overlapFractionThreshold,
             boolean useIngestDbRestoreMode,
+            boolean useDeleteFilesInRange,
             boolean asyncCompactAfterRescale) {
         this.rocksHandle =
                 new RocksDBHandle(
@@ -182,6 +185,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
         this.userCodeClassLoader = userCodeClassLoader;
         this.useIngestDbRestoreMode = useIngestDbRestoreMode;
         this.asyncCompactAfterRescale = asyncCompactAfterRescale;
+        this.useDeleteFilesInRange = useDeleteFilesInRange;
     }
 
     /**
@@ -370,7 +374,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                         this.rocksHandle.getColumnFamilyHandles(),
                         keyGroupRange,
                         stateHandleKeyGroupRange,
-                        keyGroupPrefixBytes);
+                        keyGroupPrefixBytes,
+                        useDeleteFilesInRange);
             } catch (RocksDBException e) {
                 String errMsg = "Failed to clip DB after initialization.";
                 logger.error(errMsg, e);
@@ -655,7 +660,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                 rocksHandle.getColumnFamilyHandles(),
                 keyGroupRange,
                 exportKeyGroupRange,
-                keyGroupPrefixBytes);
+                keyGroupPrefixBytes,
+                useDeleteFilesInRange);
 
         logger.info(
                 "Completed importing exported state handles for backend with range {} in operator {} using Clip/Ingest DB.",

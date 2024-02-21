@@ -851,6 +851,28 @@ public class RocksDBStateBackendConfigTest {
     }
 
     @Test
+    public void testDefaultUseDeleteFilesInRange() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        assertEquals(
+                RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE.defaultValue(),
+                rocksDBStateBackend.getUseDeleteFilesInRange());
+    }
+
+    @Test
+    public void testConfigureUseFilesInRange() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        Configuration configuration = new Configuration();
+        configuration.set(
+                RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE,
+                !RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE.defaultValue());
+        rocksDBStateBackend =
+                rocksDBStateBackend.configure(configuration, getClass().getClassLoader());
+        assertEquals(
+                !RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE.defaultValue(),
+                rocksDBStateBackend.getUseDeleteFilesInRange());
+    }
+
+    @Test
     public void testDefaultIncrementalRestoreInstanceBufferSize() {
         EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
         assertEquals(

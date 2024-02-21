@@ -117,6 +117,12 @@
             <td>If true, every newly created SST file will contain a Bloom filter. It is disabled by default.</td>
         </tr>
         <tr>
+            <td><h5>state.backend.rocksdb.use-delete-files-in-range</h5></td>
+            <td style="word-wrap: break-word;">true</td>
+            <td>Boolean</td>
+            <td>If true, during recovery with rescaling we use RocksDB's deleteFilesInRange(...) to delete SST files that only contain keys outside the backends key-group range. This reduces write amplification for the first checkpoint(s) after rescaling, in particular before compaction happened.</td>
+        </tr>
+        <tr>
             <td><h5>state.backend.rocksdb.use-ingest-db-restore-mode</h5></td>
             <td style="word-wrap: break-word;">false</td>
             <td>Boolean</td>

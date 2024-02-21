@@ -276,6 +276,16 @@ public class RocksDBConfigurableOptions implements Serializable {
                             "A recovery mode that directly clips and ingests multiple DBs during state recovery if the keys"
                                     + " in the SST files does not exceed the declared key-group range.");
 
+    public static final ConfigOption<Boolean> USE_DELETE_FILES_IN_RANGE =
+            key("state.backend.rocksdb.use-delete-files-in-range")
+                    .booleanType()
+                    .defaultValue(Boolean.TRUE)
+                    .withDescription(
+                            "If true, during recovery with rescaling we use RocksDB's deleteFilesInRange(...) "
+                                    + "to delete SST files that only contain keys outside the backends key-group range. "
+                                    + "This reduces write amplification for the first checkpoint(s) after rescaling, "
+                                    + "in particular before compaction happened.");
+
     public static final ConfigOption<Boolean> INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE =
             key("state.backend.rocksdb.incremental-restore-async-compact-after-rescale")
                     .booleanType()
@@ -309,6 +319,7 @@ public class RocksDBConfigurableOptions implements Serializable {
                 BLOOM_FILTER_BLOCK_BASED_MODE,
                 RESTORE_OVERLAP_FRACTION_THRESHOLD,
                 USE_INGEST_DB_RESTORE_MODE,
+                USE_DELETE_FILES_IN_RANGE,
                 INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE
             };
 

@@ -179,7 +179,8 @@ public class RocksDBIncrementalCheckpointUtilsTest extends TestLogger {
                     Collections.singletonList(columnFamilyHandle),
                     targetGroupRange,
                     currentGroupRange,
-                    keyGroupPrefixBytes);
+                    keyGroupPrefixBytes,
+                    true);
 
             for (int i = currentGroupRangeStart; i <= currentGroupRangeEnd; ++i) {
                 for (int j = 0; j < 100; ++j) {
