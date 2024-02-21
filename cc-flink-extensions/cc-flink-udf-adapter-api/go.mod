@@ -1,6 +1,6 @@
 // Copyright 2024 Confluent Inc.
 
-module github.com/confluentinc/flink/udf/extractor/api
+module github.com/confluentinc/flink/cc-flink-extensions/cc-flink-udf-adapter-api
 
 go 1.21.5
 
