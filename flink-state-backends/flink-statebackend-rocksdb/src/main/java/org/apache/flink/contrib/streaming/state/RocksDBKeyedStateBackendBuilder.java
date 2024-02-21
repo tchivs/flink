@@ -83,7 +83,7 @@ import java.util.function.Function;
 
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.RESTORE_OVERLAP_FRACTION_THRESHOLD;
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -134,7 +134,9 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
     private RocksDB injectedTestDB; // for testing
     private boolean incrementalRestoreAsyncCompactAfterRescale =
             INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE.defaultValue();
-    private boolean useDeleteFilesInRange = USE_DELETE_FILES_IN_RANGE.defaultValue();
+    private boolean rescalingUseDeleteFilesInRange =
+            USE_DELETE_FILES_IN_RANGE_DURING_RESCALING.defaultValue();
+
     private double overlapFractionThreshold = RESTORE_OVERLAP_FRACTION_THRESHOLD.defaultValue();
     private boolean useIngestDbRestoreMode = USE_INGEST_DB_RESTORE_MODE.defaultValue();
     private ColumnFamilyHandle injectedDefaultColumnFamilyHandle; // for testing
@@ -296,13 +298,14 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
         return this;
     }
 
-    RocksDBKeyedStateBackendBuilder<K> setUseDeleteFilesInRange(boolean useDeleteFilesInRange) {
-        this.useDeleteFilesInRange = useDeleteFilesInRange;
+    RocksDBKeyedStateBackendBuilder<K> setIOExecutor(ExecutorService ioExecutor) {
+        this.ioExecutor = ioExecutor;
         return this;
     }
 
-    RocksDBKeyedStateBackendBuilder<K> setIOExecutor(ExecutorService ioExecutor) {
-        this.ioExecutor = ioExecutor;
+    RocksDBKeyedStateBackendBuilder<K> setRescalingUseDeleteFilesInRange(
+            boolean rescalingUseDeleteFilesInRange) {
+        this.rescalingUseDeleteFilesInRange = rescalingUseDeleteFilesInRange;
         return this;
     }
 
@@ -536,8 +539,8 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
                     optionsContainer.getWriteBufferManagerCapacity(),
                     overlapFractionThreshold,
                     useIngestDbRestoreMode,
-                    useDeleteFilesInRange,
-                    incrementalRestoreAsyncCompactAfterRescale);
+                    incrementalRestoreAsyncCompactAfterRescale,
+                    rescalingUseDeleteFilesInRange);
         } else if (priorityQueueStateType
                 == EmbeddedRocksDBStateBackend.PriorityQueueStateType.HEAP) {
             return new RocksDBHeapTimersFullRestoreOperation<>(

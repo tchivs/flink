@@ -128,9 +128,9 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
     private final boolean useIngestDbRestoreMode;
 
-    private final boolean useDeleteFilesInRange;
-
     private final boolean asyncCompactAfterRescale;
+
+    private final boolean useDeleteFilesInRange;
 
     public RocksDBIncrementalRestoreOperation(
             String operatorIdentifier,
@@ -155,8 +155,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
             Long writeBufferManagerCapacity,
             double overlapFractionThreshold,
             boolean useIngestDbRestoreMode,
-            boolean useDeleteFilesInRange,
-            boolean asyncCompactAfterRescale) {
+            boolean asyncCompactAfterRescale,
+            boolean useDeleteFilesInRange) {
         this.rocksHandle =
                 new RocksDBHandle(
                         kvStateInformation,

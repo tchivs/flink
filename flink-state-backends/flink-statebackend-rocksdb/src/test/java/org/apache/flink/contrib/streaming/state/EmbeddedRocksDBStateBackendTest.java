@@ -95,7 +95,7 @@ import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertNotNull;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE;
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -742,7 +742,9 @@ public class EmbeddedRocksDBStateBackendTest
         testConfig.setBoolean(
                 INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,
                 !INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE.defaultValue());
-        testConfig.setBoolean(USE_DELETE_FILES_IN_RANGE, !USE_DELETE_FILES_IN_RANGE.defaultValue());
+        testConfig.setBoolean(
+                USE_DELETE_FILES_IN_RANGE_DURING_RESCALING,
+                !USE_DELETE_FILES_IN_RANGE_DURING_RESCALING.defaultValue());
         EmbeddedRocksDBStateBackend configuredBackend =
                 rocksDBStateBackend.configure(
                         testConfig, Thread.currentThread().getContextClassLoader());
@@ -753,8 +755,8 @@ public class EmbeddedRocksDBStateBackendTest
                 configuredBackend.getUseIngestDbRestoreMode());
         checkBooleanWithBaseConf(
                 baseConfig,
-                USE_DELETE_FILES_IN_RANGE,
-                configuredBackend.getUseDeleteFilesInRange());
+                USE_DELETE_FILES_IN_RANGE_DURING_RESCALING,
+                configuredBackend.isRescalingUseDeleteFilesInRange());
         checkBooleanWithBaseConf(
                 baseConfig,
                 INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,

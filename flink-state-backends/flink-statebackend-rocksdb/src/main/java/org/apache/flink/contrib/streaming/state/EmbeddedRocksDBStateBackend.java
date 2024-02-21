@@ -73,7 +73,7 @@ import java.util.function.Supplier;
 import static org.apache.flink.configuration.description.TextElement.text;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.RESTORE_OVERLAP_FRACTION_THRESHOLD;
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_SIZE;
 import static org.apache.flink.contrib.streaming.state.RocksDBOptions.CHECKPOINT_TRANSFER_THREAD_NUM;
@@ -180,16 +180,16 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
     private final TernaryBoolean useIngestDbRestoreMode;
 
     /**
-     * Whether we try to delete SST files that are completely out of the target key-groups range for
-     * the backend after rescaling.
-     */
-    private final TernaryBoolean useDeleteFilesInRange;
-
-    /**
      * Whether we trigger an async compaction after restores for which we detect state in the
      * database (including tombstones) that exceed the proclaimed key-groups range of the backend.
      */
     private final TernaryBoolean incrementalRestoreAsyncCompactAfterRescale;
+
+    /**
+     * Whether to leverage deleteFilesInRange API to clean up useless rocksdb files during
+     * rescaling.
+     */
+    private final TernaryBoolean rescalingUseDeleteFilesInRange;
 
     /** Factory for Write Buffer Manager and Block Cache. */
     private RocksDBMemoryFactory rocksDBMemoryFactory;
@@ -225,8 +225,8 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
         this.overlapFractionThreshold = UNDEFINED_OVERLAP_FRACTION_THRESHOLD;
         this.rocksDBMemoryFactory = RocksDBMemoryFactory.DEFAULT;
         this.useIngestDbRestoreMode = TernaryBoolean.UNDEFINED;
-        this.useDeleteFilesInRange = TernaryBoolean.UNDEFINED;
         this.incrementalRestoreAsyncCompactAfterRescale = TernaryBoolean.UNDEFINED;
+        this.rescalingUseDeleteFilesInRange = TernaryBoolean.UNDEFINED;
         this.manualCompactionConfig = null;
     }
 
@@ -334,9 +334,11 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                 TernaryBoolean.mergeTernaryBooleanWithConfig(
                         original.useIngestDbRestoreMode, USE_INGEST_DB_RESTORE_MODE, config);
 
-        useDeleteFilesInRange =
+        rescalingUseDeleteFilesInRange =
                 TernaryBoolean.mergeTernaryBooleanWithConfig(
-                        original.useDeleteFilesInRange, USE_DELETE_FILES_IN_RANGE, config);
+                        original.rescalingUseDeleteFilesInRange,
+                        USE_DELETE_FILES_IN_RANGE_DURING_RESCALING,
+                        config);
 
         this.rocksDBMemoryFactory = original.rocksDBMemoryFactory;
 
@@ -517,7 +519,7 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                         .setIncrementalRestoreAsyncCompactAfterRescale(
                                 getIncrementalRestoreAsyncCompactAfterRescale())
                         .setUseIngestDbRestoreMode(getUseIngestDbRestoreMode())
-                        .setUseDeleteFilesInRange(getUseDeleteFilesInRange())
+                        .setRescalingUseDeleteFilesInRange(isRescalingUseDeleteFilesInRange())
                         .setIOExecutor(parameters.getEnv().getIOManager().getExecutorService())
                         .setManualCompactionConfig(
                                 manualCompactionConfig == null
@@ -872,8 +874,9 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
         return useIngestDbRestoreMode.getOrDefault(USE_INGEST_DB_RESTORE_MODE.defaultValue());
     }
 
-    boolean getUseDeleteFilesInRange() {
-        return useDeleteFilesInRange.getOrDefault(USE_DELETE_FILES_IN_RANGE.defaultValue());
+    boolean isRescalingUseDeleteFilesInRange() {
+        return rescalingUseDeleteFilesInRange.getOrDefault(
+                USE_DELETE_FILES_IN_RANGE_DURING_RESCALING.defaultValue());
     }
 
     // ------------------------------------------------------------------------
