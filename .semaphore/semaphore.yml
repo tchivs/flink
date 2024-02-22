@@ -204,7 +204,7 @@ blocks:
             - make flink-deploy
 
 promotions:
-  - name: trigger cc-flink-docker
-    pipeline_file: trigger-cc-flink-docker.yml
+  - name: trigger kdb
+    pipeline_file: trigger-kdb.yml
     auto_promote:
       when: "result = 'passed' and branch =~ '^release-[0-9]+\\.[0-9]+-confluent$'"
