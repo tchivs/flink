@@ -180,8 +180,8 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
     private final TernaryBoolean useIngestDbRestoreMode;
 
     /**
-     * Whether we try to delete SST files that are completely out of the target key-groups range
-     * for the backend after rescaling.
+     * Whether we try to delete SST files that are completely out of the target key-groups range for
+     * the backend after rescaling.
      */
     private final TernaryBoolean useDeleteFilesInRange;
 
@@ -325,20 +325,18 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                 "Overlap fraction threshold of restoring should be between 0 and 1");
 
         incrementalRestoreAsyncCompactAfterRescale =
-                original.incrementalRestoreAsyncCompactAfterRescale == TernaryBoolean.UNDEFINED
-                        ? TernaryBoolean.fromBoxedBoolean(
-                                config.get(INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE))
-                        : original.incrementalRestoreAsyncCompactAfterRescale;
+                TernaryBoolean.mergeTernaryBooleanWithConfig(
+                        original.incrementalRestoreAsyncCompactAfterRescale,
+                        INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,
+                        config);
 
         useIngestDbRestoreMode =
-                original.useIngestDbRestoreMode == TernaryBoolean.UNDEFINED
-                        ? TernaryBoolean.fromBoxedBoolean(config.get(USE_INGEST_DB_RESTORE_MODE))
-                        : TernaryBoolean.fromBoolean(original.getUseIngestDbRestoreMode());
+                TernaryBoolean.mergeTernaryBooleanWithConfig(
+                        original.useIngestDbRestoreMode, USE_INGEST_DB_RESTORE_MODE, config);
 
         useDeleteFilesInRange =
-                original.useDeleteFilesInRange == TernaryBoolean.UNDEFINED
-                        ? TernaryBoolean.fromBoxedBoolean(config.get(USE_DELETE_FILES_IN_RANGE))
-                        : TernaryBoolean.fromBoolean(original.getUseDeleteFilesInRange());
+                TernaryBoolean.mergeTernaryBooleanWithConfig(
+                        original.useDeleteFilesInRange, USE_DELETE_FILES_IN_RANGE, config);
 
         this.rocksDBMemoryFactory = original.rocksDBMemoryFactory;
 

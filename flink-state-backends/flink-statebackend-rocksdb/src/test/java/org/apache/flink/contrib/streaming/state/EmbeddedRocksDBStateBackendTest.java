@@ -27,6 +27,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
+import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.contrib.streaming.state.sstmerge.RocksDBManualCompactionOptions;
 import org.apache.flink.core.fs.Path;
@@ -93,6 +94,8 @@ import java.util.concurrent.RunnableFuture;
 import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertNotNull;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE;
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -189,15 +192,20 @@ public class EmbeddedRocksDBStateBackendTest
         dbPath = TEMP_FOLDER.newFolder().getAbsolutePath();
         EmbeddedRocksDBStateBackend backend =
                 new EmbeddedRocksDBStateBackend(enableIncrementalCheckpointing);
+        Configuration configuration = createBackendConfig();
+        backend = backend.configure(configuration, Thread.currentThread().getContextClassLoader());
+        backend.setDbStoragePath(dbPath);
+        return backend;
+    }
+
+    private Configuration createBackendConfig() {
         Configuration configuration = new Configuration();
         configuration.set(USE_INGEST_DB_RESTORE_MODE, useIngestDB);
         configuration.set(
                 RocksDBOptions.TIMER_SERVICE_FACTORY,
                 EmbeddedRocksDBStateBackend.PriorityQueueStateType.ROCKSDB);
         configuration.set(RocksDBManualCompactionOptions.MIN_INTERVAL, Duration.ofMillis(1));
-        backend = backend.configure(configuration, Thread.currentThread().getContextClassLoader());
-        backend.setDbStoragePath(dbPath);
-        return backend;
+        return configuration;
     }
 
     @Override
@@ -716,6 +724,46 @@ public class EmbeddedRocksDBStateBackendTest
         }
         // allow some time for the background compaction to fail hard by calling closed db
         Thread.sleep(100);
+    }
+
+    /** Test for all configs that use {@link org.apache.flink.util.TernaryBoolean}. */
+    @Test
+    public void testConfigureTernaryBooleanConfigs() throws Exception {
+        ConfigurableStateBackend stateBackend = getStateBackend();
+        if (!(stateBackend instanceof EmbeddedRocksDBStateBackend)) {
+            return;
+        }
+        EmbeddedRocksDBStateBackend rocksDBStateBackend =
+                (EmbeddedRocksDBStateBackend) stateBackend;
+        Configuration baseConfig = createBackendConfig();
+        Configuration testConfig = new Configuration();
+        testConfig.setBoolean(
+                USE_INGEST_DB_RESTORE_MODE, !USE_INGEST_DB_RESTORE_MODE.defaultValue());
+        testConfig.setBoolean(
+                INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,
+                !INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE.defaultValue());
+        testConfig.setBoolean(USE_DELETE_FILES_IN_RANGE, !USE_DELETE_FILES_IN_RANGE.defaultValue());
+        EmbeddedRocksDBStateBackend configuredBackend =
+                rocksDBStateBackend.configure(
+                        testConfig, Thread.currentThread().getContextClassLoader());
+
+        checkBooleanWithBaseConf(
+                baseConfig,
+                USE_INGEST_DB_RESTORE_MODE,
+                configuredBackend.getUseIngestDbRestoreMode());
+        checkBooleanWithBaseConf(
+                baseConfig,
+                USE_DELETE_FILES_IN_RANGE,
+                configuredBackend.getUseDeleteFilesInRange());
+        checkBooleanWithBaseConf(
+                baseConfig,
+                INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,
+                configuredBackend.getIncrementalRestoreAsyncCompactAfterRescale());
+    }
+
+    private void checkBooleanWithBaseConf(
+            Configuration testConfig, ConfigOption<Boolean> option, boolean value) {
+        assertEquals(testConfig.getOptional(option).orElse(!option.defaultValue()), value);
     }
 
     private void runStateUpdates() throws Exception {
