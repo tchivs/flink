@@ -1,5 +1,0 @@
-#
-# Copyright 2023 Confluent Inc.
-#
-
-io.confluent.flink.jobgraph.FlinkIntegrationImpl
