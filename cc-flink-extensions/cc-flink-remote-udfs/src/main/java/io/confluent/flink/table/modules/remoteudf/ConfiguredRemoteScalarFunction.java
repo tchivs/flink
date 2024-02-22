@@ -139,7 +139,7 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     }
 
     @Override
-    public boolean isDeterministic() {
+    public boolean canReduceExpression() {
         return false;
     }
 }

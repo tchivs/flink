@@ -99,7 +99,7 @@ public class RemoteScalarFunction extends ScalarFunction {
     }
 
     @Override
-    public boolean isDeterministic() {
+    public boolean canReduceExpression() {
         return false;
     }
 }

@@ -86,6 +86,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
     private static final String SERVER_HOST_NAME = "localhost";
     private static final int SERVER_PORT = 8100;
     private static final String SERVER_TARGET = SERVER_HOST_NAME + ":" + SERVER_PORT;
+    private static final int INT_RETURN_VALUE = 424242;
 
     @BeforeEach
     public void before() {
@@ -187,6 +188,18 @@ public class RemoteUdfITCase extends AbstractTestBase {
                 ResultPlanUtils.foregroundJobCustomConfig(
                         tableEnv, "SELECT cat1.db1.remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
+    }
+
+    @Test
+    public void testJssRemoteUdfsNoExpressionReducer() throws Exception {
+        // should be enabled by default for JSS service
+        final TableEnvironment tableEnv = getJssTableEnvironment();
+
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote1(1)");
+        // The value of remote(1) is INT_RETURN_VALUE, but we want to ensure that the
+        // Expression reducer didn't inline the value into the plan.
+        assertThat(plan.getCompiledPlan()).doesNotContain(Integer.toString(INT_RETURN_VALUE));
     }
 
     @Test
@@ -318,7 +331,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
             }
             Assertions.assertEquals(1, results2.size());
             Row row2 = results2.get(0);
-            Assertions.assertEquals(42, row2.getField(0));
+            Assertions.assertEquals(INT_RETURN_VALUE, row2.getField(0));
             Assertions.assertTrue(testUdfGateway.instanceToFuncIds.isEmpty());
 
             TableResult result3 = tEnv.executeSql("SELECT cat1.db1.remote3();");
@@ -433,7 +446,7 @@ public class RemoteUdfITCase extends AbstractTestBase {
                             .getReturnType()
                             .getLogicalType()
                             .is(DataTypes.INT().getLogicalType().getTypeRoot())) {
-                        builder.setPayload(serialization.serializeReturnValue(42));
+                        builder.setPayload(serialization.serializeReturnValue(INT_RETURN_VALUE));
                     } else {
                         throw new Exception(
                                 "Unknown return type "
