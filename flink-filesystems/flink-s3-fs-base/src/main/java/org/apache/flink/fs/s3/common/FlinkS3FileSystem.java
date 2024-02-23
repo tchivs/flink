@@ -276,21 +276,28 @@ public class FlinkS3FileSystem extends HadoopFileSystem
             exitCode = wizard.waitFor();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException(createSpellErrorMessage(artefacts), e);
+            throw new IOException(
+                    createSpellErrorMessage(exitCode, stdOutputContent, artefacts), e);
         } catch (IOException e) {
-            throw new IOException(createSpellErrorMessage(artefacts), e);
+            throw new IOException(
+                    createSpellErrorMessage(exitCode, stdOutputContent, artefacts), e);
         }
 
         if (exitCode != 0) {
-            throw new IOException(
-                    createSpellErrorMessage(artefacts)
-                            + String.format(". Exit code = %d due to:\n%s", exitCode)
-                            + stdOutputContent);
+            throw new IOException(createSpellErrorMessage(exitCode, stdOutputContent, artefacts));
         }
     }
 
-    private static String createSpellErrorMessage(String... artefacts) {
-        return "Failed to cast s5cmd spell [" + String.join(" ", artefacts) + "]";
+    private static String createSpellErrorMessage(
+            int exitCode, StringBuilder stdOutputContent, String... artefacts) {
+        return new StringBuilder()
+                .append("Failed to cast s5cmd spell [")
+                .append(String.join(" ", artefacts))
+                .append("]")
+                .append(String.format(" [exit code = %d]", exitCode))
+                .append(" maybe due to:\n")
+                .append(stdOutputContent)
+                .toString();
     }
 
     @Nullable
