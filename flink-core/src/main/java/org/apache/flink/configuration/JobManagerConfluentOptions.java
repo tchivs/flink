@@ -34,6 +34,13 @@ public class JobManagerConfluentOptions {
                     .booleanType()
                     .defaultValue(false);
 
+    public static final ConfigOption<String> FORCED_WEB_TMP_UI_DIR =
+            key("confluent.web.ui.tmpdir")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Static base directory from which WebUI files are served. This is similar to 'web.tmpdir', but avoids safety precautions in the ClusterEntrypoint where a random directory is injected.");
+
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
     }
