@@ -32,7 +32,10 @@ public class ScalarFunctionHandlerTest {
         final ScalarFunctionHandler functionHandler = new ScalarFunctionHandler();
         functionHandler.open(
                 createSerializedOpenPayload(
-                        "UUID",
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
                         new VarCharType(Integer.MAX_VALUE),
                         Arrays.asList(new VarCharType()),
                         IdentityScalarFunction.class.getName()),
@@ -53,7 +56,10 @@ public class ScalarFunctionHandlerTest {
         final ScalarFunctionHandler functionHandler = new ScalarFunctionHandler();
         functionHandler.open(
                 createSerializedOpenPayload(
-                        "UUID",
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
                         new VarCharType(Integer.MAX_VALUE),
                         Arrays.asList(
                                 new VarCharType(Integer.MAX_VALUE),
@@ -78,7 +84,10 @@ public class ScalarFunctionHandlerTest {
         final ScalarFunctionHandler functionHandler = new ScalarFunctionHandler();
         functionHandler.open(
                 createSerializedOpenPayload(
-                        "UUID",
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
                         new IntType(),
                         Arrays.asList(new IntType(), new IntType()),
                         SumScalarFunction.class.getName()),
@@ -99,7 +108,10 @@ public class ScalarFunctionHandlerTest {
         final ScalarFunctionHandler functionHandler = new ScalarFunctionHandler();
         functionHandler.open(
                 createSerializedOpenPayload(
-                        "UUID",
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
                         new VarCharType(Integer.MAX_VALUE),
                         Arrays.asList(new VarCharType()),
                         HelloScalarFunction.class.getName()),
@@ -126,7 +138,10 @@ public class ScalarFunctionHandlerTest {
                                             new ScalarFunctionHandler();
                                     functionHandler.open(
                                             createSerializedOpenPayload(
-                                                    "UUID",
+                                                    "testOrg",
+                                                    "testEnv",
+                                                    "pluginUUID",
+                                                    "pluginVersionUUID",
                                                     new IntType(),
                                                     Arrays.asList(new IntType(false)),
                                                     NoMatchingScalarFunction.class.getName()),

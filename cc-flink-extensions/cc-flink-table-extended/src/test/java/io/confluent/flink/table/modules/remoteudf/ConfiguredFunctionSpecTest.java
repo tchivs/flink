@@ -23,6 +23,8 @@ public class ConfiguredFunctionSpecTest {
     public void testConfiguredRight() {
         List<ConfiguredFunctionSpec> spec =
                 ConfiguredFunctionSpec.newBuilder()
+                        .setOrganization("testOrg")
+                        .setEnvironment("testEnv")
                         .setCatalog("cat")
                         .setDatabase("db")
                         .setName("func")
@@ -33,6 +35,8 @@ public class ConfiguredFunctionSpecTest {
                         .addReturnType("STRING")
                         .build();
         assertThat(spec).hasSize(1);
+        assertThat(spec.get(0).getOrganization()).isEqualTo("testOrg");
+        assertThat(spec.get(0).getEnvironment()).isEqualTo("testEnv");
         assertThat(spec.get(0).getCatalog()).isEqualTo("cat");
         assertThat(spec.get(0).getDatabase()).isEqualTo("db");
         assertThat(spec.get(0).getName()).isEqualTo("func");
@@ -47,6 +51,8 @@ public class ConfiguredFunctionSpecTest {
     public void testOverrides() {
         List<ConfiguredFunctionSpec> spec =
                 ConfiguredFunctionSpec.newBuilder()
+                        .setOrganization("testOrg")
+                        .setEnvironment("testEnv")
                         .setCatalog("cat")
                         .setDatabase("db")
                         .setName("func")
@@ -59,6 +65,8 @@ public class ConfiguredFunctionSpecTest {
                         .addReturnType("INT")
                         .build();
         assertThat(spec).hasSize(2);
+        assertThat(spec.get(0).getOrganization()).isEqualTo("testOrg");
+        assertThat(spec.get(0).getEnvironment()).isEqualTo("testEnv");
         assertThat(spec.get(0).getCatalog()).isEqualTo("cat");
         assertThat(spec.get(0).getDatabase()).isEqualTo("db");
         assertThat(spec.get(0).getName()).isEqualTo("func");
@@ -81,6 +89,8 @@ public class ConfiguredFunctionSpecTest {
     public void testInconsistentArgs() {
         ConfiguredFunctionSpec.Builder builder =
                 ConfiguredFunctionSpec.newBuilder()
+                        .setOrganization("testOrg")
+                        .setEnvironment("testEnv")
                         .setCatalog("cat")
                         .setDatabase("db")
                         .setName("func")
@@ -98,6 +108,8 @@ public class ConfiguredFunctionSpecTest {
     public void testEmptyArgs() {
         List<ConfiguredFunctionSpec> spec =
                 ConfiguredFunctionSpec.newBuilder()
+                        .setOrganization("testOrg")
+                        .setEnvironment("testEnv")
                         .setCatalog("cat")
                         .setDatabase("db")
                         .setName("func")
@@ -108,6 +120,8 @@ public class ConfiguredFunctionSpecTest {
                         .addReturnType("STRING")
                         .build();
         assertThat(spec).hasSize(1);
+        assertThat(spec.get(0).getOrganization()).isEqualTo("testOrg");
+        assertThat(spec.get(0).getEnvironment()).isEqualTo("testEnv");
         assertThat(spec.get(0).getCatalog()).isEqualTo("cat");
         assertThat(spec.get(0).getDatabase()).isEqualTo("db");
         assertThat(spec.get(0).getName()).isEqualTo("func");

@@ -40,7 +40,15 @@ public class AdapterPerformanceTest {
                     argTypes.stream().map(InternalSerializers::create).collect(Collectors.toList());
 
             DataOutputSerializer out = new DataOutputSerializer(8);
-            TestUtil.writeSerializedOpenPayload(callerUUID, retType, argTypes, functionClass, out);
+            TestUtil.writeSerializedOpenPayload(
+                    "testOrg",
+                    "testEnv",
+                    callerUUID,
+                    "testVersionId",
+                    retType,
+                    argTypes,
+                    functionClass,
+                    out);
             byte[] openPayloadBytes = out.getCopyOfBuffer();
             final ScalarFunctionHandler handler = new ScalarFunctionHandler();
             handler.open(openPayloadBytes, TestUtil.DUMMY_CONTEXT);

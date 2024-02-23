@@ -98,7 +98,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
                                     CreateInstanceRequest.newBuilder()
                                             .setMetadata(
                                                     FunctionInstanceMetadata.newBuilder()
-                                                            .setName(remoteUdfSpec.getFunctionId()))
+                                                            .setName(remoteUdfSpec.getPluginId()))
                                             .setSpec(functionSpec)
                                             .build());
 
@@ -107,7 +107,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             return new RemoteUdfRuntime(
                     remoteUdfSerialization,
                     remoteUdfGatewayConnection,
-                    remoteUdfSpec.getFunctionId());
+                    remoteUdfSpec.getPluginId());
         } catch (Exception ex) {
             // Cleanup on exception.
             IOUtils.closeQuietly(remoteUdfGatewayConnection);

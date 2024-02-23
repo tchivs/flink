@@ -23,8 +23,14 @@ import java.util.stream.Collectors;
 public class RemoteUdfSpec implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    String organization;
+    String environment;
+
     /** ID under which the UDF was registered at creation time. */
-    private final String functionId;
+    private final String pluginId;
+
+    /** ID under which the UDF was registered at creation time. */
+    private final String pluginVersionId;
 
     /** Name of the class that contains that implements the UDF. */
     private final String functionClassName;
@@ -36,18 +42,36 @@ public class RemoteUdfSpec implements Serializable {
     private final List<DataType> argumentTypes;
 
     public RemoteUdfSpec(
-            String functionId,
+            String organization,
+            String environment,
+            String pluginId,
+            String pluginVersionId,
             String functionClassName,
             DataType returnType,
             List<DataType> argumentTypes) {
-        this.functionId = functionId;
+        this.organization = organization;
+        this.environment = environment;
+        this.pluginId = pluginId;
+        this.pluginVersionId = pluginVersionId;
         this.functionClassName = functionClassName;
         this.returnType = returnType;
         this.argumentTypes = argumentTypes;
     }
 
-    public String getFunctionId() {
-        return functionId;
+    public String getOrganization() {
+        return organization;
+    }
+
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public String getPluginId() {
+        return pluginId;
+    }
+
+    public String getPluginVersionId() {
+        return pluginVersionId;
     }
 
     public String getFunctionClassName() {
@@ -82,7 +106,10 @@ public class RemoteUdfSpec implements Serializable {
      * @throws IOException on serialization errors.
      */
     public void serialize(DataOutput out) throws IOException {
-        out.writeUTF(functionId);
+        out.writeUTF(organization);
+        out.writeUTF(environment);
+        out.writeUTF(pluginId);
+        out.writeUTF(pluginVersionId);
         out.writeUTF(functionClassName);
         out.writeUTF(stringifyDataType(returnType));
         out.writeInt(argumentTypes.size());
@@ -101,7 +128,10 @@ public class RemoteUdfSpec implements Serializable {
      */
     public static RemoteUdfSpec deserialize(DataInput in, ClassLoader classLoader)
             throws IOException {
-        String functionId = in.readUTF();
+        String organization = in.readUTF();
+        String environment = in.readUTF();
+        String pluginId = in.readUTF();
+        String pluginVersionId = in.readUTF();
         String functionClassName = in.readUTF();
         DataType returnType = parseFromString(in.readUTF(), classLoader);
         int numArgs = in.readInt();
@@ -109,7 +139,14 @@ public class RemoteUdfSpec implements Serializable {
         for (int i = 0; i < numArgs; ++i) {
             argumentTypes.add(parseFromString(in.readUTF(), classLoader));
         }
-        return new RemoteUdfSpec(functionId, functionClassName, returnType, argumentTypes);
+        return new RemoteUdfSpec(
+                organization,
+                environment,
+                pluginId,
+                pluginVersionId,
+                functionClassName,
+                returnType,
+                argumentTypes);
     }
 
     private static String stringifyDataType(DataType dataType) {

@@ -68,7 +68,9 @@ import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ARGUME
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALOG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ENV_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ORG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_ID_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_VERSION_ID_FIELD;
@@ -274,6 +276,8 @@ public class RemoteUdfITCase extends AbstractTestBase {
     private static void registerUdf(Map<String, String> udfConf, TestFunc[] funcs) {
         for (TestFunc func : funcs) {
             Preconditions.checkState(func.argTypes.size() == func.returnType.size());
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_ORG_FIELD, "testOrg");
+            udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_ENV_FIELD, "testEnv");
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_CATALOG_FIELD, "cat1");
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_DATABASE_FIELD, "db1");
             udfConf.put(FUNCTIONS_PREFIX + func.name + "." + FUNCTION_NAME_FIELD, func.name);

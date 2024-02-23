@@ -50,8 +50,8 @@ public class RemoteScalarFunction extends ScalarFunction {
     public @Nullable Object eval(Object... args) throws Exception {
 
         LOG.debug(
-                "Invoking remote scalar function. Handler: {}, Function: {}, Rtype: {}, Args: {}",
-                remoteUdfSpec.getFunctionId(),
+                "Invoking remote scalar function. Plugin: {}, Function: {}, Rtype: {}, Args: {}",
+                remoteUdfSpec.getPluginId(),
                 remoteUdfSpec.getFunctionClassName(),
                 remoteUdfSpec.getReturnType(),
                 args);

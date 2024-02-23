@@ -33,6 +33,8 @@ public class UdfUtil {
     private static final Logger LOG = LoggerFactory.getLogger(UdfUtil.class);
 
     public static final String FUNCTIONS_PREFIX = "confluent.functions.";
+    public static final String FUNCTION_ORG_FIELD = "org";
+    public static final String FUNCTION_ENV_FIELD = "env";
     public static final String FUNCTION_NAME_FIELD = "name";
     public static final String FUNCTION_DATABASE_FIELD = "database";
     public static final String FUNCTION_CATALOG_FIELD = "catalog";
@@ -45,6 +47,14 @@ public class UdfUtil {
     private static final List<Field> ALL_FIELDS =
             Collections.unmodifiableList(
                     Arrays.asList(
+                            Field.of(
+                                    FUNCTION_ORG_FIELD,
+                                    ConfiguredFunctionSpec.Builder::setOrganization,
+                                    ConfiguredFunctionSpec::getOrganization),
+                            Field.of(
+                                    FUNCTION_ENV_FIELD,
+                                    ConfiguredFunctionSpec.Builder::setEnvironment,
+                                    ConfiguredFunctionSpec::getEnvironment),
                             Field.of(
                                     FUNCTION_NAME_FIELD,
                                     ConfiguredFunctionSpec.Builder::setName,

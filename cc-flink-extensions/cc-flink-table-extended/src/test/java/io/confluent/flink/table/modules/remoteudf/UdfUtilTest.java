@@ -19,7 +19,9 @@ import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ARGUME
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALOG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ENV_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ORG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_ID_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.PLUGIN_VERSION_ID_FIELD;
@@ -43,6 +45,8 @@ public class UdfUtilTest {
 
     private Configuration createConfig() {
         Configuration udfConf = new Configuration();
+        udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_ORG_FIELD, "testOrg");
+        udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_ENV_FIELD, "testEnv");
         udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_CATALOG_FIELD, "cat1");
         udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_DATABASE_FIELD, "db1");
         udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_NAME_FIELD, "func");
@@ -67,6 +71,9 @@ public class UdfUtilTest {
         Configuration udfConf = createConfig();
         List<ConfiguredRemoteScalarFunction> functions = UdfUtil.extractUdfs(udfConf.toMap());
         assertThat(functions).hasSize(1);
+        assertThat(functions.get(0).getOrganization()).isEqualTo("testOrg");
+        assertThat(functions.get(0).getEnvironment()).isEqualTo("testEnv");
+        assertThat(functions.get(0).getFunctionCatalog()).isEqualTo("cat1");
         assertThat(functions.get(0).getFunctionCatalog()).isEqualTo("cat1");
         assertThat(functions.get(0).getFunctionDatabase()).isEqualTo("db1");
         assertThat(functions.get(0).getFunctionName()).isEqualTo("func");

@@ -22,6 +22,8 @@ public class ConfiguredFunctionSpec implements Serializable {
     private static final String ARGUMENT_TYPE_DELIMITER = ";";
     private final String argumentTypes;
     private final String returnType;
+    private final String organization;
+    private final String environment;
     private final String pluginId;
     private final String pluginVersionId;
     private final String className;
@@ -30,6 +32,8 @@ public class ConfiguredFunctionSpec implements Serializable {
     private final String name;
 
     private ConfiguredFunctionSpec(
+            String organization,
+            String environment,
             String catalog,
             String database,
             String name,
@@ -38,6 +42,8 @@ public class ConfiguredFunctionSpec implements Serializable {
             String pluginId,
             String pluginVersionId,
             String className) {
+        this.organization = organization;
+        this.environment = environment;
         this.catalog = catalog;
         this.database = database;
         this.name = name;
@@ -50,7 +56,13 @@ public class ConfiguredFunctionSpec implements Serializable {
 
     public RemoteUdfSpec createRemoteUdfSpec(DataTypeFactory typeFactory) {
         return new RemoteUdfSpec(
-                pluginId, className, getReturnType(typeFactory), getArgumentTypes(typeFactory));
+                organization,
+                environment,
+                pluginId,
+                pluginVersionId,
+                className,
+                getReturnType(typeFactory),
+                getArgumentTypes(typeFactory));
     }
 
     public List<DataType> getArgumentTypes(DataTypeFactory typeFactory) {
@@ -72,6 +84,14 @@ public class ConfiguredFunctionSpec implements Serializable {
 
     public String getReturnType() {
         return returnType;
+    }
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public String getEnvironment() {
+        return environment;
     }
 
     public String getCatalog() {
@@ -104,6 +124,8 @@ public class ConfiguredFunctionSpec implements Serializable {
 
     /** A builder for {@link ConfiguredFunctionSpec}. */
     public static class Builder {
+        private String organization;
+        private String environment;
         private String catalog;
         private String database;
         private String name;
@@ -125,6 +147,16 @@ public class ConfiguredFunctionSpec implements Serializable {
 
         public Builder addReturnType(String returnType) {
             this.returnTypes.add(returnType);
+            return this;
+        }
+
+        public Builder setOrganization(String organization) {
+            this.organization = organization;
+            return this;
+        }
+
+        public Builder setEnvironment(String environment) {
+            this.environment = environment;
             return this;
         }
 
@@ -160,6 +192,9 @@ public class ConfiguredFunctionSpec implements Serializable {
         }
 
         public List<ConfiguredFunctionSpec> build() {
+            Preconditions.checkNotNull(organization);
+            Preconditions.checkNotNull(environment);
+            Preconditions.checkNotNull(database);
             Preconditions.checkNotNull(catalog);
             Preconditions.checkNotNull(database);
             Preconditions.checkNotNull(name);
@@ -175,6 +210,8 @@ public class ConfiguredFunctionSpec implements Serializable {
             for (int i = 0; i < returnTypes.size(); i++) {
                 result.add(
                         new ConfiguredFunctionSpec(
+                                organization,
+                                environment,
                                 catalog,
                                 database,
                                 name,

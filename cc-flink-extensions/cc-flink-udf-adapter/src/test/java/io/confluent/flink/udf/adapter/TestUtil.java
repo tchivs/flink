@@ -22,14 +22,20 @@ public class TestUtil {
     public static final Context DUMMY_CONTEXT = new SimpleContext();
 
     public static void writeSerializedOpenPayload(
-            String functionId,
+            String organization,
+            String environment,
+            String pluginId,
+            String pluginVersionId,
             LogicalType retType,
             List<LogicalType> argTypes,
             String functionClass,
             DataOutputSerializer out)
             throws Exception {
         new RemoteUdfSpec(
-                        functionId,
+                        organization,
+                        environment,
+                        pluginId,
+                        pluginVersionId,
                         functionClass,
                         DataTypeUtils.toInternalDataType(retType),
                         argTypes.stream()
@@ -39,13 +45,24 @@ public class TestUtil {
     }
 
     public static byte[] createSerializedOpenPayload(
-            String callerUUID,
+            String organization,
+            String environment,
+            String pluginId,
+            String pluginVersionId,
             LogicalType retType,
             List<LogicalType> argTypes,
             String functionClass)
             throws Exception {
         DataOutputSerializer out = new DataOutputSerializer(512);
-        writeSerializedOpenPayload(callerUUID, retType, argTypes, functionClass, out);
+        writeSerializedOpenPayload(
+                organization,
+                environment,
+                pluginId,
+                pluginVersionId,
+                retType,
+                argTypes,
+                functionClass,
+                out);
         return out.getCopyOfBuffer();
     }
 

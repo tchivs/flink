@@ -33,6 +33,8 @@ public class QuerySummaryTest {
 
     private static final List<ConfiguredFunctionSpec> UDF_SPECS =
             ConfiguredFunctionSpec.newBuilder()
+                    .setOrganization("testOrg")
+                    .setEnvironment("testEnv")
                     .setCatalog("a")
                     .setDatabase("b")
                     .setName("c")
@@ -47,6 +49,8 @@ public class QuerySummaryTest {
 
     private static final List<ConfiguredFunctionSpec> UDF_SPECS2 =
             ConfiguredFunctionSpec.newBuilder()
+                    .setOrganization("testOrg")
+                    .setEnvironment("testEnv")
                     .setCatalog("a")
                     .setDatabase("b")
                     .setName("d")

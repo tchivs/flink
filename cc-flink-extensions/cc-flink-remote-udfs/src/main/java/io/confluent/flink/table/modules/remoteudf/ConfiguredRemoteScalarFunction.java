@@ -62,6 +62,16 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
         return configuredFunctionSpecs.get(0).getName();
     }
 
+    public String getOrganization() {
+        Preconditions.checkState(!configuredFunctionSpecs.isEmpty());
+        return configuredFunctionSpecs.get(0).getOrganization();
+    }
+
+    public String getEnvironment() {
+        Preconditions.checkState(!configuredFunctionSpecs.isEmpty());
+        return configuredFunctionSpecs.get(0).getEnvironment();
+    }
+
     public String getFunctionCatalog() {
         Preconditions.checkState(!configuredFunctionSpecs.isEmpty());
         return configuredFunctionSpecs.get(0).getCatalog();
