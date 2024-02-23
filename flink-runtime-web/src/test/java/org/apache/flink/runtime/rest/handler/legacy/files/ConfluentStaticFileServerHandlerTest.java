@@ -48,6 +48,12 @@ class ConfluentStaticFileServerHandlerTest {
 
             int restPort = clusterEntrypoint.getRestPort();
 
+            int lastResponseCode;
+            do {
+                lastResponseCode = HttpUtils.getFromHTTP("http://localhost:" + restPort).f0;
+                Thread.sleep(5L);
+            } while (lastResponseCode != 200);
+
             final Tuple2<Integer, String> response =
                     HttpUtils.getFromHTTP("http://localhost:" + restPort + "/" + fileToServe);
 
