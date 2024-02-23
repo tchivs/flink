@@ -29,8 +29,6 @@ import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /** State which describes a failing job which is currently being canceled. */
 class Failing extends StateWithExecutionGraph {
@@ -73,7 +71,7 @@ class Failing extends StateWithExecutionGraph {
     }
 
     @Override
-    void onFailure(Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+    void onFailure(Throwable failure) {
         // We've already failed the execution graph, so there is noting else we can do.
     }
 

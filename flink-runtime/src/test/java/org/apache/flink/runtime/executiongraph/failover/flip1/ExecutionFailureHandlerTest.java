@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.executiongraph.failover.flip1;
 
-import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.core.failure.TestingFailureEnricher;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.execution.SuppressRestartsException;
@@ -37,9 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
@@ -115,36 +112,6 @@ class ExecutionFailureHandlerTest {
         assertThat(executionFailureHandler.getNumberOfRestarts()).isEqualTo(1);
     }
 
-    @Test
-    void testLabeling() throws Exception {
-        final Map<String, String> expectedFailureLabels =
-                Collections.singletonMap(FailureEnricher.KEY_JOB_CANNOT_RESTART, "");
-
-        testingFailureEnricher.setFailureLabels(expectedFailureLabels);
-        testingFailureEnricher.setOutputKeys(expectedFailureLabels.keySet());
-
-        final Set<ExecutionVertexID> tasksToRestart =
-                Collections.singleton(new ExecutionVertexID(new JobVertexID(), 0));
-        failoverStrategy.setTasksToRestart(tasksToRestart);
-
-        Execution execution = createExecution(EXECUTOR_RESOURCE.getExecutor());
-        Exception cause = new Exception("test failure");
-        long timestamp = System.currentTimeMillis();
-        // trigger a task failure
-        final FailureHandlingResult result =
-                executionFailureHandler.getFailureHandlingResult(execution, cause, timestamp);
-
-        // verify results
-        assertThat(result.canRestart()).isFalse();
-        assertThat(result.getFailedExecution()).isPresent();
-        assertThat(result.getFailedExecution().get()).isSameAs(execution);
-        assertThat(result.getError()).hasCause(cause);
-        assertThat(result.getTimestamp()).isEqualTo(timestamp);
-        assertThat(testingFailureEnricher.getSeenThrowables()).containsExactly(cause);
-        assertThat(result.getFailureLabels().get()).isEqualTo(expectedFailureLabels);
-        assertThat(executionFailureHandler.getNumberOfRestarts()).isZero();
-    }
-
     /** Tests the case that task restarting is suppressed. */
     @Test
     void testRestartingSuppressedFailureHandlingResult() throws Exception {
@@ -167,11 +134,7 @@ class ExecutionFailureHandlerTest {
         assertThat(testingFailureEnricher.getSeenThrowables()).containsExactly(error);
         assertThat(result.getFailureLabels().get())
                 .isEqualTo(testingFailureEnricher.getFailureLabels());
-        assertThat(
-                        ExecutionFailureHandler.isUnrecoverableError(
-                                result.getError(),
-                                CompletableFuture.completedFuture(Collections.emptyMap())))
-                .isFalse();
+        assertThat(ExecutionFailureHandler.isUnrecoverableError(result.getError())).isFalse();
 
         assertThatThrownBy(result::getVerticesToRestart)
                 .as("getVerticesToRestart is not allowed when restarting is suppressed")
@@ -201,11 +164,7 @@ class ExecutionFailureHandlerTest {
         assertThat(result.getFailedExecution()).isPresent();
         assertThat(result.getFailedExecution().get()).isSameAs(execution);
         assertThat(result.getError()).isNotNull();
-        assertThat(
-                        ExecutionFailureHandler.isUnrecoverableError(
-                                result.getError(),
-                                CompletableFuture.completedFuture(Collections.emptyMap())))
-                .isTrue();
+        assertThat(ExecutionFailureHandler.isUnrecoverableError(result.getError())).isTrue();
         assertThat(testingFailureEnricher.getSeenThrowables()).containsExactly(error);
         assertThat(result.getFailureLabels().get())
                 .isEqualTo(testingFailureEnricher.getFailureLabels());
@@ -226,24 +185,18 @@ class ExecutionFailureHandlerTest {
     @Test
     void testUnrecoverableErrorCheck() {
         // normal error
-        assertThat(
-                        ExecutionFailureHandler.isUnrecoverableError(
-                                new Exception(),
-                                CompletableFuture.completedFuture(Collections.emptyMap())))
-                .isFalse();
+        assertThat(ExecutionFailureHandler.isUnrecoverableError(new Exception())).isFalse();
 
         // direct unrecoverable error
         assertThat(
                         ExecutionFailureHandler.isUnrecoverableError(
-                                new SuppressRestartsException(new Exception()),
-                                CompletableFuture.completedFuture(Collections.emptyMap())))
+                                new SuppressRestartsException(new Exception())))
                 .isTrue();
 
         // nested unrecoverable error
         assertThat(
                         ExecutionFailureHandler.isUnrecoverableError(
-                                new Exception(new SuppressRestartsException(new Exception())),
-                                CompletableFuture.completedFuture(Collections.emptyMap())))
+                                new Exception(new SuppressRestartsException(new Exception()))))
                 .isTrue();
     }
 

@@ -155,9 +155,6 @@ public class AdaptiveSchedulerTest {
     private static final int PARALLELISM = 4;
     private static final JobVertex JOB_VERTEX = createNoOpVertex("v1", PARALLELISM);
 
-    private static final CompletableFuture<Map<String, String>> EMPTY_LABELS_FUTURE =
-            CompletableFuture.completedFuture(Collections.emptyMap());
-
     private static final Logger LOG = LoggerFactory.getLogger(AdaptiveSchedulerTest.class);
 
     @RegisterExtension
@@ -1387,11 +1384,7 @@ public class AdaptiveSchedulerTest {
                         .setRestartBackoffTimeStrategy(NoRestartBackoffTimeStrategy.INSTANCE)
                         .build();
 
-        assertThat(
-                        scheduler
-                                .howToHandleFailure(new Exception("test"), EMPTY_LABELS_FUTURE)
-                                .canRestart())
-                .isFalse();
+        assertThat(scheduler.howToHandleFailure(new Exception("test")).canRestart()).isFalse();
     }
 
     @Test
@@ -1407,8 +1400,7 @@ public class AdaptiveSchedulerTest {
                         .setRestartBackoffTimeStrategy(restartBackoffTimeStrategy)
                         .build();
 
-        final FailureResult failureResult =
-                scheduler.howToHandleFailure(new Exception("test"), EMPTY_LABELS_FUTURE);
+        final FailureResult failureResult = scheduler.howToHandleFailure(new Exception("test"));
 
         assertThat(failureResult.canRestart()).isTrue();
         assertThat(failureResult.getBackoffTime().toMillis())
@@ -1427,32 +1419,7 @@ public class AdaptiveSchedulerTest {
         assertThat(
                         scheduler
                                 .howToHandleFailure(
-                                        new SuppressRestartsException(new Exception("test")),
-                                        EMPTY_LABELS_FUTURE)
-                                .canRestart())
-                .isFalse();
-    }
-
-    @Test
-    void testHowToHandleFailureWithCannotRestartLabel() throws Exception {
-        final TestRestartBackoffTimeStrategy restartBackoffTimeStrategy =
-                new TestRestartBackoffTimeStrategy(true, 0);
-        final AdaptiveScheduler scheduler =
-                new AdaptiveSchedulerBuilder(
-                                createJobGraph(),
-                                mainThreadExecutor,
-                                EXECUTOR_RESOURCE.getExecutor())
-                        .setRestartBackoffTimeStrategy(restartBackoffTimeStrategy)
-                        .build();
-
-        assertThat(
-                        scheduler
-                                .howToHandleFailure(
-                                        new Exception("test"),
-                                        CompletableFuture.completedFuture(
-                                                Collections.singletonMap(
-                                                        FailureEnricher.KEY_JOB_CANNOT_RESTART,
-                                                        "")))
+                                        new SuppressRestartsException(new Exception("test")))
                                 .canRestart())
                 .isFalse();
     }

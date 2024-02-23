@@ -28,8 +28,6 @@ import org.apache.flink.runtime.scheduler.exceptionhistory.ExceptionHistoryEntry
 import org.slf4j.Logger;
 
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /** State which describes a job which is currently being canceled. */
 class Canceling extends StateWithExecutionGraph {
@@ -68,7 +66,7 @@ class Canceling extends StateWithExecutionGraph {
     }
 
     @Override
-    void onFailure(Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+    void onFailure(Throwable failure) {
         // Execution graph is already cancelling, so there is nothing more we can do.
     }
 

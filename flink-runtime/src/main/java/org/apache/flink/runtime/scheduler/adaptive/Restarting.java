@@ -31,8 +31,6 @@ import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 
 /** State which describes a job which is currently being restarted. */
@@ -91,7 +89,7 @@ class Restarting extends StateWithExecutionGraph {
     }
 
     @Override
-    void onFailure(Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+    void onFailure(Throwable failure) {
         // We've already cancelled the execution graph, so there is noting else we can do.
     }
 

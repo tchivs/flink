@@ -4,7 +4,6 @@
 
 package io.confluent.flink.runtime.failure;
 
-import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.core.failure.FailureEnricher.Context;
 import org.apache.flink.runtime.failure.DefaultFailureEnricherContext;
 import org.apache.flink.table.api.Table;
@@ -145,13 +144,5 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         Collections.singleton(new TypeFailureEnricher()));
         final Map<String, String> failureLabels = resultFuture.get();
         assertThat(failureLabels).containsValues(expectedLabels);
-
-        // Check that we label jobs as unrecoverable on user errors
-        for (String expectedLabel : expectedLabels) {
-            if ("USER".equals(expectedLabel)) {
-                assertThat(failureLabels).containsKey(FailureEnricher.KEY_JOB_CANNOT_RESTART);
-            }
-            break;
-        }
     }
 }

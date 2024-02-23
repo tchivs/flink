@@ -41,14 +41,12 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static org.apache.flink.runtime.scheduler.adaptive.WaitingForResourcesTest.assertNonNull;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -93,7 +91,7 @@ class StopWithSavepointTest {
             StopWithSavepoint sws =
                     createStopWithSavepoint(ctx, mockExecutionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
+            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
 
             // fail job:
             mockExecutionGraph.completeTerminationFuture(JobStatus.FAILED);
@@ -126,7 +124,7 @@ class StopWithSavepointTest {
             StopWithSavepoint sws =
                     createStopWithSavepoint(ctx, mockExecutionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
+            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
 
             ctx.setExpectFailing(
                     failingArguments -> {
@@ -197,8 +195,7 @@ class StopWithSavepointTest {
             final CompletableFuture<String> savepointFuture = CompletableFuture.completedFuture("");
             StopWithSavepoint sws = createStopWithSavepoint(ctx, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure(
-                    (failure, labels) -> FailureResult.canRestart(failure, Duration.ZERO));
+            ctx.setHowToHandleFailure(failure -> FailureResult.canRestart(failure, Duration.ZERO));
 
             ctx.setExpectRestarting(assertNonNull());
 
@@ -214,7 +211,7 @@ class StopWithSavepointTest {
             final CompletableFuture<String> savepointFuture = CompletableFuture.completedFuture("");
             StopWithSavepoint sws = createStopWithSavepoint(ctx, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
+            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
 
             ctx.setExpectFailing(
                     failingArguments -> {
@@ -234,7 +231,7 @@ class StopWithSavepointTest {
             final CompletableFuture<String> savepointFuture = CompletableFuture.completedFuture("");
             StopWithSavepoint sws = createStopWithSavepoint(ctx, executionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure((f, l) -> FailureResult.canNotRestart(f));
+            ctx.setHowToHandleFailure(FailureResult::canNotRestart);
 
             ctx.setExpectFailing(
                     failingArguments -> {
@@ -266,8 +263,7 @@ class StopWithSavepointTest {
             final CompletableFuture<String> savepointFuture = CompletableFuture.completedFuture("");
             StopWithSavepoint sws = createStopWithSavepoint(ctx, executionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
-            ctx.setHowToHandleFailure(
-                    (failure, labels) -> FailureResult.canRestart(failure, Duration.ZERO));
+            ctx.setHowToHandleFailure(failure -> FailureResult.canRestart(failure, Duration.ZERO));
 
             ctx.setExpectRestarting(assertNonNull());
 
@@ -346,8 +342,7 @@ class StopWithSavepointTest {
                             ctx, mockStopWithSavepointOperations, executionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
 
-            ctx.setHowToHandleFailure(
-                    (failure, labels) -> FailureResult.canRestart(failure, Duration.ZERO));
+            ctx.setHowToHandleFailure(failure -> FailureResult.canRestart(failure, Duration.ZERO));
 
             ctx.setExpectRestarting(assertNonNull());
 
@@ -384,12 +379,9 @@ class StopWithSavepointTest {
                             ctx, mockStopWithSavepointOperations, executionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
 
-            ctx.setHowToHandleFailure(
-                    (failure, labels) -> FailureResult.canRestart(failure, Duration.ZERO));
+            ctx.setHowToHandleFailure(failure -> FailureResult.canRestart(failure, Duration.ZERO));
 
-            sws.onFailure(
-                    new Exception("task failure"),
-                    CompletableFuture.completedFuture(Collections.emptyMap()));
+            sws.onFailure(new Exception("task failure"));
             // this is a sanity check that we haven't scheduled a state transition
             ctx.triggerExecutors();
 
@@ -410,12 +402,9 @@ class StopWithSavepointTest {
                             ctx, mockStopWithSavepointOperations, executionGraph, savepointFuture);
             ctx.setStopWithSavepoint(sws);
 
-            ctx.setHowToHandleFailure(
-                    (failure, labels) -> FailureResult.canRestart(failure, Duration.ZERO));
+            ctx.setHowToHandleFailure(failure -> FailureResult.canRestart(failure, Duration.ZERO));
 
-            sws.onFailure(
-                    new Exception("task failure"),
-                    CompletableFuture.completedFuture(Collections.emptyMap()));
+            sws.onFailure(new Exception("task failure"));
             // this is a sanity check that we haven't scheduled a state transition
             ctx.triggerExecutors();
 
@@ -510,8 +499,7 @@ class StopWithSavepointTest {
     private static class MockStopWithSavepointContext extends MockStateWithExecutionGraphContext
             implements StopWithSavepoint.Context {
 
-        private BiFunction<Throwable, CompletableFuture<Map<String, String>>, FailureResult>
-                howToHandleFailure;
+        private Function<Throwable, FailureResult> howToHandleFailure;
 
         private final StateValidator<ExecutingTest.FailingArguments> failingStateValidator =
                 new StateValidator<>("failing");
@@ -545,16 +533,13 @@ class StopWithSavepointTest {
             executingStateTransition.expectInput(asserter);
         }
 
-        public void setHowToHandleFailure(
-                BiFunction<Throwable, CompletableFuture<Map<String, String>>, FailureResult>
-                        function) {
+        public void setHowToHandleFailure(Function<Throwable, FailureResult> function) {
             this.howToHandleFailure = function;
         }
 
         @Override
-        public FailureResult howToHandleFailure(
-                Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
-            return howToHandleFailure.apply(failure, failureLabels);
+        public FailureResult howToHandleFailure(Throwable failure) {
+            return howToHandleFailure.apply(failure);
         }
 
         private void simulateTransitionToState(Class<? extends State> target) {
