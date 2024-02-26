@@ -119,7 +119,7 @@ Copyright 2023 Confluent Inc.
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>flink-faker</artifactId>
-			<version>0.16.0</version>
+			<version>0.17.0</version>
 			<scope>runtime</scope>
 			<exclusions>
 				<exclusion>
@@ -128,6 +128,13 @@ Copyright 2023 Confluent Inc.
 					<artifactId>*</artifactId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+		<!-- Required by flink-faker -->
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-datagen</artifactId>
+			<version>${project.version}</version>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.scala-lang</groupId>
