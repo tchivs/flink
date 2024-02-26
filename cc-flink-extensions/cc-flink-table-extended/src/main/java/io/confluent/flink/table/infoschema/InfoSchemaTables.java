@@ -60,10 +60,10 @@ import java.util.stream.Stream;
 public class InfoSchemaTables {
 
     /**
-     * ID of the Information Schema database. Prefixed with $ to indicate a system database that
+     * ID of the Information Schema database. Prefixed with "db-" to indicate a system database that
      * cannot collide with Confluent IDs.
      */
-    public static final String INFORMATION_SCHEMA_DATABASE_ID = "$information-schema";
+    public static final String INFORMATION_SCHEMA_DATABASE_ID = "db-information-schema";
 
     /** Name of the Information Schema database. */
     public static final String INFORMATION_SCHEMA_DATABASE_NAME = "INFORMATION_SCHEMA";
@@ -73,10 +73,10 @@ public class InfoSchemaTables {
             DatabaseInfo.of(INFORMATION_SCHEMA_DATABASE_ID, INFORMATION_SCHEMA_DATABASE_NAME);
 
     /**
-     * ID of the Definition Schema database. Prefixed with $ to indicate a system database that
+     * ID of the Definition Schema database. Prefixed with "db-" to indicate a system database that
      * cannot collide with Confluent IDs.
      */
-    public static final String DEFINITION_SCHEMA_DATABASE_ID = "$metadata";
+    public static final String DEFINITION_SCHEMA_DATABASE_ID = "db-metadata";
 
     /** {@link DatabaseInfo} for Definition Schema. */
     public static final DatabaseInfo DEFINITION_SCHEMA_DATABASE_INFO =

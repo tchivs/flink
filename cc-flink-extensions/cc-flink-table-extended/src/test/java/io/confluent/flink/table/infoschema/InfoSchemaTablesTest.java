@@ -71,7 +71,7 @@ public class InfoSchemaTablesTest {
                 .map(CatalogView::getExpandedQuery)
                 .contains(
                         "SELECT `CATALOG_ID`, `CATALOG_NAME`, `SCHEMA_ID`, `SCHEMA_NAME` "
-                                + "FROM `$system`.`$metadata`.`SCHEMATA` "
+                                + "FROM `cat-system`.`db-metadata`.`SCHEMATA` "
                                 + "WHERE `CATALOG_ID` = 'env-123'");
     }
 
@@ -85,7 +85,7 @@ public class InfoSchemaTablesTest {
                 .map(CatalogView::getExpandedQuery)
                 .contains(
                         "SELECT `CATALOG_ID`, `CATALOG_NAME`, `SCHEMA_ID`, `SCHEMA_NAME` "
-                                + "FROM `$system`.`$metadata`.`SCHEMATA` "
+                                + "FROM `cat-system`.`db-metadata`.`SCHEMATA` "
                                 + "WHERE `CATALOG_ID` = 'env-123'");
     }
 

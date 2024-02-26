@@ -128,7 +128,7 @@ public class InfoSchemaExecutionTest {
                 "SELECT * FROM `INFORMATION_SCHEMA`.`SCHEMATA`",
                 row("env-2", "cat2", "lkc-1", "db1"),
                 row("env-2", "cat2", "lkc-2", "db2"),
-                row("env-2", "cat2", "$information-schema", "INFORMATION_SCHEMA"));
+                row("env-2", "cat2", "db-information-schema", "INFORMATION_SCHEMA"));
     }
 
     @Test
@@ -137,7 +137,7 @@ public class InfoSchemaExecutionTest {
                 "SELECT * FROM `INFORMATION_SCHEMA`.`DATABASES`",
                 row("env-2", "cat2", "lkc-1", "db1"),
                 row("env-2", "cat2", "lkc-2", "db2"),
-                row("env-2", "cat2", "$information-schema", "INFORMATION_SCHEMA"));
+                row("env-2", "cat2", "db-information-schema", "INFORMATION_SCHEMA"));
     }
 
     @Test
@@ -228,7 +228,7 @@ public class InfoSchemaExecutionTest {
                 row(
                         "env-1",
                         "cat1",
-                        "$information-schema",
+                        "db-information-schema",
                         "INFORMATION_SCHEMA",
                         "SCHEMATA",
                         "VIEW",
@@ -433,8 +433,8 @@ public class InfoSchemaExecutionTest {
     @Test
     void testAccessToDefinitionSchema() {
         assertUnsupported(
-                "SELECT `SCHEMA_NAME` FROM `$system`.`$metadata`.`SCHEMATA`",
-                "Table '`$system`.`$metadata`.`SCHEMATA`' cannot "
+                "SELECT `SCHEMA_NAME` FROM `cat-system`.`db-metadata`.`SCHEMATA`",
+                "Table '`cat-system`.`db-metadata`.`SCHEMATA`' cannot "
                         + "be accessed without providing the required column: CATALOG_ID");
     }
 

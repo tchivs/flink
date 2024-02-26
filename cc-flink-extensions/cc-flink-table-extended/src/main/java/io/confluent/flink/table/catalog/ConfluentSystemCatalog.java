@@ -34,10 +34,10 @@ import java.util.Optional;
 public class ConfluentSystemCatalog implements ConfluentCatalog {
 
     /**
-     * ID of this catalog. Prefixed with $ to indicate a system catalog that cannot collide with
-     * Confluent IDs.
+     * ID of this catalog. Prefixed with "cat-" to indicate a system catalog that cannot collide
+     * with Confluent IDs.
      */
-    public static final String ID = "$system";
+    public static final String ID = "cat-system";
 
     /**
      * For now this catalog has no own name. Once we officially expose the catalog, we can choose an
