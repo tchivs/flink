@@ -920,11 +920,13 @@ public class AlterSchemaConverter {
                 catalogManager.qualifyIdentifier(
                         UnresolvedIdentifier.of(alterTable.fullTableName())),
                 tableChanges,
-                CatalogTable.of(
-                        newSchema,
-                        oldTable.getComment(),
-                        oldTable.getPartitionKeys(),
-                        oldTable.getOptions()),
+                CatalogTable.newBuilder()
+                        .schema(newSchema)
+                        .comment(oldTable.getComment())
+                        .distribution(oldTable.getDistribution().orElse(null))
+                        .partitionKeys(oldTable.getPartitionKeys())
+                        .options(oldTable.getOptions())
+                        .build(),
                 alterTable.ifTableExists());
     }
 
