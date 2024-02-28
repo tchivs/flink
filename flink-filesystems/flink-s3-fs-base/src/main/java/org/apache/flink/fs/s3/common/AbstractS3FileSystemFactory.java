@@ -45,23 +45,25 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
     public static final ConfigOption<String> ACCESS_KEY =
             ConfigOptions.key("s3.access-key")
                     .stringType()
-                    .defaultValue("")
+                    .noDefaultValue()
                     .withDescription("This optionally defines S3 access key.");
 
     public static final ConfigOption<String> SECRET_KEY =
             ConfigOptions.key("s3.secret-key")
                     .stringType()
-                    .defaultValue("This optionally defines S3 secret key.");
+                    .noDefaultValue()
+                    .withDescription("This optionally defines S3 secret key.");
 
     public static final ConfigOption<String> ENDPOINT =
             ConfigOptions.key("s3.endpoint")
                     .stringType()
-                    .defaultValue("This optionally defines S3 endpoint.");
+                    .noDefaultValue()
+                    .withDescription("This optionally defines S3 endpoint.");
 
     public static final ConfigOption<String> S5CMD_PATH =
             ConfigOptions.key("s3.s5cmd.path")
                     .stringType()
-                    .defaultValue("")
+                    .noDefaultValue()
                     .withDescription(
                             "When specified, s5cmd will be used for coping files to/from S3. Currently supported only "
                                     + "during RocksDB Incremental state recovery.");
@@ -69,8 +71,9 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
     public static final ConfigOption<String> S5CMD_EXTRA_ARGS =
             ConfigOptions.key("s3.s5cmd.args")
                     .stringType()
-                    .defaultValue("-r 0 --no-sign-request")
-                    .withDescription("Extra arguments to be passed to s5cmd.");
+                    .defaultValue("-r 0")
+                    .withDescription(
+                            "Extra arguments to be passed to s5cmd. For example, --no-sign-request for public buckets and -r 10 for 10 retries");
 
     public static final ConfigOption<Long> PART_UPLOAD_MIN_SIZE =
             ConfigOptions.key("s3.upload.min.part.size")

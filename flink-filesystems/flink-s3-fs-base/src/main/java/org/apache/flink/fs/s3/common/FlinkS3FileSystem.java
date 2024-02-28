@@ -44,8 +44,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -105,17 +103,17 @@ public class FlinkS3FileSystem extends HadoopFileSystem
     public static class S5CmdConfiguration {
         private final String path;
         private final List<String> args;
-        private final String accessArtifact;
-        private final String secretArtifact;
-        private final String endpoint;
+        @Nullable private final String accessArtifact;
+        @Nullable private final String secretArtifact;
+        @Nullable private final String endpoint;
 
         /** All parameters can be empty. */
         public S5CmdConfiguration(
                 String path,
                 String args,
-                String accessArtifact,
-                String secretArtifact,
-                String endpoint) {
+                @Nullable String accessArtifact,
+                @Nullable String secretArtifact,
+                @Nullable String endpoint) {
             if (!path.isEmpty()) {
                 File s5CmdFile = new File(path);
                 checkArgument(s5CmdFile.isFile(), "Unable to find s5cmd binary under [%s]", path);
@@ -130,18 +128,16 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         }
 
         public static Optional<S5CmdConfiguration> of(Configuration flinkConfig) {
-            String s5CmdPath = flinkConfig.getString(S5CMD_PATH);
-
-            if (s5CmdPath.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(
-                    new S5CmdConfiguration(
-                            s5CmdPath,
-                            flinkConfig.getString(S5CMD_EXTRA_ARGS),
-                            flinkConfig.getString(ACCESS_KEY),
-                            flinkConfig.getString(SECRET_KEY),
-                            flinkConfig.getString(ENDPOINT)));
+            return flinkConfig
+                    .getOptional(S5CMD_PATH)
+                    .map(
+                            s ->
+                                    new S5CmdConfiguration(
+                                            s,
+                                            flinkConfig.getString(S5CMD_EXTRA_ARGS),
+                                            flinkConfig.get(ACCESS_KEY),
+                                            flinkConfig.get(SECRET_KEY),
+                                            flinkConfig.get(ENDPOINT)));
         }
 
         private void configureEnvironment(Map<String, String> environment) {
@@ -151,18 +147,39 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         }
 
         private static void maybeSetEnvironmentVariable(
-                Map<String, String> environment, String key, String value) {
-            if (!value.isEmpty()) {
-                String oldValue = environment.put(key, value);
-                if (oldValue != null) {
-                    LOG.warn(
-                            "FlinkS3FileSystem configuration overwrote environment "
-                                    + "variable's [{}] old value [{}] with [{}]",
-                            key,
-                            oldValue,
-                            value);
-                }
+                Map<String, String> environment, String key, @Nullable String value) {
+            if (value == null) {
+                return;
             }
+            String oldValue = environment.put(key, value);
+            if (oldValue != null) {
+                LOG.warn(
+                        "FlinkS3FileSystem configuration overwrote environment "
+                                + "variable's [{}] old value [{}] with [{}]",
+                        key,
+                        oldValue,
+                        value);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "S5CmdConfiguration{"
+                    + "path='"
+                    + path
+                    + '\''
+                    + ", args="
+                    + args
+                    + ", accessArtifact='"
+                    + (accessArtifact == null ? null : "****")
+                    + '\''
+                    + ", secretArtifact='"
+                    + (secretArtifact == null ? null : "****")
+                    + '\''
+                    + ", endpoint='"
+                    + endpoint
+                    + '\''
+                    + '}';
         }
     }
 
@@ -208,6 +225,7 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         checkArgument(s3uploadPartSize >= S3_MULTIPART_MIN_PART_SIZE);
         this.s3uploadPartSize = s3uploadPartSize;
         this.maxConcurrentUploadsPerStream = maxConcurrentUploadsPerStream;
+        LOG.info("Created Flink S3 FS, s5Cmd configuration: {}", s5CmdConfiguration);
     }
 
     // ------------------------------------------------------------------------
@@ -234,12 +252,8 @@ public class FlinkS3FileSystem extends HadoopFileSystem
             spells.add(
                     String.format(
                             "cp %s %s",
-                            URLEncoder.encode(
-                                    copyTask.getSrcPath().toString(),
-                                    StandardCharsets.UTF_8.name()),
-                            URLEncoder.encode(
-                                    copyTask.getDestPath().toString(),
-                                    StandardCharsets.UTF_8.name())));
+                            copyTask.getSrcPath().toUri().toString(),
+                            copyTask.getDestPath().getPath()));
         }
         return spells;
     }
@@ -254,24 +268,27 @@ public class FlinkS3FileSystem extends HadoopFileSystem
             Process wizard = hogwart.redirectErrorStream(true).start();
 
             try (BufferedReader stdOutput =
-                            new BufferedReader(new InputStreamReader(wizard.getInputStream()));
-                    BufferedWriter stdIn =
-                            new BufferedWriter(new OutputStreamWriter(wizard.getOutputStream()))) {
-                String stdOutLine;
-                while (spells.hasNext()) {
-                    stdIn.write(spells.next());
-                    stdIn.newLine();
-                    while (stdOutput.ready()) {
-                        stdOutLine = stdOutput.readLine();
-                        if (stdOutLine != null) {
-                            stdOutputContent.append(stdOutLine);
+                    new BufferedReader(new InputStreamReader(wizard.getInputStream()))) {
+                try (BufferedWriter stdIn =
+                        new BufferedWriter(new OutputStreamWriter(wizard.getOutputStream()))) {
+                    while (spells.hasNext()) {
+                        stdIn.write(spells.next());
+                        stdIn.newLine();
+                        while (stdOutput.ready()) {
+                            String str = stdOutput.readLine();
+                            if (str != null) {
+                                stdOutputContent.append(str);
+                            }
                         }
                     }
                 }
 
+                String stdOutLine;
                 while ((stdOutLine = stdOutput.readLine()) != null) {
                     stdOutputContent.append(stdOutLine);
                 }
+            } catch (Exception e) {
+                LOG.warn("Unable to read s5cmd output", e);
             }
             exitCode = wizard.waitFor();
         } catch (InterruptedException e) {
@@ -288,13 +305,16 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         }
     }
 
-    private static String createSpellErrorMessage(
+    private String createSpellErrorMessage(
             int exitCode, StringBuilder stdOutputContent, String... artefacts) {
         return new StringBuilder()
                 .append("Failed to cast s5cmd spell [")
                 .append(String.join(" ", artefacts))
                 .append("]")
                 .append(String.format(" [exit code = %d]", exitCode))
+                .append(" [cfg: ")
+                .append(s5CmdConfiguration)
+                .append("]")
                 .append(" maybe due to:\n")
                 .append(stdOutputContent)
                 .toString();

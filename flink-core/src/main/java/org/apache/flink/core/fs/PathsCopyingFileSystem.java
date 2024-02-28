@@ -55,6 +55,11 @@ public interface PathsCopyingFileSystem extends IFileSystem {
         public Path getDestPath() {
             return destPath;
         }
+
+        @Override
+        public String toString() {
+            return "CopyTask{" + "srcPath=" + srcPath + ", destPath=" + destPath + '}';
+        }
     }
 
     /**
