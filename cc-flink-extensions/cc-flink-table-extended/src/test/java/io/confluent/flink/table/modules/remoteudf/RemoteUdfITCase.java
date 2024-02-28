@@ -35,6 +35,7 @@ import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.infoschema.InfoSchemaTables;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import io.confluent.flink.table.service.ServiceTasks;
+import io.confluent.flink.table.service.ServiceTasksOptions;
 import io.confluent.secure.compute.gateway.v1.CreateInstanceRequest;
 import io.confluent.secure.compute.gateway.v1.CreateInstanceResponse;
 import io.confluent.secure.compute.gateway.v1.DeleteInstanceRequest;
@@ -165,20 +166,21 @@ public class RemoteUdfITCase extends AbstractTestBase {
     }
 
     @Test
-    public void testNumberOfBuiltinFunctions() {
-        Map<String, String> confMap = new HashMap<>();
-        confMap.put(CONFLUENT_REMOTE_UDF_TARGET.key(), SERVER_TARGET);
-        registerUdf(
-                confMap,
-                new TestFunc[] {
-                    new TestFunc("remote1", new String[] {"INT", "STRING", "INT"}, "STRING"),
-                    new TestFunc("remote2", new String[] {"STRING"}, "STRING")
-                });
-        List<ConfiguredRemoteScalarFunction> functions = UdfUtil.extractUdfs(confMap);
-        final RemoteUdfModule remoteUdfModule = new RemoteUdfModule(functions);
-        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(2);
-        assertThat(remoteUdfModule.getFunctionDefinition("SYSTEM_CAT1_DB1_REMOTE1")).isPresent();
-        assertThat(remoteUdfModule.getFunctionDefinition("SYSTEM_CAT1_DB1_REMOTE2")).isPresent();
+    public void testIsSmaller() {
+        final RemoteUdfModule remoteUdfModule = new RemoteUdfModule();
+        assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(1);
+        assertThat(remoteUdfModule.getFunctionDefinition("IS_SMALLER")).isPresent();
+
+        Map<String, String> conf = new HashMap<>();
+        conf.put(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED.key(), "true");
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        INSTANCE.configureEnvironment(
+                tableEnv, Collections.emptyMap(), conf, ServiceTasks.Service.SQL_SERVICE);
+
+        TableResult result = tableEnv.executeSql("SELECT IS_SMALLER('Small', 'Large')");
+        Row row = result.collect().next();
+        assertThat(row.getField(0)).isEqualTo(true);
     }
 
     @Test

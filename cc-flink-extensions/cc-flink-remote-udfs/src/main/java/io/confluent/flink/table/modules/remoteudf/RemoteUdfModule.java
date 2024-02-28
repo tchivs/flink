@@ -9,13 +9,11 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
-import java.util.AbstractMap;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /** Module for Remote UFDs. */
 public class RemoteUdfModule implements Module {
@@ -27,25 +25,15 @@ public class RemoteUdfModule implements Module {
 
     private final Map<String, FunctionDefinition> normalizedFunctions;
 
-    public RemoteUdfModule(List<ConfiguredRemoteScalarFunction> functions) {
+    public RemoteUdfModule() {
         // Register all the UDFs as system function under the name for
         // testing purposes.
         normalizedFunctions =
-                functions.stream()
-                        .map(
-                                rf ->
-                                        new AbstractMap.SimpleEntry<>(
-                                                "SYSTEM_"
-                                                        + rf.getFunctionCatalog().toUpperCase()
-                                                        + "_"
-                                                        + rf.getFunctionDatabase().toUpperCase()
-                                                        + "_"
-                                                        + rf.getFunctionName().toUpperCase(),
-                                                rf))
-                        .collect(
-                                Collectors.toMap(
-                                        AbstractMap.SimpleEntry::getKey,
-                                        AbstractMap.SimpleEntry::getValue));
+                new HashMap<String, FunctionDefinition>() {
+                    {
+                        put(TShirtSizingIsSmaller.NAME, new TShirtSizingIsSmaller());
+                    }
+                };
     }
 
     @Override

@@ -54,6 +54,7 @@ import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
+import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import io.confluent.flink.table.modules.remoteudf.UdfUtil;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
@@ -258,6 +259,7 @@ class DefaultServiceTasks implements ServiceTasks {
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)
                 // TODO: remove this demo hack...
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
+            tableEnvironment.loadModule("remote-udf", new RemoteUdfModule());
             // Forward the target address of the remote gateway (or proxy) to the udf.
             Map<String, String> remoteUdfConfig = new HashMap<>();
             remoteUdfConfig.put(
