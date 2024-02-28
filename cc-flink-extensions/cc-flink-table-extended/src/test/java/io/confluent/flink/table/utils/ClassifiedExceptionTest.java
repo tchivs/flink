@@ -347,7 +347,7 @@ public class ClassifiedExceptionTest {
         final String description;
         final List<Consumer<TableEnvironment>> tableEnvSetup = new ArrayList<>();
         final List<String> sqlStatements = new ArrayList<>();
-        final Set<Class<? extends Exception>> allowedCauses = new HashSet<>();
+        final Set<Class<? extends Throwable>> allowedCauses = new HashSet<>();
 
         String expectedError;
         ExceptionKind expectedKind;

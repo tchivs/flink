@@ -69,7 +69,7 @@ public final class ClassifiedException {
     }
 
     /** Initial list of causes known to be valid. */
-    public static final Set<Class<? extends Exception>> VALID_CAUSES =
+    public static final Set<Class<? extends Throwable>> VALID_CAUSES =
             new HashSet<>(
                     Arrays.asList(
                             TableException.class,
@@ -126,8 +126,8 @@ public final class ClassifiedException {
 
     /** Classifies the given exception. */
     public static ClassifiedException of(
-            Exception e,
-            Set<Class<? extends Exception>> validCauses,
+            Throwable e,
+            Set<Class<? extends Throwable>> validCauses,
             ReadableConfig publicOptions) {
         final StackTraceElement stackTrace = getCauseFromStackTrace(e.getStackTrace());
 
@@ -181,7 +181,7 @@ public final class ClassifiedException {
 
     /** Utility method to pretty print a chain of causes. */
     public static Optional<String> buildMessageWithCauses(
-            Exception e, @Nullable Set<Class<? extends Exception>> validCauses) {
+            Throwable e, @Nullable Set<Class<? extends Throwable>> validCauses) {
         return buildMessageWithCauses(IncludeTopLevel.IF_VALID_CAUSE, e, validCauses);
     }
 
@@ -210,7 +210,7 @@ public final class ClassifiedException {
     public static Optional<String> buildMessageWithCauses(
             IncludeTopLevel includeTopLevel,
             Throwable t,
-            @Nullable Set<Class<? extends Exception>> validCauses) {
+            @Nullable Set<Class<? extends Throwable>> validCauses) {
         final List<String> messages = collectCauses(includeTopLevel, t, validCauses);
         return buildMessageWithCauses(messages);
     }
@@ -513,8 +513,8 @@ public final class ClassifiedException {
 
     private static Optional<ClassifiedException> classifyBasedOnCodeLocation(
             CodeLocation codeLocation,
-            Exception e,
-            Set<Class<? extends Exception>> validCauses,
+            Throwable e,
+            Set<Class<? extends Throwable>> validCauses,
             ReadableConfig publicOptions) {
 
         final List<Handler> possibleHandlers = classifiedExceptions.get(codeLocation);
@@ -534,8 +534,8 @@ public final class ClassifiedException {
 
     private static ClassifiedException classifyExceptionWithHandler(
             Handler handler,
-            Exception e,
-            Set<Class<? extends Exception>> validCauses,
+            Throwable e,
+            Set<Class<? extends Throwable>> validCauses,
             ReadableConfig publicOptions) {
         final Optional<String> message =
                 handler.messageProvider.apply(e, validCauses, publicOptions);
@@ -543,7 +543,7 @@ public final class ClassifiedException {
                 .orElseGet(() -> classifyAsSystemException(e));
     }
 
-    private static ClassifiedException classifyAsSystemException(Exception e) {
+    private static ClassifiedException classifyAsSystemException(Throwable e) {
         final String systemMessage =
                 buildMessageWithCauses(IncludeTopLevel.ALWAYS, e, null)
                         .orElse(e.getClass().getName());
@@ -551,7 +551,7 @@ public final class ClassifiedException {
     }
 
     private static ClassifiedException classifyAsUserExceptionIfPossible(
-            Exception e, Set<Class<? extends Exception>> validCauses) {
+            Throwable e, Set<Class<? extends Throwable>> validCauses) {
         final Optional<String> message = buildMessageWithCauses(e, validCauses);
         return message.map(s -> new ClassifiedException(ExceptionKind.USER, s))
                 .orElseGet(() -> classifyAsSystemException(e));
@@ -664,7 +664,7 @@ public final class ClassifiedException {
             this.messageProvider = messageProvider;
         }
 
-        boolean matches(Exception e) {
+        boolean matches(Throwable e) {
             return messagePredicate.test(e.getMessage());
         }
 
@@ -762,37 +762,33 @@ public final class ClassifiedException {
     private interface MessageProvider {
 
         Optional<String> apply(
-                Exception e,
-                Set<Class<? extends Exception>> validCauses,
+                Throwable e,
+                Set<Class<? extends Throwable>> validCauses,
                 ReadableConfig publicOptions);
     }
 
     private static List<String> collectCauses(
             IncludeTopLevel includeTopLevel,
             Throwable t,
-            @Nullable Set<Class<? extends Exception>> validCauses) {
-        if (!(t instanceof Exception)) {
-            return Collections.emptyList();
-        }
-        Exception e = (Exception) t;
+            @Nullable Set<Class<? extends Throwable>> validCauses) {
 
         final List<String> messages = new ArrayList<>();
         if (includeTopLevel == IncludeTopLevel.ALWAYS) {
-            messages.add(e.getMessage());
+            messages.add(t.getMessage());
         } else if (includeTopLevel == IncludeTopLevel.IF_VALID_CAUSE) {
-            if (validCauses == null || validCauses.contains(e.getClass())) {
-                messages.add(e.getMessage());
+            if (validCauses == null || validCauses.contains(t.getClass())) {
+                messages.add(t.getMessage());
             } else {
                 return Collections.emptyList();
             }
         }
-        while (e != null) {
-            final Throwable cause = e.getCause();
+        while (t != null) {
+            final Throwable cause = t.getCause();
             if (cause != null && (validCauses == null || validCauses.contains(cause.getClass()))) {
-                e = (Exception) cause;
-                messages.add(e.getMessage());
+                t = cause;
+                messages.add(t.getMessage());
             } else {
-                e = null;
+                t = null;
             }
         }
 
