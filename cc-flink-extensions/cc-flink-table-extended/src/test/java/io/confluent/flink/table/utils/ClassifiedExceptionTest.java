@@ -280,7 +280,13 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "The use of RAW types is not supported. "
                                         + "Use standard SQL types to represent 'java.lang.Object' objects. "
-                                        + "Or use BYTES and implement custom serialization logic."));
+                                        + "Or use BYTES and implement custom serialization logic."),
+                // ---
+                TestSpec.test("expose codegen exceptions")
+                        .executeSql(
+                                "SELECT TIMESTAMPDIFF(MONTH, TO_TIMESTAMP_LTZ(0, 3), TIME '00:00:01')")
+                        .expectExactUserError(
+                                "TIMESTAMP_LTZ only supports diff between the same type."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -297,8 +303,7 @@ public class ClassifiedExceptionTest {
         } catch (Throwable t) {
             assertThat(t).isInstanceOf(Exception.class);
             final ClassifiedException classified =
-                    ClassifiedException.of(
-                            (Exception) t, testSpec.allowedCauses, new Configuration());
+                    ClassifiedException.of(t, testSpec.allowedCauses, new Configuration());
             switch (testSpec.matchCondition) {
                 case SENSITIVE_MESSAGE_EXACT:
                     assertThat(classified.getSensitiveMessage()).isEqualTo(testSpec.expectedError);

@@ -16,6 +16,7 @@ import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
+import org.apache.flink.table.planner.codegen.CodeGenException;
 import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.operations.AlterSchemaConverter;
 import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
@@ -446,11 +447,27 @@ public final class ClassifiedException {
                             }
                             final ClassifiedException classifiedCause =
                                     ClassifiedException.of(
-                                            (Exception) e.getCause(), validCauses, publicOptions);
+                                            e.getCause(), validCauses, publicOptions);
                             if (classifiedCause.exceptionKind == ExceptionKind.USER) {
                                 return Optional.of(classifiedCause.sensitiveMessage);
                             }
                             return Optional.empty();
+                        }));
+
+        // Codegen errors should not be valid causes,
+        // but until the validation layer has improved significantly,
+        // we need to allow it. The rule below matches for obvious bugs,
+        // it has been manually tested.
+        putClassifiedException(
+                CodeLocation.ofClass(CodeGenException.class),
+                Handler.custom(
+                        null,
+                        ExceptionKind.USER,
+                        (e, validCauses, publicOptions) -> {
+                            if (e.getMessage().contains("a bug")) {
+                                return Optional.empty();
+                            }
+                            return Optional.of(e.getMessage());
                         }));
 
         // Don't throw exceptions for operations we don't support
@@ -744,7 +761,7 @@ public final class ClassifiedException {
                     (e, validCauses, publicOptions) -> {
                         if (e.getCause() instanceof Exception) {
                             return ClassifiedException.buildMessageWithCauses(
-                                    (Exception) e.getCause(), validCauses);
+                                    e.getCause(), validCauses);
                         }
                         return ClassifiedException.buildMessageWithCauses(e, validCauses);
                     });
