@@ -28,6 +28,7 @@ import org.apache.flink.core.fs.RefCountedTmpFileCreator;
 import org.apache.flink.fs.s3.common.writer.S3AccessHelper;
 import org.apache.flink.fs.s3.common.writer.S3RecoverableWriter;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 import org.apache.flink.util.function.FunctionWithException;
@@ -269,26 +270,35 @@ public class FlinkS3FileSystem extends HadoopFileSystem
 
             try (BufferedReader stdOutput =
                     new BufferedReader(new InputStreamReader(wizard.getInputStream()))) {
+
+                String stdOutLine;
+                @Nullable IOException firstException = null;
                 try (BufferedWriter stdIn =
                         new BufferedWriter(new OutputStreamWriter(wizard.getOutputStream()))) {
                     while (spells.hasNext()) {
                         stdIn.write(spells.next());
                         stdIn.newLine();
                         while (stdOutput.ready()) {
-                            String str = stdOutput.readLine();
-                            if (str != null) {
-                                stdOutputContent.append(str);
+                            stdOutLine = stdOutput.readLine();
+                            if (stdOutLine != null) {
+                                stdOutputContent.append(stdOutLine);
                             }
                         }
                     }
+                } catch (IOException e) {
+                    firstException = e;
                 }
 
-                String stdOutLine;
-                while ((stdOutLine = stdOutput.readLine()) != null) {
-                    stdOutputContent.append(stdOutLine);
+                // Try to read output even in case of an exception to get a better error message.
+                // Before reading output we also have to first send EOF on the stdIn, otherwise a
+                // deadlock could potentially happen.
+                try {
+                    while ((stdOutLine = stdOutput.readLine()) != null) {
+                        stdOutputContent.append(stdOutLine);
+                    }
+                } catch (IOException secondException) {
+                    throw ExceptionUtils.firstOrSuppressed(secondException, firstException);
                 }
-            } catch (Exception e) {
-                LOG.warn("Unable to read s5cmd output", e);
             }
             exitCode = wizard.waitFor();
         } catch (InterruptedException e) {
