@@ -11,6 +11,7 @@ import org.apache.flink.table.catalog.Column.ComputedColumn;
 import org.apache.flink.table.catalog.Column.MetadataColumn;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.planner.plan.nodes.exec.serde.SerdeContext;
@@ -52,14 +53,17 @@ class ColumnsStreamProvider extends InfoTableStreamProvider {
                             if (baseTable.getTableKind() == TableKind.TABLE) {
                                 final ResolvedCatalogTable resolvedTable =
                                         (ResolvedCatalogTable) baseTable;
-                                // TODO rework this after DISTRIBUTED BY is supported
-                                final List<String> keys = resolvedTable.getPartitionKeys();
+                                final List<String> bucketKeys =
+                                        resolvedTable
+                                                .getDistribution()
+                                                .map(TableDistribution::getBucketKeys)
+                                                .orElseGet(Collections::emptyList);
                                 distributionKeys =
-                                        IntStream.range(0, keys.size())
+                                        IntStream.range(0, bucketKeys.size())
                                                 .boxed()
                                                 .collect(
                                                         Collectors.toMap(
-                                                                keys::get, pos -> pos + 1));
+                                                                bucketKeys::get, pos -> pos + 1));
                             } else {
                                 distributionKeys = Collections.emptyMap();
                             }

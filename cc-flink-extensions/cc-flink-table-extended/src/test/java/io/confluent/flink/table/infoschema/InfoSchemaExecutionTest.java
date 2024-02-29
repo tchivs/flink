@@ -80,7 +80,7 @@ public class InfoSchemaExecutionTest {
                         + "t TIMESTAMP_LTZ(3),\n"
                         + "WATERMARK FOR t AS t + INTERVAL '1' SECOND,\n"
                         + "c AS UPPER(s))\n"
-                        + "PARTITIONED BY (s)\n"
+                        + "DISTRIBUTED BY HASH(s) INTO 2 BUCKETS\n"
                         + "WITH ('connector' = 'confluent', 'confluent.kafka.topic' = 'SECRET')");
         tableEnv.executeSql(
                 "CREATE TABLE `env-1`.`lkc-1`.`table2` (\n"
@@ -89,7 +89,7 @@ public class InfoSchemaExecutionTest {
                         + "ts TIMESTAMP(3) METADATA FROM 'timestamp'\n"
                         + ")\n"
                         + "COMMENT 'Hello'\n"
-                        + "PARTITIONED BY (s)\n"
+                        + "DISTRIBUTED BY (s) INTO 1 BUCKETS\n"
                         + "WITH ('connector' = 'confluent')");
         tableEnv.executeSql(
                 "CREATE TABLE `env-1`.`lkc-2`.`table3` (\n"
@@ -163,7 +163,7 @@ public class InfoSchemaExecutionTest {
                         // IS_DISTRIBUTED
                         "YES",
                         "HASH",
-                        null,
+                        "2",
                         // IS_WATERMARKED
                         "YES",
                         "t",
@@ -179,8 +179,9 @@ public class InfoSchemaExecutionTest {
                         "BASE TABLE",
                         // IS_DISTRIBUTED
                         "YES",
-                        "HASH",
                         null,
+                        "1",
+                        // IS_WATERMARKED
                         "NO",
                         null,
                         null,
@@ -194,9 +195,11 @@ public class InfoSchemaExecutionTest {
                         "db2",
                         "table3",
                         "BASE TABLE",
+                        // IS_DISTRIBUTED
                         "NO",
                         null,
                         null,
+                        // IS_WATERMARKED
                         "NO",
                         null,
                         null,
@@ -209,9 +212,11 @@ public class InfoSchemaExecutionTest {
                         "db2",
                         "table4",
                         "BASE TABLE",
+                        // IS_DISTRIBUTED
                         "NO",
                         null,
                         null,
+                        // IS_WATERMARKED
                         "NO",
                         null,
                         null,

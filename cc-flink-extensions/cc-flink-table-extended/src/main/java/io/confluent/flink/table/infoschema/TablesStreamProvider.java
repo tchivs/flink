@@ -9,6 +9,7 @@ import org.apache.flink.table.catalog.CatalogBaseTable.TableKind;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
@@ -18,6 +19,7 @@ import org.apache.flink.util.StringUtils;
 import io.confluent.flink.table.catalog.SystemColumnUtil;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /** {@link InfoTableStreamProvider} for {@link InfoSchemaTables#TABLE_TABLES}. */
@@ -64,14 +66,18 @@ class TablesStreamProvider extends InfoTableStreamProvider {
 
             final ResolvedCatalogTable table = (ResolvedCatalogTable) baseTable;
 
-            // TODO rework this after DISTRIBUTED BY is supported
-            if (table.getPartitionKeys().size() > 0) {
+            final TableDistribution distribution = table.getDistribution().orElse(null);
+            if (distribution != null) {
                 isDistributed = YES;
-                distributionAlgorithm = DISTRIBUTION_ALGORITHM_HASH;
+                if (distribution.getKind() == TableDistribution.Kind.HASH) {
+                    distributionAlgorithm = DISTRIBUTION_ALGORITHM_HASH;
+                }
+                distributionBuckets =
+                        distribution.getBucketCount().map(Objects::toString).orElse(null);
             }
 
             final ResolvedSchema schema = baseTable.getResolvedSchema();
-            if (schema.getWatermarkSpecs().size() > 0) {
+            if (!schema.getWatermarkSpecs().isEmpty()) {
                 // Reiterate if we support more than one watermark spec, but
                 // this is unlikely.
                 final WatermarkSpec spec = schema.getWatermarkSpecs().get(0);
