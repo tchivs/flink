@@ -62,8 +62,7 @@ final class TypeFailureEnricherUtils {
      * @param searchType the type of exception to search for in the chain.
      * @return Optional throwable of the requested type if available, otherwise empty
      */
-    public static <T extends Throwable> Optional<T> findThrowableByName(
-            Throwable throwable, Class<T> searchType) {
+    public static Optional<Throwable> findThrowableByName(Throwable throwable, Class searchType) {
         if (throwable == null || searchType == null) {
             return Optional.empty();
         }
@@ -72,7 +71,7 @@ final class TypeFailureEnricherUtils {
         Throwable t = throwable;
         while (t != null) {
             if (searchName.equals(t.getClass().getName())) {
-                return Optional.of(searchType.cast(t));
+                return Optional.of(throwable);
             } else {
                 t = t.getCause();
             }
