@@ -99,6 +99,37 @@ Copyright 2024 Confluent Inc.
 			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+			<version>${protoc.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-stub</artifactId>
+			<version>${grpc.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.google.errorprone</groupId>
+					<artifactId>error_prone_annotations</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-protobuf</artifactId>
+			<version>${grpc.version}</version>
+			<exclusions>
+				<exclusion>
+					<artifactId>protobuf-java</artifactId>
+					<groupId>com.google.protobuf</groupId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
 		<!-- Test Dependencies -->
 
 	</dependencies>
@@ -126,7 +157,9 @@ Copyright 2024 Confluent Inc.
 							<artifactSet>
 								<includes>
 									<include>org.apache.flink:*</include>
+									<include>org.apache.commons:*</include>
 									<include>com.google.protobuf:*</include>
+									<include>org.scala-lang:scala-library</include>
 									<include>io.confluent.flink:*</include>
 								</includes>
 							</artifactSet>

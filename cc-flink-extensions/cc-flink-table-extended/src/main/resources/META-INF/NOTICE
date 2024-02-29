@@ -1,0 +1,62 @@
+cc-flink-table-extended
+Copyright 2014-2024 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This project bundles the following dependencies under the BSD license.
+See bundled license files for details.
+
+- org.jetbrains.kotlin:kotlin-stdlib:1.6.20
+- org.apache.commons:commons-lang3:3.12.0
+- io.grpc:grpc-netty-shaded:1.53.0
+- com.google.guava:guava:31.1-android
+- com.google.guava:failureaccess:1.0.1
+- com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+- org.checkerframework:checker-qual:3.12.0
+- com.google.j2objc:j2objc-annotations:1.3
+- com.google.errorprone:error_prone_annotations:2.14.0
+- io.perfmark:perfmark-api:0.25.0
+- io.grpc:grpc-core:1.53.0
+- com.google.code.gson:gson:2.9.0
+- com.google.android:annotations:4.1.1.4
+- org.codehaus.mojo:animal-sniffer-annotations:1.18
+- io.grpc:grpc-protobuf:1.53.0
+- io.grpc:grpc-api:1.53.0
+- io.grpc:grpc-context:1.53.0
+- com.google.api.grpc:proto-google-common-protos:2.9.0
+- io.grpc:grpc-protobuf-lite:1.53.0
+- io.grpc:grpc-stub:1.53.0
+- com.google.protobuf:protobuf-java:3.22.5
+- javax.annotation:javax.annotation-api:1.2
+- io.grpc:grpc-netty:1.53.0
+- io.netty:netty-codec-http2:4.1.70.Final
+- io.netty:netty-common:4.1.70.Final
+- io.netty:netty-buffer:4.1.70.Final
+- io.netty:netty-transport:4.1.70.Final
+- io.netty:netty-resolver:4.1.70.Final
+- io.netty:netty-codec:4.1.70.Final
+- io.netty:netty-handler:4.1.70.Final
+- io.netty:netty-codec-http:4.1.70.Final
+- io.netty:netty-handler-proxy:4.1.70.Final
+- io.netty:netty-codec-socks:4.1.70.Final
+- io.netty:netty-transport-native-unix-common:4.1.70.Final
+- build.buf.protoc-gen-validate:pgv-java-stub:1.0.2
+- com.google.re2j:re2j:1.7
+- commons-validator:commons-validator:1.7
+- com.google.protobuf:protobuf-java-util:3.23.3
+- io.confluent.auth.dataplane:auth-dataplane:0.112.0
+- org.bouncycastle:bcprov-jdk18on:1.73
+- org.bouncycastle:bcpkix-jdk18on:1.73
+- org.bouncycastle:bcutil-jdk18on:1.73
+- io.opentelemetry.proto:opentelemetry-proto:1.0.0-alpha
+- com.squareup.okhttp3:logging-interceptor:4.10.0
+- com.squareup.okhttp3:okhttp:4.10.0
+- com.squareup.okio:okio-jvm:3.0.0
+- org.jetbrains:annotations:13.0
+- io.swagger:swagger-annotations:1.5.24
+- io.gsonfire:gson-fire:1.8.5
+- org.slf4j:slf4j-api:1.7.36
+- com.google.code.findbugs:jsr305:1.3.9
+- com.google.protobuf:protobuf-bom:3.16.3
+- io.grpc:grpc-bom:1.53.0

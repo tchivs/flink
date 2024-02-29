@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
 import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -35,11 +36,23 @@ public class RemoteUdfGatewayConnection implements Closeable {
     /**
      * Opens a connection to the given target gateway.
      *
-     * @param udfGatewayTarget the gateway target address (e.g. localhost:5001).
+     * @param udfTask containing the gateway target address (e.g. localhost:5001) as part of its
+     *     Status.
      * @return the open connection.
      */
-    public static RemoteUdfGatewayConnection open(String udfGatewayTarget) {
-        Preconditions.checkArgument(!udfGatewayTarget.isEmpty(), "Gateway target not configured!");
+    public static RemoteUdfGatewayConnection open(ComputeV1alphaFlinkUdfTask udfTask) {
+        Preconditions.checkArgument(
+                !udfTask.getStatus().getEndpoint().getHost().isEmpty(),
+                "Gateway Host not configured!");
+        Preconditions.checkArgument(
+                !udfTask.getStatus().getEndpoint().getPort().equals(0),
+                "Gateway Port not configured!");
+
+        String udfGatewayTarget =
+                String.format(
+                        "%s:%d",
+                        udfTask.getStatus().getEndpoint().getHost(),
+                        udfTask.getStatus().getEndpoint().getPort());
 
         ManagedChannel channel =
                 Preconditions.checkNotNull(

@@ -31,7 +31,8 @@ public class AdapterPerformanceTest {
     @Test
     public void testAdapter() throws Throwable {
         for (int k = 0; k < ITERATIONS; ++k) {
-            final String callerUUID = UUID.randomUUID().toString();
+            final String pluginUUID = UUID.randomUUID().toString();
+            final String pluginVersionUUID = UUID.randomUUID().toString();
             final LogicalType retType = new IntType();
             final List<LogicalType> argTypes = Arrays.asList(new IntType(), new IntType());
             final String functionClass = SumScalarFunction.class.getName();
@@ -43,8 +44,8 @@ public class AdapterPerformanceTest {
             TestUtil.writeSerializedOpenPayload(
                     "testOrg",
                     "testEnv",
-                    callerUUID,
-                    "testVersionId",
+                    pluginUUID,
+                    pluginVersionUUID,
                     retType,
                     argTypes,
                     functionClass,

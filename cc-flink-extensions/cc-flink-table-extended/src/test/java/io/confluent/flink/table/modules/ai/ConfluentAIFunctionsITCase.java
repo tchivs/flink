@@ -27,7 +27,6 @@ import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import uk.org.webcompere.systemstubs.environment.EnvironmentVariables;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.OAEPParameterSpec;
@@ -158,23 +157,6 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
 
         assertThatThrownBy(() -> tableEnv.executeSql("SELECT SECRET('a', 'b');"))
                 .hasMessageContaining("No match found for function signature SECRET");
-    }
-
-    @Test
-    public void testAIFunctionSecretUDF() throws Exception {
-        final String apiKey = "someOpenAIKey";
-        final List<Row> expectedRows = Collections.singletonList(Row.of(apiKey));
-
-        new EnvironmentVariables("OPENAI_API_KEY", apiKey)
-                .execute(
-                        () -> {
-                            // in here the environment is temporarily set
-                            TableEnvironment tEnv = getSqlServiceTableEnvironment(true);
-                            TableResult result = tEnv.executeSql("SELECT SECRET();");
-                            final List<Row> results = new ArrayList<>();
-                            result.collect().forEachRemaining(results::add);
-                            assertThat(results).containsExactlyInAnyOrderElementsOf(expectedRows);
-                        });
     }
 
     @Test

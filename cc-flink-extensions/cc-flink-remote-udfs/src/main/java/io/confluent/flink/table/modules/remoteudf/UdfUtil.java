@@ -9,24 +9,36 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.inference.TypeStrategies;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
+import io.confluent.flink.apiserver.client.model.ApisMetaV1ObjectMeta;
+import io.confluent.flink.apiserver.client.model.ComputeV1alphaArtifact;
+import io.confluent.flink.apiserver.client.model.ComputeV1alphaEntryPoint;
+import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
+import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTaskSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
 
 /** A utility with methods common to Udf classes. */
 public class UdfUtil {
@@ -188,6 +200,62 @@ public class UdfUtil {
             index++;
         }
         return config;
+    }
+
+    static ComputeV1alphaFlinkUdfTask getUdfTaskFromSpec(
+            Map<String, String> config,
+            RemoteUdfSpec remoteUdfSpec,
+            RemoteUdfSerialization remoteUdfSerialization)
+            throws IOException {
+        String pluginId = config.getOrDefault(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "");
+        String versionId = config.getOrDefault(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "");
+        Preconditions.checkArgument(!pluginId.isEmpty(), "PluginId must be set");
+        Preconditions.checkArgument(!versionId.isEmpty(), "VersionId must be set");
+
+        String udfTaskName = "udf-tm-" + UUID.randomUUID();
+        ComputeV1alphaFlinkUdfTask udfTask = new ComputeV1alphaFlinkUdfTask();
+        ComputeV1alphaFlinkUdfTaskSpec udfTaskSpec = new ComputeV1alphaFlinkUdfTaskSpec();
+
+        // Metadata must contain Org, Env, and Name
+        ApisMetaV1ObjectMeta udfTaskMeta = new ApisMetaV1ObjectMeta();
+        udfTaskMeta.setName(udfTaskName);
+        udfTaskMeta.setOrg(remoteUdfSpec.getOrganization());
+        udfTaskMeta.setEnvironment(remoteUdfSpec.getEnvironment());
+
+        // Entrypoint must contain className, open and close Payloads
+        ComputeV1alphaEntryPoint udfTaskEntryPoint = new ComputeV1alphaEntryPoint();
+        udfTaskEntryPoint.setClassName("io.confluent.flink.udf.adapter.ScalarFunctionHandler");
+        udfTaskEntryPoint.setOpenPayload(
+                remoteUdfSerialization
+                        .serializeRemoteUdfSpec(remoteUdfSpec)
+                        .toByteArray()); // to be removed
+        // Unused at the moment -- pass something until platform supports empty payloads
+        udfTaskEntryPoint.setClosePayload(Base64.getEncoder().encode("bye".getBytes()));
+
+        // Artifact must contain name, scope, pluginId, versionId, inClassPath, and orgOpts
+        ComputeV1alphaArtifact udfTaskArtifact = new ComputeV1alphaArtifact();
+        udfTaskArtifact.setName("udf-task");
+        udfTaskArtifact.setScope(ComputeV1alphaArtifact.ScopeEnum.ORG);
+        udfTaskArtifact.setPluginId(remoteUdfSpec.getPluginId());
+        udfTaskArtifact.setVersionId(remoteUdfSpec.getPluginVersionId());
+        udfTaskArtifact.setInClassPath(true);
+
+        ComputeV1alphaArtifact udfTaskArtifactInternal = new ComputeV1alphaArtifact();
+        udfTaskArtifactInternal.setName("udf-shim-internal");
+        udfTaskArtifactInternal.setScope(ComputeV1alphaArtifact.ScopeEnum.INTERNAL);
+        udfTaskArtifactInternal.setPluginId(pluginId);
+        udfTaskArtifactInternal.setVersionId(versionId);
+        udfTaskArtifactInternal.setInClassPath(true);
+
+        // Enrich UdfTaskSpec with Artifact and EntryPoint details
+        udfTaskSpec.addArtifactsItem(udfTaskArtifact);
+        udfTaskSpec.addArtifactsItem(udfTaskArtifactInternal);
+        udfTaskSpec.setEntryPoint(udfTaskEntryPoint);
+        // Assign the UdfTaskSpec to the UdfTask
+        udfTask.setSpec(udfTaskSpec);
+        // Assign the Metadata to the UdfTask
+        udfTask.setMetadata(udfTaskMeta);
+        return udfTask;
     }
 
     private static class Field {

@@ -17,15 +17,13 @@ import javax.annotation.Nullable;
 
 import java.util.Map;
 
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_TARGET;
-
 /** Proof-of-concept implementation for remote scalar UDF. */
 public class RemoteScalarFunction extends ScalarFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(RemoteScalarFunction.class);
 
-    /** The UDF service gateway target address (e.g. localhost:5001). */
-    private final String udfGatewayTarget;
+    /** Config map for the remote UDF runtime. */
+    private final Map<String, String> configMap;
 
     /** The specification of the remote UDF, e.g. class name, argument and return value types. */
     private final RemoteUdfSpec remoteUdfSpec;
@@ -33,10 +31,10 @@ public class RemoteScalarFunction extends ScalarFunction {
     /** Runtime to invoke the remote function. */
     private transient RemoteUdfRuntime remoteUdfRuntime;
 
-    private RemoteScalarFunction(String udfGatewayTarget, RemoteUdfSpec remoteUdfSpec) {
-        Preconditions.checkNotNull(udfGatewayTarget);
+    private RemoteScalarFunction(Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec) {
+        Preconditions.checkNotNull(confMap);
         Preconditions.checkNotNull(remoteUdfSpec);
-        this.udfGatewayTarget = udfGatewayTarget;
+        this.configMap = confMap;
         this.remoteUdfSpec = remoteUdfSpec;
     }
 
@@ -69,7 +67,7 @@ public class RemoteScalarFunction extends ScalarFunction {
         }
 
         Preconditions.checkNotNull(remoteUdfSpec);
-        this.remoteUdfRuntime = RemoteUdfRuntime.open(udfGatewayTarget, remoteUdfSpec);
+        this.remoteUdfRuntime = RemoteUdfRuntime.open(configMap, remoteUdfSpec);
     }
 
     @Override
@@ -89,13 +87,7 @@ public class RemoteScalarFunction extends ScalarFunction {
     public static RemoteScalarFunction create(
             Map<String, String> config, RemoteUdfSpec remoteUdfSpec) {
         LOG.info("RemoteScalarFunction config: {}", config);
-        String udfGatewayTarget = config.get(CONFLUENT_REMOTE_UDF_TARGET.key());
-
-        if (udfGatewayTarget == null || udfGatewayTarget.isEmpty()) {
-            // TODO: remove hardcoded proxy
-            udfGatewayTarget = "udf-proxy.udf-proxy:50051";
-        }
-        return new RemoteScalarFunction(udfGatewayTarget, remoteUdfSpec);
+        return new RemoteScalarFunction(config, remoteUdfSpec);
     }
 
     @Override

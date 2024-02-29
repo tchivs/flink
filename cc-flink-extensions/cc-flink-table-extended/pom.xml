@@ -87,12 +87,28 @@ Copyright 2023 Confluent Inc.
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-compute-credentials</artifactId>
 			<version>${project.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.squareup.okhttp3</groupId>
+					<artifactId>okhttp</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-remote-udfs</artifactId>
 			<version>${project.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.squareup.okhttp3</groupId>
+					<artifactId>okhttp</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.squareup.okhttp3</groupId>
+					<artifactId>logging-interceptor</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<!-- otlp proto dependency is only required for OTLP functions declared in
@@ -127,21 +143,16 @@ Copyright 2023 Confluent Inc.
 
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
-			<artifactId>okhttp</artifactId>
-			<version>${okhttp.version}</version>
+			<artifactId>logging-interceptor</artifactId>
 		</dependency>
-
 		<dependency>
-			<groupId>uk.org.webcompere</groupId>
-			<artifactId>system-stubs-jupiter</artifactId>
-			<version>2.0.2</version>
-			<scope>test</scope>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
 		</dependency>
 
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>mockwebserver</artifactId>
-			<version>3.12.12</version>
 			<scope>test</scope>
 		</dependency>
 
@@ -215,6 +226,15 @@ Copyright 2023 Confluent Inc.
 						</configuration>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<systemPropertyVariables>
+						<apiserver.image.version>${apiserver.version}</apiserver.image.version>
+					</systemPropertyVariables>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
