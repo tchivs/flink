@@ -286,7 +286,11 @@ public class ClassifiedExceptionTest {
                         .executeSql(
                                 "SELECT TIMESTAMPDIFF(MONTH, TO_TIMESTAMP_LTZ(0, 3), TIME '00:00:01')")
                         .expectExactUserError(
-                                "TIMESTAMP_LTZ only supports diff between the same type."));
+                                "TIMESTAMP_LTZ only supports diff between the same type."),
+                // ---
+                TestSpec.test("expression reducer exception using division by zero")
+                        .executeSql("SELECT 1/0")
+                        .expectExactUserError("Division by zero."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")

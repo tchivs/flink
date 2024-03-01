@@ -17,6 +17,7 @@ import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
 import org.apache.flink.table.planner.codegen.CodeGenException;
+import org.apache.flink.table.planner.codegen.ExpressionReducer;
 import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.operations.AlterSchemaConverter;
 import org.apache.flink.table.planner.operations.SqlNodeToOperationConversion;
@@ -469,6 +470,12 @@ public final class ClassifiedException {
                             }
                             return Optional.of(e.getMessage());
                         }));
+
+        // Division by zero has a special path in ExpressionReducer. This is covered here.
+        // For all other kinds of errors, constant folding is skipped and retried during runtime.
+        putClassifiedException(
+                CodeLocation.inClass(ExpressionReducer.class, ArithmeticException.class),
+                Handler.rewriteMessage(ExceptionKind.USER, "Division by zero."));
 
         // Don't throw exceptions for operations we don't support
         final List<String> unsupportedOperations =
