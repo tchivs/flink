@@ -73,6 +73,45 @@
       }
     }
   }, {
+    "url" : "/confluent/submit/compiled-plan",
+    "method" : "POST",
+    "status-code" : "202 Accepted",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:ConfluentJobSubmitRequestBody",
+      "properties" : {
+        "jobId" : {
+          "type" : "string"
+        },
+        "savepointPath" : {
+          "type" : "string"
+        },
+        "generatorArguments" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "configuration" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:EmptyResponseBody"
+    }
+  }, {
     "url" : "/datasets",
     "method" : "GET",
     "status-code" : "200 OK",

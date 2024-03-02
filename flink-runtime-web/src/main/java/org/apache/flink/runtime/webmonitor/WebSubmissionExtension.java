@@ -26,6 +26,7 @@ import org.apache.flink.client.deployment.application.DetachedApplicationRunner;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.rest.handler.RestHandlerSpecification;
+import org.apache.flink.runtime.rest.handler.job.ConfluentJobSubmitHandler;
 import org.apache.flink.runtime.webmonitor.handlers.JarDeleteHandler;
 import org.apache.flink.runtime.webmonitor.handlers.JarDeleteHeaders;
 import org.apache.flink.runtime.webmonitor.handlers.JarListHandler;
@@ -167,6 +168,13 @@ public class WebSubmissionExtension implements WebMonitorExtension {
         webSubmissionHandlers.add(Tuple2.of(JarDeleteHeaders.getInstance(), jarDeleteHandler));
         webSubmissionHandlers.add(Tuple2.of(JarPlanGetHeaders.getInstance(), jarPlanHandler));
         webSubmissionHandlers.add(Tuple2.of(JarPlanPostHeaders.getInstance(), postJarPlanHandler));
+
+        final ConfluentJobSubmitHandler confluentJobSubmitHandler =
+                new ConfluentJobSubmitHandler(
+                        leaderRetriever, timeout, responseHeaders, configuration, executor);
+        webSubmissionHandlers.add(
+                Tuple2.of(
+                        confluentJobSubmitHandler.getMessageHeaders(), confluentJobSubmitHandler));
     }
 
     @Override

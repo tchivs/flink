@@ -68,7 +68,9 @@ public class ScalaSuffixChecker {
                             "flink-rpc-akka",
                             // we ignore flink-table-planner-loader because it loads the planner
                             // through a different classpath
-                            "flink-table-planner-loader"));
+                            "flink-table-planner-loader",
+                            // excluded to reduce diff from Apache Flink
+                            "flink-runtime-web"));
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {

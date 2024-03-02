@@ -26,6 +26,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DashboardConfiguration'
+  /confluent/submit/compiled-plan:
+    post:
+      description: Submits a compiled plan.
+      operationId: submitCompiledPlan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfluentJobSubmitRequestBody'
+      responses:
+        "202":
+          description: The request was successful.
   /datasets:
     get:
       description: Returns all cluster data sets.
@@ -2095,6 +2107,21 @@ components:
         key:
           type: string
         value:
+          type: string
+    ConfluentJobSubmitRequestBody:
+      type: object
+      properties:
+        configuration:
+          type: object
+          additionalProperties:
+            type: string
+        generatorArguments:
+          type: array
+          items:
+            type: string
+        jobId:
+          type: string
+        savepointPath:
           type: string
     Counts:
       type: object

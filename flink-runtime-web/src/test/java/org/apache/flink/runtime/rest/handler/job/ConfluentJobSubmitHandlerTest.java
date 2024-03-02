@@ -1,0 +1,354 @@
+/*
+ * Copyright 2023 Confluent Inc.
+ */
+
+package org.apache.flink.runtime.rest.handler.job;
+
+import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.configuration.UnmodifiableConfiguration;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.rest.handler.HandlerRequest;
+import org.apache.flink.runtime.rest.handler.RestHandlerException;
+import org.apache.flink.runtime.rest.messages.EmptyMessageParameters;
+import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitRequestBody;
+import org.apache.flink.runtime.webmonitor.TestingDispatcherGateway;
+import org.apache.flink.testutils.executor.TestExecutorExtension;
+import org.apache.flink.util.IOUtils;
+import org.apache.flink.util.function.BiFunctionWithException;
+
+import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+import javax.annotation.Nullable;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/** Tests for the {@link ConfluentJobSubmitHandler}. */
+@Confluent
+class ConfluentJobSubmitHandlerTest {
+
+    private static final int maxParallelism = 12345;
+    private static final Configuration clusterConfig =
+            UnmodifiableConfiguration.fromMap(
+                    Collections.singletonMap(
+                            PipelineOptions.MAX_PARALLELISM.key(), String.valueOf(maxParallelism)));
+
+    @RegisterExtension
+    static final TestExecutorExtension<ExecutorService> EXECUTOR_EXTENSION =
+            new TestExecutorExtension<>(Executors::newSingleThreadExecutor);
+
+    /**
+     * Verifies that the generated job graph uses a default parallelism of 1.
+     *
+     * <p>This test MUST NOT be run with a MiniClusterExtension because it affects the generated
+     * graph.
+     */
+    @Test
+    void testGeneratedJobGraphHasParallelismOf1() throws Exception {
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        Collections.emptyMap());
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(jobGraph.getMaximumParallelism()).isEqualTo(1);
+    }
+
+    @Test
+    void testSetJobID() throws Exception {
+        final JobID jobId = JobID.generate();
+
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        jobId.toHexString(),
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        Collections.emptyMap());
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(jobGraph.getJobID()).isEqualTo(jobId);
+    }
+
+    @Test
+    void testSetJobConfigurationOnJobGraph() throws Exception {
+        final Map<String, String> jobConfiguration = Collections.singletonMap("foo", "bar");
+
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        jobConfiguration);
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(jobGraph.getJobConfiguration().toMap()).containsAllEntriesOf(jobConfiguration);
+        assertThat(
+                        jobGraph.getSerializedExecutionConfig()
+                                .deserializeValue(getClass().getClassLoader())
+                                .getMaxParallelism())
+                .isEqualTo(maxParallelism);
+    }
+
+    @Test
+    void testUseClusterConfigurationDuringGeneration() throws Exception {
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        Collections.emptyMap());
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(
+                        jobGraph.getSerializedExecutionConfig()
+                                .deserializeValue(getClass().getClassLoader())
+                                .getMaxParallelism())
+                .isEqualTo(maxParallelism);
+    }
+
+    @Test
+    void testJobConfigMergedIntoClusterConfigurationDuringGeneration() throws Exception {
+        final int customMaxParallelism = 22222;
+        final Map<String, String> jobConfiguration =
+                Collections.singletonMap(
+                        PipelineOptions.MAX_PARALLELISM.key(),
+                        String.valueOf(customMaxParallelism));
+
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        jobConfiguration);
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(
+                        jobGraph.getSerializedExecutionConfig()
+                                .deserializeValue(getClass().getClassLoader())
+                                .getMaxParallelism())
+                .isEqualTo(customMaxParallelism);
+    }
+
+    @Test
+    void testSetSavepointPath() throws Exception {
+        final String savepoint = "savepoint";
+
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        JobID.generate().toHexString(),
+                        savepoint,
+                        Collections.singleton(loadCompiledPlan()),
+                        Collections.emptyMap());
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(jobGraph.getSavepointRestoreSettings().getRestorePath()).isEqualTo(savepoint);
+    }
+
+    @Test
+    void testParameterValidation() throws Exception {
+        final String compiledPlan = loadCompiledPlan();
+
+        testErrorHandling(
+                createRequest(
+                        null, null, Collections.singleton(compiledPlan), Collections.emptyMap()),
+                HttpResponseStatus.BAD_REQUEST,
+                "jobId must not be null");
+
+        testErrorHandling(
+                createRequest(
+                        "invalid-job-id",
+                        null,
+                        Collections.singleton(compiledPlan),
+                        Collections.emptyMap()),
+                HttpResponseStatus.BAD_REQUEST,
+                "jobId is not a valid job ID");
+
+        testErrorHandling(
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.emptyList(),
+                        Collections.emptyMap()),
+                HttpResponseStatus.BAD_REQUEST,
+                "generatorArguments must not be empty");
+    }
+
+    @Test
+    void testJoGraphGenerationErrorHandling() throws Exception {
+        final String compiledPlan = "foo bar baz";
+
+        final Exception generationFailure = new RuntimeException("generation failure");
+
+        testErrorHandling(
+                createHandler(
+                        (i1, i2) -> {
+                            throw generationFailure;
+                        },
+                        e ->
+                                new RestHandlerException(
+                                        e.getMessage(), HttpResponseStatus.BAD_REQUEST)),
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(compiledPlan),
+                        Collections.emptyMap()),
+                HttpResponseStatus.BAD_REQUEST,
+                generationFailure.getMessage());
+    }
+
+    @Test
+    void testJoGraphGenerationErrorClassificationErrorHandling() throws Exception {
+        final String compiledPlan = "foo bar baz";
+
+        final Exception generationFailure = new RuntimeException("generation failure");
+        final RuntimeException classificationFailure =
+                new RuntimeException("classification failure");
+
+        testErrorHandling(
+                createHandler(
+                        (i1, i2) -> {
+                            throw generationFailure;
+                        },
+                        e -> {
+                            throw classificationFailure;
+                        }),
+                createRequest(
+                        JobID.generate().toHexString(),
+                        null,
+                        Collections.singleton(compiledPlan),
+                        Collections.emptyMap()),
+                HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                "Internal error occurred");
+    }
+
+    private static void testErrorHandling(
+            HandlerRequest<ConfluentJobSubmitRequestBody> request,
+            HttpResponseStatus expectedError,
+            String errorMessage)
+            throws Exception {
+        testErrorHandling(createHandler(), request, expectedError, errorMessage);
+    }
+
+    private static void testErrorHandling(
+            ConfluentJobSubmitHandler handler,
+            HandlerRequest<ConfluentJobSubmitRequestBody> request,
+            HttpResponseStatus expectedError,
+            String errorMessage)
+            throws Exception {
+
+        try {
+
+            assertThatThrownBy(
+                            () ->
+                                    handler.handleRequest(
+                                                    request,
+                                                    TestingDispatcherGateway.newBuilder().build())
+                                            .join())
+                    .cause()
+                    .satisfies(
+                            exception -> {
+                                assertThat(exception).isInstanceOf(RestHandlerException.class);
+                                assertThat(exception).hasMessageContaining(errorMessage);
+                                assertThat(
+                                                ((RestHandlerException) exception)
+                                                        .getHttpResponseStatus())
+                                        .isEqualTo(expectedError);
+                            });
+        } finally {
+            handler.close();
+        }
+    }
+
+    private static HandlerRequest<ConfluentJobSubmitRequestBody> createRequest(
+            @Nullable String jobId,
+            @Nullable String savepointPath,
+            @Nullable Collection<String> generatorArguments,
+            @Nullable Map<String, String> jobConfiguration) {
+        final ConfluentJobSubmitRequestBody request =
+                new ConfluentJobSubmitRequestBody(
+                        jobId, savepointPath, generatorArguments, jobConfiguration);
+        return HandlerRequest.create(request, EmptyMessageParameters.getInstance());
+    }
+
+    private JobGraph submitAndRetrieveJobGraph(
+            HandlerRequest<ConfluentJobSubmitRequestBody> request) throws Exception {
+
+        final CompletableFuture<JobGraph> jobGraphFuture = new CompletableFuture<>();
+        final DispatcherGateway gateway =
+                TestingDispatcherGateway.newBuilder()
+                        .setSubmitFunction(
+                                jobGraph -> {
+                                    jobGraphFuture.complete(jobGraph);
+                                    return CompletableFuture.completedFuture(Acknowledge.get());
+                                })
+                        .build();
+
+        try (ConfluentJobSubmitHandler handler = createHandler()) {
+            handler.handleRequest(request, gateway).join();
+            return jobGraphFuture.join();
+        }
+    }
+
+    private static ConfluentJobSubmitHandler createHandler() {
+        return new ConfluentJobSubmitHandler(
+                CompletableFuture::new,
+                Time.seconds(10),
+                Collections.emptyMap(),
+                clusterConfig,
+                EXECUTOR_EXTENSION.getExecutor());
+    }
+
+    private static ConfluentJobSubmitHandler createHandler(
+            BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
+                    jobGraphGenerator,
+            Function<Throwable, RestHandlerException> exceptionClassifier) {
+        return new ConfluentJobSubmitHandler(
+                CompletableFuture::new,
+                Time.seconds(10),
+                Collections.emptyMap(),
+                clusterConfig,
+                EXECUTOR_EXTENSION.getExecutor(),
+                jobGraphGenerator,
+                exceptionClassifier);
+    }
+
+    static String loadCompiledPlan() throws IOException {
+        return loadResource("/compiled_plan.json");
+    }
+
+    private static String loadResource(String name) throws IOException {
+        InputStream in = ConfluentJobSubmitHandlerTest.class.getResourceAsStream(name);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        IOUtils.copyBytes(in, out);
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    }
+}
