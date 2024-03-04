@@ -141,7 +141,8 @@ class Executing extends StateWithExecutionGraph implements ResourceListener {
                     getExecutionGraphHandler(),
                     getOperatorCoordinatorHandler(),
                     Duration.ofMillis(0L),
-                    getFailures());
+                    getFailures(),
+                    StateTransitions.ToRestarting.Cause.RESCALE);
         }
     }
 

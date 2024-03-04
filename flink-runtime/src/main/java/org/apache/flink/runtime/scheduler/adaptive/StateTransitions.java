@@ -135,7 +135,13 @@ public interface StateTransitions {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
                 Duration backoffTime,
-                List<ExceptionHistoryEntry> failureCollection);
+                List<ExceptionHistoryEntry> failureCollection,
+                Cause cause);
+
+        enum Cause {
+            RESCALE,
+            ERROR
+        }
     }
 
     /** Interface covering transition to the {@link StopWithSavepoint} state. */

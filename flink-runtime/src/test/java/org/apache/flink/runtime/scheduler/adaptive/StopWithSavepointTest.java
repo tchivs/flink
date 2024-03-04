@@ -572,7 +572,8 @@ class StopWithSavepointTest {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
                 Duration backoffTime,
-                List<ExceptionHistoryEntry> failureCollection) {
+                List<ExceptionHistoryEntry> failureCollection,
+                Cause cause) {
             if (hadStateTransition) {
                 throw new IllegalStateException("Only one state transition is allowed.");
             }

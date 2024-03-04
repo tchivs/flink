@@ -504,6 +504,10 @@ public class AdaptiveSchedulerTest {
 
     @Test
     void testNumRestartsMetric() throws Exception {
+        final CompletableFuture<Gauge<Integer>> numRescaleRestartsMetricFuture =
+                new CompletableFuture<>();
+        final CompletableFuture<Gauge<Integer>> numFailureRestartsMetricFuture =
+                new CompletableFuture<>();
         final CompletableFuture<Gauge<Long>> numRestartsMetricFuture = new CompletableFuture<>();
         final MetricRegistry metricRegistry =
                 TestingMetricRegistry.builder()
@@ -511,6 +515,12 @@ public class AdaptiveSchedulerTest {
                                 (metric, name, group) -> {
                                     if (MetricNames.NUM_RESTARTS.equals(name)) {
                                         numRestartsMetricFuture.complete((Gauge<Long>) metric);
+                                    } else if (MetricNames.NUM_RESCALE_RESTARTS.equals(name)) {
+                                        numRescaleRestartsMetricFuture.complete(
+                                                (Gauge<Integer>) metric);
+                                    } else if (MetricNames.NUM_ERROR_RESTARTS.equals(name)) {
+                                        numFailureRestartsMetricFuture.complete(
+                                                (Gauge<Integer>) metric);
                                     }
                                 })
                         .build();
@@ -540,9 +550,12 @@ public class AdaptiveSchedulerTest {
                                                 metricRegistry, "localhost")
                                         .addJob(new JobID(), "jobName"))
                         .setDeclarativeSlotPool(declarativeSlotPool)
+                        .setRestartBackoffTimeStrategy(new TestRestartBackoffTimeStrategy(true, 0L))
                         .build();
 
         final Gauge<Long> numRestartsMetric = numRestartsMetricFuture.get();
+        final Gauge<Integer> numRescaleRestartsMetric = numRescaleRestartsMetricFuture.get();
+        final Gauge<Integer> numErrorRestartsMetric = numFailureRestartsMetricFuture.get();
 
         final SubmissionBufferingTaskManagerGateway taskManagerGateway =
                 new SubmissionBufferingTaskManagerGateway(1 + PARALLELISM);
@@ -565,6 +578,8 @@ public class AdaptiveSchedulerTest {
         taskManagerGateway.waitForSubmissions(1);
 
         assertThat(numRestartsMetric.getValue()).isEqualTo(0L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(0L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(0L);
 
         singleThreadMainThreadExecutor.execute(
                 () -> {
@@ -581,6 +596,18 @@ public class AdaptiveSchedulerTest {
         taskManagerGateway.waitForSubmissions(PARALLELISM);
 
         assertThat(numRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(0L);
+
+        singleThreadMainThreadExecutor.execute(
+                () -> scheduler.handleGlobalFailure(new Exception("test exception")));
+
+        // wait for the redeployed task submissions
+        taskManagerGateway.waitForSubmissions(PARALLELISM);
+
+        assertThat(numRestartsMetric.getValue()).isEqualTo(2L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(1L);
     }
 
     @Test

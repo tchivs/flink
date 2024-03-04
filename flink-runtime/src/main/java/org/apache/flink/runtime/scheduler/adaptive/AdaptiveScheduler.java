@@ -216,6 +216,8 @@ public class AdaptiveScheduler
     private boolean isTransitioningState = false;
 
     private int numRestarts = 0;
+    private int numRestartsDueToRescales = 0;
+    private int numRestartsDueToErrors = 0;
 
     private final MutableVertexAttemptNumberStore vertexAttemptNumberStore =
             new DefaultVertexAttemptNumberStore();
@@ -320,6 +322,12 @@ public class AdaptiveScheduler
                 tmpJobStatusListeners::add,
                 initializationTimestamp,
                 jobStatusMetricsSettings);
+        jobManagerJobMetricGroup.gauge(
+                org.apache.flink.runtime.metrics.MetricNames.NUM_RESCALE_RESTARTS,
+                () -> numRestartsDueToRescales);
+        jobManagerJobMetricGroup.gauge(
+                org.apache.flink.runtime.metrics.MetricNames.NUM_ERROR_RESTARTS,
+                () -> numRestartsDueToErrors);
 
         jobStatusListeners = Collections.unmodifiableCollection(tmpJobStatusListeners);
         this.failureEnrichers = failureEnrichers;
@@ -975,7 +983,8 @@ public class AdaptiveScheduler
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler,
             Duration backoffTime,
-            List<ExceptionHistoryEntry> failureCollection) {
+            List<ExceptionHistoryEntry> failureCollection,
+            Cause cause) {
 
         for (ExecutionVertex executionVertex : executionGraph.getAllExecutionVertices()) {
             final int attemptNumber =
@@ -998,6 +1007,14 @@ public class AdaptiveScheduler
                         userCodeClassLoader,
                         failureCollection));
         numRestarts++;
+        switch (cause) {
+            case RESCALE:
+                numRestartsDueToRescales++;
+                break;
+            case ERROR:
+                numRestartsDueToErrors++;
+                break;
+        }
     }
 
     @Override

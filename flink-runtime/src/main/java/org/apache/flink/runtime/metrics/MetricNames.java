@@ -19,7 +19,7 @@
 package org.apache.flink.runtime.metrics;
 
 /** Collection of metric names. */
-public class MetricNames {
+public class MetricNames extends ConfluentMetricNames {
     private MetricNames() {}
 
     public static final String SUFFIX_RATE = "PerSecond";
