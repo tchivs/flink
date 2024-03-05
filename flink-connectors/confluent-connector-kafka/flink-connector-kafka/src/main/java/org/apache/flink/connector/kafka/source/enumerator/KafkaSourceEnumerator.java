@@ -157,6 +157,15 @@ public class KafkaSourceEnumerator
     @Override
     public void start() {
         adminClient = getKafkaAdminClient();
+        subscriber.open(
+                new KafkaSubscriberInitContext(
+                        context.metricGroup().addGroup(SUBSCRIBER_METRIC_GROUP)));
+        startingOffsetInitializer.open(
+                new OffsetsInitializerInitContext(
+                        context.metricGroup().addGroup(STARTING_OFFSETS_INITIALIZER_METRIC_GROUP)));
+        stoppingOffsetInitializer.open(
+                new OffsetsInitializerInitContext(
+                        context.metricGroup().addGroup(STOPPING_OFFSETS_INITIALIZER_METRIC_GROUP)));
         if (partitionDiscoveryIntervalMs > 0) {
             LOG.info(
                     "Starting the KafkaSourceEnumerator for consumer group {} "
@@ -175,15 +184,6 @@ public class KafkaSourceEnumerator
                     consumerGroupId);
             context.callAsync(this::getSubscribedTopicPartitions, this::checkPartitionChanges);
         }
-        subscriber.open(
-                new KafkaSubscriberInitContext(
-                        context.metricGroup().addGroup(SUBSCRIBER_METRIC_GROUP)));
-        startingOffsetInitializer.open(
-                new OffsetsInitializerInitContext(
-                        context.metricGroup().addGroup(STARTING_OFFSETS_INITIALIZER_METRIC_GROUP)));
-        stoppingOffsetInitializer.open(
-                new OffsetsInitializerInitContext(
-                        context.metricGroup().addGroup(STOPPING_OFFSETS_INITIALIZER_METRIC_GROUP)));
     }
 
     @Override
