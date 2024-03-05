@@ -7,6 +7,7 @@ package io.confluent.flink.formats.registry.json;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -15,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ShortNode;
@@ -27,10 +29,13 @@ import org.everit.json.schema.ObjectSchema;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link JsonToRowDataConverters}. */
@@ -45,11 +50,11 @@ class RowDataToJsonConvertersTest {
     void testMapNonStringKeys() throws Exception {
         NumberSchema keySchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int8"))
+                        .unprocessedProperties(singletonMap("connect.type", "int8"))
                         .build();
         NumberSchema valueSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int16"))
+                        .unprocessedProperties(singletonMap("connect.type", "int16"))
                         .build();
         ObjectSchema mapSchema =
                 ObjectSchema.builder()
@@ -59,7 +64,7 @@ class RowDataToJsonConvertersTest {
         ArraySchema schema =
                 ArraySchema.builder()
                         .allItemSchema(mapSchema)
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "map"))
+                        .unprocessedProperties(singletonMap("connect.type", "map"))
                         .build();
 
         final LogicalType flinkSchema =
@@ -91,11 +96,11 @@ class RowDataToJsonConvertersTest {
                         .build();
         NumberSchema longSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int64"))
+                        .unprocessedProperties(singletonMap("connect.type", "int64"))
                         .build();
         CombinedSchema oneof =
                 CombinedSchema.oneOf(Arrays.asList(NullSchema.INSTANCE, longSchema))
-                        .unprocessedProperties(Collections.singletonMap("connect.index", 1))
+                        .unprocessedProperties(singletonMap("connect.index", 1))
                         .build();
         ObjectSchema schema =
                 ObjectSchema.builder()
@@ -134,7 +139,7 @@ class RowDataToJsonConvertersTest {
                         .build();
         CombinedSchema oneof =
                 CombinedSchema.oneOf(Arrays.asList(NullSchema.INSTANCE, nestedSchema))
-                        .unprocessedProperties(Collections.singletonMap("connect.index", 1))
+                        .unprocessedProperties(singletonMap("connect.index", 1))
                         .build();
         ObjectSchema schema =
                 ObjectSchema.builder().addPropertySchema("nested", oneof).title("Record").build();
@@ -169,11 +174,11 @@ class RowDataToJsonConvertersTest {
     void testOneOf() throws Exception {
         NumberSchema firstSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int8"))
+                        .unprocessedProperties(singletonMap("connect.type", "int8"))
                         .build();
         NumberSchema secondSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int16"))
+                        .unprocessedProperties(singletonMap("connect.type", "int16"))
                         .build();
         CombinedSchema schema =
                 CombinedSchema.oneOf(Arrays.asList(firstSchema, secondSchema)).build();
@@ -197,11 +202,11 @@ class RowDataToJsonConvertersTest {
     void testAnyOf() throws Exception {
         NumberSchema firstSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int8"))
+                        .unprocessedProperties(singletonMap("connect.type", "int8"))
                         .build();
         NumberSchema secondSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int16"))
+                        .unprocessedProperties(singletonMap("connect.type", "int16"))
                         .build();
         CombinedSchema schema =
                 CombinedSchema.anyOf(Arrays.asList(firstSchema, secondSchema)).build();
@@ -225,15 +230,15 @@ class RowDataToJsonConvertersTest {
     void testAllOf() throws Exception {
         NumberSchema firstSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int8"))
+                        .unprocessedProperties(singletonMap("connect.type", "int8"))
                         .build();
         NumberSchema secondSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int16"))
+                        .unprocessedProperties(singletonMap("connect.type", "int16"))
                         .build();
         NumberSchema thirdSchema =
                 NumberSchema.builder()
-                        .unprocessedProperties(Collections.singletonMap("connect.type", "int32"))
+                        .unprocessedProperties(singletonMap("connect.type", "int32"))
                         .build();
 
         ObjectSchema objectSchema1 =
@@ -281,6 +286,24 @@ class RowDataToJsonConvertersTest {
         expected.set("c", NullNode.getInstance());
         expected.set("d", IntNode.valueOf(123));
         assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
+    void testTimestampLtz() {
+        NumberSchema timestampSchema =
+                NumberSchema.builder()
+                        .unprocessedProperties(singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64))
+                        .title(CONNECT_TYPE_TIMESTAMP)
+                        .build();
+
+        final LogicalType flinkSchema = DataTypes.TIMESTAMP_LTZ(3).getLogicalType();
+
+        final RowDataToJsonConverter converter =
+                RowDataToJsonConverters.createConverter(flinkSchema, timestampSchema);
+        final long milliseconds = 123456;
+        final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
+        final JsonNode result = converter.convert(OBJECT_MAPPER, null, timestampData);
+        assertThat(result).isEqualTo(LongNode.valueOf(milliseconds));
     }
 
     private static <K, V> Map<K, V> mapOf(K key1, V value1, K key2, V value2) {

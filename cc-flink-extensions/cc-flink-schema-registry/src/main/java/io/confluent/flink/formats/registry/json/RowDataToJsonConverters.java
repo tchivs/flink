@@ -12,10 +12,10 @@ import org.apache.flink.table.data.MapData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.TimestampType;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +28,6 @@ import org.everit.json.schema.ObjectSchema;
 import org.everit.json.schema.Schema;
 
 import java.io.Serializable;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -186,8 +185,8 @@ public class RowDataToJsonConverters {
                         return mapper.getNodeFactory().binaryNode((byte[]) value);
                     }
                 };
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-                final TimestampType timestampType = (TimestampType) type;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                final LocalZonedTimestampType timestampType = (LocalZonedTimestampType) type;
                 return createTimestampConverter(timestampType.getPrecision());
             case DECIMAL:
                 return new RowDataToJsonConverter() {
@@ -209,7 +208,7 @@ public class RowDataToJsonConverters {
             case RAW:
             case INTERVAL_YEAR_MONTH: // long
             case INTERVAL_DAY_TIME: // long
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -224,32 +223,6 @@ public class RowDataToJsonConverters {
                 public JsonNode convert(ObjectMapper mapper, JsonNode reuse, Object value) {
                     return mapper.getNodeFactory()
                             .numberNode(((TimestampData) value).toInstant().toEpochMilli());
-                }
-            };
-        } else if (precision <= 6) {
-            return new RowDataToJsonConverter() {
-                private static final long serialVersionUID = 1L;
-
-                @Override
-                public JsonNode convert(ObjectMapper mapper, JsonNode reuse, Object value) {
-                    // copied over from
-                    // org.apache.avro.data.TimeConversions.TimestampMicrosConversion.toLong
-                    final Instant instant = ((TimestampData) value).toInstant();
-                    long seconds = instant.getEpochSecond();
-                    int nanos = instant.getNano();
-
-                    final long result;
-                    if (seconds < 0 && nanos > 0) {
-                        long micros = Math.multiplyExact(seconds + 1, 1_000_000L);
-                        long adjustment = (nanos / 1_000L) - 1_000_000;
-
-                        result = Math.addExact(micros, adjustment);
-                    } else {
-                        long micros = Math.multiplyExact(seconds, 1_000_000L);
-
-                        result = Math.addExact(micros, nanos / 1_000L);
-                    }
-                    return mapper.getNodeFactory().numberNode(result);
                 }
             };
         } else {

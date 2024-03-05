@@ -281,7 +281,7 @@ public class FlinkToJsonSchemaConverter {
 
     private static Schema.Builder<?> convertTimestamp(LocalZonedTimestampType logicalType) {
         final int precision = logicalType.getPrecision();
-        if (precision <= 6) {
+        if (precision <= 3) {
             return NumberSchema.builder()
                     .title(CONNECT_TYPE_TIMESTAMP)
                     .unprocessedProperties(
@@ -291,7 +291,7 @@ public class FlinkToJsonSchemaConverter {
                     "JSON does not support TIMESTAMP type "
                             + "with precision: "
                             + precision
-                            + ", it only supports precision less than or equal to 6.");
+                            + ", it only supports precision less than or equal to 3.");
         }
     }
 

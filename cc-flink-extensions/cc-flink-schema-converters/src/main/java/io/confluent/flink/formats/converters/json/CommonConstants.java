@@ -9,26 +9,24 @@ package io.confluent.flink.formats.converters.json;
  */
 public class CommonConstants {
 
-    static final String CONNECT_TYPE_PROP = "connect.type";
-
-    static final String CONNECT_TYPE_INT8 = "int8";
-    static final String CONNECT_TYPE_INT16 = "int16";
-    static final String CONNECT_TYPE_INT32 = "int32";
-    static final String CONNECT_TYPE_INT64 = "int64";
-    static final String CONNECT_TYPE_FLOAT32 = "float32";
-    static final String CONNECT_TYPE_FLOAT64 = "float64";
-    static final String CONNECT_TYPE_BYTES = "bytes";
-    static final String CONNECT_TYPE_MAP = "map";
-    static final String KEY_FIELD = "key";
-    static final String VALUE_FIELD = "value";
-    static final String CONNECT_INDEX_PROP = "connect.index";
-    static final String CONNECT_TYPE_TIME = "org.apache.kafka.connect.data.Time";
-    static final String CONNECT_TYPE_DATE = "org.apache.kafka.connect.data.Date";
-    static final String CONNECT_TYPE_TIMESTAMP = "org.apache.kafka.connect.data.Timestamp";
-
-    static final String CONNECT_TYPE_DECIMAL = "org.apache.kafka.connect.data.Decimal";
-    static final String CONNECT_PARAMETERS = "connect.parameters";
-    static final String CONNECT_TYPE_DECIMAL_SCALE = "scale";
-    static final String CONNECT_TYPE_DECIMAL_PRECISION = "connect.decimal.precision";
-    static final String GENERALIZED_TYPE_UNION_PREFIX = "connect_union_field_";
+    public static final String CONNECT_TYPE_PROP = "connect.type";
+    public static final String CONNECT_TYPE_INT8 = "int8";
+    public static final String CONNECT_TYPE_INT16 = "int16";
+    public static final String CONNECT_TYPE_INT32 = "int32";
+    public static final String CONNECT_TYPE_INT64 = "int64";
+    public static final String CONNECT_TYPE_FLOAT32 = "float32";
+    public static final String CONNECT_TYPE_FLOAT64 = "float64";
+    public static final String CONNECT_TYPE_BYTES = "bytes";
+    public static final String CONNECT_TYPE_MAP = "map";
+    public static final String KEY_FIELD = "key";
+    public static final String VALUE_FIELD = "value";
+    public static final String CONNECT_INDEX_PROP = "connect.index";
+    public static final String CONNECT_TYPE_TIME = "org.apache.kafka.connect.data.Time";
+    public static final String CONNECT_TYPE_DATE = "org.apache.kafka.connect.data.Date";
+    public static final String CONNECT_TYPE_TIMESTAMP = "org.apache.kafka.connect.data.Timestamp";
+    public static final String CONNECT_TYPE_DECIMAL = "org.apache.kafka.connect.data.Decimal";
+    public static final String CONNECT_PARAMETERS = "connect.parameters";
+    public static final String CONNECT_TYPE_DECIMAL_SCALE = "scale";
+    public static final String CONNECT_TYPE_DECIMAL_PRECISION = "connect.decimal.precision";
+    public static final String GENERALIZED_TYPE_UNION_PREFIX = "connect_union_field_";
 }

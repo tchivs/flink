@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.registry.json;
 
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.MapData;
@@ -31,11 +32,16 @@ import org.everit.json.schema.NumberSchema;
 import org.everit.json.schema.ObjectSchema;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link JsonToRowDataConverters}. */
@@ -380,6 +386,24 @@ class JsonToRowDataConvertersTest {
         expected.setField(0, nested);
 
         assertThat(converter.convert(obj)).isEqualTo(expected);
+    }
+
+    @Test
+    void testTimestampLtz() throws IOException {
+        NumberSchema timestampSchema =
+                NumberSchema.builder()
+                        .unprocessedProperties(singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64))
+                        .title(CONNECT_TYPE_TIMESTAMP)
+                        .build();
+
+        final LogicalType flinkSchema = DataTypes.TIMESTAMP_LTZ(3).getLogicalType();
+
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(timestampSchema, flinkSchema);
+        final long milliseconds = 123456;
+        final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
+        final Object result = converter.convert(LongNode.valueOf(milliseconds));
+        assertThat(result).isEqualTo(TimestampData.fromEpochMillis(milliseconds));
     }
 
     public static <K, V> Map<K, V> mapOf(K key1, V value1, K key2, V value2) {
