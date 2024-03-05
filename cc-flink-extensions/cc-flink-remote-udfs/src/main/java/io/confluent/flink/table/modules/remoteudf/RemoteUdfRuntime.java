@@ -157,13 +157,11 @@ public class RemoteUdfRuntime implements AutoCloseable {
     /** Deletes the UdfTask from the ApiServer. */
     private static void deleteUdfTask(ApiClient apiClient, ComputeV1alphaFlinkUdfTask udfTask)
             throws ApiException {
-        if (udfTask == null) {
-            ComputeV1alphaApi computeV1alphaApi = new ComputeV1alphaApi(apiClient);
-            computeV1alphaApi.deleteComputeV1alphaFlinkUdfTask(
-                    udfTask.getMetadata().getEnvironment(),
-                    udfTask.getMetadata().getName(),
-                    udfTask.getMetadata().getOrg());
-        }
+        ComputeV1alphaApi computeV1alphaApi = new ComputeV1alphaApi(apiClient);
+        computeV1alphaApi.deleteComputeV1alphaFlinkUdfTask(
+                udfTask.getMetadata().getEnvironment(),
+                udfTask.getMetadata().getName(),
+                udfTask.getMetadata().getOrg());
     }
 
     /** Returns the ApiClient for the given configuration. */

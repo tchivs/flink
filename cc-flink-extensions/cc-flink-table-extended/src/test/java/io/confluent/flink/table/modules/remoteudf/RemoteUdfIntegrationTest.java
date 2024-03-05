@@ -156,6 +156,10 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals(1, results.size());
         Row row = results.get(0);
         Assertions.assertEquals("[1, test, 4]", row.getField(0));
+
+        Collection<ComputeV1alphaFlinkUdfTask> udfTasks =
+                ApiServerUtils.listRunningUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
+        Assertions.assertEquals(0, udfTasks.size());
     }
 
     @Test

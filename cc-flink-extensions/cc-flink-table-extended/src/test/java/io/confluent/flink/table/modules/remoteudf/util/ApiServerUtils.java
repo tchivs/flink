@@ -71,4 +71,17 @@ public class ApiServerUtils {
             throw new Exception(e.getResponseBody(), e);
         }
     }
+
+    public static Collection<ComputeV1alphaFlinkUdfTask> listRunningUdfTasks(
+            ApiServerContainer container, String org, String env) throws Exception {
+        try {
+            return container.getComputeV1alphaApi()
+                    .listComputeV1alphaFlinkUdfTasks(
+                            env, org, null, null, "status.phase=Running", null, 1)
+                    .getItems().stream()
+                    .collect(Collectors.toSet());
+        } catch (ApiException e) {
+            throw new Exception(e.getResponseBody(), e);
+        }
+    }
 }
