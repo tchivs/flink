@@ -85,9 +85,15 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
 
     @Override
     public boolean delegationTokensRequired() {
-        if (!isCredentialsRequired) {
-            // we only need this provider when running in AWS
-            return EC2MetadataUtils.getInstanceId() != null;
+        if (!isCredentialsRequired && EC2MetadataUtils.getInstanceId() != null) {
+            if (getCcFlinkSecurityCredentials().isEmpty()) {
+                LOG.warn(
+                        "Running in AWS but could not retrieve security credentials."
+                                + " Will not retrieve delegation tokens.");
+                return false;
+            } else {
+                return true;
+            }
         }
         if (StringUtils.isNullOrWhitespaceOnly(region)
                 || StringUtils.isNullOrWhitespaceOnly(accessKey)
@@ -117,10 +123,7 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
             credentials = sessionTokenResult.getCredentials();
         } else {
             List<EC2MetadataUtils.IAMSecurityCredential> iamSecurityCredentials =
-                    EC2MetadataUtils.getIAMSecurityCredentials().entrySet().stream()
-                            .filter(entry -> entry.getKey().contains("cc-flink-"))
-                            .map(Map.Entry::getValue)
-                            .collect(Collectors.toList());
+                    getCcFlinkSecurityCredentials();
 
             if (iamSecurityCredentials.size() != 1) {
                 throw new RuntimeException(
@@ -148,5 +151,12 @@ public abstract class AbstractS3DelegationTokenProvider implements DelegationTok
         return new ObtainedDelegationTokens(
                 InstantiationUtil.serializeObject(credentials),
                 Optional.of(credentials.getExpiration().getTime()));
+    }
+
+    private static List<EC2MetadataUtils.IAMSecurityCredential> getCcFlinkSecurityCredentials() {
+        return EC2MetadataUtils.getIAMSecurityCredentials().entrySet().stream()
+                .filter(entry -> entry.getKey().contains("cc-flink-"))
+                .map(Map.Entry::getValue)
+                .collect(Collectors.toList());
     }
 }
