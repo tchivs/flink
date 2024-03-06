@@ -20,6 +20,7 @@ package org.apache.flink.connector.kafka.source.enumerator.subscriber;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.connector.kafka.source.enumerator.TopicPartitionWithId;
 import org.apache.flink.metrics.MetricGroup;
 
 import org.apache.kafka.clients.admin.AdminClient;
@@ -29,6 +30,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Kafka consumer allows a few different ways to consume from the topics, including:
@@ -65,6 +67,20 @@ public interface KafkaSubscriber extends Serializable {
      * @return A set of subscribed {@link TopicPartition}s
      */
     Set<TopicPartition> getSubscribedTopicPartitions(AdminClient adminClient);
+
+    /**
+     * Get a set of subscribed {@link TopicPartitionWithId}s.
+     *
+     * @param adminClient The admin client used to retrieve subscribed topic partitions.
+     * @return A set of subscribed {@link TopicPartitionWithId}s
+     */
+    @Confluent
+    default Set<TopicPartitionWithId> getSubscribedTopicPartitionWithIds(AdminClient adminClient) {
+        final Set<TopicPartition> withoutTopicIds = getSubscribedTopicPartitions(adminClient);
+        return withoutTopicIds.stream()
+                .map(withoutId -> new TopicPartitionWithId(withoutId, null))
+                .collect(Collectors.toSet());
+    }
 
     /**
      * Closes the subscriber. This lifecycle method will be called after this {@link

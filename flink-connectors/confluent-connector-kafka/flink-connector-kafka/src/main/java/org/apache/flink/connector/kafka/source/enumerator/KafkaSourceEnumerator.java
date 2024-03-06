@@ -148,7 +148,7 @@ public class KafkaSourceEnumerator
      * <p>The invoking chain of partition discovery would be:
      *
      * <ol>
-     *   <li>{@link #getSubscribedTopicPartitions} in worker thread
+     *   <li>{@link #getSubscribedTopicPartitionWithIds()} in worker thread
      *   <li>{@link #checkPartitionChanges} in coordinator thread
      *   <li>{@link #initializePartitionSplits} in worker thread
      *   <li>{@link #handlePartitionSplitChanges} in coordinator thread
@@ -173,7 +173,7 @@ public class KafkaSourceEnumerator
                     consumerGroupId,
                     partitionDiscoveryIntervalMs);
             context.callAsync(
-                    this::getSubscribedTopicPartitions,
+                    this::getSubscribedTopicPartitionWithIds,
                     this::checkPartitionChanges,
                     0,
                     partitionDiscoveryIntervalMs);
@@ -182,7 +182,8 @@ public class KafkaSourceEnumerator
                     "Starting the KafkaSourceEnumerator for consumer group {} "
                             + "without periodic partition discovery.",
                     consumerGroupId);
-            context.callAsync(this::getSubscribedTopicPartitions, this::checkPartitionChanges);
+            context.callAsync(
+                    this::getSubscribedTopicPartitionWithIds, this::checkPartitionChanges);
         }
     }
 
@@ -235,8 +236,16 @@ public class KafkaSourceEnumerator
      *
      * @return Set of subscribed {@link TopicPartition}s
      */
-    private Set<TopicPartition> getSubscribedTopicPartitions() {
-        return subscriber.getSubscribedTopicPartitions(adminClient);
+    private Map<TopicPartition, TopicPartitionWithId> getSubscribedTopicPartitionWithIds() {
+        final Set<TopicPartitionWithId> subscribedTopicPartitionWithIds =
+                subscriber.getSubscribedTopicPartitionWithIds(adminClient);
+        final Map<TopicPartition, TopicPartitionWithId> asMap =
+                new HashMap<>(subscribedTopicPartitionWithIds.size());
+        subscribedTopicPartitionWithIds.forEach(
+                topicPartitionWithId -> {
+                    asMap.put(topicPartitionWithId.getTopicPartition(), topicPartitionWithId);
+                });
+        return asMap;
     }
 
     /**
@@ -249,7 +258,8 @@ public class KafkaSourceEnumerator
      * @param fetchedPartitions Map from topic name to its description
      * @param t Exception in worker thread
      */
-    private void checkPartitionChanges(Set<TopicPartition> fetchedPartitions, Throwable t) {
+    private void checkPartitionChanges(
+            Map<TopicPartition, TopicPartitionWithId> fetchedPartitions, Throwable t) {
         if (t != null) {
             throw new FlinkRuntimeException(
                     "Failed to list subscribed topic partitions due to ", t);
@@ -284,21 +294,25 @@ public class KafkaSourceEnumerator
      *     partitions
      */
     private PartitionSplitChange initializePartitionSplits(PartitionChange partitionChange) {
-        Set<TopicPartition> newPartitions =
+        Set<TopicPartitionWithId> newPartitions =
                 Collections.unmodifiableSet(partitionChange.getNewPartitions());
         OffsetsInitializer.PartitionOffsetsRetriever offsetsRetriever = getOffsetsRetriever();
 
-        Map<TopicPartition, Long> startingOffsets =
-                startingOffsetInitializer.getPartitionOffsets(newPartitions, offsetsRetriever);
-        Map<TopicPartition, Long> stoppingOffsets =
-                stoppingOffsetInitializer.getPartitionOffsets(newPartitions, offsetsRetriever);
+        Map<TopicPartitionWithId, Long> startingOffsets =
+                startingOffsetInitializer.getPartitionOffsetsWithIds(
+                        newPartitions, offsetsRetriever);
+        Map<TopicPartitionWithId, Long> stoppingOffsets =
+                stoppingOffsetInitializer.getPartitionOffsetsWithIds(
+                        newPartitions, offsetsRetriever);
 
         Set<KafkaPartitionSplit> partitionSplits = new HashSet<>(newPartitions.size());
-        for (TopicPartition tp : newPartitions) {
+        for (TopicPartitionWithId tp : newPartitions) {
             Long startingOffset = startingOffsets.get(tp);
             long stoppingOffset =
                     stoppingOffsets.getOrDefault(tp, KafkaPartitionSplit.NO_STOPPING_OFFSET);
-            partitionSplits.add(new KafkaPartitionSplit(tp, startingOffset, stoppingOffset));
+            partitionSplits.add(
+                    new KafkaPartitionSplit(
+                            tp.getTopicPartition(), startingOffset, stoppingOffset));
         }
         return new PartitionSplitChange(partitionSplits, partitionChange.getRemovedPartitions());
     }
@@ -394,12 +408,18 @@ public class KafkaSourceEnumerator
     }
 
     @VisibleForTesting
-    PartitionChange getPartitionChange(Set<TopicPartition> fetchedPartitions) {
-        final Set<TopicPartition> removedPartitions = new HashSet<>();
-        Consumer<TopicPartition> dedupOrMarkAsRemoved =
-                (tp) -> {
-                    if (!fetchedPartitions.remove(tp)) {
-                        removedPartitions.add(tp);
+    PartitionChange getPartitionChange(
+            Map<TopicPartition, TopicPartitionWithId> fetchedPartitions) {
+        final Set<TopicPartitionWithId> removedPartitions = new HashSet<>();
+        final Consumer<TopicPartition> dedupOrMarkAsRemoved =
+                (topicPartitionWithoutId) -> {
+                    final TopicPartitionWithId removed =
+                            fetchedPartitions.remove(topicPartitionWithoutId);
+                    // if nothing was removed from fetchedPartitions, means the partition is no
+                    // longer present
+                    if (removed == null) {
+                        removedPartitions.add(
+                                new TopicPartitionWithId(topicPartitionWithoutId, null));
                     }
                 };
 
@@ -416,7 +436,7 @@ public class KafkaSourceEnumerator
             LOG.info("Discovered removed partitions: {}", removedPartitions);
         }
 
-        return new PartitionChange(fetchedPartitions, removedPartitions);
+        return new PartitionChange(Set.copyOf(fetchedPartitions.values()), removedPartitions);
     }
 
     private AdminClient getKafkaAdminClient() {
@@ -503,19 +523,21 @@ public class KafkaSourceEnumerator
     /** A container class to hold the newly added partitions and removed partitions. */
     @VisibleForTesting
     static class PartitionChange {
-        private final Set<TopicPartition> newPartitions;
-        private final Set<TopicPartition> removedPartitions;
+        private final Set<TopicPartitionWithId> newPartitions;
+        private final Set<TopicPartitionWithId> removedPartitions;
 
-        PartitionChange(Set<TopicPartition> newPartitions, Set<TopicPartition> removedPartitions) {
+        PartitionChange(
+                Set<TopicPartitionWithId> newPartitions,
+                Set<TopicPartitionWithId> removedPartitions) {
             this.newPartitions = newPartitions;
             this.removedPartitions = removedPartitions;
         }
 
-        public Set<TopicPartition> getNewPartitions() {
+        public Set<TopicPartitionWithId> getNewPartitions() {
             return newPartitions;
         }
 
-        public Set<TopicPartition> getRemovedPartitions() {
+        public Set<TopicPartitionWithId> getRemovedPartitions() {
             return removedPartitions;
         }
 
@@ -526,11 +548,11 @@ public class KafkaSourceEnumerator
 
     private static class PartitionSplitChange {
         private final Set<KafkaPartitionSplit> newPartitionSplits;
-        private final Set<TopicPartition> removedPartitions;
+        private final Set<TopicPartitionWithId> removedPartitions;
 
         private PartitionSplitChange(
                 Set<KafkaPartitionSplit> newPartitionSplits,
-                Set<TopicPartition> removedPartitions) {
+                Set<TopicPartitionWithId> removedPartitions) {
             this.newPartitionSplits = Collections.unmodifiableSet(newPartitionSplits);
             this.removedPartitions = Collections.unmodifiableSet(removedPartitions);
         }

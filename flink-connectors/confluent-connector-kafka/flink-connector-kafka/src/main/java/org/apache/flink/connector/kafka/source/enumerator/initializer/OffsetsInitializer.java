@@ -21,6 +21,7 @@ package org.apache.flink.connector.kafka.source.enumerator.initializer;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.kafka.source.KafkaSource;
+import org.apache.flink.connector.kafka.source.enumerator.TopicPartitionWithId;
 import org.apache.flink.connector.kafka.source.split.KafkaPartitionSplit;
 import org.apache.flink.metrics.MetricGroup;
 
@@ -32,7 +33,10 @@ import org.apache.kafka.common.TopicPartition;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * An interface for users to specify the starting / stopping offset of a {@link
@@ -85,6 +89,36 @@ public interface OffsetsInitializer extends Serializable {
             PartitionOffsetsRetriever partitionOffsetsRetriever);
 
     /**
+     * Get the initial offsets for the given Kafka partitions. These offsets will be used as either
+     * starting offsets or stopping offsets of the Kafka partitions.
+     *
+     * <p>If the implementation returns a starting offset which causes {@code
+     * OffsetsOutOfRangeException} from Kafka. The {@link OffsetResetStrategy} provided by the
+     * {@link #getAutoOffsetResetStrategy()} will be used to reset the offset.
+     *
+     * @param partitionsWithTopicIds the Kafka partitions to get the starting offsets.
+     * @param partitionOffsetsRetriever a helper to retrieve information of the Kafka partitions.
+     * @return A mapping from Kafka partition to their offsets to start consuming from.
+     */
+    @Confluent
+    default Map<TopicPartitionWithId, Long> getPartitionOffsetsWithIds(
+            Collection<TopicPartitionWithId> partitionsWithTopicIds,
+            PartitionOffsetsRetriever partitionOffsetsRetriever) {
+        final Set<TopicPartition> partitionsWithoutTopicIds =
+                partitionsWithTopicIds.stream()
+                        .map(TopicPartitionWithId::getTopicPartition)
+                        .collect(Collectors.toSet());
+        final Map<TopicPartition, Long> offsetsWithoutTopicIds =
+                getPartitionOffsets(partitionsWithoutTopicIds, partitionOffsetsRetriever);
+        final Map<TopicPartitionWithId, Long> offsetsWithTopicIds = new HashMap<>();
+        for (Map.Entry<TopicPartition, Long> entry : offsetsWithoutTopicIds.entrySet()) {
+            offsetsWithTopicIds.put(
+                    new TopicPartitionWithId(entry.getKey(), null), entry.getValue());
+        }
+        return offsetsWithTopicIds;
+    }
+
+    /**
      * Get the auto offset reset strategy in case the initialized offsets falls out of the range.
      *
      * <p>The OffsetStrategy is only used when the offset initializer is used to initialize the
@@ -99,6 +133,7 @@ public interface OffsetsInitializer extends Serializable {
      * An interface that provides necessary information to the {@link OffsetsInitializer} to get the
      * initial offsets of the Kafka partitions.
      */
+    @PublicEvolving
     interface PartitionOffsetsRetriever {
 
         /**

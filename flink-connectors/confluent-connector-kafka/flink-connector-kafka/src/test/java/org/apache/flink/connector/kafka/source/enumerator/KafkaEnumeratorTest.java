@@ -428,20 +428,23 @@ public class KafkaEnumeratorTest {
 
             // Check partition change using only DYNAMIC_TOPIC_NAME-0
             TopicPartition newPartition = new TopicPartition(DYNAMIC_TOPIC_NAME, 0);
-            Set<TopicPartition> fetchedPartitions = new HashSet<>();
-            fetchedPartitions.add(newPartition);
+            Map<TopicPartition, TopicPartitionWithId> fetchedPartitions = new HashMap<>();
+            fetchedPartitions.put(newPartition, new TopicPartitionWithId(newPartition, null));
             final KafkaSourceEnumerator.PartitionChange partitionChange =
                     enumerator.getPartitionChange(fetchedPartitions);
 
             // Since enumerator never met DYNAMIC_TOPIC_NAME-0, it should be mark as a new partition
-            Set<TopicPartition> expectedNewPartitions = Collections.singleton(newPartition);
+            Set<TopicPartitionWithId> expectedNewPartitions =
+                    Collections.singleton(new TopicPartitionWithId(newPartition, null));
 
             // All existing topics are not in the fetchedPartitions, so they should be marked as
             // removed
-            Set<TopicPartition> expectedRemovedPartitions = new HashSet<>();
+            Set<TopicPartitionWithId> expectedRemovedPartitions = new HashSet<>();
             for (int i = 0; i < KafkaSourceTestEnv.NUM_PARTITIONS; i++) {
-                expectedRemovedPartitions.add(new TopicPartition(TOPIC1, i));
-                expectedRemovedPartitions.add(new TopicPartition(TOPIC2, i));
+                expectedRemovedPartitions.add(
+                        new TopicPartitionWithId(new TopicPartition(TOPIC1, i), null));
+                expectedRemovedPartitions.add(
+                        new TopicPartitionWithId(new TopicPartition(TOPIC2, i), null));
             }
 
             assertThat(partitionChange.getNewPartitions()).isEqualTo(expectedNewPartitions);
