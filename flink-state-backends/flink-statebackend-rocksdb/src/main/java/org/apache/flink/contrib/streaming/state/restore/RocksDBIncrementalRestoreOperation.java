@@ -465,7 +465,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
         final Path exportCfBasePath = absolutInstanceBasePath.resolve("export-cfs");
         Files.createDirectories(exportCfBasePath);
 
-        final Map<RegisteredStateMetaInfoBase, List<ExportImportFilesMetaData>>
+        final Map<RegisteredStateMetaInfoBase.Key, List<ExportImportFilesMetaData>>
                 exportedColumnFamilyMetaData = new HashMap<>(localKeyedStateHandles.size());
 
         final List<IncrementalLocalKeyedStateHandle> notImportableHandles =
@@ -518,7 +518,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
     private KeyGroupRange exportColumnFamiliesWithSstDataInKeyGroupsRange(
             Path exportCfBasePath,
             List<IncrementalLocalKeyedStateHandle> localKeyedStateHandles,
-            Map<RegisteredStateMetaInfoBase, List<ExportImportFilesMetaData>>
+            Map<RegisteredStateMetaInfoBase.Key, List<ExportImportFilesMetaData>>
                     exportedColumnFamiliesOut,
             List<IncrementalLocalKeyedStateHandle> skipped)
             throws Exception {
@@ -656,7 +656,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
      * @throws Exception on import error.
      */
     private void initBaseDBFromColumnFamilyImports(
-            Map<RegisteredStateMetaInfoBase, List<ExportImportFilesMetaData>>
+            Map<RegisteredStateMetaInfoBase.Key, List<ExportImportFilesMetaData>>
                     exportedColumnFamilyMetaData,
             KeyGroupRange exportKeyGroupRange)
             throws Exception {
