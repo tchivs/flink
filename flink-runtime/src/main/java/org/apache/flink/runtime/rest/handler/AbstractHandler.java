@@ -60,6 +60,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Super class for netty-based handlers that work with {@link RequestBody}.
@@ -244,8 +245,12 @@ public abstract class AbstractHandler<
         int maxLength = flinkHttpObjectAggregator.maxContentLength() - OTHER_RESP_PAYLOAD_OVERHEAD;
         if (throwable instanceof RestHandlerException) {
             RestHandlerException rhe = (RestHandlerException) throwable;
-            String stackTrace = ExceptionUtils.stringifyException(rhe);
-            String truncatedStackTrace = Ascii.truncate(stackTrace, maxLength, "...");
+            ErrorResponseBody responseBody = rhe.toErrorResponseBody();
+            ErrorResponseBody truncatedResponseBody =
+                    new ErrorResponseBody(
+                            responseBody.errors.stream()
+                                    .map(msg -> Ascii.truncate(msg, maxLength, "..."))
+                                    .collect(Collectors.toList()));
             if (log.isDebugEnabled()) {
                 log.error("Exception occurred in REST handler.", rhe);
             } else if (rhe.logException()) {
@@ -254,7 +259,7 @@ public abstract class AbstractHandler<
             return HandlerUtils.sendErrorResponse(
                     ctx,
                     httpRequest,
-                    new ErrorResponseBody(truncatedStackTrace),
+                    truncatedResponseBody,
                     rhe.getHttpResponseStatus(),
                     responseHeaders);
         } else if (throwable instanceof EndpointNotStartedException) {
