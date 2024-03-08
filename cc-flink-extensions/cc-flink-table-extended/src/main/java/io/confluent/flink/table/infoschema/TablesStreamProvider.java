@@ -19,7 +19,6 @@ import org.apache.flink.util.StringUtils;
 import io.confluent.flink.table.catalog.SystemColumnUtil;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 /** {@link InfoTableStreamProvider} for {@link InfoSchemaTables#TABLE_TABLES}. */
@@ -56,7 +55,7 @@ class TablesStreamProvider extends InfoTableStreamProvider {
         final String tableType;
         String isDistributed = NO;
         String distributionAlgorithm = null;
-        String distributionBuckets = null;
+        Integer distributionBuckets = null;
         String isWatermarked = NO;
         String watermarkColumn = null;
         String watermarkExpression = null;
@@ -72,8 +71,7 @@ class TablesStreamProvider extends InfoTableStreamProvider {
                 if (distribution.getKind() == TableDistribution.Kind.HASH) {
                     distributionAlgorithm = DISTRIBUTION_ALGORITHM_HASH;
                 }
-                distributionBuckets =
-                        distribution.getBucketCount().map(Objects::toString).orElse(null);
+                distributionBuckets = distribution.getBucketCount().orElse(null);
             }
 
             final ResolvedSchema schema = baseTable.getResolvedSchema();
@@ -99,7 +97,7 @@ class TablesStreamProvider extends InfoTableStreamProvider {
         // DISTRIBUTION_ALGORITHM
         out.setField(7, StringData.fromString(distributionAlgorithm));
         // DISTRIBUTION_BUCKETS
-        out.setField(8, StringData.fromString(distributionBuckets));
+        out.setField(8, distributionBuckets);
         // IS_WATERMARKED
         out.setField(9, StringData.fromString(isWatermarked));
         // WATERMARK_COLUMN

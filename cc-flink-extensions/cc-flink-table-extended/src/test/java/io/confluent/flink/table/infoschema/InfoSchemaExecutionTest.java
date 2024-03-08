@@ -152,7 +152,8 @@ public class InfoSchemaExecutionTest {
     void testListTables() throws Exception {
         assertResult(
                 "SELECT * FROM `env-1`.`INFORMATION_SCHEMA`.`TABLES` "
-                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA'",
+                        + "WHERE `TABLE_SCHEMA` <> 'INFORMATION_SCHEMA' "
+                        + "AND (`DISTRIBUTION_BUCKETS` <> 4 OR `DISTRIBUTION_BUCKETS` IS NULL)",
                 row(
                         "env-1",
                         "cat1",
@@ -163,7 +164,7 @@ public class InfoSchemaExecutionTest {
                         // IS_DISTRIBUTED
                         "YES",
                         "HASH",
-                        "2",
+                        2,
                         // IS_WATERMARKED
                         "YES",
                         "t",
@@ -180,7 +181,7 @@ public class InfoSchemaExecutionTest {
                         // IS_DISTRIBUTED
                         "YES",
                         null,
-                        "1",
+                        1,
                         // IS_WATERMARKED
                         "NO",
                         null,
