@@ -124,6 +124,7 @@ class CompactionTaskProducer {
         SstFileMetaData head = compaction.iterator().next();
         ColumnFamilyHandle cf = columnFamilyLookup.get(head.columnFamilyName());
         if (cf == null) {
+            LOG.warn("Unknown column family: {}", head.columnFamilyName);
             return Optional.empty();
         }
         List<String> fileNames =

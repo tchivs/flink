@@ -348,6 +348,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
         int keyGroupPrefixBytes =
                 CompositeKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(
                         numberOfKeyGroups);
+        RocksDBManualCompactionManager manualCompactionManager;
 
         try {
             // Variables for snapshot strategy when incremental checkpoint is enabled
@@ -416,13 +417,16 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
                             materializedSstFiles,
                             lastCompletedCheckpointId);
             // init priority queue factory
+            manualCompactionManager =
+                    RocksDBManualCompactionManager.create(db, manualCompactionConfig, ioExecutor);
             priorityQueueFactory =
                     initPriorityQueueFactory(
                             keyGroupPrefixBytes,
                             kvStateInformation,
                             db,
                             writeBatchWrapper,
-                            nativeMetricMonitor);
+                            nativeMetricMonitor,
+                            manualCompactionManager);
         } catch (Throwable e) {
             // Do clean up
             List<ColumnFamilyOptions> columnFamilyOptions =
@@ -492,7 +496,7 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
                 keyContext,
                 writeBatchSize,
                 asyncCompactAfterRestoreFuture,
-                RocksDBManualCompactionManager.create(db, manualCompactionConfig, ioExecutor));
+                manualCompactionManager);
     }
 
     private RocksDBRestoreOperation getRocksDBRestoreOperation(
@@ -631,7 +635,8 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
             Map<String, RocksDBKeyedStateBackend.RocksDbKvStateInfo> kvStateInformation,
             RocksDB db,
             RocksDBWriteBatchWrapper writeBatchWrapper,
-            RocksDBNativeMetricMonitor nativeMetricMonitor) {
+            RocksDBNativeMetricMonitor nativeMetricMonitor,
+            RocksDBManualCompactionManager manualCompactionManager) {
         PriorityQueueSetFactory priorityQueueFactory;
         switch (priorityQueueStateType) {
             case HEAP:
@@ -649,7 +654,8 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
                                 writeBatchWrapper,
                                 nativeMetricMonitor,
                                 columnFamilyOptionsFactory,
-                                optionsContainer.getWriteBufferManagerCapacity());
+                                optionsContainer.getWriteBufferManagerCapacity(),
+                                manualCompactionManager);
                 break;
             default:
                 throw new IllegalArgumentException(
