@@ -18,7 +18,7 @@
 ################################################################################
 
 if [ -z $1 ] || [ -z $2 ]; then
- echo "Usage: ./test_resume_externalized_checkpoints.sh <original_dop> <new_dop> <state_backend_setting> <state_backend_file_async_setting> <state_backend_rocks_incremental_setting> <simulate_failure> <use_s5cmd>"
+ echo "Usage: ./test_resume_externalized_checkpoints.sh <original_dop> <new_dop> <state_backend_setting> <state_backend_file_async_setting> <state_backend_rocks_incremental_setting>"
  exit 1
 fi
 
@@ -31,7 +31,6 @@ function run_resume_externalized_checkpoints() {
   STATE_BACKEND_FILE_ASYNC=$4
   STATE_BACKEND_ROCKS_INCREMENTAL=$5
   SIMULATE_FAILURE=$6
-  USE_S5CMD=$7
 
   if (( $ORIGINAL_DOP >= $NEW_DOP )); then
    NUM_SLOTS=$ORIGINAL_DOP
@@ -41,13 +40,6 @@ function run_resume_externalized_checkpoints() {
 
   set_config_key "taskmanager.numberOfTaskSlots" "${NUM_SLOTS}"
   set_config_key "metrics.fetcher.update-interval" "2000"
-  if [[ $USE_S5CMD == "true" ]]; then
-    source "$(dirname "$0")"/common_s3.sh
-    s3_setup presto
-    source "$(dirname "$0")"/common_s5cmd.sh
-    s5cmd_setup
-  fi
-
   setup_flink_slf4j_metric_reporter "numRecordsIn"
   start_cluster
 
