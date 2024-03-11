@@ -7,6 +7,9 @@ package org.apache.flink.connector.kafka.sink;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.Internal;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -25,6 +28,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 @Confluent
 @Internal
 public class FixedSizeProducerPool<K, V> implements TransactionalProducerPool<K, V> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(FixedSizeProducerPool.class);
 
     private final Deque<InternalKafkaProducer<K, V>> idleProducerPool;
     private final TransactionIdRangeState currentExecutionTransactionIdRange;
@@ -47,9 +52,15 @@ public class FixedSizeProducerPool<K, V> implements TransactionalProducerPool<K,
     }
 
     @Override
-    public InternalKafkaProducer<K, V> getForCheckpoint(long ignoredCheckpointId) {
+    public InternalKafkaProducer<K, V> getForCheckpoint(long checkpointId) {
         final InternalKafkaProducer<K, V> reusableInactiveProducer = idleProducerPool.poll();
         if (reusableInactiveProducer != null) {
+            LOG.info(
+                    "Using recycled producer with assigned KafkaCommittable {} (within range {}) for checkpoint {} of subtask {}.",
+                    reusableInactiveProducer.getAssignedCommittable(),
+                    currentExecutionTransactionIdRange,
+                    checkpointId,
+                    subtaskIndex);
             return reusableInactiveProducer;
         }
         if (numCreatedProducers >= currentExecutionTransactionIdRange.getPoolSize()) {
@@ -64,6 +75,13 @@ public class FixedSizeProducerPool<K, V> implements TransactionalProducerPool<K,
                         currentExecutionTransactionIdRange.getStartId() + numCreatedProducers);
         newProducer.initTransactions(false);
         numCreatedProducers++;
+
+        LOG.info(
+                "Created new producer with assigned KafkaCommittable {} (within range {}) for checkpoint {} of subtask {}.",
+                newProducer.getAssignedCommittable(),
+                currentExecutionTransactionIdRange,
+                checkpointId,
+                subtaskIndex);
         return newProducer;
     }
 

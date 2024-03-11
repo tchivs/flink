@@ -67,6 +67,9 @@ class KafkaCommitter
                                 try (final TwoPhaseCommitProducer<?, ?> abortingProducer =
                                         new TwoPhaseCommitProducer<>(
                                                 kafkaProducerConfig, committableToAbort)) {
+                                    LOG.info(
+                                            "Aborting potential lingering transaction {} that was in previous execution's active committable range.",
+                                            committableToAbort);
                                     abortingProducer.initAndAbortOngoingTransaction();
                                 }
                             });
