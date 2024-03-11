@@ -168,4 +168,25 @@ public class OAuthBearerLoginCallbackHandlerTest {
                         new AppConfigurationEntry(
                                 "module", LoginModuleControlFlag.REQUIRED, moduleOptions)));
     }
+
+    @Test
+    public void testExceptionThrown() throws Exception {
+        credentialsCache.withError();
+        moduleOptions.put(MODULE_CONFIG_LOGICAL_CLUSTER_ID, "lkc-abc");
+        moduleOptions.put(MODULE_CONFIG_JOB_ID, "000000000000000a0000000000000014");
+        handler.configure(
+                config,
+                OAUTHBEARER_MECHANISM,
+                ImmutableList.of(
+                        new AppConfigurationEntry(
+                                "module", LoginModuleControlFlag.REQUIRED, moduleOptions)));
+        assertThatThrownBy(
+                        () ->
+                                handler.handle(
+                                        new Callback[] {
+                                            oAuthBearerTokenCallback, saslExtensionsCallback
+                                        }))
+                .hasMessageContaining("Error!");
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    }
 }

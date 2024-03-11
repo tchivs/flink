@@ -24,6 +24,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.security.auth.AuthenticateCallbackHandler;
@@ -157,12 +158,21 @@ public class OAuthBearerLoginCallbackHandler implements AuthenticateCallbackHand
             throw new IllegalArgumentException("Callback had a token already");
         }
 
-        Optional<KafkaCredentials> credentials = credentialsCache.getCredentials(jobID);
-        // token is passed in through JAAS (not built in Kafka),
-        // therefore these constructor options are ignored
-        callback.token(
-                new OAuthBearerJwsToken(
-                        credentials.map(KafkaCredentials::getDpatToken).orElse(null),
-                        tokenExpirationMs));
+        try {
+            Optional<KafkaCredentials> credentials = credentialsCache.getCredentials(jobID);
+            // token is passed in through JAAS (not built in Kafka),
+            // therefore these constructor options are ignored
+            callback.token(
+                    new OAuthBearerJwsToken(
+                            credentials.map(KafkaCredentials::getDpatToken).orElse(null),
+                            tokenExpirationMs));
+        } catch (FlinkRuntimeException e) {
+            // With the Kafka we're interrupting ourselves to break out of any login loops.
+            // If we hit the point of throwing an exception here, it should just give up trying to
+            // login. Without this, it retries forever.
+            log.warn("Stopping login attempts by interrupting current thread.");
+            Thread.currentThread().interrupt();
+            throw e;
+        }
     }
 }
