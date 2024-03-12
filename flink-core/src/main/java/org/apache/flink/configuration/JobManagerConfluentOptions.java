@@ -48,6 +48,14 @@ public class JobManagerConfluentOptions {
                     .withDescription(
                             "Controls whether the resource-wait-timeout is applied or not.");
 
+    public static final ConfigOption<Boolean> ENABLE_SUBMISSION_ENDPOINT =
+            key("confluent.rest.submission.enabled")
+                    .booleanType()
+                    // disabled by default to avoid noise in the vanilla Flink logs
+                    .defaultValue(false)
+                    .withDescription(
+                            "Controls whether we the proprietary job submission endpoint is enabled.");
+
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
     }

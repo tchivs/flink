@@ -169,12 +169,17 @@ public class WebSubmissionExtension implements WebMonitorExtension {
         webSubmissionHandlers.add(Tuple2.of(JarPlanGetHeaders.getInstance(), jarPlanHandler));
         webSubmissionHandlers.add(Tuple2.of(JarPlanPostHeaders.getInstance(), postJarPlanHandler));
 
-        final ConfluentJobSubmitHandler confluentJobSubmitHandler =
-                new ConfluentJobSubmitHandler(
-                        leaderRetriever, timeout, responseHeaders, configuration, executor);
-        webSubmissionHandlers.add(
-                Tuple2.of(
-                        confluentJobSubmitHandler.getMessageHeaders(), confluentJobSubmitHandler));
+        if (configuration.get(
+                org.apache.flink.configuration.JobManagerConfluentOptions
+                        .ENABLE_SUBMISSION_ENDPOINT)) {
+            final ConfluentJobSubmitHandler confluentJobSubmitHandler =
+                    new ConfluentJobSubmitHandler(
+                            leaderRetriever, timeout, responseHeaders, configuration, executor);
+            webSubmissionHandlers.add(
+                    Tuple2.of(
+                            confluentJobSubmitHandler.getMessageHeaders(),
+                            confluentJobSubmitHandler));
+        }
     }
 
     @Override

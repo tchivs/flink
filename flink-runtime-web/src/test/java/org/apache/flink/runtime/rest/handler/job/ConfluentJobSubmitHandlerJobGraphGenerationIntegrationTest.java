@@ -7,6 +7,8 @@ package org.apache.flink.runtime.rest.handler.job;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.client.program.ClusterClient;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerConfluentOptions;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.jobmaster.JobResult;
 import org.apache.flink.runtime.rest.RestClient;
@@ -41,7 +43,15 @@ class ConfluentJobSubmitHandlerJobGraphGenerationIntegrationTest {
 
     @RegisterExtension
     static final MiniClusterExtension FLINK =
-            new MiniClusterExtension(new MiniClusterResourceConfiguration.Builder().build());
+            new MiniClusterExtension(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setConfiguration(
+                                    new Configuration()
+                                            .set(
+                                                    JobManagerConfluentOptions
+                                                            .ENABLE_SUBMISSION_ENDPOINT,
+                                                    true))
+                            .build());
 
     @Test
     void testJobGraphSubmission(
