@@ -978,10 +978,10 @@ public class CheckpointCoordinator {
             @Nullable PendingCheckpoint checkpoint,
             CheckpointProperties checkpointProperties,
             Throwable throwable) {
-        // beautify the stack trace a bit
-        throwable = ExceptionUtils.stripCompletionException(throwable);
-
         try {
+            // beautify the stack trace a bit
+            throwable = ExceptionUtils.stripCompletionException(throwable);
+
             coordinatorsToCheckpoint.forEach(
                     OperatorCoordinatorCheckpointContext::abortCurrentTriggering);
 
@@ -997,6 +997,10 @@ public class CheckpointCoordinator {
                 failureManager.handleCheckpointException(
                         checkpoint, checkpointProperties, cause, null, job, null, statsTracker);
             }
+        } catch (Throwable secondThrowable) {
+            secondThrowable.addSuppressed(throwable);
+            throw secondThrowable;
+
         } finally {
             isTriggering = false;
             executeQueuedRequest();
