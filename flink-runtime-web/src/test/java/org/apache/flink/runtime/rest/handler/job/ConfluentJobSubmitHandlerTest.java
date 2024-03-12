@@ -54,6 +54,8 @@ class ConfluentJobSubmitHandlerTest {
                     Collections.singletonMap(
                             PipelineOptions.MAX_PARALLELISM.key(), String.valueOf(maxParallelism)));
 
+    private static final String COMPILED_PLAN = loadCompiledPlan();
+
     @RegisterExtension
     static final TestExecutorExtension<ExecutorService> EXECUTOR_EXTENSION =
             new TestExecutorExtension<>(Executors::newSingleThreadExecutor);
@@ -86,7 +88,7 @@ class ConfluentJobSubmitHandlerTest {
                 createRequest(
                         jobId.toHexString(),
                         null,
-                        Collections.singleton(loadCompiledPlan()),
+                        Collections.singleton(COMPILED_PLAN),
                         Collections.emptyMap());
 
         final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
@@ -165,7 +167,7 @@ class ConfluentJobSubmitHandlerTest {
                 createRequest(
                         JobID.generate().toHexString(),
                         savepoint,
-                        Collections.singleton(loadCompiledPlan()),
+                        Collections.singleton(COMPILED_PLAN),
                         Collections.emptyMap());
 
         final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
@@ -179,7 +181,7 @@ class ConfluentJobSubmitHandlerTest {
 
         testErrorHandling(
                 createRequest(
-                        null, null, Collections.singleton(compiledPlan), Collections.emptyMap()),
+                        null, null, Collections.singleton(COMPILED_PLAN), Collections.emptyMap()),
                 HttpResponseStatus.BAD_REQUEST,
                 "jobId must not be null");
 
@@ -187,7 +189,7 @@ class ConfluentJobSubmitHandlerTest {
                 createRequest(
                         "invalid-job-id",
                         null,
-                        Collections.singleton(compiledPlan),
+                        Collections.singleton(COMPILED_PLAN),
                         Collections.emptyMap()),
                 HttpResponseStatus.BAD_REQUEST,
                 "jobId is not a valid job ID");
@@ -341,8 +343,12 @@ class ConfluentJobSubmitHandlerTest {
                 exceptionClassifier);
     }
 
-    static String loadCompiledPlan() throws IOException {
-        return loadResource("/compiled_plan.json");
+    static String loadCompiledPlan() {
+        try {
+            return loadResource("/compiled_plan.json");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String loadResource(String name) throws IOException {
