@@ -56,6 +56,13 @@ public class JobManagerConfluentOptions {
                     .withDescription(
                             "Controls whether we the proprietary job submission endpoint is enabled.");
 
+    public static final ConfigOption<Integer> REST_MAX_PARALLEL_JOB_SUBMISSIONS =
+            key("rest.submissions.max-parallel")
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription(
+                            "Controls how many job submissions may be processed in parallel.");
+
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
     }

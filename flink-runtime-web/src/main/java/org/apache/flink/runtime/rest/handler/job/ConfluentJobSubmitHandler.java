@@ -9,6 +9,8 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerConfluentOptions;
+import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
@@ -32,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 
 /** This handler can be used to submit jobs to a Flink cluster. */
@@ -57,6 +61,8 @@ public final class ConfluentJobSubmitHandler
     private final BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
             jobGraphGenerator;
     private final Function<Throwable, RestHandlerException> exceptionClassifier;
+
+    private final Semaphore inProgressRequests;
 
     public ConfluentJobSubmitHandler(
             GatewayRetriever<? extends DispatcherGateway> leaderRetriever,
@@ -89,13 +95,44 @@ public final class ConfluentJobSubmitHandler
         this.executor = executor;
         this.jobGraphGenerator = jobGraphGenerator;
         this.exceptionClassifier = exceptionClassifier;
+
+        final int configuredParallelism =
+                configuration.get(JobManagerConfluentOptions.REST_MAX_PARALLEL_JOB_SUBMISSIONS);
+        final int effectiveMaxParallelism = configuration.get(RestOptions.SERVER_NUM_THREADS);
+
+        if (effectiveMaxParallelism < configuredParallelism) {
+            LOG.warn(
+                    "{} job submissions are meant to be processable in parallel, but the REST API only has {} threads. Picking the minimum value.",
+                    configuredParallelism,
+                    effectiveMaxParallelism);
+        }
+
+        this.inProgressRequests =
+                new Semaphore(Math.min(configuredParallelism, effectiveMaxParallelism));
     }
 
     @Override
     protected CompletableFuture<EmptyResponseBody> handleRequest(
             @Nonnull HandlerRequest<ConfluentJobSubmitRequestBody> request,
-            @Nonnull DispatcherGateway gateway)
-            throws RestHandlerException {
+            @Nonnull DispatcherGateway gateway) {
+
+        if (!inProgressRequests.tryAcquire()) {
+            return FutureUtils.completedExceptionally(
+                    new ShortMultiRestHandlerException(
+                            HttpResponseStatus.TOO_MANY_REQUESTS,
+                            Collections.singletonList(
+                                    "Too many job submissions already in-progress.")));
+        }
+
+        return CompletableFuture.supplyAsync(
+                        () -> internalHandleRequest(request, gateway), executor)
+                .thenCompose(Function.identity())
+                .whenComplete((i1, i2) -> inProgressRequests.release());
+    }
+
+    private CompletableFuture<EmptyResponseBody> internalHandleRequest(
+            @Nonnull HandlerRequest<ConfluentJobSubmitRequestBody> request,
+            @Nonnull DispatcherGateway gateway) {
 
         final ConfluentJobSubmitRequestBody requestBody = request.getRequestBody();
 
@@ -104,9 +141,9 @@ public final class ConfluentJobSubmitHandler
             return FutureUtils.completedExceptionally(restHandlerException.get());
         }
 
-        return CompletableFuture.supplyAsync(() -> processJobSubmission(requestBody), executor)
-                .thenCompose(jobGraph -> gateway.submitJob(jobGraph, timeout))
-                .thenApply(i -> EmptyResponseBody.getInstance());
+        final JobGraph jobGraph = processJobSubmission(requestBody);
+
+        return gateway.submitJob(jobGraph, timeout).thenApply(i -> EmptyResponseBody.getInstance());
     }
 
     private static Optional<RestHandlerException> validateInput(
