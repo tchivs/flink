@@ -134,16 +134,24 @@ public final class ConfluentJobSubmitHandler
             @Nonnull HandlerRequest<ConfluentJobSubmitRequestBody> request,
             @Nonnull DispatcherGateway gateway) {
 
+        log.info("Received job submission request.");
         final ConfluentJobSubmitRequestBody requestBody = request.getRequestBody();
 
         final Optional<RestHandlerException> restHandlerException = validateInput(requestBody);
         if (restHandlerException.isPresent()) {
             return FutureUtils.completedExceptionally(restHandlerException.get());
         }
+        log.info("Validated job submission request: {}.", requestBody.jobId);
 
         final JobGraph jobGraph = processJobSubmission(requestBody);
+        log.info("Generated job graph: {}.", requestBody.jobId);
 
-        return gateway.submitJob(jobGraph, timeout).thenApply(i -> EmptyResponseBody.getInstance());
+        return gateway.submitJob(jobGraph, timeout)
+                .thenApply(
+                        i -> {
+                            log.info("Submitted job: {}.", requestBody.jobId);
+                            return EmptyResponseBody.getInstance();
+                        });
     }
 
     private static Optional<RestHandlerException> validateInput(
