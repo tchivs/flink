@@ -41,6 +41,12 @@ Copyright 2023 Confluent Inc.
 			<version>${kafka.version}</version>
 			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-schema-registry-client</artifactId>
+			<version>${schema.registry.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
 
 		<!-- Test Utils -->
 		<dependency>
@@ -125,6 +131,7 @@ Copyright 2023 Confluent Inc.
 								<includes>
 									<!-- Include all FailureEnricher dependencies here -->
 									<include>org.apache.kafka:*</include>
+									<include>io.confluent:kafka-schema-registry-client</include>
 								</includes>
 							</artifactSet>
 							<filters>
@@ -145,6 +152,13 @@ Copyright 2023 Confluent Inc.
 									<exclude>LICENSE</exclude>
 									<exclude>NOTICE</exclude>
 								</excludes>
+								</filter>
+								<filter>
+									<artifact>io.confluent:kafka-schema-registry-client</artifact>
+									<excludes>
+										<exclude>LICENSE</exclude>
+										<exclude>NOTICE</exclude>
+									</excludes>
 								</filter>
 							</filters>
 						</configuration>

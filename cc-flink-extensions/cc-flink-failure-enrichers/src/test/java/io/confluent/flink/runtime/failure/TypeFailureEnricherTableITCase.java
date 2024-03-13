@@ -12,6 +12,8 @@ import org.apache.flink.table.planner.runtime.utils.StreamingTestBase;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test that the TypeFailureEnricher correctly labels common exceptions in SQL queries. */
 public class TypeFailureEnricherTableITCase extends StreamingTestBase {
+    private static final int DELETED_SCHEMA_ID = 7;
 
     @BeforeEach
     @Override
@@ -73,6 +76,14 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         new RuntimeException("test"));
         final String expectedUserMessage = FailureMessageUtil.buildMessage(userIOException);
         assertFailureEnricherLabelIsExpectedLabel(userIOException, "USER", expectedUserMessage);
+    }
+
+    @Test
+    public void testSchemaNotFoundError() {
+        MockSchemaRegistryClient client = new MockSchemaRegistryClient();
+        assertThatThrownBy(() -> client.getSchemaById(DELETED_SCHEMA_ID))
+                .isInstanceOf(RestClientException.class)
+                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
     }
 
     @Test
