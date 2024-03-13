@@ -49,6 +49,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -122,7 +123,15 @@ public class OperatorCoordinatorHolder
     private final int operatorMaxParallelism;
 
     private GlobalFailureHandler globalFailureHandler;
-    private ComponentMainThreadExecutor mainThreadExecutor;
+
+    /**
+     * {@link #mainThreadExecutor} is being accessed from different threads, for example {@link
+     * org.apache.flink.runtime.checkpoint.CheckpointCoordinator}'s timer thread, thus it requires
+     * thread safe read access from those threads after setting it in the {@link
+     * #lazyInitialize(GlobalFailureHandler, ComponentMainThreadExecutor)} method.
+     */
+    private final AtomicReference<ComponentMainThreadExecutor> mainThreadExecutor =
+            new AtomicReference<>();
 
     private OperatorCoordinatorHolder(
             final OperatorID operatorId,
@@ -148,7 +157,7 @@ public class OperatorCoordinatorHolder
             ComponentMainThreadExecutor mainThreadExecutor) {
 
         this.globalFailureHandler = globalFailureHandler;
-        this.mainThreadExecutor = mainThreadExecutor;
+        this.mainThreadExecutor.set(mainThreadExecutor);
 
         context.lazyInitialize(globalFailureHandler, mainThreadExecutor);
         setupAllSubtaskGateways();
@@ -182,7 +191,7 @@ public class OperatorCoordinatorHolder
     // ------------------------------------------------------------------------
 
     public void start() throws Exception {
-        mainThreadExecutor.assertRunningInMainThread();
+        mainThreadExecutor.get().assertRunningInMainThread();
         checkState(context.isInitialized(), "Coordinator Context is not yet initialized");
         coordinator.start();
     }
@@ -195,7 +204,7 @@ public class OperatorCoordinatorHolder
 
     public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event)
             throws Exception {
-        mainThreadExecutor.assertRunningInMainThread();
+        mainThreadExecutor.get().assertRunningInMainThread();
         if (event instanceof AcknowledgeCheckpointEvent) {
             subtaskGatewayMap
                     .get(subtask)
@@ -207,13 +216,13 @@ public class OperatorCoordinatorHolder
     }
 
     public void executionAttemptFailed(int subtask, int attemptNumber, @Nullable Throwable reason) {
-        mainThreadExecutor.assertRunningInMainThread();
+        mainThreadExecutor.get().assertRunningInMainThread();
         coordinator.executionAttemptFailed(subtask, attemptNumber, reason);
     }
 
     @Override
     public void subtaskReset(int subtask, long checkpointId) {
-        mainThreadExecutor.assertRunningInMainThread();
+        mainThreadExecutor.get().assertRunningInMainThread();
 
         // this needs to happen first, so that the coordinator may access the gateway
         // in the 'subtaskReset()' function (even though they cannot send events, yet).
@@ -228,7 +237,7 @@ public class OperatorCoordinatorHolder
         // checkpoint coordinator time thread.
         // we can remove the delegation once the checkpoint coordinator runs fully in the
         // scheduler's main thread executor
-        mainThreadExecutor.execute(() -> checkpointCoordinatorInternal(checkpointId, result));
+        mainThreadExecutor.get().execute(() -> checkpointCoordinatorInternal(checkpointId, result));
     }
 
     @Override
@@ -237,13 +246,15 @@ public class OperatorCoordinatorHolder
         // checkpoint coordinator time thread.
         // we can remove the delegation once the checkpoint coordinator runs fully in the
         // scheduler's main thread executor
-        mainThreadExecutor.execute(
-                () -> {
-                    subtaskGatewayMap
-                            .values()
-                            .forEach(x -> x.openGatewayAndUnmarkCheckpoint(checkpointId));
-                    coordinator.notifyCheckpointComplete(checkpointId);
-                });
+        mainThreadExecutor
+                .get()
+                .execute(
+                        () -> {
+                            subtaskGatewayMap
+                                    .values()
+                                    .forEach(x -> x.openGatewayAndUnmarkCheckpoint(checkpointId));
+                            coordinator.notifyCheckpointComplete(checkpointId);
+                        });
     }
 
     @Override
@@ -252,13 +263,15 @@ public class OperatorCoordinatorHolder
         // checkpoint coordinator time thread.
         // we can remove the delegation once the checkpoint coordinator runs fully in the
         // scheduler's main thread executor
-        mainThreadExecutor.execute(
-                () -> {
-                    subtaskGatewayMap
-                            .values()
-                            .forEach(x -> x.openGatewayAndUnmarkCheckpoint(checkpointId));
-                    coordinator.notifyCheckpointAborted(checkpointId);
-                });
+        mainThreadExecutor
+                .get()
+                .execute(
+                        () -> {
+                            subtaskGatewayMap
+                                    .values()
+                                    .forEach(x -> x.openGatewayAndUnmarkCheckpoint(checkpointId));
+                            coordinator.notifyCheckpointAborted(checkpointId);
+                        });
     }
 
     @Override
@@ -266,8 +279,8 @@ public class OperatorCoordinatorHolder
             throws Exception {
         // the first time this method is called is early during execution graph construction,
         // before the main thread executor is set. hence this conditional check.
-        if (mainThreadExecutor != null) {
-            mainThreadExecutor.assertRunningInMainThread();
+        if (mainThreadExecutor.get() != null) {
+            mainThreadExecutor.get().assertRunningInMainThread();
         }
 
         subtaskGatewayMap.values().forEach(SubtaskGatewayImpl::openGatewayAndUnmarkAllCheckpoint);
@@ -279,7 +292,7 @@ public class OperatorCoordinatorHolder
         // is called when the scheduler is properly set up.
         // this is a bit clumsy, but it is caused by the non-straightforward initialization of the
         // ExecutionGraph and Scheduler.
-        if (mainThreadExecutor != null) {
+        if (mainThreadExecutor.get() != null) {
             setupAllSubtaskGateways();
         }
 
@@ -288,7 +301,7 @@ public class OperatorCoordinatorHolder
 
     private void checkpointCoordinatorInternal(
             final long checkpointId, final CompletableFuture<byte[]> result) {
-        mainThreadExecutor.assertRunningInMainThread();
+        mainThreadExecutor.get().assertRunningInMainThread();
 
         final CompletableFuture<byte[]> coordinatorCheckpoint = new CompletableFuture<>();
 
@@ -309,7 +322,7 @@ public class OperatorCoordinatorHolder
                             }
                             return null;
                         },
-                        mainThreadExecutor));
+                        mainThreadExecutor.get()));
 
         try {
             subtaskGatewayMap.forEach(
@@ -385,13 +398,15 @@ public class OperatorCoordinatorHolder
         // checkpoint coordinator time thread.
         // we can remove the delegation once the checkpoint coordinator runs fully in the
         // scheduler's main thread executor
-        mainThreadExecutor.execute(
-                () ->
-                        subtaskGatewayMap
-                                .values()
-                                .forEach(
-                                        SubtaskGatewayImpl
-                                                ::openGatewayAndUnmarkLastCheckpointIfAny));
+        mainThreadExecutor
+                .get()
+                .execute(
+                        () ->
+                                subtaskGatewayMap
+                                        .values()
+                                        .forEach(
+                                                SubtaskGatewayImpl
+                                                        ::openGatewayAndUnmarkLastCheckpointIfAny));
     }
 
     // ------------------------------------------------------------------------
@@ -418,7 +433,7 @@ public class OperatorCoordinatorHolder
 
     private void setupSubtaskGateway(final SubtaskAccess sta) {
         final SubtaskGatewayImpl gateway =
-                new SubtaskGatewayImpl(sta, mainThreadExecutor, unconfirmedEvents);
+                new SubtaskGatewayImpl(sta, mainThreadExecutor.get(), unconfirmedEvents);
 
         // When concurrent execution attempts is supported, the checkpoint must have been disabled.
         // Thus, we don't need to maintain subtaskGatewayMap
@@ -440,7 +455,7 @@ public class OperatorCoordinatorHolder
                 sta.hasSwitchedToRunning()
                         .thenAccept(
                                 (ignored) -> {
-                                    mainThreadExecutor.assertRunningInMainThread();
+                                    mainThreadExecutor.get().assertRunningInMainThread();
 
                                     // see bigger comment above
                                     if (sta.isStillRunning()) {
