@@ -140,8 +140,10 @@ class KafkaCommitter
                         ProducerConfig.TRANSACTION_TIMEOUT_CONFIG,
                         kafkaProducerConfig.getProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG),
                         e);
-                if (isRecoveredCommittable && producer != null) {
-                    producer.close();
+                if (isRecoveredCommittable) {
+                    if (producer != null) {
+                        producer.close();
+                    }
                 } else {
                     recyclable.get().close();
                 }
@@ -154,8 +156,10 @@ class KafkaCommitter
                                 + "Most likely the transaction has been aborted for some reason. Please check the Kafka logs for more details.",
                         request,
                         e);
-                if (isRecoveredCommittable && producer != null) {
-                    producer.close();
+                if (isRecoveredCommittable) {
+                    if (producer != null) {
+                        producer.close();
+                    }
                 } else {
                     recyclable.get().close();
                 }
@@ -165,8 +169,10 @@ class KafkaCommitter
                         "Unable to commit transaction ({}) " + UNKNOWN_PRODUCER_ID_ERROR_MESSAGE,
                         request,
                         e);
-                if (isRecoveredCommittable && producer != null) {
-                    producer.close();
+                if (isRecoveredCommittable) {
+                    if (producer != null) {
+                        producer.close();
+                    }
                 } else {
                     recyclable.get().close();
                 }
@@ -176,8 +182,10 @@ class KafkaCommitter
                         "Transaction ({}) encountered error and data has been potentially lost.",
                         request,
                         e);
-                if (isRecoveredCommittable && producer != null) {
-                    producer.close();
+                if (isRecoveredCommittable) {
+                    if (producer != null) {
+                        producer.close();
+                    }
                 } else {
                     recyclable.get().close();
                 }
