@@ -17,6 +17,7 @@ public enum SqlStatementKind {
     CREATE_TABLE(Category.DDL),
     ALTER_TABLE(Category.DDL),
     CREATE_FUNCTION(Category.DDL),
+    DROP_FUNCTION(Category.DDL),
     // -------------- DQL --------------
     DESCRIBE(Category.DQL),
     SELECT(Category.DQL),
