@@ -589,7 +589,8 @@ public class ExecutingTest extends TestLogger {
         }
 
         @Override
-        public FailureResult howToHandleFailure(Throwable failure) {
+        public FailureResult howToHandleFailure(
+                Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
             return howToHandleFailure.apply(failure);
         }
 

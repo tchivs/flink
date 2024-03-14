@@ -25,6 +25,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.configuration.SchedulerExecutionMode;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.configuration.WebOptions;
 import org.apache.flink.core.execution.CheckpointType;
 import org.apache.flink.core.execution.SavepointFormatType;
@@ -236,6 +237,9 @@ public class AdaptiveScheduler
 
     private final Duration slotIdleTimeout;
 
+    private final JobFailureMetricReporter jobFailureMetricReporter;
+    private final boolean reportEventsAsSpans;
+
     public AdaptiveScheduler(
             JobGraph jobGraph,
             @Nullable JobResourceRequirements jobResourceRequirements,
@@ -337,6 +341,9 @@ public class AdaptiveScheduler
         this.jobManagerJobMetricGroup = jobManagerJobMetricGroup;
         this.slotIdleTimeout =
                 Duration.ofMillis(configuration.get(JobManagerOptions.SLOT_IDLE_TIMEOUT));
+
+        this.jobFailureMetricReporter = new JobFailureMetricReporter(jobManagerJobMetricGroup);
+        this.reportEventsAsSpans = configuration.get(TraceOptions.REPORT_EVENTS_AS_SPANS);
     }
 
     private static void assertPreconditions(JobGraph jobGraph) throws RuntimeException {
@@ -1232,7 +1239,20 @@ public class AdaptiveScheduler
     }
 
     @Override
-    public FailureResult howToHandleFailure(Throwable failure) {
+    public FailureResult howToHandleFailure(
+            Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+        FailureResult failureResult = howToHandleFailure(failure);
+        if (reportEventsAsSpans) {
+            // TODO: replace with reporting as event once events are supported.
+            // Add reporting as callback for when the failure labeling is completed.
+            failureLabels.thenAcceptAsync(
+                    (labels) -> jobFailureMetricReporter.reportJobFailure(failureResult, labels),
+                    componentMainThreadExecutor);
+        }
+        return failureResult;
+    }
+
+    private FailureResult howToHandleFailure(Throwable failure) {
         if (ExecutionFailureHandler.isUnrecoverableError(failure)) {
             return FailureResult.canNotRestart(
                     new JobException("The failure is not recoverable", failure));
