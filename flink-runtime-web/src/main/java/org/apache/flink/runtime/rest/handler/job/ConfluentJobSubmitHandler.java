@@ -23,6 +23,7 @@ import org.apache.flink.runtime.rest.messages.ErrorResponseBody;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitHeaders;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitRequestBody;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 import org.apache.flink.util.concurrent.FutureUtils;
 import org.apache.flink.util.function.BiFunctionWithException;
 
@@ -34,6 +35,8 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import java.net.URL;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -63,6 +66,8 @@ public final class ConfluentJobSubmitHandler
     private final Function<Throwable, RestHandlerException> exceptionClassifier;
 
     private final Semaphore inProgressRequests;
+
+    private final ClassLoader classLoader = new GcPreventingURLCLassLoader(new URL[] {});
 
     public ConfluentJobSubmitHandler(
             GatewayRetriever<? extends DispatcherGateway> leaderRetriever,
@@ -109,6 +114,14 @@ public final class ConfluentJobSubmitHandler
 
         this.inProgressRequests =
                 new Semaphore(Math.min(configuredParallelism, effectiveMaxParallelism));
+
+        try {
+            generateJobGraph(
+                    Collections.singleton(ResourceUtils.loadResource("/preload_plan.json")),
+                    Collections.emptyMap());
+        } catch (Throwable e) {
+            LOG.warn("Preloading failed with an exception.", e);
+        }
     }
 
     @Override
@@ -204,9 +217,7 @@ public final class ConfluentJobSubmitHandler
             generatorConfiguration.putAll(requestBody.configuration);
 
             JobGraph jobGraph =
-                    jobGraphGenerator.apply(
-                            requestBody.generatorArguments.iterator().next(),
-                            generatorConfiguration);
+                    generateJobGraph(requestBody.generatorArguments, generatorConfiguration);
 
             adjustJobGraph(
                     jobGraph,
@@ -227,6 +238,14 @@ public final class ConfluentJobSubmitHandler
                                 HttpResponseStatus.INTERNAL_SERVER_ERROR);
             }
             throw new CompletionException(finalException);
+        }
+    }
+
+    private JobGraph generateJobGraph(
+            Collection<String> arguments, Map<String, String> generatorConfiguration)
+            throws Exception {
+        try (TemporaryClassLoaderContext ignored = TemporaryClassLoaderContext.of(classLoader)) {
+            return jobGraphGenerator.apply(arguments.iterator().next(), generatorConfiguration);
         }
     }
 

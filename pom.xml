@@ -1729,6 +1729,7 @@ under the License.
 
 						<!-- confluent-specific json files -->
 						<exclude>cc-flink-extensions/**/*.json</exclude>
+						<exclude>flink-runtime-web/src/main/resources/preload_plan.json</exclude>
 						<exclude>flink-runtime-web/src/test/resources/compiled_plan.json</exclude>
 					</excludes>
 				</configuration>

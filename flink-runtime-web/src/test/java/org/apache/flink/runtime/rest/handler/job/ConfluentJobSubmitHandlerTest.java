@@ -22,7 +22,6 @@ import org.apache.flink.runtime.rest.messages.EmptyResponseBody;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitRequestBody;
 import org.apache.flink.runtime.webmonitor.TestingDispatcherGateway;
 import org.apache.flink.testutils.executor.TestExecutorExtension;
-import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.concurrent.FutureUtils;
 import org.apache.flink.util.function.BiFunctionWithException;
 
@@ -33,10 +32,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import javax.annotation.Nullable;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -406,16 +402,9 @@ class ConfluentJobSubmitHandlerTest {
 
     static String loadCompiledPlan() {
         try {
-            return loadResource("/compiled_plan.json");
+            return ResourceUtils.loadResource("/compiled_plan.json");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static String loadResource(String name) throws IOException {
-        InputStream in = ConfluentJobSubmitHandlerTest.class.getResourceAsStream(name);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        IOUtils.copyBytes(in, out);
-        return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 }
