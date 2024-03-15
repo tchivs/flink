@@ -91,7 +91,7 @@ class Executing extends StateWithExecutionGraph implements ResourceListener {
 
     @Override
     void onFailure(Throwable cause, CompletableFuture<Map<String, String>> failureLabels) {
-        getLogger().info("Handling failure {}", cause);
+        getLogger().info("Handling failure for job {}", getJobId(), cause);
         FailureResultUtil.restartOrFail(
                 context.howToHandleFailure(cause, failureLabels), context, this);
     }
