@@ -1498,6 +1498,30 @@ public class AdaptiveSchedulerTest {
     }
 
     @Test
+    void testHowToHandleFailureWithCannotRestartLabel() throws Exception {
+        final TestRestartBackoffTimeStrategy restartBackoffTimeStrategy =
+                new TestRestartBackoffTimeStrategy(true, 0);
+        final AdaptiveScheduler scheduler =
+                new AdaptiveSchedulerBuilder(
+                                createJobGraph(),
+                                mainThreadExecutor,
+                                EXECUTOR_RESOURCE.getExecutor())
+                        .setRestartBackoffTimeStrategy(restartBackoffTimeStrategy)
+                        .build();
+
+        assertThat(
+                        scheduler
+                                .howToHandleFailure(
+                                        new Exception("test"),
+                                        CompletableFuture.completedFuture(
+                                                Collections.singletonMap(
+                                                        FailureEnricher.KEY_JOB_CANNOT_RESTART,
+                                                        "")))
+                                .canRestart())
+                .isFalse();
+    }
+
+    @Test
     void testExceptionHistoryWithGlobalFailureLabels() throws Exception {
         final Exception expectedException = new Exception("Global Exception to label");
         BiConsumer<AdaptiveScheduler, List<ExecutionAttemptID>> testLogic =

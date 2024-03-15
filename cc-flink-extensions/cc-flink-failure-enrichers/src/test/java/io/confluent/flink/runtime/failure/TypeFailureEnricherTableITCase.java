@@ -65,7 +65,10 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
         tEnv().executeSql(query);
         Table tableQuery = tEnv().sqlQuery(query);
         assertThatThrownBy(() -> tableQuery.executeInsert("t2").await())
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     @Test
@@ -75,7 +78,8 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         "Failed to deserialize consumer record due to",
                         new RuntimeException("test"));
         final String expectedUserMessage = FailureMessageUtil.buildMessage(userIOException);
-        assertFailureEnricherLabelIsExpectedLabel(userIOException, "USER", expectedUserMessage);
+        assertFailureEnricherLabelIsExpectedLabel(
+                userIOException, Collections.emptyList(), "USER", expectedUserMessage);
     }
 
     @Test
@@ -83,7 +87,10 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
         MockSchemaRegistryClient client = new MockSchemaRegistryClient();
         assertThatThrownBy(() -> client.getSchemaById(DELETED_SCHEMA_ID))
                 .isInstanceOf(RestClientException.class)
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     @Test
@@ -111,7 +118,10 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
         Table tableQuery = tEnv().sqlQuery(query);
         TestCollectionTableFactory.initData(sourceData);
         assertThatThrownBy(() -> tableQuery.executeInsert("t2").await())
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     @Test
@@ -139,11 +149,15 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
         Table tableQuery = tEnv().sqlQuery(query);
         TestCollectionTableFactory.initData(sourceData);
         assertThatThrownBy(() -> tableQuery.executeInsert("t2").await())
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     public static void assertFailureEnricherLabelIsExpectedLabel(
-            Exception e, String... expectedLabels) throws ExecutionException, InterruptedException {
+            Exception e, List<String> expectedKeys, String... expectedLabels)
+            throws ExecutionException, InterruptedException {
         final Context taskFailureCtx =
                 DefaultFailureEnricherContext.forTaskFailure(
                         null, null, null, newSingleThreadExecutor(), null);
@@ -154,6 +168,9 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         newSingleThreadExecutor(),
                         Collections.singleton(new TypeFailureEnricher()));
         final Map<String, String> failureLabels = resultFuture.get();
+        if (!expectedKeys.isEmpty()) {
+            assertThat(failureLabels).containsKeys(expectedKeys.toArray(new String[0]));
+        }
         assertThat(failureLabels).containsValues(expectedLabels);
     }
 }

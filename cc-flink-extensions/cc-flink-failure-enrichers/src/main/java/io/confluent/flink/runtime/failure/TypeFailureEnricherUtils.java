@@ -38,11 +38,11 @@ final class TypeFailureEnricherUtils {
      * @param classLoader
      * @return Optionally the class at the top of the stackTrace
      */
-    public static Optional<Class> findClassFromStackTraceTop(
+    public static Optional<Class<?>> findClassFromStackTraceTop(
             Throwable throwable, ClassLoader classLoader) {
         for (StackTraceElement currElement : throwable.getStackTrace()) {
             try {
-                Class topClass = Class.forName(currElement.getClassName(), false, classLoader);
+                Class<?> topClass = Class.forName(currElement.getClassName(), false, classLoader);
                 return Optional.of(topClass);
             } catch (ClassNotFoundException ex) {
                 // continue

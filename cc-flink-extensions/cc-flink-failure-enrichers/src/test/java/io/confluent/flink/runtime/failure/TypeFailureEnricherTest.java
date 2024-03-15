@@ -28,9 +28,9 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.DateTimeException;
 import java.util.ArrayList;
@@ -97,31 +97,48 @@ class TypeFailureEnricherTest {
     @Test
     void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
         assertFailureEnricherLabelIsExpectedLabel(
-                new SerializedThrowable(new Exception("serialization error")), "USER");
-        assertFailureEnricherLabelIsExpectedLabel(new ArithmeticException("test"), "USER");
-        assertFailureEnricherLabelIsExpectedLabel(new NumberFormatException("test"), "USER");
-        assertFailureEnricherLabelIsExpectedLabel(new DateTimeException("test"), "USER");
+                new SerializedThrowable(new Exception("serialization error")),
+                Collections.emptyList(),
+                "USER");
         assertFailureEnricherLabelIsExpectedLabel(
-                new TransactionalIdAuthorizationException("test"), "USER");
-        assertFailureEnricherLabelIsExpectedLabel(new TopicAuthorizationException("test"), "USER");
-        assertFailureEnricherLabelIsExpectedLabel(new FlinkException("test"), "SYSTEM");
-        assertFailureEnricherLabelIsExpectedLabel(new ExpectedTestException("test"), "UNKNOWN");
+                new ArithmeticException("test"), Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new NumberFormatException("test"), Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new DateTimeException("test"), Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new TransactionalIdAuthorizationException("test"), Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new TopicAuthorizationException("test"), Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new FlinkException("test"), Collections.emptyList(), "SYSTEM");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new ExpectedTestException("test"), Collections.emptyList(), "UNKNOWN");
     }
 
     @Test
-    void testTableExceptionClassification() throws ExecutionException, InterruptedException {
+    void testTableExceptionClassificationNullValue()
+            throws ExecutionException, InterruptedException {
         final String errorMsg =
                 "Column 'b' is NOT NULL, however, a null value is being written into it. "
                         + "You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' "
                         + "to suppress this exception and drop such records silently.";
-        assertFailureEnricherLabelIsExpectedLabel(new TableException(errorMsg), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                new TableException(errorMsg), Collections.emptyList(), "USER");
+    }
+
+    @Test
+    void testTableExceptionClassification() throws ExecutionException, InterruptedException {
+        final String errorMsg = "Some other error message";
+        assertFailureEnricherLabelIsExpectedLabel(
+                new TableException(errorMsg), Collections.emptyList(), "USER");
     }
 
     @Test
     void testUserSecretExceptionClassification() throws ExecutionException, InterruptedException {
         Exception toValidate =
                 new FlinkRuntimeException(String.format(AISecret.ERROR_MESSAGE, "name"));
-        assertFailureEnricherLabelIsExpectedLabel(toValidate, "USER");
+        assertFailureEnricherLabelIsExpectedLabel(toValidate, Collections.emptyList(), "USER");
     }
 
     @Test
@@ -167,7 +184,7 @@ class TypeFailureEnricherTest {
 
         // pack class file to jar
         File jarFile = Paths.get(tmpDir.toString(), jarName).toFile();
-        JarOutputStream jos = new JarOutputStream(new FileOutputStream(jarFile));
+        JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jarFile.toPath()));
         for (String className : classNameCodes.keySet()) {
             File classFile = Paths.get(tmpDir.toString(), className + ".class").toFile();
             JarEntry jarEntry = new JarEntry(className + ".class");

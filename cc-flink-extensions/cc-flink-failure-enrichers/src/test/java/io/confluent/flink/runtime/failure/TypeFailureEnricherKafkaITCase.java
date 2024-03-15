@@ -60,7 +60,10 @@ public class TypeFailureEnricherKafkaITCase extends TestLogger {
         assertThatThrownBy(() -> subscriber.getSubscribedTopicPartitions(adminClient))
                 .isInstanceOf(RuntimeException.class)
                 .satisfies(anyCauseMatches(UnknownTopicOrPartitionException.class))
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     @Test
@@ -85,7 +88,10 @@ public class TypeFailureEnricherKafkaITCase extends TestLogger {
         // Next invocation should rethrow the async exception
         assertThatThrownBy(() -> testHarness.processElement(new StreamRecord<>("mesage-2")))
                 .hasMessageContaining(timeoutException.getMessage())
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "USER"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "USER"));
     }
 
     /** Returns a mocked String the KafkaProducer. */

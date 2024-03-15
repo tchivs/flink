@@ -1241,7 +1241,7 @@ public class AdaptiveScheduler
     @Override
     public FailureResult howToHandleFailure(
             Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
-        FailureResult failureResult = howToHandleFailure(failure);
+        FailureResult failureResult = determineFailureResult(failure, failureLabels);
         if (reportEventsAsSpans) {
             // TODO: replace with reporting as event once events are supported.
             // Add reporting as callback for when the failure labeling is completed.
@@ -1252,8 +1252,9 @@ public class AdaptiveScheduler
         return failureResult;
     }
 
-    private FailureResult howToHandleFailure(Throwable failure) {
-        if (ExecutionFailureHandler.isUnrecoverableError(failure)) {
+    private FailureResult determineFailureResult(
+            Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+        if (ExecutionFailureHandler.isUnrecoverableError(failure, failureLabels)) {
             return FailureResult.canNotRestart(
                     new JobException("The failure is not recoverable", failure));
         }

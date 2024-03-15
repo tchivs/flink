@@ -15,6 +15,7 @@ import org.apache.flink.util.TestLogger;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Collections;
 
 import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +43,10 @@ public class TypeFailureEnricherStreamITCase extends TestLogger {
                 .output(new DiscardingOutputFormat<ConsumesTooMuchSpanning>());
 
         assertThatThrownBy(() -> env.execute())
-                .satisfies(e -> assertFailureEnricherLabelIsExpectedLabel((Exception) e, "SYSTEM"));
+                .satisfies(
+                        e ->
+                                assertFailureEnricherLabelIsExpectedLabel(
+                                        (Exception) e, Collections.emptyList(), "SYSTEM"));
     }
 
     // ------------------------------------------------------------------------
