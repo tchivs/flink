@@ -226,6 +226,8 @@ public class CheckpointCoordinator {
 
     private boolean forceFullSnapshot;
 
+    private final boolean storeSavepointsInCheckpointStore;
+
     // --------------------------------------------------------------------------------------------
 
     public CheckpointCoordinator(
@@ -240,7 +242,8 @@ public class CheckpointCoordinator {
             ScheduledExecutor timer,
             CheckpointFailureManager failureManager,
             CheckpointPlanCalculator checkpointPlanCalculator,
-            CheckpointStatsTracker statsTracker) {
+            CheckpointStatsTracker statsTracker,
+            boolean storeSavepointsInCheckpointStore) {
 
         this(
                 job,
@@ -256,6 +259,7 @@ public class CheckpointCoordinator {
                 checkpointPlanCalculator,
                 SystemClock.getInstance(),
                 statsTracker,
+                storeSavepointsInCheckpointStore,
                 VertexFinishedStateChecker::new);
     }
 
@@ -274,6 +278,7 @@ public class CheckpointCoordinator {
             CheckpointPlanCalculator checkpointPlanCalculator,
             Clock clock,
             CheckpointStatsTracker statsTracker,
+            boolean storeSavepointsInCheckpointStore,
             BiFunction<
                             Set<ExecutionJobVertex>,
                             Map<OperatorID, OperatorState>,
@@ -353,6 +358,7 @@ public class CheckpointCoordinator {
                         this.checkpointsCleaner::getNumberOfCheckpointsToClean);
         this.statsTracker = checkNotNull(statsTracker, "Statistic tracker can not be null");
         this.vertexFinishedStateCheckerFactory = checkNotNull(vertexFinishedStateCheckerFactory);
+        this.storeSavepointsInCheckpointStore = storeSavepointsInCheckpointStore;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -1309,7 +1315,7 @@ public class CheckpointCoordinator {
             // the pending checkpoint must be discarded after the finalization
             Preconditions.checkState(pendingCheckpoint.isDisposed() && completedCheckpoint != null);
 
-            if (!props.isSavepoint()) {
+            if (!props.isSavepoint() || storeSavepointsInCheckpointStore) {
                 lastSubsumed =
                         addCompletedCheckpointToStoreAndSubsumeOldest(
                                 checkpointId, completedCheckpoint, pendingCheckpoint);

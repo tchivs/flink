@@ -30,9 +30,11 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.HighAvailabilityOptions;
+import org.apache.flink.configuration.JobManagerConfluentOptions;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.kubernetes.KubernetesExtension;
 import org.apache.flink.kubernetes.configuration.KubernetesConfigOptions;
+import org.apache.flink.kubernetes.kubeclient.resources.KubernetesConfigMap;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 import org.apache.flink.runtime.jobmanager.HighAvailabilityMode;
@@ -121,11 +123,17 @@ class KubernetesHighAvailabilityRecoverFromSavepointITCase {
         final String savepoint2Path =
                 triggerSavepoint(clusterClient, jobGraph.getJobID(), savepointPath);
 
+        // validate savepoints are written to HA
+        assertJobConfigMapContainsSavepointPath(jobGraph.getJobID(), savepoint2Path);
+
         // Cancel the old job
         clusterClient.cancel(jobGraph.getJobID());
         CommonTestUtils.waitUntilCondition(
                 () -> clusterClient.getJobStatus(jobGraph.getJobID()).get() == JobStatus.CANCELED,
                 1000);
+
+        // validate checkpointPath entry is not deleted on job termination
+        assertJobConfigMapContainsSavepointPath(jobGraph.getJobID(), savepoint2Path);
 
         // Start a new job with savepoint 2
         Path stateBackend2 = Files.createDirectory(temporaryPath.resolve("stateBackend2"));
@@ -142,6 +150,8 @@ class KubernetesHighAvailabilityRecoverFromSavepointITCase {
         Configuration configuration = new Configuration();
         configuration.set(KubernetesConfigOptions.CLUSTER_ID, CLUSTER_ID);
         configuration.set(HighAvailabilityOptions.HA_MODE, HighAvailabilityMode.KUBERNETES.name());
+        configuration.set(JobManagerConfluentOptions.RETAIN_JOB_HA_CP_STORE_ON_TERMINATION, true);
+        configuration.set(JobManagerConfluentOptions.STORE_SAVEPOINTS_IN_CHECKPOINT_STORE, true);
         try {
             temporaryPath = Files.createTempDirectory("haStorage");
         } catch (IOException e) {
@@ -162,6 +172,23 @@ class KubernetesHighAvailabilityRecoverFromSavepointITCase {
             // ignore
         }
         return null;
+    }
+
+    private static void assertJobConfigMapContainsSavepointPath(JobID jobId, String path) {
+        assertThat(
+                        kubernetesExtension
+                                .getFlinkKubeClient()
+                                .getConfigMap(
+                                        CLUSTER_ID + "-" + jobId.toHexString() + "-config-map")
+                                .map(KubernetesConfigMap::getData))
+                .hasValueSatisfying(
+                        data ->
+                                assertThat(data)
+                                        .anySatisfy(
+                                                (key, value) -> {
+                                                    assertThat(key).startsWith("checkpointPath-");
+                                                    assertThat(value).isEqualTo(path);
+                                                }));
     }
 
     private JobGraph createJobGraph(File stateBackendFolder) throws Exception {

@@ -34,6 +34,12 @@ public class JobManagerConfluentOptions {
                     .booleanType()
                     .defaultValue(false);
 
+    /** Controls whether savepoints are written to the job HA checkpoint store. */
+    public static final ConfigOption<Boolean> STORE_SAVEPOINTS_IN_CHECKPOINT_STORE =
+            key("confluent.high-availability.store-savepoints-in-checkpoint-store")
+                    .booleanType()
+                    .defaultValue(false);
+
     public static final ConfigOption<String> FORCED_WEB_TMP_UI_DIR =
             key("confluent.web.ui.tmpdir")
                     .stringType()

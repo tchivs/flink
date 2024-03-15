@@ -448,7 +448,8 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
             CheckpointStorage checkpointStorage,
             CheckpointStatsTracker statsTracker,
             CheckpointsCleaner checkpointsCleaner,
-            String changelogStorageName) {
+            String changelogStorageName,
+            boolean storeSavepointsInCheckpointStore) {
 
         checkState(state == JobStatus.CREATED, "Job must be in CREATED state");
         checkState(checkpointCoordinator == null, "checkpointing already enabled");
@@ -502,7 +503,8 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
                         failureManager,
                         createCheckpointPlanCalculator(
                                 chkConfig.isEnableCheckpointsAfterTasksFinish()),
-                        checkpointStatsTracker);
+                        checkpointStatsTracker,
+                        storeSavepointsInCheckpointStore);
 
         // register the master hooks on the checkpoint coordinator
         for (MasterTriggerRestoreHook<?> hook : masterHooks) {
