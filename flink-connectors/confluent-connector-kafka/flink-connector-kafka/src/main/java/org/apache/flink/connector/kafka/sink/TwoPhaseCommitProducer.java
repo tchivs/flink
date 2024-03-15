@@ -36,6 +36,7 @@ public class TwoPhaseCommitProducer<K, V> extends KafkaProducer<K, V>
 
     private static final Logger LOG = LoggerFactory.getLogger(TwoPhaseCommitProducer.class);
 
+    private final Consumer<InternalKafkaProducer<K, V>> onClose;
     @Nullable private final ConfluentKafkaCommittableV1 assignedCommittable;
 
     private volatile boolean inTransaction = false;
@@ -44,8 +45,16 @@ public class TwoPhaseCommitProducer<K, V> extends KafkaProducer<K, V>
 
     public TwoPhaseCommitProducer(
             Properties properties, @Nullable ConfluentKafkaCommittableV1 assignedCommittable) {
+        this(properties, assignedCommittable, null);
+    }
+
+    public TwoPhaseCommitProducer(
+            Properties properties,
+            @Nullable ConfluentKafkaCommittableV1 assignedCommittable,
+            @Nullable Consumer<InternalKafkaProducer<K, V>> onClose) {
         super(withTransactionalId(properties, assignedCommittable));
         this.assignedCommittable = assignedCommittable;
+        this.onClose = onClose;
     }
 
     @Override
@@ -124,12 +133,18 @@ public class TwoPhaseCommitProducer<K, V> extends KafkaProducer<K, V>
         } else {
             super.close(Duration.ofHours(1));
         }
+        if (onClose != null) {
+            onClose.accept(this);
+        }
     }
 
     @Override
     public void close(Duration timeout) {
         closed = true;
         super.close(timeout);
+        if (onClose != null) {
+            onClose.accept(this);
+        }
     }
 
     @Override

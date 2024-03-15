@@ -179,7 +179,10 @@ class KafkaWriter<IN>
 
         this.producerFactory =
                 new TwoPhaseCommitProducerFactory<>(
-                        kafkaProducerConfig, producerCloseables::add, this::initKafkaMetrics);
+                        kafkaProducerConfig,
+                        producerCloseables::add,
+                        producerCloseables::remove,
+                        this::initKafkaMetrics);
         this.transactionalProducerPool =
                 new FixedSizeProducerPool<>(
                         this.currentTransactionsIdRange,
@@ -287,6 +290,7 @@ class KafkaWriter<IN>
         LOG.debug("Closing writer with {}", currentProducer);
         closeAll(this::abortCurrentProducer, transactionalProducerPool::clearAll);
         closeAll(producerCloseables);
+        producerCloseables.clear();
         checkState(
                 currentProducer.isClosed(), "Could not close current producer " + currentProducer);
         currentProducer = null;

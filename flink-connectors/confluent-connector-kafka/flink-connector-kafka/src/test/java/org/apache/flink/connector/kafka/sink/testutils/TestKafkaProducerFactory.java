@@ -5,12 +5,14 @@
 package org.apache.flink.connector.kafka.sink.testutils;
 
 import org.apache.flink.connector.kafka.sink.ConfluentKafkaCommittableV1;
+import org.apache.flink.connector.kafka.sink.InternalKafkaProducer;
 import org.apache.flink.connector.kafka.sink.InternalKafkaProducerFactory;
 
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /** Mock implementation of {@link InternalKafkaProducerFactory}. */
 public class TestKafkaProducerFactory
@@ -21,14 +23,16 @@ public class TestKafkaProducerFactory
 
     public TestKafkaProducerFactory(
             Set<String> usedTransactionIds, Set<String> abortedTransactionIds) {
-        super(new Properties(), ignored -> {}, ignored -> {});
+        super(new Properties(), ignored -> {}, ignored -> {}, ignored -> {});
         this.usedTransactionIds = usedTransactionIds;
         this.abortedTransactionIds = abortedTransactionIds;
     }
 
     @Override
     protected TestKafkaProducer createProducerInstance(
-            Properties resolvedProperties, @Nullable ConfluentKafkaCommittableV1 committable) {
+            Properties resolvedProperties,
+            @Nullable ConfluentKafkaCommittableV1 committable,
+            Consumer<InternalKafkaProducer<String, String>> onClose) {
         return new TestKafkaProducer(committable, usedTransactionIds, abortedTransactionIds);
     }
 }

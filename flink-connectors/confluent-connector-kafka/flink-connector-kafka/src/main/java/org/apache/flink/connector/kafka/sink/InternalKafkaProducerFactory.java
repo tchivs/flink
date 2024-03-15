@@ -18,14 +18,17 @@ public abstract class InternalKafkaProducerFactory<K, V, PT extends InternalKafk
 
     private final Properties baseKafkaClientProperties;
     private final Consumer<InternalKafkaProducer<K, V>> closerRegistry;
+    private final Consumer<InternalKafkaProducer<K, V>> onCloseAction;
     private final Consumer<InternalKafkaProducer<K, V>> kafkaMetricsInitializer;
 
     public InternalKafkaProducerFactory(
             Properties baseKafkaClientProperties,
             Consumer<InternalKafkaProducer<K, V>> closerRegistry,
+            Consumer<InternalKafkaProducer<K, V>> onCloseAction,
             Consumer<InternalKafkaProducer<K, V>> kafkaMetricsInitializer) {
         this.baseKafkaClientProperties = checkNotNull(baseKafkaClientProperties);
         this.closerRegistry = checkNotNull(closerRegistry);
+        this.onCloseAction = checkNotNull(onCloseAction);
         this.kafkaMetricsInitializer = checkNotNull(kafkaMetricsInitializer);
     }
 
@@ -39,19 +42,23 @@ public abstract class InternalKafkaProducerFactory<K, V, PT extends InternalKafk
         resolvedProps.setProperty(
                 ProducerConfig.TRANSACTIONAL_ID_CONFIG, committable.getTransactionalId());
 
-        final PT transactionalProducer = createProducerInstance(resolvedProps, committable);
+        final PT transactionalProducer =
+                createProducerInstance(resolvedProps, committable, onCloseAction);
         closerRegistry.accept(transactionalProducer);
         kafkaMetricsInitializer.accept(transactionalProducer);
         return transactionalProducer;
     }
 
     public final PT createNonTransactional() {
-        final PT nonTransactionalProducer = createProducerInstance(baseKafkaClientProperties, null);
+        final PT nonTransactionalProducer =
+                createProducerInstance(baseKafkaClientProperties, null, onCloseAction);
         closerRegistry.accept(nonTransactionalProducer);
         kafkaMetricsInitializer.accept(nonTransactionalProducer);
         return nonTransactionalProducer;
     }
 
     protected abstract PT createProducerInstance(
-            Properties resolvedProperties, @Nullable ConfluentKafkaCommittableV1 committable);
+            Properties resolvedProperties,
+            @Nullable ConfluentKafkaCommittableV1 committable,
+            Consumer<InternalKafkaProducer<K, V>> onCloseAction);
 }

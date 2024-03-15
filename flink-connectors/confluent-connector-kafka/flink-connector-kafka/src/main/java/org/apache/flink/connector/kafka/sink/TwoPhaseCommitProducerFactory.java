@@ -19,13 +19,16 @@ public class TwoPhaseCommitProducerFactory<K, V>
     TwoPhaseCommitProducerFactory(
             Properties baseKafkaClientProperties,
             Consumer<InternalKafkaProducer<K, V>> closerRegistry,
+            Consumer<InternalKafkaProducer<K, V>> onCloseAction,
             Consumer<InternalKafkaProducer<K, V>> kafkaMetricsInitializer) {
-        super(baseKafkaClientProperties, closerRegistry, kafkaMetricsInitializer);
+        super(baseKafkaClientProperties, closerRegistry, onCloseAction, kafkaMetricsInitializer);
     }
 
     @Override
     protected TwoPhaseCommitProducer<K, V> createProducerInstance(
-            Properties resolvedProperties, ConfluentKafkaCommittableV1 committable) {
-        return new TwoPhaseCommitProducer<>(resolvedProperties, committable);
+            Properties resolvedProperties,
+            ConfluentKafkaCommittableV1 committable,
+            Consumer<InternalKafkaProducer<K, V>> onCloseAction) {
+        return new TwoPhaseCommitProducer<>(resolvedProperties, committable, onCloseAction);
     }
 }
