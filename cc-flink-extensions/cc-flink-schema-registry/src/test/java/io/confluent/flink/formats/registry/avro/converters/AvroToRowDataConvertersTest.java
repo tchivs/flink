@@ -17,6 +17,7 @@ import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
+import io.confluent.flink.formats.converters.UnionUtil;
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters.AvroToRowDataConverter;
 import org.apache.avro.LogicalTypes;
@@ -26,6 +27,8 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -37,7 +40,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link io.confluent.flink.formats.registry.avro.converters.RowDataToAvroConverters}.
+ * Tests for {@link io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters}.
  */
 @ExtendWith(TestLoggerExtension.class)
 class AvroToRowDataConvertersTest {
@@ -331,5 +334,18 @@ class AvroToRowDataConvertersTest {
                                         ByteBuffer.wrap(bigDecimal.unscaledValue().toByteArray()))
                                 .build());
         assertThat(actual).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ArgumentsSource(UnionUtil.DataProvider.class)
+    void testUnion(Schema unionSchema, Object avroRecord, Object expectedRowData) {
+        // Given: Flink schema and converter
+        LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(unionSchema);
+        AvroToRowDataConverter converter =
+                AvroToRowDataConverters.createConverter(unionSchema, flinkSchema);
+
+        // When: converting AVRO Record to Flink RowData
+        // Then:
+        assertThat(expectedRowData).isEqualTo(converter.convert(avroRecord));
     }
 }

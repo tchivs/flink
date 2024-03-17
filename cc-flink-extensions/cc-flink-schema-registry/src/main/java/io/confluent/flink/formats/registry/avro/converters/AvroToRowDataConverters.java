@@ -38,9 +38,11 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 
+import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
@@ -57,7 +59,6 @@ import java.util.stream.IntStream;
 /** Tool class used to convert from Avro {@link GenericRecord} to {@link RowData}. * */
 @Internal
 public class AvroToRowDataConverters {
-
     private static final Schema NULL_AVRO_SCHEMA = Schema.create(Type.NULL);
 
     /**
@@ -150,7 +151,28 @@ public class AvroToRowDataConverters {
                     }
                 };
             case UNION:
-                return createUnionConverter(readSchema, targetType);
+                if (readSchema.getTypes().size() == 2) {
+                    if (readSchema.getTypes().contains(NULL_AVRO_SCHEMA)) {
+                        for (Schema memberSchema : readSchema.getTypes()) {
+                            if (!memberSchema.equals(NULL_AVRO_SCHEMA)) {
+                                final AvroToRowDataConverter nestedConverter =
+                                        createConverter(memberSchema, targetType);
+                                return new AvroToRowDataConverter() {
+                                    @Override
+                                    public Object convert(Object object) {
+                                        if (object == null) {
+                                            return null;
+                                        }
+
+                                        return nestedConverter.convert(object);
+                                    }
+                                };
+                            }
+                        }
+                    }
+                }
+
+                return createUnionConverter(readSchema, (RowType) targetType);
             default:
                 throw new IllegalStateException(
                         "Couldn't translate unsupported schema type "
@@ -173,31 +195,36 @@ public class AvroToRowDataConverters {
         }
     }
 
-    private static AvroToRowDataConverter createUnionConverter(
-            Schema readSchema, LogicalType targetType) {
-        if (readSchema.getTypes().size() == 2) {
-            if (readSchema.getTypes().contains(NULL_AVRO_SCHEMA)) {
-                for (Schema memberSchema : readSchema.getTypes()) {
-                    if (!memberSchema.equals(NULL_AVRO_SCHEMA)) {
-                        final AvroToRowDataConverter nestedConverter =
-                                createConverter(memberSchema, targetType);
-                        return new AvroToRowDataConverter() {
-                            @Override
-                            public Object convert(Object object) {
-                                if (object == null) {
-                                    return null;
-                                }
+    private static AvroToRowDataConverter createUnionConverter(Schema readSchema, RowType rowType) {
+        Schema intermediateUnion = AvroToFlinkSchemaConverter.intermediateUnionSchema(readSchema);
+        List<Schema> memberSchemas = intermediateUnion.getTypes();
 
-                                return nestedConverter.convert(object);
-                            }
-                        };
-                    }
-                }
-            }
+        int arity = rowType.getFieldCount();
+        AvroToRowDataConverter[] fieldConverters = new AvroToRowDataConverter[arity];
+        for (int i = 0; i < arity; i++) {
+            final LogicalType fieldType = rowType.getTypeAt(i);
+            final Schema fieldSchema = memberSchemas.get(i);
+            fieldConverters[i] = createConverter(fieldSchema, fieldType);
         }
 
-        // TODO: add runtime support for reading UNIONs first
-        throw new IllegalArgumentException("Custom UNION types are not yet supported.");
+        return new AvroToRowDataConverter() {
+            @Override
+            public Object convert(Object object) {
+                if (object == null) {
+                    return null;
+                }
+
+                // find the best match converter. See GenericData#resolveUnion for more details
+                int indexOfGenericRowField =
+                        GenericData.get().resolveUnion(intermediateUnion, object);
+                AvroToRowDataConverter converter = fieldConverters[indexOfGenericRowField];
+                GenericRowData row = new GenericRowData(arity);
+                Object toFlink = converter.convert(object);
+                row.setField(indexOfGenericRowField, toFlink);
+
+                return row;
+            }
+        };
     }
 
     private static AvroToRowDataConverter createRecordConverter(

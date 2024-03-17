@@ -26,14 +26,19 @@ import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
 
+import org.apache.flink.shaded.guava31.com.google.common.annotations.VisibleForTesting;
+
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Type;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static org.apache.avro.Schema.Type.NULL;
 
 /** A converter from {@link Schema} to {@link LogicalType}. */
 @Confluent
@@ -53,7 +58,40 @@ public class AvroToFlinkSchemaConverter {
     private static final String AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS = "local-timestamp-micros";
     private static final String KEY_FIELD = "key";
     private static final String VALUE_FIELD = "value";
-    private static final Schema NULL_AVRO_SCHEMA = Schema.create(Type.NULL);
+
+    /**
+     * Converts an intermediate representation of the UNION in which:
+     *
+     * <p>1) NULLs are removed
+     *
+     * <p>2) STRINGS are removed if there is an ENUM in the UNION
+     *
+     * <p>3) ENUMs are unwrapped to STRINGs if there is no STRING in the UNION as ENUMs are
+     * unwrapped to STRING and there can't be two STRINGS in the UNION
+     *
+     * <p>Useful for {@link
+     * io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters} when multiple
+     * AVRO types map to the same Flink SQL Type. See {@link #sanitizeMemberSchemas(List)} for more
+     * details.
+     */
+    public static Schema intermediateUnionSchema(Schema schema) {
+        return Schema.createUnion(sanitizeMemberSchemas(schema.getTypes()));
+    }
+
+    private static List<Schema> sanitizeMemberSchemas(List<Schema> unionTypes) {
+        // check if there is an ENUM in the UNION
+        boolean hasEnum = unionTypes.stream().anyMatch(s -> s.getType().equals(Type.ENUM));
+
+        return unionTypes.stream()
+                // remove NULLS
+                .filter(s -> !s.getType().equals(NULL))
+                // remove STRINGS if there is an ENUM in the UNION as ENUMs are unwrapped to STRING
+                // and there can't be two STRINGS in the UNION
+                .filter(s -> !hasEnum || !s.getType().equals(Type.STRING))
+                // unwrap ENUM to STRING if there is no STRING in the UNION
+                .map(s -> s.getType().equals(Type.ENUM) ? Schema.create(Type.STRING) : s)
+                .collect(Collectors.toList());
+    }
 
     /**
      * Mostly copied over from <a
@@ -164,6 +202,8 @@ public class AvroToFlinkSchemaConverter {
                     return new BigIntType(isOptional);
                 }
             case STRING:
+            case ENUM:
+                // enums are unwrapped to strings and the original enum is not preserved
                 return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
 
             case ARRAY:
@@ -212,51 +252,38 @@ public class AvroToFlinkSchemaConverter {
                                                                     false,
                                                                     cycleContext)))
                                     .collect(Collectors.toList());
-                    return new RowType(isOptional, rowFields);
+                    return new RowType(false, rowFields);
                 }
-
-            case ENUM:
-                // enums are unwrapped to strings and the original enum is not preserved
-                return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
 
             case UNION:
-                {
-                    if (schema.getTypes().size() == 2) {
-                        if (schema.getTypes().contains(NULL_AVRO_SCHEMA)) {
-                            for (Schema memberSchema : schema.getTypes()) {
-                                if (!memberSchema.equals(NULL_AVRO_SCHEMA)) {
-                                    return toFlinkSchemaWithCycleDetection(
-                                            memberSchema, true, cycleContext);
-                                }
-                            }
-                        }
-                    }
-                    // TODO: add runtime support for reading UNIONs first
-                    throw new IllegalArgumentException("Custom UNION types are not yet supported.");
-                    //                Set<String> fieldNames = new HashSet<>();
-                    //                boolean unionOptional = false;
-                    //                final List<RowField> rowFields = new ArrayList<>();
-                    //                for (Schema memberSchema : schema.getTypes()) {
-                    //                    if (memberSchema.getType() == Schema.Type.NULL) {
-                    //                        unionOptional = true;
-                    //                    } else {
-                    //                        String fieldName = unionMemberFieldName(memberSchema);
-                    //                        if (fieldNames.contains(fieldName)) {
-                    //                            throw new IllegalStateException(
-                    //                                    "Multiple union schemas map to the Connect
-                    // union field name");
-                    //                        }
-                    //                        fieldNames.add(fieldName);
-                    //                        rowFields.add(
-                    //                                new RowField(
-                    //                                        fieldName,
-                    //                                        toFlinkSchemaWithCycleDetection(
-                    //                                                memberSchema, false,
-                    // cycleContext)));
-                    //                    }
-                    //                }
-                    //                return new RowType(unionOptional || isOptional, rowFields);
+                List<Schema> unionTypes = schema.getTypes();
+                boolean isNullable =
+                        unionTypes.stream().anyMatch(s -> s.getType().equals(Type.NULL));
+                List<Schema> memberSchemas = sanitizeMemberSchemas(unionTypes);
+
+                // Don't wrap it in a Row if there is only one non-NULL type
+                if (memberSchemas.size() == 1) {
+                    return toFlinkSchemaWithCycleDetection(
+                            memberSchemas.get(0), isNullable, cycleContext);
                 }
+
+                Set<String> fieldNames = new HashSet<>();
+                List<RowField> rowFields = new ArrayList<>();
+                for (Schema memberSchema : memberSchemas) {
+                    String fieldName = unionMemberFieldName(memberSchema);
+                    if (!fieldNames.add(fieldName)) {
+                        throw new IllegalStateException(
+                                "Multiple union schemas map to the Connect union field name");
+                    }
+
+                    LogicalType memberType =
+                            toFlinkSchemaWithCycleDetection(memberSchema, false, cycleContext);
+
+                    // make a field with nullable type
+                    rowFields.add(new RowField(fieldName, memberType.copy(true)));
+                }
+
+                return new RowType(isNullable, rowFields);
 
             case NULL:
                 return new NullType();
@@ -285,10 +312,12 @@ public class AvroToFlinkSchemaConverter {
         }
     }
 
-    private static String unionMemberFieldName(org.apache.avro.Schema schema) {
+    @VisibleForTesting
+    public static String unionMemberFieldName(org.apache.avro.Schema schema) {
         if (schema.getType() != Type.RECORD
                 && schema.getType() != Type.ENUM
-                && schema.getType() != Type.FIXED) {
+                && schema.getType() != Type.FIXED
+                && schema.getType() != Type.ENUM) {
             return schema.getType().getName();
         } else {
             return schema.getFullName();

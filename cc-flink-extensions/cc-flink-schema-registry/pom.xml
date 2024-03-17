@@ -207,6 +207,13 @@ under the License.
 
 		<!-- test dependencies -->
 		<dependency>
+			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-schema-converters</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+			<type>test-jar</type>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-core</artifactId>
 			<version>${project.version}</version>

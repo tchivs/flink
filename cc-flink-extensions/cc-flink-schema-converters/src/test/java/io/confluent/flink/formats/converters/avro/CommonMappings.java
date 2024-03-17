@@ -72,6 +72,21 @@ public final class CommonMappings {
                         new VarCharType(true, VarCharType.MAX_LENGTH)));
     }
 
+    public static Stream<TypeMapping> getNotNull() {
+        return Stream.of(
+                new TypeMapping(SchemaBuilder.builder().doubleType(), new DoubleType(false)),
+                new TypeMapping(SchemaBuilder.builder().longType(), new BigIntType(false)),
+                new TypeMapping(SchemaBuilder.builder().intType(), new IntType(false)),
+                new TypeMapping(SchemaBuilder.builder().booleanType(), new BooleanType(false)),
+                new TypeMapping(SchemaBuilder.builder().floatType(), new FloatType(false)),
+                new TypeMapping(
+                        SchemaBuilder.builder().bytesType(),
+                        new VarBinaryType(false, VarBinaryType.MAX_LENGTH)),
+                new TypeMapping(
+                        SchemaBuilder.builder().stringType(),
+                        new VarCharType(false, VarCharType.MAX_LENGTH)));
+    }
+
     public static Schema nullable(Schema schema) {
         return SchemaBuilder.unionOf().nullType().and().type(schema).endUnion();
     }
