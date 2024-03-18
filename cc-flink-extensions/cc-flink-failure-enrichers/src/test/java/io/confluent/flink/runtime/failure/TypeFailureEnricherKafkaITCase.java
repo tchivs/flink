@@ -91,7 +91,9 @@ public class TypeFailureEnricherKafkaITCase extends TestLogger {
                 .satisfies(
                         e ->
                                 assertFailureEnricherLabelIsExpectedLabel(
-                                        (Exception) e, Collections.emptyList(), "USER"));
+                                        (Exception) e,
+                                        Collections.singletonList("JOB_CANNOT_RESTART"),
+                                        "USER"));
     }
 
     /** Returns a mocked String the KafkaProducer. */

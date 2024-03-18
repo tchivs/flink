@@ -76,7 +76,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                 // This is meant to capture any exception that has "serializ" in the error message,
                 // such as "(de)serialize", "(de)serialization", or "(de)serializable"
                 SERIALIZE_MESSAGE,
-                Classification.of(Type.USER, Handling.RECOVER),
+                Classification.of(Type.USER, Handling.FAIL),
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
@@ -84,14 +84,31 @@ public class TypeFailureEnricher implements FailureEnricher {
                                                 .contains(BROKEN_SERIALIZATION_ERROR_MESSAGE),
                         Type.SYSTEM,
                         Handling.RECOVER)),
-        forSystemThrowable(TableException.class, Classification.of(Type.USER, Handling.RECOVER)),
         forSystemThrowable(
-                ArithmeticException.class, Classification.of(Type.USER, Handling.RECOVER)),
+                TableException.class,
+                Classification.of(Type.USER, Handling.RECOVER),
+                ConditionalClassification.of(
+                        t ->
+                                t.getMessage() != null
+                                        && t.getMessage()
+                                                .contains("a null value is being written into it"),
+                        Type.USER,
+                        Handling.FAIL)),
+        forSystemThrowable(ArithmeticException.class, Classification.of(Type.USER, Handling.FAIL)),
         // Kafka exceptions.
-        forUserThrowable(TimeoutException.class, Classification.of(Type.USER, Handling.RECOVER)),
+        forUserThrowable(
+                TimeoutException.class,
+                Classification.of(Type.USER, Handling.RECOVER),
+                ConditionalClassification.of(
+                        t ->
+                                t.getMessage() != null
+                                        && t.getMessage()
+                                                .matches(".*Topic .* not present in metadata.*"),
+                        Type.USER,
+                        Handling.FAIL)),
         forUserThrowable(
                 UnknownTopicOrPartitionException.class,
-                Classification.of(Type.USER, Handling.RECOVER)),
+                Classification.of(Type.USER, Handling.FAIL)),
         // Schema Registry exceptions.
         forUserThrowable(RestClientException.class, Classification.of(Type.USER, Handling.RECOVER)),
         // Cast exceptions.

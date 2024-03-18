@@ -98,10 +98,12 @@ class TypeFailureEnricherTest {
     void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
         assertFailureEnricherLabelIsExpectedLabel(
                 new SerializedThrowable(new Exception("serialization error")),
-                Collections.emptyList(),
+                Collections.singletonList("JOB_CANNOT_RESTART"),
                 "USER");
         assertFailureEnricherLabelIsExpectedLabel(
-                new ArithmeticException("test"), Collections.emptyList(), "USER");
+                new ArithmeticException("test"),
+                Collections.singletonList("JOB_CANNOT_RESTART"),
+                "USER");
         assertFailureEnricherLabelIsExpectedLabel(
                 new NumberFormatException("test"), Collections.emptyList(), "USER");
         assertFailureEnricherLabelIsExpectedLabel(
@@ -124,7 +126,9 @@ class TypeFailureEnricherTest {
                         + "You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' "
                         + "to suppress this exception and drop such records silently.";
         assertFailureEnricherLabelIsExpectedLabel(
-                new TableException(errorMsg), Collections.emptyList(), "USER");
+                new TableException(errorMsg),
+                Collections.singletonList("JOB_CANNOT_RESTART"),
+                "USER");
     }
 
     @Test
