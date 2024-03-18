@@ -870,6 +870,9 @@ public class CheckpointConfig implements java.io.Serializable {
                 .getOptional(ExecutionCheckpointingOptions.ENABLE_UNALIGNED)
                 .ifPresent(this::enableUnalignedCheckpoints);
         configuration
+                .getOptional(ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS)
+                .ifPresent(this::enableUnalignedCheckpointsSplittableTimers);
+        configuration
                 .getOptional(ExecutionCheckpointingOptions.CHECKPOINT_ID_OF_IGNORED_IN_FLIGHT_DATA)
                 .ifPresent(this::setCheckpointIdOfIgnoredInFlightData);
         configuration

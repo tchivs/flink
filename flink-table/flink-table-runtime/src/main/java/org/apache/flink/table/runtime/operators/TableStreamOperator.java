@@ -24,7 +24,6 @@ import org.apache.flink.streaming.api.TimerService;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.InternalTimerService;
-import org.apache.flink.streaming.api.operators.WatermarkHoldingOutput;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
@@ -53,16 +52,6 @@ public abstract class TableStreamOperator<OUT> extends AbstractStreamOperator<OU
         this.ctx = new ContextImpl(getProcessingTimeService());
     }
 
-    @Override
-    public void processWatermark(Watermark mark) throws Exception {
-        currentWatermark = mark.getTimestamp();
-        if (getTimeServiceManager().isPresent()) {
-            WatermarkHoldingOutput.emitWatermarkInsideMailbox(this, mark);
-        } else {
-            output.emitWatermark(mark);
-        }
-    }
-
     /** Compute memory size from memory faction. */
     public long computeMemorySize() {
         final Environment environment = getContainingTask().getEnvironment();
@@ -76,6 +65,11 @@ public abstract class TableStreamOperator<OUT> extends AbstractStreamOperator<OU
                                         environment.getUserCodeClassLoader().asClassLoader()));
     }
 
+    @Override
+    public void processWatermark(Watermark mark) throws Exception {
+        currentWatermark = mark.getTimestamp();
+        super.processWatermark(mark);
+    }
     /** Information available in an invocation of processElement. */
     protected class ContextImpl implements TimerService {
 

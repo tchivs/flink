@@ -120,6 +120,11 @@ public class TestStreamEnvironment extends StreamExecutionEnvironment {
                     Duration.ofSeconds(0),
                     Duration.ofMillis(100),
                     Duration.ofSeconds(2));
+            randomize(
+                    conf,
+                    ExecutionCheckpointingOptions.ENABLE_UNALIGNED_SPLITTABLE_TIMERS,
+                    true,
+                    false);
             randomize(conf, ExecutionOptions.SNAPSHOT_COMPRESSION, true, false);
         }
 

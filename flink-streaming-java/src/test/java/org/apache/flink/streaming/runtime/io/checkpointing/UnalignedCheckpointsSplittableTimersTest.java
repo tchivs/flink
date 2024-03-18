@@ -18,28 +18,30 @@
 
 package org.apache.flink.streaming.runtime.io.checkpointing;
 
+import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
+import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.InternalTimer;
 import org.apache.flink.streaming.api.operators.InternalTimerService;
+import org.apache.flink.streaming.api.operators.MailboxWatermarkProcessor;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
 import org.apache.flink.streaming.api.operators.Triggerable;
-import org.apache.flink.streaming.api.operators.WatermarkHoldingOutput;
+import org.apache.flink.streaming.api.operators.YieldingOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
-import org.apache.flink.testutils.TestingUtils;
-import org.apache.flink.testutils.executor.TestExecutorExtension;
 import org.apache.flink.util.TestLoggerExtension;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.extension.RegisterExtension;
+
+import javax.annotation.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,119 +49,22 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Tests interaction between {@link WatermarkHoldingOutput} and unaligned checkpoints. */
+/**
+ * Tests interaction between {@link
+ * ExecutionCheckpointingOptions#ENABLE_UNALIGNED_SPLITTABLE_TIMERS} and unaligned checkpoints.
+ */
 @ExtendWith(TestLoggerExtension.class)
 class UnalignedCheckpointsSplittableTimersTest {
 
-    @RegisterExtension
-    static final TestExecutorExtension<ScheduledExecutorService> EXECUTOR_RESOURCE =
-            TestingUtils.defaultExecutorExtension();
-
-    private static Watermark asWatermark(Instant timestamp) {
-        return new Watermark(timestamp.toEpochMilli());
-    }
-
-    private static void setupStreamConfig(StreamConfig cfg) {
-        cfg.setUnalignedCheckpointsEnabled(true);
-        cfg.setUnalignedCheckpointsSplittableTimersEnabled(true);
-        cfg.setStateKeySerializer(StringSerializer.INSTANCE);
-    }
-
-    private static class MultipleTimersAtTheSameTimestamp extends AbstractStreamOperator<String>
-            implements OneInputStreamOperator<String, String>, Triggerable<String, String> {
-
-        private static final ConcurrentMap<String, CountDownLatch> FIRED_LATCHES =
-                new ConcurrentHashMap<>();
-        private static final ConcurrentMap<String, CountDownLatch> PROCESSED_LATCHES =
-                new ConcurrentHashMap<>();
-
-        private final String testId;
-        private final Map<Instant, Integer> timersToRegister;
-        private final boolean blockingTimers;
-
-        static void awaitOnTimer(
-                String testId, CountDownLatch timerFired, CountDownLatch timerProcessed) {
-            FIRED_LATCHES.put(testId, timerFired);
-            PROCESSED_LATCHES.put(testId, timerProcessed);
-        }
-
-        static void clear(String testId) {
-            FIRED_LATCHES.remove(testId);
-            PROCESSED_LATCHES.remove(testId);
-        }
-
-        MultipleTimersAtTheSameTimestamp(String testId) {
-            this(testId, Collections.emptyMap(), false);
-        }
-
-        MultipleTimersAtTheSameTimestamp(
-                String testId, Map<Instant, Integer> timersToRegister, boolean blockingTimers) {
-            this.testId = testId;
-            this.timersToRegister = timersToRegister;
-            this.blockingTimers = blockingTimers;
-        }
-
-        @Override
-        public void processElement(StreamRecord<String> element) {
-            if (!timersToRegister.isEmpty()) {
-                final InternalTimerService<String> timers =
-                        getInternalTimerService("timers", StringSerializer.INSTANCE, this);
-                for (Map.Entry<Instant, Integer> entry : timersToRegister.entrySet()) {
-                    for (int keyIdx = 0; keyIdx < entry.getValue(); keyIdx++) {
-                        final String key = String.format("key-%d", keyIdx);
-                        setCurrentKey(key);
-                        timers.registerEventTimeTimer(
-                                String.format("window-%s", entry.getKey()),
-                                entry.getKey().toEpochMilli());
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void processWatermark(Watermark mark) throws Exception {
-            WatermarkHoldingOutput.emitWatermarkInsideMailbox(this, mark);
-        }
-
-        @Override
-        public void onEventTime(InternalTimer<String, String> timer) throws Exception {
-            if (blockingTimers) {
-                Objects.requireNonNull(FIRED_LATCHES.get(testId)).countDown();
-                Objects.requireNonNull(PROCESSED_LATCHES.get(testId)).await();
-            }
-            output.collect(new StreamRecord<>("fired-" + timer.getKey()));
-        }
-
-        @Override
-        public void onProcessingTime(InternalTimer<String, String> timer) throws Exception {}
-
-        MultipleTimersAtTheSameTimestamp withTimers(Instant timestamp, int count) {
-            final Map<Instant, Integer> copy = new HashMap<>(timersToRegister);
-            copy.put(timestamp, count);
-            return new MultipleTimersAtTheSameTimestamp(testId, copy, blockingTimers);
-        }
-
-        MultipleTimersAtTheSameTimestamp withBlockingTimers() {
-            return new MultipleTimersAtTheSameTimestamp(testId, timersToRegister, true);
-        }
-    }
-
     @Test
     void testSingleWatermarkHoldingOperatorInTheChain() throws Exception {
-        final String testId = UUID.randomUUID().toString();
         final Instant firstWindowEnd = Instant.ofEpochMilli(1000L);
-        final int numFirstWindowTimers = 123;
+        final int numFirstWindowTimers = 2;
         final Instant secondWindowEnd = Instant.ofEpochMilli(2000L);
-        final int numSecondWindowTimers = 321;
+        final int numSecondWindowTimers = 2;
 
         try (final StreamTaskMailboxTestHarness<String> harness =
                 new StreamTaskMailboxTestHarnessBuilder<>(OneInputStreamTask::new, Types.STRING)
@@ -168,70 +73,30 @@ class UnalignedCheckpointsSplittableTimersTest {
                         .addInput(Types.STRING)
                         .setupOperatorChain(
                                 SimpleOperatorFactory.of(
-                                        new MultipleTimersAtTheSameTimestamp(testId)
-                                                .withBlockingTimers()
+                                        new MultipleTimersAtTheSameTimestamp()
                                                 .withTimers(firstWindowEnd, numFirstWindowTimers)
                                                 .withTimers(
                                                         secondWindowEnd, numSecondWindowTimers)))
                         .name("first")
                         .finishForSingletonOperatorChain(StringSerializer.INSTANCE)
                         .build()) {
-            harness.setAutoProcess(false);
-            harness.processElement(new StreamRecord<>("impulse"));
+            harness.processElement(new StreamRecord<>("register timers"));
             harness.processAll();
             harness.processElement(asWatermark(firstWindowEnd));
             harness.processElement(asWatermark(secondWindowEnd));
 
-            int seenRecords = 0;
-            final List<Watermark> seenWatermarks = new ArrayList<>();
-            while (seenRecords < numFirstWindowTimers + numSecondWindowTimers) {
-                final CountDownLatch timerFired = new CountDownLatch(1);
-                final CountDownLatch timerProcessed = new CountDownLatch(1);
-                final CountDownLatch barrierProcessed = new CountDownLatch(1);
-                MultipleTimersAtTheSameTimestamp.awaitOnTimer(testId, timerFired, timerProcessed);
-
-                // Once timer fires, we schedule processing of the barrier onto the main mailbox
-                // executor. This simulates unaligned checkpoint after single event time timer.
-                EXECUTOR_RESOURCE
-                        .getExecutor()
-                        .execute(
-                                () -> {
-                                    try {
-                                        timerFired.await();
-                                        harness.getMainMailboxExecutor()
-                                                .execute(
-                                                        barrierProcessed::countDown,
-                                                        "processBarrier");
-                                        timerProcessed.countDown();
-                                    } catch (InterruptedException e) {
-                                        Thread.currentThread().interrupt();
-                                    }
-                                });
-
-                while (barrierProcessed.getCount() > 0) {
-                    harness.processSingleMailboxLoop();
-                }
-
-                int recordsInThisLoop = 0;
-                Object outputElement;
-                while ((outputElement = harness.getOutput().poll()) != null) {
-                    if (outputElement instanceof StreamRecord) {
-                        recordsInThisLoop++;
-                        seenRecords++;
-                    }
-                    if (outputElement instanceof Watermark) {
-                        seenWatermarks.add((Watermark) outputElement);
-                    }
-                }
-
-                assertThat(recordsInThisLoop)
-                        .withFailMessage("More than one timer has been fired in a loop.")
-                        .isEqualTo(1);
-            }
-            assertThat(seenWatermarks)
-                    .containsExactly(asWatermark(firstWindowEnd), asWatermark(secondWindowEnd));
-        } finally {
-            MultipleTimersAtTheSameTimestamp.clear(testId);
+            assertThat(harness.getOutput())
+                    .containsExactly(
+                            asFiredRecord("key-0"),
+                            asMailRecord("key-0"),
+                            asFiredRecord("key-1"),
+                            asMailRecord("key-1"),
+                            asWatermark(firstWindowEnd),
+                            asFiredRecord("key-0"),
+                            asMailRecord("key-0"),
+                            asFiredRecord("key-1"),
+                            asMailRecord("key-1"),
+                            asWatermark(secondWindowEnd));
         }
     }
 
@@ -246,9 +111,7 @@ class UnalignedCheckpointsSplittableTimersTest {
                                 UnalignedCheckpointsSplittableTimersTest::setupStreamConfig)
                         .addInput(Types.STRING)
                         .setupOperatorChain(
-                                SimpleOperatorFactory.of(
-                                        new MultipleTimersAtTheSameTimestamp(
-                                                UUID.randomUUID().toString())))
+                                SimpleOperatorFactory.of(new MultipleTimersAtTheSameTimestamp()))
                         .name("first")
                         .finishForSingletonOperatorChain(StringSerializer.INSTANCE)
                         .build()) {
@@ -270,6 +133,99 @@ class UnalignedCheckpointsSplittableTimersTest {
             }
             assertThat(seenWatermarks)
                     .containsExactly(asWatermark(firstWindowEnd), asWatermark(secondWindowEnd));
+        }
+    }
+
+    private static Watermark asWatermark(Instant timestamp) {
+        return new Watermark(timestamp.toEpochMilli());
+    }
+
+    private static StreamRecord<String> asFiredRecord(String key) {
+        return new StreamRecord("fired-" + key);
+    }
+
+    private static StreamRecord<String> asMailRecord(String key) {
+        return new StreamRecord("mail-" + key);
+    }
+
+    private static void setupStreamConfig(StreamConfig cfg) {
+        cfg.setUnalignedCheckpointsEnabled(true);
+        cfg.setUnalignedCheckpointsSplittableTimersEnabled(true);
+        cfg.setStateKeySerializer(StringSerializer.INSTANCE);
+    }
+
+    private static class MultipleTimersAtTheSameTimestamp extends AbstractStreamOperator<String>
+            implements OneInputStreamOperator<String, String>,
+                    Triggerable<String, String>,
+                    YieldingOperator<String> {
+
+        private final Map<Instant, Integer> timersToRegister;
+        private transient @Nullable MailboxExecutor mailboxExecutor;
+        private transient @Nullable MailboxWatermarkProcessor watermarkProcessor;
+
+        MultipleTimersAtTheSameTimestamp() {
+            this(Collections.emptyMap());
+        }
+
+        MultipleTimersAtTheSameTimestamp(Map<Instant, Integer> timersToRegister) {
+            this.timersToRegister = timersToRegister;
+        }
+
+        @Override
+        public void setMailboxExecutor(MailboxExecutor mailboxExecutor) {
+            this.mailboxExecutor = mailboxExecutor;
+        }
+
+        @Override
+        public void open() throws Exception {
+            super.open();
+            if (getTimeServiceManager().isPresent()) {
+                this.watermarkProcessor =
+                        new MailboxWatermarkProcessor(
+                                output, mailboxExecutor, getTimeServiceManager().get());
+            }
+        }
+
+        @Override
+        public void processElement(StreamRecord<String> element) {
+            if (!timersToRegister.isEmpty()) {
+                final InternalTimerService<String> timers =
+                        getInternalTimerService("timers", StringSerializer.INSTANCE, this);
+                for (Map.Entry<Instant, Integer> entry : timersToRegister.entrySet()) {
+                    for (int keyIdx = 0; keyIdx < entry.getValue(); keyIdx++) {
+                        final String key = String.format("key-%d", keyIdx);
+                        setCurrentKey(key);
+                        timers.registerEventTimeTimer(
+                                String.format("window-%s", entry.getKey()),
+                                entry.getKey().toEpochMilli());
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void processWatermark(Watermark mark) throws Exception {
+            if (watermarkProcessor == null) {
+                super.processWatermark(mark);
+            } else {
+                watermarkProcessor.emitWatermarkInsideMailbox(mark);
+            }
+        }
+
+        @Override
+        public void onEventTime(InternalTimer<String, String> timer) throws Exception {
+            mailboxExecutor.execute(
+                    () -> output.collect(asMailRecord(timer.getKey())), "mail-" + timer.getKey());
+            output.collect(asFiredRecord(timer.getKey()));
+        }
+
+        @Override
+        public void onProcessingTime(InternalTimer<String, String> timer) throws Exception {}
+
+        MultipleTimersAtTheSameTimestamp withTimers(Instant timestamp, int count) {
+            final Map<Instant, Integer> copy = new HashMap<>(timersToRegister);
+            copy.put(timestamp, count);
+            return new MultipleTimersAtTheSameTimestamp(copy);
         }
     }
 }

@@ -314,6 +314,10 @@ public class InternalTimerServiceImpl<K, N> implements InternalTimerService<N> {
                         }));
     }
 
+    /**
+     * @return true if following watermarks can be processed immediately. False if the firing timers
+     *     should be interrupted as soon as possible.
+     */
     public boolean tryAdvanceWatermark(
             long time, InternalTimeServiceManager.ShouldStopAdvancingFn shouldStopAdvancingFn)
             throws Exception {
@@ -322,13 +326,13 @@ public class InternalTimerServiceImpl<K, N> implements InternalTimerService<N> {
         while ((timer = eventTimeTimersQueue.peek()) != null
                 && timer.getTimestamp() <= time
                 && !cancellationContext.isCancelled()) {
-            if (shouldStopAdvancingFn.shouldStopAdvancing()) {
-                return false;
-            }
             keyContext.setCurrentKey(timer.getKey());
             eventTimeTimersQueue.poll();
             triggerTarget.onEventTime(timer);
             taskIOMetricGroup.getNumFiredTimers().inc();
+            if (shouldStopAdvancingFn.shouldStopAdvancing()) {
+                return false;
+            }
         }
         return true;
     }
