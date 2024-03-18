@@ -34,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.DateTimeException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -98,24 +99,44 @@ class TypeFailureEnricherTest {
     void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
         assertFailureEnricherLabelIsExpectedLabel(
                 new SerializedThrowable(new Exception("serialization error")),
-                Collections.singletonList("JOB_CANNOT_RESTART"),
-                "USER");
+                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "USER",
+                "1");
         assertFailureEnricherLabelIsExpectedLabel(
                 new ArithmeticException("test"),
-                Collections.singletonList("JOB_CANNOT_RESTART"),
-                "USER");
+                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "USER",
+                "5");
         assertFailureEnricherLabelIsExpectedLabel(
-                new NumberFormatException("test"), Collections.emptyList(), "USER");
+                new NumberFormatException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "USER",
+                "10");
         assertFailureEnricherLabelIsExpectedLabel(
-                new DateTimeException("test"), Collections.emptyList(), "USER");
+                new DateTimeException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "USER",
+                "11");
         assertFailureEnricherLabelIsExpectedLabel(
-                new TransactionalIdAuthorizationException("test"), Collections.emptyList(), "USER");
+                new TransactionalIdAuthorizationException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "USER",
+                "12");
         assertFailureEnricherLabelIsExpectedLabel(
-                new TopicAuthorizationException("test"), Collections.emptyList(), "USER");
+                new TopicAuthorizationException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "USER",
+                "13");
         assertFailureEnricherLabelIsExpectedLabel(
-                new FlinkException("test"), Collections.emptyList(), "SYSTEM");
+                new FlinkException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "SYSTEM",
+                "15");
         assertFailureEnricherLabelIsExpectedLabel(
-                new ExpectedTestException("test"), Collections.emptyList(), "UNKNOWN");
+                new ExpectedTestException("test"),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "UNKNOWN",
+                "0");
     }
 
     @Test
@@ -127,22 +148,27 @@ class TypeFailureEnricherTest {
                         + "to suppress this exception and drop such records silently.";
         assertFailureEnricherLabelIsExpectedLabel(
                 new TableException(errorMsg),
-                Collections.singletonList("JOB_CANNOT_RESTART"),
-                "USER");
+                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "USER",
+                "4");
     }
 
     @Test
     void testTableExceptionClassification() throws ExecutionException, InterruptedException {
         final String errorMsg = "Some other error message";
         assertFailureEnricherLabelIsExpectedLabel(
-                new TableException(errorMsg), Collections.emptyList(), "USER");
+                new TableException(errorMsg),
+                Collections.singletonList("ERROR_CLASS_CODE"),
+                "USER",
+                "3");
     }
 
     @Test
     void testUserSecretExceptionClassification() throws ExecutionException, InterruptedException {
         Exception toValidate =
                 new FlinkRuntimeException(String.format(AISecret.ERROR_MESSAGE, "name"));
-        assertFailureEnricherLabelIsExpectedLabel(toValidate, Collections.emptyList(), "USER");
+        assertFailureEnricherLabelIsExpectedLabel(
+                toValidate, Collections.singletonList("ERROR_CLASS_CODE"), "USER", "14");
     }
 
     @Test

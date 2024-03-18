@@ -40,8 +40,13 @@ public class TypeFailureEnricher implements FailureEnricher {
 
     private static final String KEY_TYPE = "TYPE";
     private static final String KEY_MSG = "USER_ERROR_MSG";
+    private static final String KEY_ERROR_CLASS_CODE = "ERROR_CLASS_CODE";
     private static final Set<String> ALLOWED_KEYS =
-            Stream.of(KEY_TYPE, KEY_MSG, FailureEnricher.KEY_JOB_CANNOT_RESTART)
+            Stream.of(
+                            KEY_TYPE,
+                            KEY_MSG,
+                            KEY_ERROR_CLASS_CODE,
+                            FailureEnricher.KEY_JOB_CANNOT_RESTART)
                     .collect(Collectors.toSet());
     private static final String SERIALIZE_MESSAGE = "serializ";
     // Copy of org.apache.flink.runtime.io.network.api.serialization.NonSpanningWrapper;
@@ -76,62 +81,70 @@ public class TypeFailureEnricher implements FailureEnricher {
                 // This is meant to capture any exception that has "serializ" in the error message,
                 // such as "(de)serialize", "(de)serialization", or "(de)serializable"
                 SERIALIZE_MESSAGE,
-                Classification.of(Type.USER, Handling.FAIL),
+                Classification.of(Type.USER, Handling.FAIL, 1),
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
                                         && t.getMessage()
                                                 .contains(BROKEN_SERIALIZATION_ERROR_MESSAGE),
                         Type.SYSTEM,
-                        Handling.RECOVER)),
+                        Handling.RECOVER,
+                        2)),
         forSystemThrowable(
                 TableException.class,
-                Classification.of(Type.USER, Handling.RECOVER),
+                Classification.of(Type.USER, Handling.RECOVER, 3),
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
                                         && t.getMessage()
                                                 .contains("a null value is being written into it"),
                         Type.USER,
-                        Handling.FAIL)),
-        forSystemThrowable(ArithmeticException.class, Classification.of(Type.USER, Handling.FAIL)),
+                        Handling.FAIL,
+                        4)),
+        forSystemThrowable(
+                ArithmeticException.class, Classification.of(Type.USER, Handling.FAIL, 5)),
         // Kafka exceptions.
         forUserThrowable(
                 TimeoutException.class,
-                Classification.of(Type.USER, Handling.RECOVER),
+                Classification.of(Type.USER, Handling.RECOVER, 6),
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
                                         && t.getMessage()
                                                 .matches(".*Topic .* not present in metadata.*"),
                         Type.USER,
-                        Handling.FAIL)),
+                        Handling.FAIL,
+                        7)),
         forUserThrowable(
                 UnknownTopicOrPartitionException.class,
-                Classification.of(Type.USER, Handling.FAIL)),
+                Classification.of(Type.USER, Handling.FAIL, 8)),
         // Schema Registry exceptions.
-        forUserThrowable(RestClientException.class, Classification.of(Type.USER, Handling.RECOVER)),
+        forUserThrowable(
+                RestClientException.class, Classification.of(Type.USER, Handling.RECOVER, 9)),
         // Cast exceptions.
         forSystemThrowable(
-                NumberFormatException.class, Classification.of(Type.USER, Handling.RECOVER)),
-        forSystemThrowable(DateTimeException.class, Classification.of(Type.USER, Handling.RECOVER)),
+                NumberFormatException.class, Classification.of(Type.USER, Handling.RECOVER, 10)),
+        forSystemThrowable(
+                DateTimeException.class, Classification.of(Type.USER, Handling.RECOVER, 11)),
         // Authorization exceptions coming from Kafka.
         forUserThrowable(
                 TransactionalIdAuthorizationException.class,
-                Classification.of(Type.USER, Handling.RECOVER)),
+                Classification.of(Type.USER, Handling.RECOVER, 12)),
         forUserThrowable(
-                TopicAuthorizationException.class, Classification.of(Type.USER, Handling.RECOVER)),
+                TopicAuthorizationException.class,
+                Classification.of(Type.USER, Handling.RECOVER, 13)),
         // User Secret error message.
         forPredicate(
                 TypeFailureEnricherUtils::isUserSecretErrorMessage,
-                Classification.of(Type.USER, Handling.RECOVER)),
+                Classification.of(Type.USER, Handling.RECOVER, 14)),
         // System exceptions.
-        forSystemThrowable(FlinkException.class, Classification.of(Type.SYSTEM, Handling.RECOVER)),
+        forSystemThrowable(
+                FlinkException.class, Classification.of(Type.SYSTEM, Handling.RECOVER, 15)),
         forPredicate(
                 ExceptionUtils::isJvmFatalOrOutOfMemoryError,
-                Classification.of(Type.SYSTEM, Handling.RECOVER)),
+                Classification.of(Type.SYSTEM, Handling.RECOVER, 16)),
         // Catch all.
-        throwable -> Optional.of(Classification.of(Type.UNKNOWN, Handling.RECOVER))
+        throwable -> Optional.of(Classification.of(Type.UNKNOWN, Handling.RECOVER, 0))
     };
 
     /**
@@ -272,6 +285,7 @@ public class TypeFailureEnricher implements FailureEnricher {
             if (maybeClassification.isPresent()) {
                 Classification classification = maybeClassification.get();
                 labels.put(KEY_TYPE, classification.type.name());
+                labels.put(KEY_ERROR_CLASS_CODE, classification.errorClassCode);
                 if (Handling.FAIL.equals(classification.handling)) {
                     labels.put(FailureEnricher.KEY_JOB_CANNOT_RESTART, "");
                 }
@@ -286,22 +300,32 @@ public class TypeFailureEnricher implements FailureEnricher {
     static class Classification {
         final Type type;
         final Handling handling;
+        final String errorClassCode;
 
-        Classification(Type type, Handling handling) {
+        Classification(Type type, Handling handling, String errorClassCode) {
             this.type = Preconditions.checkNotNull(type);
             this.handling = Preconditions.checkNotNull(handling);
+            this.errorClassCode = Preconditions.checkNotNull(errorClassCode);
         }
 
-        static Classification of(Type type, Handling handling) {
-            return new Classification(type, handling);
+        static Classification of(Type type, Handling handling, String errorClassCode) {
+            return new Classification(type, handling, errorClassCode);
+        }
+
+        static Classification of(Type type, Handling handling, int errorClassCode) {
+            return of(type, handling, String.valueOf(errorClassCode));
         }
     }
 
     static class ConditionalClassification extends Classification {
         final Predicate<Throwable> condition;
 
-        ConditionalClassification(Predicate<Throwable> condition, Type type, Handling handling) {
-            super(type, handling);
+        ConditionalClassification(
+                Predicate<Throwable> condition,
+                Type type,
+                Handling handling,
+                String errorClassCode) {
+            super(type, handling, errorClassCode);
             this.condition = condition;
         }
 
@@ -310,8 +334,16 @@ public class TypeFailureEnricher implements FailureEnricher {
         }
 
         static ConditionalClassification of(
-                Predicate<Throwable> condition, Type type, Handling handling) {
-            return new ConditionalClassification(condition, type, handling);
+                Predicate<Throwable> condition,
+                Type type,
+                Handling handling,
+                String errorClassCode) {
+            return new ConditionalClassification(condition, type, handling, errorClassCode);
+        }
+
+        static ConditionalClassification of(
+                Predicate<Throwable> condition, Type type, Handling handling, int errorClassCode) {
+            return of(condition, type, handling, String.valueOf(errorClassCode));
         }
     }
 }
