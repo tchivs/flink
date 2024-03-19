@@ -34,7 +34,7 @@ class ConverterUtils {
             Schema notNullSchema = null;
             boolean nullSchemaFound = false;
             for (Schema subSchema : ((CombinedSchema) readSchema).getSubschemas()) {
-                if (subSchema.equals(NullSchema.INSTANCE)) {
+                if (subSchema instanceof NullSchema) {
                     nullSchemaFound = true;
                 } else {
                     notNullSchema = subSchema;
