@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.registry.json;
 
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.MapData;
@@ -195,6 +196,58 @@ class JsonToRowDataConvertersTest {
         final RowData row = (RowData) converter.convert(obj);
         final GenericRowData expected = new GenericRowData(2);
         expected.setField(0, (byte) 12);
+        assertThat(row).isEqualTo(expected);
+    }
+
+    @Test
+    void testArrayNullableWithProperties() throws Exception {
+        String schemaString =
+                "{\n"
+                        + "  \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n"
+                        + "  \"title\": \"Event\",\n"
+                        + "  \"type\": \"object\",\n"
+                        + "  \"properties\": {\n"
+                        + "    \"rental_methods\": {\n"
+                        + "      \"description\": \"Payment methods accepted at this station.\",\n"
+                        + "      \"oneOf\": [\n"
+                        + "        {\n"
+                        + "          \"title\": \"Not included\",\n"
+                        + "          \"type\": \"null\"\n"
+                        + "        },\n"
+                        + "        {\n"
+                        + "          \"items\": {\n"
+                        + "            \"enum\": [\n"
+                        + "              \"KEY\",\n"
+                        + "              \"CREDITCARD\",\n"
+                        + "              \"PAYPASS\",\n"
+                        + "              \"APPLEPAY\",\n"
+                        + "              \"ANDROIDPAY\",\n"
+                        + "              \"TRANSITCARD\",\n"
+                        + "              \"ACCOUNTNUMBER\",\n"
+                        + "              \"PHONE\"\n"
+                        + "            ],\n"
+                        + "            \"type\": \"string\"\n"
+                        + "          },\n"
+                        + "          \"type\": \"array\"\n"
+                        + "        }\n"
+                        + "      ]\n"
+                        + "    }"
+                        + "  }\n"
+                        + "}\n";
+        JsonSchema jsonSchema = new JsonSchema(schemaString);
+        ObjectSchema schema = (ObjectSchema) jsonSchema.rawSchema();
+
+        String json = "{\"rental_methods\": []}";
+        ObjectNode obj = (ObjectNode) Jackson.newObjectMapper().readTree(json);
+        final LogicalType flinkSchema = JsonToFlinkSchemaConverter.toFlinkSchema(schema);
+
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(schema, flinkSchema);
+
+        final RowData row = (RowData) converter.convert(obj);
+
+        final GenericRowData expected = new GenericRowData(1);
+        expected.setField(0, new GenericArrayData(new Object[0]));
         assertThat(row).isEqualTo(expected);
     }
 
