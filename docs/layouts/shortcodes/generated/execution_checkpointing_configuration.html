@@ -86,5 +86,11 @@
             <td>Integer</td>
             <td>Defines the maximum number of subtasks that share the same channel state file. It can reduce the number of small files when enable unaligned checkpoint. Each subtask will create a new channel state file when this is configured to 1.</td>
         </tr>
+        <tr>
+            <td><h5>execution.checkpointing.unaligned.splittable-timers.enabled</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Allows unaligned checkpoints to skip timers that are currently being fired.</td>
+        </tr>
     </tbody>
 </table>
