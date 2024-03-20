@@ -56,6 +56,9 @@ public class TypeFailureEnricher implements FailureEnricher {
                     + "This indicates broken serialization. If you are using custom serialization types "
                     + "(Value or Writable), check their serialization methods. If you are using a ";
 
+    private static final String PEKKO_SERIALIZATION_ERROR =
+            "Pekko failed sending the message silently";
+
     /* Enum to map a Throwable into a Type. */
     private enum Type {
         USER,
@@ -93,8 +96,11 @@ public class TypeFailureEnricher implements FailureEnricher {
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
-                                        && t.getMessage()
-                                                .contains(BROKEN_SERIALIZATION_ERROR_MESSAGE),
+                                        && (t.getMessage()
+                                                        .contains(
+                                                                BROKEN_SERIALIZATION_ERROR_MESSAGE)
+                                                || t.getMessage()
+                                                        .contains(PEKKO_SERIALIZATION_ERROR)),
                         Type.SYSTEM,
                         Handling.RECOVER,
                         2)),

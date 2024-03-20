@@ -117,12 +117,37 @@ class TypeFailureEnricherTest {
     }
 
     @Test
-    void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
+    void testTypeFailureEnricherSerializationErrors()
+            throws ExecutionException, InterruptedException {
         assertFailureEnricherLabelIsExpectedLabel(
                 new SerializedThrowable(new Exception("serialization error")),
                 Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
                 "USER",
                 "1");
+
+        assertFailureEnricherLabelIsExpectedLabel(
+                new SerializedThrowable(
+                        new Exception(
+                                "serialization error. "
+                                        + "Serializer consumed more bytes than the record had. "
+                                        + "This indicates broken serialization. If you are using custom serialization types "
+                                        + "(Value or Writable), check their serialization methods. If you are using a ")),
+                Arrays.asList("ERROR_CLASS_CODE"),
+                "SYSTEM",
+                "2");
+
+        assertFailureEnricherLabelIsExpectedLabel(
+                new SerializedThrowable(
+                        new Exception(
+                                "serialization error. "
+                                        + "Pekko failed sending the message silently")),
+                Arrays.asList("ERROR_CLASS_CODE"),
+                "SYSTEM",
+                "2");
+    }
+
+    @Test
+    void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
         assertFailureEnricherLabelIsExpectedLabel(
                 new ArithmeticException("test"),
                 Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
