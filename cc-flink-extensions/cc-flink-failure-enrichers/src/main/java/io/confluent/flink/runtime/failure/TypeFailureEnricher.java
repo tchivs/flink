@@ -13,6 +13,7 @@ import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
@@ -132,6 +133,17 @@ public class TypeFailureEnricher implements FailureEnricher {
         forUserThrowable(
                 UnknownTopicOrPartitionException.class,
                 Classification.of(Type.USER, Handling.FAIL, 8)),
+        forUserThrowable(
+                SaslAuthenticationException.class,
+                Classification.of(Type.SYSTEM, Handling.RECOVER, 17),
+                ConditionalClassification.of(
+                        t ->
+                                t.getMessage() != null
+                                        && t.getMessage()
+                                                .contains("logicalCluster: CLUSTER_NOT_FOUND"),
+                        Type.USER,
+                        Handling.FAIL,
+                        18)),
         // Schema Registry exceptions.
         forUserThrowable(
                 RestClientException.class, Classification.of(Type.USER, Handling.RECOVER, 9)),
