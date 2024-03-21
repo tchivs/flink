@@ -108,10 +108,12 @@ class KafkaCommitter
             final boolean isRecoveredCommittable = !recyclable.isPresent();
             InternalKafkaProducer<?, ?> producer = null;
             try {
-                producer =
-                        isRecoveredCommittable
-                                ? getRecoveryProducer(committable)
-                                : recyclable.get().getObject();
+                if (isRecoveredCommittable) {
+                    producer = getRecoveryProducer(committable);
+                    producer.resumePreparedTransaction(committable);
+                } else {
+                    producer = recyclable.get().getObject();
+                }
                 producer.commitTransaction();
                 producer.flush();
                 if (isRecoveredCommittable) {
@@ -219,7 +221,6 @@ class KafkaCommitter
             default:
                 throw new RuntimeException("Unexpected KafkaCommittable version: " + committable);
         }
-        recoveryProducer.resumePreparedTransaction(committable);
         return recoveryProducer;
     }
 }
