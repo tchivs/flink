@@ -4,6 +4,7 @@
 
 package io.confluent.flink.runtime.failure;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.table.api.TableException;
@@ -93,6 +94,26 @@ class TypeFailureEnricherTest {
 
         Class<?> userClass = Class.forName(USER_CLASS, false, classLoader);
         assertTrue(TypeFailureEnricherUtils.isUserCodeClassLoader(userClass.getClassLoader()));
+    }
+
+    @Test
+    void testTypeFailureConfiguration() throws ExecutionException, InterruptedException {
+        Configuration configuration = new Configuration();
+        configuration.set(
+                TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.FALSE);
+        assertFailureEnricherLabelIsExpectedLabel(
+                configuration,
+                new ArithmeticException("test_1"),
+                Arrays.asList("ERROR_CLASS_CODE"),
+                "USER",
+                "5");
+        configuration.set(TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.TRUE);
+        assertFailureEnricherLabelIsExpectedLabel(
+                configuration,
+                new ArithmeticException("test_2"),
+                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "USER",
+                "5");
     }
 
     @Test

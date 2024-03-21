@@ -16,6 +16,6 @@ public class TypeFailureEnricherFactory implements FailureEnricherFactory {
 
     @Override
     public FailureEnricher createFailureEnricher(Configuration conf) {
-        return new TypeFailureEnricher();
+        return new TypeFailureEnricher(conf);
     }
 }

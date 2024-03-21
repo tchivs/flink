@@ -4,6 +4,7 @@
 
 package io.confluent.flink.runtime.failure;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.ExceptionUtils;
@@ -70,6 +71,13 @@ public class TypeFailureEnricher implements FailureEnricher {
     /* Functional interface to classify a Throwable into a Type. */
     private interface Classifier {
         Optional<Classification> classify(Throwable throwable);
+    }
+
+    private final boolean enableJobCannotRestartTag;
+
+    public TypeFailureEnricher(Configuration conf) {
+        enableJobCannotRestartTag =
+                conf.getBoolean(TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL);
     }
 
     /**
@@ -275,10 +283,16 @@ public class TypeFailureEnricher implements FailureEnricher {
     @Override
     public CompletableFuture<Map<String, String>> processFailure(
             final Throwable cause, final Context context) {
-        LOG.info("Processing failure:", cause);
+
+        LOG.info(
+                "Processing failure with enableJobCannotRestartTag={} :",
+                enableJobCannotRestartTag,
+                cause);
+
         if (cause == null) {
             return CompletableFuture.completedFuture(Collections.emptyMap());
         }
+
         final Map<String, String> labels = new HashMap<>();
         for (Classifier classifier : TYPE_CLASSIFIERS) {
             final Optional<Classification> maybeClassification = classifier.classify(cause);
@@ -286,7 +300,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                 Classification classification = maybeClassification.get();
                 labels.put(KEY_TYPE, classification.type.name());
                 labels.put(KEY_ERROR_CLASS_CODE, classification.errorClassCode);
-                if (Handling.FAIL.equals(classification.handling)) {
+                if (enableJobCannotRestartTag && Handling.FAIL.equals(classification.handling)) {
                     labels.put(FailureEnricher.KEY_JOB_CANNOT_RESTART, "");
                 }
                 break;

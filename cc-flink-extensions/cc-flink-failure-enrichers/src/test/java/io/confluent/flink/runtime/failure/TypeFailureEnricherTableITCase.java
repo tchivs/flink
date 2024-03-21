@@ -4,6 +4,7 @@
 
 package io.confluent.flink.runtime.failure;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failure.FailureEnricher.Context;
 import org.apache.flink.runtime.failure.DefaultFailureEnricherContext;
 import org.apache.flink.table.api.Table;
@@ -158,6 +159,16 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
     public static void assertFailureEnricherLabelIsExpectedLabel(
             Exception e, List<String> expectedKeys, String... expectedLabels)
             throws ExecutionException, InterruptedException {
+        assertFailureEnricherLabelIsExpectedLabel(
+                new Configuration(), e, expectedKeys, expectedLabels);
+    }
+
+    public static void assertFailureEnricherLabelIsExpectedLabel(
+            Configuration configuration,
+            Exception e,
+            List<String> expectedKeys,
+            String... expectedLabels)
+            throws ExecutionException, InterruptedException {
         final Context taskFailureCtx =
                 DefaultFailureEnricherContext.forTaskFailure(
                         null, null, null, newSingleThreadExecutor(), null);
@@ -166,7 +177,7 @@ public class TypeFailureEnricherTableITCase extends StreamingTestBase {
                         e,
                         taskFailureCtx,
                         newSingleThreadExecutor(),
-                        Collections.singleton(new TypeFailureEnricher()));
+                        Collections.singleton(new TypeFailureEnricher(configuration)));
         final Map<String, String> failureLabels = resultFuture.get();
         if (!expectedKeys.isEmpty()) {
             assertThat(failureLabels).containsKeys(expectedKeys.toArray(new String[0]));
