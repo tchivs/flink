@@ -46,6 +46,7 @@ import org.apache.flink.runtime.state.StateBackend.CustomInitializationMetrics;
 import org.apache.flink.runtime.state.StateSerializerProvider;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.runtime.state.metainfo.StateMetaInfoSnapshot;
+import org.apache.flink.runtime.taskmanager.AsyncExceptionHandler;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
@@ -144,6 +145,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
     private final boolean useDeleteFilesInRange;
 
+    private final AsyncExceptionHandler asyncExceptionHandler;
+
     public RocksDBIncrementalRestoreOperation(
             String operatorIdentifier,
             KeyGroupRange keyGroupRange,
@@ -169,7 +172,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
             double overlapFractionThreshold,
             boolean useIngestDbRestoreMode,
             boolean asyncCompactAfterRescale,
-            boolean useDeleteFilesInRange) {
+            boolean useDeleteFilesInRange,
+            AsyncExceptionHandler asyncExceptionHandler) {
         this.rocksHandle =
                 new RocksDBHandle(
                         kvStateInformation,
@@ -200,6 +204,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
         this.useIngestDbRestoreMode = useIngestDbRestoreMode;
         this.asyncCompactAfterRescale = asyncCompactAfterRescale;
         this.useDeleteFilesInRange = useDeleteFilesInRange;
+        this.asyncExceptionHandler = asyncExceptionHandler;
     }
 
     /**
@@ -287,7 +292,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                                 dbResourceGuard,
                                 // This task will be owned by the backend's lifecycle because it
                                 // continues to exist after restore is completed.
-                                cancelRegistryForBackend);
+                                cancelRegistryForBackend,
+                                asyncExceptionHandler);
                 runAndReportDuration(asyncRangeCompactionTask, RESTORE_ASYNC_COMPACTION_DURATION);
                 logger.info(
                         "Completed async compaction after restore for backend {} in operator {} after {} ms.",

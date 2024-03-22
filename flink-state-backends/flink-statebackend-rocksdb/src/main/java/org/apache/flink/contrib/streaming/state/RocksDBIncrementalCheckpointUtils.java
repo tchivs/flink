@@ -22,6 +22,7 @@ import org.apache.flink.runtime.state.CompositeKeySerializationUtils;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
+import org.apache.flink.runtime.taskmanager.AsyncExceptionHandler;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.ResourceGuard;
@@ -255,7 +256,8 @@ public class RocksDBIncrementalCheckpointUtils {
             int keyGroupPrefixBytes,
             KeyGroupRange dbExpectedKeyGroupRange,
             ResourceGuard rocksDBResourceGuard,
-            CloseableRegistry closeableRegistry) {
+            CloseableRegistry closeableRegistry,
+            AsyncExceptionHandler asyncExceptionHandler) {
 
         return () -> {
             logger.debug(
@@ -333,6 +335,11 @@ public class RocksDBIncrementalCheckpointUtils {
                                         compactionOptions);
                             }
                         }
+                    }
+                } catch (Exception e) {
+                    if (!compactionOptions.canceled()) {
+                        asyncExceptionHandler.handleAsyncException(
+                                "failure during async compaction", e);
                     }
                 } finally {
                     closeableRegistry.unregisterCloseable(cancelCompactionCloseable);
