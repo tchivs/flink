@@ -14,3 +14,12 @@ make:
   enable_updates: true
 grpc:
   enable: true
+code_artifact:
+  enable: true
+  package_paths:
+    - maven-snapshots/maven/io.confluent.flink/flink
+    - maven-snapshots/maven/io.confluent.flink/cc-flink-*
+    - maven-snapshots/maven/org.apache.flink/flink-*
+    - maven-snapshots/maven/io.confluent.flink/flink-*
+    - maven-snapshots/maven/org.apache.flink/fink-migration-test-utils
+    - maven-releases/maven/io.confluent.flink/confluent-flink-plugin-parent
