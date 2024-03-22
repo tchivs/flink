@@ -152,7 +152,8 @@ class JobIDLoggingITCase {
                 ".*ResourceManager.*",
                 "Operator event.*",
                 "Recovered slot allocation snapshots.*",
-                ".*heartbeat.*");
+                ".*heartbeat.*",
+                ".*leadership.*");
 
         assertJobIDPresent(
                 jobID,
