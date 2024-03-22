@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.operations;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.internal.TableResultInternal;
 import org.apache.flink.table.functions.FunctionIdentifier;
 import org.apache.flink.table.functions.SqlLikeUtils;
@@ -141,6 +142,11 @@ public class ShowFunctionsOperation implements ShowOperation {
 
     public boolean isNotLike() {
         return notLike;
+    }
+
+    @Confluent
+    public String getLikePattern() {
+        return likePattern;
     }
 
     @Override
