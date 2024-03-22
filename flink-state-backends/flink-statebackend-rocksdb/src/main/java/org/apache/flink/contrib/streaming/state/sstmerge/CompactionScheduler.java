@@ -30,6 +30,8 @@ class CompactionScheduler {
     private final CompactionTracker tracker;
     private final Compactor compactor;
     private final CompactionTaskProducer taskProducer;
+    private final Object lock = new Object();
+    private boolean running = true;
 
     public CompactionScheduler(
             RocksDBManualCompactionConfig settings,
@@ -37,8 +39,24 @@ class CompactionScheduler {
             CompactionTaskProducer taskProducer,
             Compactor compactor,
             CompactionTracker tracker) {
+        this(
+                settings,
+                ioExecutor,
+                taskProducer,
+                compactor,
+                tracker,
+                Executors.newSingleThreadScheduledExecutor());
+    }
+
+    public CompactionScheduler(
+            RocksDBManualCompactionConfig settings,
+            ExecutorService ioExecutor,
+            CompactionTaskProducer taskProducer,
+            Compactor compactor,
+            CompactionTracker tracker,
+            ScheduledExecutorService scheduledExecutor) {
         this.ioExecutor = ioExecutor;
-        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.scheduledExecutor = scheduledExecutor;
         this.checkPeriodMs = settings.minInterval;
         this.tracker = tracker;
         this.compactor = compactor;
@@ -50,13 +68,29 @@ class CompactionScheduler {
     }
 
     public void stop() throws InterruptedException {
-        scheduledExecutor.shutdownNow();
+        synchronized (lock) {
+            if (running) {
+                running = false;
+                scheduledExecutor.shutdownNow();
+            }
+        }
+        if (!scheduledExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+            LOG.warn("Unable to terminate scheduled tasks in 5s");
+        }
     }
 
     public void scheduleScan() {
-        LOG.trace("Schedule SST scan in {} ms", checkPeriodMs);
-        scheduledExecutor.schedule(
-                () -> ioExecutor.execute(this::maybeScan), checkPeriodMs, TimeUnit.MILLISECONDS);
+        synchronized (lock) {
+            if (running) {
+                LOG.trace("Schedule SST scan in {} ms", checkPeriodMs);
+                scheduledExecutor.schedule(
+                        () -> ioExecutor.execute(this::maybeScan),
+                        checkPeriodMs,
+                        TimeUnit.MILLISECONDS);
+            } else {
+                LOG.debug("Not scheduling next scan: shutting down");
+            }
+        }
     }
 
     public void maybeScan() {

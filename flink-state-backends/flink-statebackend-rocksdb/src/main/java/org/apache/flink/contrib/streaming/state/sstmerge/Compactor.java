@@ -24,11 +24,15 @@ class Compactor {
     private static final Logger LOG = LoggerFactory.getLogger(Compactor.class);
     private static final int OUTPUT_PATH_ID = 0; // just use the first one
 
-    private final RocksDB db;
+    private final CompactionTarget db;
     private final long targetOutputFileSize;
 
     public Compactor(RocksDB db, long targetOutputFileSize) {
-        this.db = db;
+        this(db::compactFiles, targetOutputFileSize);
+    }
+
+    public Compactor(CompactionTarget target, long targetOutputFileSize) {
+        this.db = target;
         this.targetOutputFileSize = targetOutputFileSize;
     }
 
@@ -45,5 +49,18 @@ class Compactor {
                 CompactionJobInfo compactionJobInfo = new CompactionJobInfo()) {
             db.compactFiles(options, cfName, files, outputLevel, OUTPUT_PATH_ID, compactionJobInfo);
         }
+    }
+
+    public interface CompactionTarget {
+        void compactFiles(
+                CompactionOptions var1,
+                ColumnFamilyHandle var2,
+                List<String> var3,
+                int var4,
+                int var5,
+                CompactionJobInfo var6)
+                throws RocksDBException;
+
+        CompactionTarget NO_OP = (var1, var2, var3, var4, var5, var6) -> {};
     }
 }
