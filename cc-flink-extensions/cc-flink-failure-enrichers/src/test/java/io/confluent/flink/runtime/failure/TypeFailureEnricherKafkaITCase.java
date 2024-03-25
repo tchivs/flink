@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
+import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabels;
 import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,8 +62,16 @@ public class TypeFailureEnricherKafkaITCase extends TestLogger {
                 .satisfies(anyCauseMatches(UnknownTopicOrPartitionException.class))
                 .satisfies(
                         e ->
-                                assertFailureEnricherLabelIsExpectedLabel(
-                                        (Exception) e, Collections.emptyList(), "USER"));
+                                assertFailureEnricherLabels(
+                                        (Exception) e,
+                                        "ERROR_CLASS_CODE",
+                                        "8",
+                                        "JOB_CANNOT_RESTART",
+                                        "",
+                                        "TYPE",
+                                        "USER",
+                                        "USER_ERROR_MSG",
+                                        "ignore"));
     }
 
     @Test
@@ -90,10 +98,16 @@ public class TypeFailureEnricherKafkaITCase extends TestLogger {
                 .hasMessageContaining(timeoutException.getMessage())
                 .satisfies(
                         e ->
-                                assertFailureEnricherLabelIsExpectedLabel(
+                                assertFailureEnricherLabels(
                                         (Exception) e,
-                                        Collections.singletonList("JOB_CANNOT_RESTART"),
-                                        "USER"));
+                                        "ERROR_CLASS_CODE",
+                                        "7",
+                                        "JOB_CANNOT_RESTART",
+                                        "",
+                                        "TYPE",
+                                        "USER",
+                                        "USER_ERROR_MSG",
+                                        "ignore"));
     }
 
     /** Returns a mocked String the KafkaProducer. */

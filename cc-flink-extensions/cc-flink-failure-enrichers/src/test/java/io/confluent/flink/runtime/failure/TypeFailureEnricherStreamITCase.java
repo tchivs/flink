@@ -15,9 +15,8 @@ import org.apache.flink.util.TestLogger;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Collections;
 
-import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
+import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabels;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test that the TypeFailureEnricher correctly labels common exceptions in the DataStream API. */
@@ -45,8 +44,14 @@ public class TypeFailureEnricherStreamITCase extends TestLogger {
         assertThatThrownBy(() -> env.execute())
                 .satisfies(
                         e ->
-                                assertFailureEnricherLabelIsExpectedLabel(
-                                        (Exception) e, Collections.emptyList(), "SYSTEM"));
+                                assertFailureEnricherLabels(
+                                        (Exception) e,
+                                        "ERROR_CLASS_CODE",
+                                        "2",
+                                        "TYPE",
+                                        "SYSTEM",
+                                        "USER_ERROR_MSG",
+                                        "ignore"));
     }
 
     // ------------------------------------------------------------------------

@@ -35,7 +35,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.DateTimeException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +42,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
-import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
+import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabels;
 import static org.apache.flink.util.FlinkUserCodeClassLoader.NOOP_EXCEPTION_HANDLER;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -101,88 +100,134 @@ class TypeFailureEnricherTest {
         Configuration configuration = new Configuration();
         configuration.set(
                 TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.FALSE);
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 configuration,
                 new ArithmeticException("test_1"),
-                Arrays.asList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "5",
+                "TYPE",
                 "USER",
-                "5");
+                "USER_ERROR_MSG",
+                "test_1");
         configuration.set(TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.TRUE);
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 configuration,
                 new ArithmeticException("test_2"),
-                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "5",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "5");
+                "USER_ERROR_MSG",
+                "test_2");
     }
 
     @Test
     void testTypeFailureEnricherSerializationErrors()
             throws ExecutionException, InterruptedException {
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new SerializedThrowable(new Exception("serialization error")),
-                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "1",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "1");
+                "USER_ERROR_MSG",
+                "java.lang.Exception: serialization error");
 
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new SerializedThrowable(
                         new Exception(
                                 "serialization error. "
                                         + "Serializer consumed more bytes than the record had. "
                                         + "This indicates broken serialization. If you are using custom serialization types "
                                         + "(Value or Writable), check their serialization methods. If you are using a ")),
-                Arrays.asList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "2",
+                "TYPE",
                 "SYSTEM",
-                "2");
+                "USER_ERROR_MSG",
+                "java.lang.Exception: serialization error. Serializer consumed more bytes than the record had. This indicates broken serialization. If you are using custom serialization types (Value or Writable), check their serialization methods. If you are using a ");
 
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new SerializedThrowable(
                         new Exception(
                                 "serialization error. "
                                         + "Pekko failed sending the message silently")),
-                Arrays.asList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "19",
+                "TYPE",
                 "SYSTEM",
-                "2");
+                "USER_ERROR_MSG",
+                "java.lang.Exception: serialization error. Pekko failed sending the message silently");
     }
 
     @Test
     void testTypeFailureEnricherCases() throws ExecutionException, InterruptedException {
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new ArithmeticException("test"),
-                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "5",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "5");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new NumberFormatException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "10",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "10");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new DateTimeException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "11",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "11");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new TransactionalIdAuthorizationException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "12",
+                "TYPE",
                 "USER",
-                "12");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new TopicAuthorizationException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "13",
+                "TYPE",
                 "USER",
-                "13");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new FlinkException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "15",
+                "TYPE",
                 "SYSTEM",
-                "15");
-        assertFailureEnricherLabelIsExpectedLabel(
+                "USER_ERROR_MSG",
+                "test");
+        assertFailureEnricherLabels(
                 new ExpectedTestException("test"),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "0",
+                "TYPE",
                 "UNKNOWN",
-                "0");
+                "USER_ERROR_MSG",
+                "test");
     }
 
     @Test
@@ -192,29 +237,45 @@ class TypeFailureEnricherTest {
                 "Column 'b' is NOT NULL, however, a null value is being written into it. "
                         + "You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' "
                         + "to suppress this exception and drop such records silently.";
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new TableException(errorMsg),
-                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "4",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "4");
+                "USER_ERROR_MSG",
+                "Column 'b' is NOT NULL, however, a null value is being written into it. You can set job configuration 'table.exec.sink.not-null-enforcer'='DROP' to suppress this exception and drop such records silently.");
     }
 
     @Test
     void testTableExceptionClassification() throws ExecutionException, InterruptedException {
         final String errorMsg = "Some other error message";
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 new TableException(errorMsg),
-                Collections.singletonList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "3",
+                "TYPE",
                 "USER",
-                "3");
+                "USER_ERROR_MSG",
+                "Some other error message");
     }
 
     @Test
     void testUserSecretExceptionClassification() throws ExecutionException, InterruptedException {
         Exception toValidate =
                 new FlinkRuntimeException(String.format(AISecret.ERROR_MESSAGE, "name"));
-        assertFailureEnricherLabelIsExpectedLabel(
-                toValidate, Collections.singletonList("ERROR_CLASS_CODE"), "USER", "14");
+        assertFailureEnricherLabels(
+                toValidate,
+                "ERROR_CLASS_CODE",
+                "14",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
+                "USER",
+                "USER_ERROR_MSG",
+                "SECRET is null. Please SET 'name' and resubmit job.");
     }
 
     @Test

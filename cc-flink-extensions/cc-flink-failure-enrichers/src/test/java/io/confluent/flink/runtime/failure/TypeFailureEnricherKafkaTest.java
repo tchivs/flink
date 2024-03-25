@@ -9,10 +9,9 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
-import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabelIsExpectedLabel;
+import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabels;
 
 /** Unit tests for Kafka Exception classification. */
 public class TypeFailureEnricherKafkaTest {
@@ -22,19 +21,27 @@ public class TypeFailureEnricherKafkaTest {
         Configuration configuration = new Configuration();
         configuration.set(TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.TRUE);
 
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 configuration,
                 new SaslAuthenticationException("test_1"),
-                Arrays.asList("ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "17",
+                "TYPE",
                 "SYSTEM",
-                "17");
+                "USER_ERROR_MSG",
+                "test_1");
 
-        assertFailureEnricherLabelIsExpectedLabel(
+        assertFailureEnricherLabels(
                 configuration,
                 new SaslAuthenticationException(
                         "test. " + "logicalCluster: CLUSTER_NOT_FOUND" + "!"),
-                Arrays.asList("JOB_CANNOT_RESTART", "ERROR_CLASS_CODE"),
+                "ERROR_CLASS_CODE",
+                "18",
+                "JOB_CANNOT_RESTART",
+                "",
+                "TYPE",
                 "USER",
-                "18");
+                "USER_ERROR_MSG",
+                "test. logicalCluster: CLUSTER_NOT_FOUND!");
     }
 }
