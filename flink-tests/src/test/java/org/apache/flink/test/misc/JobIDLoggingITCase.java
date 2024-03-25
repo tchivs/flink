@@ -23,10 +23,12 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.minicluster.MiniCluster;
+import org.apache.flink.runtime.scheduler.adaptive.AdaptiveScheduler;
 import org.apache.flink.runtime.taskexecutor.TaskExecutor;
 import org.apache.flink.runtime.taskmanager.Task;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
@@ -57,6 +59,7 @@ import java.util.regex.Pattern;
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTS_DIRECTORY;
+import static org.apache.flink.configuration.JobManagerOptions.SCHEDULER;
 import static org.apache.flink.runtime.testutils.CommonTestUtils.waitForCheckpoint;
 import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.CHECKPOINTING_INTERVAL;
 import static org.apache.flink.util.MdcUtils.JOB_ID;
@@ -91,6 +94,10 @@ class JobIDLoggingITCase {
             new LoggerAuditingExtension(JobMaster.class, DEBUG);
 
     @RegisterExtension
+    public final LoggerAuditingExtension adaptiveSchedulerLogging =
+            new LoggerAuditingExtension(AdaptiveScheduler.class, DEBUG);
+
+    @RegisterExtension
     public final LoggerAuditingExtension asyncCheckpointRunnableLogging =
             // this class is private
             new LoggerAuditingExtension(
@@ -100,9 +107,16 @@ class JobIDLoggingITCase {
     public static MiniClusterExtension miniClusterResource =
             new MiniClusterExtension(
                     new MiniClusterResourceConfiguration.Builder()
+                            .setConfiguration(getConfiguration())
                             .setNumberTaskManagers(1)
                             .setNumberSlotsPerTaskManager(1)
                             .build());
+
+    private static Configuration getConfiguration() {
+        Configuration configuration = new Configuration();
+        configuration.set(SCHEDULER, JobManagerOptions.SchedulerType.Adaptive);
+        return configuration;
+    }
 
     @Test
     void testJobIDLogging(
@@ -177,16 +191,21 @@ class JobIDLoggingITCase {
 
         assertJobIDPresent(
                 jobID,
+                adaptiveSchedulerLogging,
+                asList(
+                        "Running initialization on master for job .*",
+                        "Successfully created execution graph from job graph .*",
+                        "Successfully ran initialization on master.*"),
+                "Registration at ResourceManager.*",
+                "Registration with ResourceManager.*",
+                "Resolved ResourceManager address.*");
+
+        assertJobIDPresent(
+                jobID,
                 jobMasterLogging,
                 asList(
                         "Initializing job .*",
-                        "Running initialization on master for job .*",
                         "Starting execution of job .*",
-                        "Starting scheduling.*",
-                        "Successfully created execution graph from job graph .*",
-                        "Successfully ran initialization on master.*",
-                        "Triggering a manual checkpoint for job .*.",
-                        "Using failover strategy .*",
                         "Using restart back off time strategy .*"),
                 "Registration at ResourceManager.*",
                 "Registration with ResourceManager.*",
