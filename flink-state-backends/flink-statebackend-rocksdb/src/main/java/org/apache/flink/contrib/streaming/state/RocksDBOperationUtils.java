@@ -19,6 +19,7 @@ package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.core.fs.ICloseableRegistry;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -130,7 +132,8 @@ public class RocksDBOperationUtils {
             Function<String, ColumnFamilyOptions> columnFamilyOptionsFactory,
             @Nullable RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
             @Nullable Long writeBufferManagerCapacity,
-            List<ExportImportFilesMetaData> importFilesMetaData) {
+            List<ExportImportFilesMetaData> importFilesMetaData,
+            ICloseableRegistry cancelStreamRegistryForRestore) {
 
         ColumnFamilyDescriptor columnFamilyDescriptor =
                 createColumnFamilyDescriptor(
@@ -138,32 +141,43 @@ public class RocksDBOperationUtils {
                         columnFamilyOptionsFactory,
                         ttlCompactFiltersManager,
                         writeBufferManagerCapacity);
+        Closeable closeable = columnFamilyDescriptor.getOptions()::close;
 
-        final ColumnFamilyHandle columnFamilyHandle;
-        try {
-            columnFamilyHandle =
+        try (Closeable ignored =
+                cancelStreamRegistryForRestore.registerCloseableTemporarily(closeable)) {
+            ColumnFamilyHandle columnFamilyHandle =
                     createColumnFamily(columnFamilyDescriptor, db, importFilesMetaData);
+            return new RocksDBKeyedStateBackend.RocksDbKvStateInfo(
+                    columnFamilyHandle, metaInfoBase);
         } catch (Exception ex) {
-            IOUtils.closeQuietly(columnFamilyDescriptor.getOptions());
+            if (cancelStreamRegistryForRestore.unregisterCloseable(closeable)) {
+                IOUtils.closeQuietly(columnFamilyDescriptor.getOptions());
+            }
             throw new FlinkRuntimeException("Error creating ColumnFamilyHandle.", ex);
         }
-
-        return new RocksDBKeyedStateBackend.RocksDbKvStateInfo(columnFamilyHandle, metaInfoBase);
     }
 
+    /**
+     * Create RocksDB-backed KV-state, including RocksDB ColumnFamily.
+     *
+     * @param cancelStreamRegistryForRestore {@link ICloseableRegistry#close closing} it interrupts
+     *     KV state creation
+     */
     public static RocksDBKeyedStateBackend.RocksDbKvStateInfo createStateInfo(
             RegisteredStateMetaInfoBase metaInfoBase,
             RocksDB db,
             Function<String, ColumnFamilyOptions> columnFamilyOptionsFactory,
             @Nullable RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
-            @Nullable Long writeBufferManagerCapacity) {
+            @Nullable Long writeBufferManagerCapacity,
+            ICloseableRegistry cancelStreamRegistryForRestore) {
         return createStateInfo(
                 metaInfoBase,
                 db,
                 columnFamilyOptionsFactory,
                 ttlCompactFiltersManager,
                 writeBufferManagerCapacity,
-                Collections.emptyList());
+                Collections.emptyList(),
+                cancelStreamRegistryForRestore);
     }
 
     /**
