@@ -1724,7 +1724,7 @@ under the License.
 						<exclude>mk-include/**</exclude>
 						<exclude>.semaphore/**</exclude>
 						<exclude>Makefile</exclude>
-						<exclude>service.yaml</exclude>
+						<exclude>service.yml</exclude>
 						<exclude>tools/ci/confluent/**</exclude>
 
 						<!-- confluent-specific json files -->
