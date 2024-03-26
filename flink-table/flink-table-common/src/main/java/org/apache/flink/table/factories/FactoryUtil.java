@@ -879,11 +879,17 @@ public final class FactoryUtil {
                 loadResults.add(serviceLoaderIterator.next());
             } catch (Throwable t) {
                 if (t instanceof NoClassDefFoundError) {
-                    LOG.debug(
-                            "NoClassDefFoundError when loading a "
-                                    + Factory.class.getCanonicalName()
-                                    + ". This is expected when trying to load a format dependency but no flink-connector-files is loaded.",
-                            t);
+                    // This is expected when trying to load a format dependency but
+                    // no flink-connector-files is loaded
+                    if (t.getMessage().endsWith("BulkReaderFormatFactory")) {
+                        LOG.debug("Formats implementing BulkReaderFormatFactory are unavailable.");
+                    } else {
+                        LOG.warn(
+                                "NoClassDefFoundError when loading a "
+                                        + Factory.class.getCanonicalName()
+                                        + ".",
+                                t);
+                    }
                 } else {
                     throw new TableException(
                             "Unexpected error when trying to load service provider.", t);
