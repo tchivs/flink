@@ -270,7 +270,12 @@ public class RocksDBOperationUtils {
             ColumnFamilyDescriptor columnDescriptor,
             RocksDB db,
             List<ExportImportFilesMetaData> importFilesMetaData)
-            throws RocksDBException {
+            throws RocksDBException, InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            // abort recovery if the task thread was already interrupted
+            // e.g. because the task was cancelled
+            throw new InterruptedException("The thread was interrupted, aborting recovery");
+        }
 
         if (importFilesMetaData.isEmpty()) {
             return db.createColumnFamily(columnDescriptor);
