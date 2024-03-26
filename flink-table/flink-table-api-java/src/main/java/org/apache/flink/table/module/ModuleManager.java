@@ -181,12 +181,10 @@ public class ModuleManager {
         for (String moduleName : usedModules) {
             if (loadedModules.get(moduleName).listFunctions(true).stream()
                     .anyMatch(name::equalsIgnoreCase)) {
-                LOG.debug("Got FunctionDefinition '{}' from '{}' module.", name, moduleName);
                 return loadedModules.get(moduleName).getFunctionDefinition(name);
             }
         }
 
-        LOG.debug("Cannot find FunctionDefinition '{}' from any loaded modules.", name);
         return Optional.empty();
     }
 
