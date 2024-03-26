@@ -1091,29 +1091,35 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
             long checkpointId,
             long latestCompletedCheckpointId,
             long checkpointTimestamp) {
-        log.debug(
-                "Abort checkpoint {}@{} for {}.",
-                checkpointId,
-                checkpointTimestamp,
-                executionAttemptID);
-
         final Task task = taskSlotTable.getTask(executionAttemptID);
+        try (MdcCloseable ignored =
+                MdcUtils.withContext(
+                        task == null
+                                ? Collections.emptyMap()
+                                : MdcUtils.asContextData(task.getJobID()))) {
+            log.debug(
+                    "Abort checkpoint {}@{} for {}.",
+                    checkpointId,
+                    checkpointTimestamp,
+                    executionAttemptID);
 
-        if (task != null) {
-            task.notifyCheckpointAborted(checkpointId, latestCompletedCheckpointId);
+            if (task != null) {
+                task.notifyCheckpointAborted(checkpointId, latestCompletedCheckpointId);
 
-            return CompletableFuture.completedFuture(Acknowledge.get());
-        } else {
-            final String message =
-                    "TaskManager received an aborted checkpoint for unknown task "
-                            + executionAttemptID
-                            + '.';
+                return CompletableFuture.completedFuture(Acknowledge.get());
+            } else {
+                final String message =
+                        "TaskManager received an aborted checkpoint for unknown task "
+                                + executionAttemptID
+                                + '.';
 
-            log.debug(message);
-            return FutureUtils.completedExceptionally(
-                    new CheckpointException(
-                            message,
-                            CheckpointFailureReason.UNKNOWN_TASK_CHECKPOINT_NOTIFICATION_FAILURE));
+                log.debug(message);
+                return FutureUtils.completedExceptionally(
+                        new CheckpointException(
+                                message,
+                                CheckpointFailureReason
+                                        .UNKNOWN_TASK_CHECKPOINT_NOTIFICATION_FAILURE));
+            }
         }
     }
 
