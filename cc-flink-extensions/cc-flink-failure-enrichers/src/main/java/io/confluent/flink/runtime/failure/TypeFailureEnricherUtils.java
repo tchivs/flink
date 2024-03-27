@@ -70,7 +70,8 @@ final class TypeFailureEnricherUtils {
         final String searchName = searchType.getCanonicalName();
         Throwable t = throwable;
         while (t != null) {
-            if (searchName.equals(t.getClass().getName())) {
+            // SQL-1836: Check for contains name instead of exact match to support shaded deps
+            if (t.getClass().getName().contains(searchName)) {
                 return Optional.of(throwable);
             } else {
                 t = t.getCause();

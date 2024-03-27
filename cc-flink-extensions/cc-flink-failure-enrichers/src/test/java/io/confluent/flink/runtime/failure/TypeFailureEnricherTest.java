@@ -124,6 +124,16 @@ class TypeFailureEnricherTest {
         assertFailureEnricherLabelIsExpectedLabel(toValidate, "USER");
     }
 
+    @Test
+    void testShadedDepsClassification() {
+        assertTrue(
+                TypeFailureEnricherUtils.findThrowableByName(
+                                new io.confluent.shaded.io.confluent.flink.runtime.failure.mock
+                                        .MockedException(),
+                                io.confluent.flink.runtime.failure.mock.MockedException.class)
+                        .isPresent());
+    }
+
     /** Pack the generated classes into a JAR and return the path of the JAR. */
     public static File createJarFile(
             File tmpDir, String jarName, Map<String, String> classNameCodes) throws IOException {
