@@ -773,11 +773,26 @@ public class TaskManagerRunner implements FatalErrorHandler {
                     "Using configured hostname/address for TaskManager: {}.",
                     configuredTaskManagerHostname);
             return configuredTaskManagerHostname;
-        } else {
-            checkNotNull(haServices);
-            return determineTaskManagerBindAddressByConnectingToResourceManager(
-                    configuration, haServices, rpcSystemUtils);
         }
+
+        final String hostEnvVar =
+                configuration.getString(TaskManagerConfluentOptions.HOST_ENVIRONMENT_VARIABLE);
+
+        if (hostEnvVar != null) {
+            String host = System.getenv(hostEnvVar);
+            LOG.info(
+                    "Using environment variable for resolving hostname/address for TaskManager: {}='{}'.",
+                    hostEnvVar,
+                    host);
+
+            if (!StringUtils.isNullOrWhitespaceOnly(host)) {
+                return host;
+            }
+        }
+
+        checkNotNull(haServices);
+        return determineTaskManagerBindAddressByConnectingToResourceManager(
+                configuration, haServices, rpcSystemUtils);
     }
 
     private static String determineTaskManagerBindAddressByConnectingToResourceManager(

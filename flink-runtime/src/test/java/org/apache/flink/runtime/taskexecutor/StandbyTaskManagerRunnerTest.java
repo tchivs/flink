@@ -32,13 +32,14 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.apache.flink.runtime.testutils.CommonTestUtils.waitUntilCondition;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 
 /** Tests for the {@link TaskManagerRunner} with STANDBY_MODE option. */
 @Confluent
@@ -88,11 +89,15 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
     public void testTakingOverStandbyTaskManagers() throws Exception {
         // given: Configured TaskManager in standby mode.
         final String standbyHost = "standbyhost";
+        final String activatedHost = "activatedhost";
+        String hostEnvVar = "TEST_HOST";
+        updateEnv(hostEnvVar, activatedHost);
         final Configuration configuration =
                 createConfiguration()
                         .set(TaskManagerConfluentOptions.STANDBY_MODE, true)
                         .set(TaskManagerConfluentOptions.STANDBY_HOST, standbyHost)
-                        .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0);
+                        .set(TaskManagerConfluentOptions.STANDBY_RPC_PORT, 0)
+                        .set(TaskManagerConfluentOptions.HOST_ENVIRONMENT_VARIABLE, hostEnvVar);
 
         // and: The one config that should be overridden and one should stay untouched.
         ConfigOption<String> keyForOverride =
@@ -149,7 +154,15 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
         assertEquals(
                 "UNTOUCHED_ORIGINAL_VALUE",
                 taskExecutorServiceFactory.lastReceivedConfig.get(untouchedKey));
-        assertNotEquals(standbyHost, taskExecutorServiceFactory.lastRpcService.getAddress());
+        assertEquals(activatedHost, taskExecutorServiceFactory.lastRpcService.getAddress());
+    }
+
+    @SuppressWarnings({"unchecked"})
+    public static void updateEnv(String name, String val) throws ReflectiveOperationException {
+        Map<String, String> env = System.getenv();
+        Field field = env.getClass().getDeclaredField("m");
+        field.setAccessible(true);
+        ((Map<String, String>) field.get(env)).put(name, val);
     }
 
     private static Configuration createConfiguration() {

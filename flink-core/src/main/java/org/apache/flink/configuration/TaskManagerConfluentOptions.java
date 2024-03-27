@@ -41,6 +41,13 @@ public class TaskManagerConfluentOptions {
                     .withDescription(
                             "The host where the TaskManager standby activation endpoint is exposed.");
 
+    public static final ConfigOption<String> HOST_ENVIRONMENT_VARIABLE =
+            key("confluent.taskmanager.host.environment-variable")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The environment variable that specifies the host name or address where the TaskManager is exposed.");
+
     // ------------------------------------------------------------------------
 
     /** Not intended to be instantiated. */
