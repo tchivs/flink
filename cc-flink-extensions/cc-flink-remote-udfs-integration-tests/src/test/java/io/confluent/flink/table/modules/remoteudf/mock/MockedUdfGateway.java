@@ -7,6 +7,7 @@ package io.confluent.flink.table.modules.remoteudf.mock;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.binary.BinaryStringData;
+import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfSerialization;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfSpec;
@@ -19,15 +20,19 @@ import io.grpc.stub.StreamObserver;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Mock implementation of the UDF gateway. */
 public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGatewayImplBase {
-    public static RemoteUdfSpec testUdfSpec;
+    private final AtomicReference<RemoteUdfSpec> testUdfSpecReference = new AtomicReference<>();
 
     @Override
     public void invokeFunction(
             InvokeFunctionRequest request,
             StreamObserver<InvokeFunctionResponse> responseObserver) {
+
+        RemoteUdfSpec testUdfSpec = testUdfSpecReference.get();
+        Preconditions.checkNotNull(testUdfSpec);
 
         InvokeFunctionResponse.Builder builder = InvokeFunctionResponse.newBuilder();
 
@@ -48,7 +53,7 @@ public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGate
                         .is(DataTypes.STRING().getLogicalType().getTypeRoot())) {
                     builder.setPayload(
                             serialization.serializeReturnValue(
-                                    BinaryStringData.fromString(Arrays.asList(args).toString())));
+                                    BinaryStringData.fromString("str:" + Arrays.asList(args))));
                 } else if (testUdfSpec
                         .getReturnType()
                         .getLogicalType()
@@ -66,5 +71,9 @@ public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGate
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    public void registerUdfSpec(RemoteUdfSpec udfSpec) {
+        testUdfSpecReference.set(udfSpec);
     }
 }

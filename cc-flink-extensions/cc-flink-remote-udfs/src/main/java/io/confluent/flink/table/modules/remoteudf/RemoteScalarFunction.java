@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.time.Clock;
 import java.util.Map;
 
 /** Proof-of-concept implementation for remote scalar UDF. */
@@ -31,11 +32,19 @@ public class RemoteScalarFunction extends ScalarFunction {
     /** Runtime to invoke the remote function. */
     private transient RemoteUdfRuntime remoteUdfRuntime;
 
-    private RemoteScalarFunction(Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec) {
+    /** Tracks events which occur with UDFs. */
+    private transient RemoteUdfMetrics metrics;
+
+    /** Clock used for timing. Can be mocked in testing */
+    private Clock clock;
+
+    private RemoteScalarFunction(
+            Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec, Clock clock) {
         Preconditions.checkNotNull(confMap);
         Preconditions.checkNotNull(remoteUdfSpec);
         this.configMap = confMap;
         this.remoteUdfSpec = remoteUdfSpec;
+        this.clock = clock;
     }
 
     /**
@@ -46,7 +55,6 @@ public class RemoteScalarFunction extends ScalarFunction {
      * @return the return value of the remote UDF execution.
      */
     public @Nullable Object eval(Object... args) throws Exception {
-
         LOG.debug(
                 "Invoking remote scalar function. Plugin: {}, Function: {}, Rtype: {}, Args: {}",
                 remoteUdfSpec.getPluginId(),
@@ -54,25 +62,42 @@ public class RemoteScalarFunction extends ScalarFunction {
                 remoteUdfSpec.getReturnType(),
                 args);
 
-        return remoteUdfRuntime.callRemoteUdf(args);
+        long startMs = clock.millis();
+        try {
+            metrics.invocation();
+            Object result = remoteUdfRuntime.callRemoteUdf(args);
+            metrics.invocationSuccess();
+            return result;
+        } catch (Throwable t) {
+            LOG.error("Got an error while doing UDF call", t);
+            metrics.invocationFailure();
+            throw t;
+        } finally {
+            long completeMs = clock.millis();
+            metrics.invocationMs(completeMs - startMs);
+        }
     }
 
     @Override
     public void open(FunctionContext context) throws Exception {
         super.open(context);
 
+        this.metrics = new RemoteUdfMetrics(context.getMetricGroup());
+
         // Open should never be called twice, but just in case...
         if (this.remoteUdfRuntime != null) {
             remoteUdfRuntime.close();
         }
 
+        metrics.instanceProvision();
         Preconditions.checkNotNull(remoteUdfSpec);
-        this.remoteUdfRuntime = RemoteUdfRuntime.open(configMap, remoteUdfSpec);
+        this.remoteUdfRuntime = RemoteUdfRuntime.open(configMap, remoteUdfSpec, metrics);
     }
 
     @Override
     public void close() throws Exception {
         if (remoteUdfRuntime != null) {
+            metrics.instanceDeprovision();
             this.remoteUdfRuntime.close();
         }
         super.close();
@@ -87,7 +112,7 @@ public class RemoteScalarFunction extends ScalarFunction {
     public static RemoteScalarFunction create(
             Map<String, String> config, RemoteUdfSpec remoteUdfSpec) {
         LOG.info("RemoteScalarFunction config: {}", config);
-        return new RemoteScalarFunction(config, remoteUdfSpec);
+        return new RemoteScalarFunction(config, remoteUdfSpec, Clock.systemUTC());
     }
 
     @Override

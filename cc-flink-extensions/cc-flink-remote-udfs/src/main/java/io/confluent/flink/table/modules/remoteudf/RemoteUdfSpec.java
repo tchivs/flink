@@ -23,8 +23,11 @@ import java.util.stream.Collectors;
 public class RemoteUdfSpec implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    String organization;
-    String environment;
+    /** The organization of the registered UDF. */
+    private final String organization;
+
+    /** The environment of the registered UDF. */
+    private final String environment;
 
     /** ID under which the UDF was registered at creation time. */
     private final String pluginId;

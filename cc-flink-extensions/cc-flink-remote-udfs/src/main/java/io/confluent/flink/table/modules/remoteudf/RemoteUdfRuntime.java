@@ -37,12 +37,14 @@ public class RemoteUdfRuntime implements AutoCloseable {
             RemoteUdfGatewayConnection remoteUdfGatewayConnection,
             String functionInstanceName,
             ApiClient apiClient,
-            ComputeV1alphaFlinkUdfTask udfTask) {
+            ComputeV1alphaFlinkUdfTask udfTask,
+            RemoteUdfMetrics metrics) {
         this.remoteUdfSerialization = remoteUdfSerialization;
         this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
         this.functionInstanceName = functionInstanceName;
         this.apiClient = apiClient;
         this.udfTask = udfTask;
+        this.metrics = metrics;
     }
 
     /** Serialization methods. */
@@ -52,9 +54,14 @@ public class RemoteUdfRuntime implements AutoCloseable {
     /** The id of the function that was created by and is known to this runtime. */
     private final String functionInstanceName;
 
+    /** Api client used to provision and deprovision compute tasks. */
     private final ApiClient apiClient;
 
+    /** The UDF task ready to take calls. */
     private final ComputeV1alphaFlinkUdfTask udfTask;
+
+    /** Metrics object used to track events. */
+    private final RemoteUdfMetrics metrics;
 
     /**
      * Calls the remote UDF.
@@ -65,6 +72,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
      */
     public Object callRemoteUdf(Object[] args) throws Exception {
         ByteString serializedArguments = remoteUdfSerialization.serializeArguments(args);
+        metrics.bytesToUdf(serializedArguments.size());
         InvokeFunctionResponse invokeResponse =
                 remoteUdfGatewayConnection
                         .getUdfGateway()
@@ -75,7 +83,9 @@ public class RemoteUdfRuntime implements AutoCloseable {
                                         .build());
 
         checkAndHandleError(invokeResponse);
-        return remoteUdfSerialization.deserializeReturnValue(invokeResponse.getPayload());
+        ByteString serializedResult = invokeResponse.getPayload();
+        metrics.bytesFromUdf(serializedResult.size());
+        return remoteUdfSerialization.deserializeReturnValue(serializedResult);
     }
 
     /**
@@ -87,7 +97,8 @@ public class RemoteUdfRuntime implements AutoCloseable {
      * @throws Exception on any error, e.g. from the connection or failing to create function
      *     instances.
      */
-    public static RemoteUdfRuntime open(Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec)
+    public static RemoteUdfRuntime open(
+            Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec, RemoteUdfMetrics metrics)
             throws Exception {
         RemoteUdfSerialization remoteUdfSerialization =
                 new RemoteUdfSerialization(
@@ -117,7 +128,8 @@ public class RemoteUdfRuntime implements AutoCloseable {
                             remoteUdfGatewayConnection,
                             udfTask.getMetadata().getName(),
                             apiClient,
-                            udfTask);
+                            udfTask,
+                            metrics);
                 }
                 Thread.sleep(POLL_INTERVAL_MS);
             }
