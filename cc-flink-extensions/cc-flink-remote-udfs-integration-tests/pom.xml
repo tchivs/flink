@@ -45,6 +45,14 @@ Copyright 2024 Confluent Inc.
 		</dependency>
 
 		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>${bouncycastle.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Test dependencies -->
+		<dependency>
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-remote-udfs</artifactId>
 			<version>${project.version}</version>

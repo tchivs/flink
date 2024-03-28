@@ -29,14 +29,20 @@ import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContai
 import io.confluent.flink.table.modules.remoteudf.util.ApiServerUtils;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
 import io.grpc.Server;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.security.KeyPair;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -140,9 +146,23 @@ public class RemoteUdfIntegrationTest {
     @BeforeEach
     public void before() throws Exception {
         MockedUdfGateway testUdfGateway = new MockedUdfGateway();
+
+        KeyPair keyPair = TestUtils.createKeyPair();
+        Certificate x509 = TestUtils.createSelfSignedCertificate(keyPair);
+
+        // Convert both key and cert to InputStream PEM format
+        InputStream keySteam =
+                new ByteArrayInputStream(
+                        TestUtils.convertToBase64PEM(keyPair.getPrivate()).getBytes());
+        InputStream certSteam =
+                new ByteArrayInputStream(TestUtils.convertToBase64PEM(x509).getBytes());
+
+        // Use the above to start a TSL enabled server endpoint
+        SslContext sslContext = GrpcSslContexts.forServer(certSteam, keySteam).build();
         gatewayServer =
                 NettyServerBuilder.forAddress(new InetSocketAddress(GW_HOST, GW_PORT))
                         .addService(testUdfGateway)
+                        .sslContext(sslContext)
                         .build()
                         .start();
 

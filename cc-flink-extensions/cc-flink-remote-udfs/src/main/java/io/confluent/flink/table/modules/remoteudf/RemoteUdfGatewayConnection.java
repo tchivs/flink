@@ -9,7 +9,11 @@ import org.apache.flink.util.Preconditions;
 import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
 import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+
+import javax.net.ssl.SSLException;
 
 import java.io.Closeable;
 
@@ -40,7 +44,8 @@ public class RemoteUdfGatewayConnection implements Closeable {
      *     Status.
      * @return the open connection.
      */
-    public static RemoteUdfGatewayConnection open(ComputeV1alphaFlinkUdfTask udfTask) {
+    public static RemoteUdfGatewayConnection open(ComputeV1alphaFlinkUdfTask udfTask)
+            throws SSLException {
         Preconditions.checkArgument(
                 !udfTask.getStatus().getEndpoint().getHost().isEmpty(),
                 "Gateway Host not configured!");
@@ -55,8 +60,12 @@ public class RemoteUdfGatewayConnection implements Closeable {
                         udfTask.getStatus().getEndpoint().getPort());
 
         ManagedChannel channel =
-                Preconditions.checkNotNull(
-                        ManagedChannelBuilder.forTarget(udfGatewayTarget).usePlaintext().build());
+                NettyChannelBuilder.forTarget(udfGatewayTarget)
+                        .sslContext(
+                                GrpcSslContexts.forClient()
+                                        .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                                        .build())
+                        .build();
 
         SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub gateway =
                 Preconditions.checkNotNull(SecureComputeGatewayGrpc.newBlockingStub(channel));

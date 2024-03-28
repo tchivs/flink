@@ -13,8 +13,29 @@ import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedCatalog;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedFunctionWithTypes;
 import io.confluent.flink.table.service.ServiceTasks;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
+import java.io.IOException;
+import java.io.StringWriter;
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Security;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,12 +60,58 @@ public class TestUtils {
     static final String APISERVER_TARGET = "http://localhost:8080";
     public static final int EXPECTED_INT_RETURN_VALUE = 424242;
 
-    public static Map<String, String> getBaseConfigMap() {
-        return getBaseConfigMap(GW_SERVER_TARGET, APISERVER_TARGET);
+    /** Generate a pair of public and private keys. */
+    public static KeyPair createKeyPair() throws NoSuchAlgorithmException {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        return kpg.generateKeyPair();
     }
 
-    public static Map<String, String> getBaseConfigMap(
-            String gatewayTarget, String apiserverTarget) {
+    /** Converts input into a Base-64 encoded string (PEM format). */
+    public static String convertToBase64PEM(Object value) throws IOException {
+        StringWriter sw = new StringWriter();
+        try (PEMWriter pw = new PEMWriter(sw)) {
+            pw.writeObject(value);
+        }
+        return sw.toString();
+    }
+
+    /** Generates a self-signed X509 certificate. */
+    public static Certificate createSelfSignedCertificate(KeyPair keyPair)
+            throws OperatorCreationException, CertificateException, IOException {
+        Provider bcProvider = new BouncyCastleProvider();
+        Security.addProvider(bcProvider);
+
+        Date startDate = new Date(System.currentTimeMillis());
+        X500Name dnName = new X500Name("CN=localhost");
+        // Use current timestamp as the certificate serial number
+        BigInteger certSerialNumber = new BigInteger(Long.toString(startDate.getTime()));
+
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(startDate);
+        calendar.add(Calendar.YEAR, 1);
+
+        Date endDate = calendar.getTime();
+        // Same as the keyPair algorithm
+        String signatureAlgorithm = "SHA256WithRSA";
+
+        ContentSigner contentSigner =
+                new JcaContentSignerBuilder(signatureAlgorithm).build(keyPair.getPrivate());
+
+        JcaX509v3CertificateBuilder certBuilder =
+                new JcaX509v3CertificateBuilder(
+                        dnName, certSerialNumber, startDate, endDate, dnName, keyPair.getPublic());
+
+        // Create basic self-signed certificate
+        X509CertificateHolder holder = certBuilder.build(contentSigner);
+        return new JcaX509CertificateConverter().getCertificate(holder);
+    }
+
+    public static Map<String, String> getBaseConfigMap() {
+        return getBaseConfigMap(APISERVER_TARGET);
+    }
+
+    public static Map<String, String> getBaseConfigMap(String apiserverTarget) {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(), apiserverTarget);
         return confMap;
