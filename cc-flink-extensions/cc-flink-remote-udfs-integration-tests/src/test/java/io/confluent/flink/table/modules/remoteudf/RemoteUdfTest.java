@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
@@ -13,8 +14,11 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedFunctionWithTypes;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
-import io.confluent.flink.table.service.ResultPlanUtils;
+import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
+import io.confluent.flink.table.service.ServiceTasks;
 import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
 
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,8 +46,7 @@ public class RemoteUdfTest extends AbstractTestBase {
 
         final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
         final ForegroundJobResultPlan plan =
-                ResultPlanUtils.foregroundJobCustomConfig(
-                        tableEnv, "SELECT IS_SMALLER('Small', 'Large')");
+                foregroundJobCustomConfig(tableEnv, "SELECT IS_SMALLER('Small', 'Large')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -53,8 +56,7 @@ public class RemoteUdfTest extends AbstractTestBase {
         final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
 
         final ForegroundJobResultPlan plan =
-                ResultPlanUtils.foregroundJobCustomConfig(
-                        tableEnv, "SELECT cat1.db1.remote2('payload')");
+                foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -64,7 +66,7 @@ public class RemoteUdfTest extends AbstractTestBase {
         final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
 
         final ForegroundJobResultPlan plan =
-                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote1(1)");
+                foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote1(1)");
         // The value of remote(1) is INT_RETURN_VALUE, but we want to ensure that the
         // Expression reducer didn't inline the value into the plan.
         assertThat(plan.getCompiledPlan())
@@ -78,8 +80,7 @@ public class RemoteUdfTest extends AbstractTestBase {
                 TestUtils.getSqlServiceTableEnvironment(testFunctionTriple, true, false);
 
         final ForegroundJobResultPlan plan =
-                ResultPlanUtils.foregroundJobCustomConfig(
-                        tableEnv, "SELECT cat1.db1.remote2('payload')");
+                foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -91,7 +92,7 @@ public class RemoteUdfTest extends AbstractTestBase {
         tableEnv.executeSql("USE CATALOG cat1");
         tableEnv.executeSql("USE db1");
         final ForegroundJobResultPlan plan =
-                ResultPlanUtils.foregroundJobCustomConfig(tableEnv, "SELECT remote2('payload')");
+                foregroundJobCustomConfig(tableEnv, "SELECT remote2('payload')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
@@ -102,5 +103,15 @@ public class RemoteUdfTest extends AbstractTestBase {
         assertThatThrownBy(() -> tableEnv.executeSql("SELECT remote2('payload')"))
                 .message()
                 .contains("No match found for function signature remote2");
+    }
+
+    public static ForegroundJobResultPlan foregroundJobCustomConfig(
+            TableEnvironment tableEnv, String sql) throws Exception {
+        final QueryOperation queryOperation = tableEnv.sqlQuery(sql).getQueryOperation();
+        return (ForegroundJobResultPlan)
+                ServiceTasks.INSTANCE.compileForegroundQuery(
+                        tableEnv,
+                        queryOperation,
+                        (identifier, execNodeId) -> Collections.emptyMap());
     }
 }

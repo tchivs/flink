@@ -60,6 +60,7 @@ public class ScalaSuffixChecker {
             new HashSet<>(
                     Arrays.asList(
                             "cc-flink-udf-adapter",
+                            "cc-flink-remote-udfs-integration-tests",
                             "flink-integration-impl-deps",
                             "cc-flink-managed-table",
                             "cc-flink-managed-table-validation",
