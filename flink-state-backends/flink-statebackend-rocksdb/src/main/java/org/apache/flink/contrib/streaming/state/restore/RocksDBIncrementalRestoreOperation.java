@@ -292,8 +292,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                                 dbResourceGuard,
                                 // This task will be owned by the backend's lifecycle because it
                                 // continues to exist after restore is completed.
-                                cancelRegistryForBackend,
-                                asyncExceptionHandler);
+                                cancelRegistryForBackend);
                 runAndReportDuration(asyncRangeCompactionTask, RESTORE_ASYNC_COMPACTION_DURATION);
                 logger.info(
                         "Completed async compaction after restore for backend {} in operator {} after {} ms.",
@@ -301,13 +300,12 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                         operatorIdentifier,
                         System.currentTimeMillis() - t);
             } catch (Throwable throwable) {
-                // We don't rethrow because the executing thread might have a fatal exception
-                // handler.
-                logger.info(
-                        "Failed async compaction after restore for backend {} in operator {} after {} ms.",
-                        backendUID,
-                        operatorIdentifier,
-                        System.currentTimeMillis() - t,
+                asyncExceptionHandler.handleAsyncException(
+                        String.format(
+                                "Failed async compaction after restore for backend {} in operator {} after {} ms.",
+                                backendUID,
+                                operatorIdentifier,
+                                System.currentTimeMillis() - t),
                         throwable);
             }
         };
