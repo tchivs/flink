@@ -38,7 +38,6 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 
-import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
@@ -54,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /** Tool class used to convert from Avro {@link GenericRecord} to {@link RowData}. * */
@@ -196,8 +196,11 @@ public class AvroToRowDataConverters {
     }
 
     private static AvroToRowDataConverter createUnionConverter(Schema readSchema, RowType rowType) {
-        Schema intermediateUnion = AvroToFlinkSchemaConverter.intermediateUnionSchema(readSchema);
-        List<Schema> memberSchemas = intermediateUnion.getTypes();
+        List<Schema> memberSchemas =
+                readSchema.getTypes().stream()
+                        .filter(s -> s.getType() != Type.NULL)
+                        .collect(Collectors.toList());
+        final Schema unionWithoutNull = Schema.createUnion(memberSchemas);
 
         int arity = rowType.getFieldCount();
         AvroToRowDataConverter[] fieldConverters = new AvroToRowDataConverter[arity];
@@ -216,7 +219,7 @@ public class AvroToRowDataConverters {
 
                 // find the best match converter. See GenericData#resolveUnion for more details
                 int indexOfGenericRowField =
-                        GenericData.get().resolveUnion(intermediateUnion, object);
+                        GenericData.get().resolveUnion(unionWithoutNull, object);
                 AvroToRowDataConverter converter = fieldConverters[indexOfGenericRowField];
                 GenericRowData row = new GenericRowData(arity);
                 Object toFlink = converter.convert(object);

@@ -10,6 +10,7 @@ import org.apache.flink.table.data.ArrayData.ElementGetter;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.MapData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.RowData.FieldGetter;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.IntType;
@@ -336,15 +337,6 @@ public class RowDataToAvroConverters {
     }
 
     private static RowDataToAvroConverter createRowConverter(RowType rowType, Schema targetSchema) {
-        final List<Field> avroFields = targetSchema.getFields();
-        final RowDataToAvroConverter[] fieldConverters =
-                IntStream.range(0, rowType.getFieldCount())
-                        .mapToObj(
-                                idx ->
-                                        RowDataToAvroConverters.createConverter(
-                                                rowType.getTypeAt(idx),
-                                                avroFields.get(idx).schema()))
-                        .toArray(RowDataToAvroConverter[]::new);
         final LogicalType[] fieldTypes =
                 rowType.getFields().stream()
                         .map(RowType.RowField::getType)
@@ -355,6 +347,74 @@ public class RowDataToAvroConverters {
         }
         final int length = rowType.getFieldCount();
 
+        switch (targetSchema.getType()) {
+            case RECORD:
+                {
+                    final List<Field> avroFields = targetSchema.getFields();
+                    final RowDataToAvroConverter[] fieldConverters =
+                            IntStream.range(0, rowType.getFieldCount())
+                                    .mapToObj(
+                                            idx ->
+                                                    RowDataToAvroConverters.createConverter(
+                                                            rowType.getTypeAt(idx),
+                                                            avroFields.get(idx).schema()))
+                                    .toArray(RowDataToAvroConverter[]::new);
+                    return createRowRecordConverter(
+                            targetSchema, length, fieldConverters, fieldGetters);
+                }
+            case UNION:
+                {
+                    final List<Schema> avroUnionSubtypes = targetSchema.getTypes();
+                    final RowDataToAvroConverter[] fieldConverters =
+                            IntStream.range(0, rowType.getFieldCount())
+                                    .mapToObj(
+                                            idx ->
+                                                    RowDataToAvroConverters.createConverterNotNull(
+                                                            rowType.getTypeAt(idx),
+                                                            avroUnionSubtypes.get(idx)))
+                                    .toArray(RowDataToAvroConverter[]::new);
+                    return createRowUnionConverter(
+                            targetSchema, length, fieldGetters, fieldConverters);
+                }
+            default:
+                throw new IllegalStateException(
+                        "Unsupported target type for a ROW: " + targetSchema);
+        }
+    }
+
+    private static RowDataToAvroConverter createRowUnionConverter(
+            Schema targetSchema,
+            int length,
+            FieldGetter[] fieldGetters,
+            RowDataToAvroConverter[] fieldConverters) {
+        return new RowDataToAvroConverter() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Object convert(Object object) {
+                final RowData row = (RowData) object;
+                for (int i = 0; i < length; ++i) {
+                    try {
+
+                        final Object fieldOrNull = fieldGetters[i].getFieldOrNull(row);
+                        if (fieldOrNull != null) {
+                            return fieldConverters[i].convert(fieldOrNull);
+                        }
+                    } catch (Throwable t) {
+                        throw new RuntimeException(
+                                String.format("Fail to serialize union: %s.", targetSchema), t);
+                    }
+                }
+                return null;
+            }
+        };
+    }
+
+    private static RowDataToAvroConverter createRowRecordConverter(
+            Schema targetSchema,
+            int length,
+            RowDataToAvroConverter[] fieldConverters,
+            FieldGetter[] fieldGetters) {
         return new RowDataToAvroConverter() {
             private static final long serialVersionUID = 1L;
 

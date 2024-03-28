@@ -4,7 +4,6 @@
 
 package io.confluent.flink.formats.converters.avro;
 
-import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
@@ -15,10 +14,8 @@ import org.apache.avro.Schema.Parser;
 import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -33,7 +30,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class AvroToFlinkSchemaConverterTest {
 
     private static Stream<Arguments> typesToCheck() {
-        return CommonMappings.get().map(Arguments::of);
+        return Stream.concat(
+                        CommonMappings.get(),
+                        Stream.of(
+                                new TypeMapping(
+                                        SchemaBuilder.builder()
+                                                .enumeration("color")
+                                                .symbols("red", "blue"),
+                                        new VarCharType(false, VarCharType.MAX_LENGTH)),
+                                new TypeMapping(
+                                        nullable(
+                                                SchemaBuilder.builder()
+                                                        .enumeration("color")
+                                                        .symbols("red", "blue")),
+                                        new VarCharType(true, VarCharType.MAX_LENGTH))))
+                .map(Arguments::of);
     }
 
     @ParameterizedTest
@@ -50,13 +61,6 @@ public class AvroToFlinkSchemaConverterTest {
                 .isEqualTo(mapping.getFlinkType());
     }
 
-    @ParameterizedTest
-    @ArgumentsSource(EnumMappings.class)
-    void testEnumMapping(TypeMapping mapping) {
-        assertThat(AvroToFlinkSchemaConverter.toFlinkSchema(mapping.getAvroSchema()))
-                .isEqualTo(mapping.getFlinkType());
-    }
-
     @Test
     void testRecordWithCycles() {
         String avroSchemaString =
@@ -67,42 +71,5 @@ public class AvroToFlinkSchemaConverterTest {
 
         assertThatThrownBy(() -> AvroToFlinkSchemaConverter.toFlinkSchema(schema))
                 .hasMessage("Cyclic schemas are not supported.");
-    }
-
-    private static class EnumMappings implements ArgumentsProvider {
-        // ============ FLINK SQL ============
-        private static final LogicalType VARCHAR = new VarCharType(false, VarCharType.MAX_LENGTH);
-
-        private static final LogicalType VARCHAR_NULLABLE =
-                new VarCharType(true, VarCharType.MAX_LENGTH);
-
-        // ============ AVRO ============
-
-        private static final Schema ENUM_AVRO =
-                SchemaBuilder.builder().enumeration("color").symbols("red", "blue");
-
-        private static final Schema UNION_STRING_AND_ENUM_AVRO =
-                SchemaBuilder.builder().unionOf().stringType().and().type(ENUM_AVRO).endUnion();
-
-        private static final Schema UNION_STRING_AND_ENUM_AND_NULL_AVRO =
-                SchemaBuilder.builder()
-                        .unionOf()
-                        .stringType()
-                        .and()
-                        .type(ENUM_AVRO)
-                        .and()
-                        .nullType()
-                        .endUnion();
-
-        @Override
-        public Stream<? extends Arguments> provideArguments(ExtensionContext context)
-                throws Exception {
-            return Stream.of(
-                            new TypeMapping(ENUM_AVRO, VARCHAR),
-                            new TypeMapping(nullable(ENUM_AVRO), VARCHAR_NULLABLE),
-                            new TypeMapping(UNION_STRING_AND_ENUM_AVRO, VARCHAR),
-                            new TypeMapping(UNION_STRING_AND_ENUM_AND_NULL_AVRO, VARCHAR_NULLABLE))
-                    .map(Arguments::of);
-        }
     }
 }

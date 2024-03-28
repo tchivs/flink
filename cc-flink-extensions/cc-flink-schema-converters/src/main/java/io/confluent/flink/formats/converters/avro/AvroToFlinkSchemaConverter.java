@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.avro;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
@@ -25,8 +26,6 @@ import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
-
-import org.apache.flink.shaded.guava31.com.google.common.annotations.VisibleForTesting;
 
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Type;
@@ -58,40 +57,6 @@ public class AvroToFlinkSchemaConverter {
     private static final String AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS = "local-timestamp-micros";
     private static final String KEY_FIELD = "key";
     private static final String VALUE_FIELD = "value";
-
-    /**
-     * Converts an intermediate representation of the UNION in which:
-     *
-     * <p>1) NULLs are removed
-     *
-     * <p>2) STRINGS are removed if there is an ENUM in the UNION
-     *
-     * <p>3) ENUMs are unwrapped to STRINGs if there is no STRING in the UNION as ENUMs are
-     * unwrapped to STRING and there can't be two STRINGS in the UNION
-     *
-     * <p>Useful for {@link
-     * io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters} when multiple
-     * AVRO types map to the same Flink SQL Type. See {@link #sanitizeMemberSchemas(List)} for more
-     * details.
-     */
-    public static Schema intermediateUnionSchema(Schema schema) {
-        return Schema.createUnion(sanitizeMemberSchemas(schema.getTypes()));
-    }
-
-    private static List<Schema> sanitizeMemberSchemas(List<Schema> unionTypes) {
-        // check if there is an ENUM in the UNION
-        boolean hasEnum = unionTypes.stream().anyMatch(s -> s.getType().equals(Type.ENUM));
-
-        return unionTypes.stream()
-                // remove NULLS
-                .filter(s -> !s.getType().equals(NULL))
-                // remove STRINGS if there is an ENUM in the UNION as ENUMs are unwrapped to STRING
-                // and there can't be two STRINGS in the UNION
-                .filter(s -> !hasEnum || !s.getType().equals(Type.STRING))
-                // unwrap ENUM to STRING if there is no STRING in the UNION
-                .map(s -> s.getType().equals(Type.ENUM) ? Schema.create(Type.STRING) : s)
-                .collect(Collectors.toList());
-    }
 
     /**
      * Mostly copied over from <a
@@ -235,7 +200,7 @@ public class AvroToFlinkSchemaConverter {
             case MAP:
                 return new MapType(
                         isOptional,
-                        new VarCharType(VarCharType.MAX_LENGTH),
+                        new VarCharType(false, VarCharType.MAX_LENGTH),
                         toFlinkSchemaWithCycleDetection(
                                 schema.getValueType(), false, cycleContext));
 
@@ -252,14 +217,16 @@ public class AvroToFlinkSchemaConverter {
                                                                     false,
                                                                     cycleContext)))
                                     .collect(Collectors.toList());
-                    return new RowType(false, rowFields);
+                    return new RowType(isOptional, rowFields);
                 }
 
             case UNION:
                 List<Schema> unionTypes = schema.getTypes();
-                boolean isNullable =
-                        unionTypes.stream().anyMatch(s -> s.getType().equals(Type.NULL));
-                List<Schema> memberSchemas = sanitizeMemberSchemas(unionTypes);
+                List<Schema> memberSchemas =
+                        unionTypes.stream()
+                                .filter(s -> s.getType() != NULL)
+                                .collect(Collectors.toList());
+                boolean isNullable = unionTypes.size() != memberSchemas.size();
 
                 // Don't wrap it in a Row if there is only one non-NULL type
                 if (memberSchemas.size() == 1) {
@@ -277,10 +244,10 @@ public class AvroToFlinkSchemaConverter {
                     }
 
                     LogicalType memberType =
-                            toFlinkSchemaWithCycleDetection(memberSchema, false, cycleContext);
+                            toFlinkSchemaWithCycleDetection(memberSchema, true, cycleContext);
 
                     // make a field with nullable type
-                    rowFields.add(new RowField(fieldName, memberType.copy(true)));
+                    rowFields.add(new RowField(fieldName, memberType));
                 }
 
                 return new RowType(isNullable, rowFields);
@@ -315,7 +282,6 @@ public class AvroToFlinkSchemaConverter {
     @VisibleForTesting
     public static String unionMemberFieldName(org.apache.avro.Schema schema) {
         if (schema.getType() != Type.RECORD
-                && schema.getType() != Type.ENUM
                 && schema.getType() != Type.FIXED
                 && schema.getType() != Type.ENUM) {
             return schema.getType().getName();

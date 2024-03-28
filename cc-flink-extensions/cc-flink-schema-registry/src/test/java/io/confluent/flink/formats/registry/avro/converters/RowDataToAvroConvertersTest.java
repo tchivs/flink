@@ -18,6 +18,9 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.converters.avro.CommonMappings;
+import io.confluent.flink.formats.converters.avro.CommonMappings.TypeMappingWithData;
+import io.confluent.flink.formats.converters.avro.util.UnionUtil;
 import io.confluent.flink.formats.registry.avro.converters.RowDataToAvroConverters.RowDataToAvroConverter;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -26,12 +29,17 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -245,5 +253,22 @@ class RowDataToAvroConvertersTest {
                                                         .build()))
                                 .set("string_multiset", stringMultiset)
                                 .build());
+    }
+
+    public static Stream<Arguments> unionTests() {
+        return UnionUtil.createUnionTypeMappings(CommonMappings.getNotNull())
+                .collect(Collectors.toList()).stream()
+                .map(UnionUtil::withData)
+                .map(Arguments::of);
+    }
+
+    @ParameterizedTest
+    @MethodSource("unionTests")
+    void testUnion(TypeMappingWithData mapping) {
+        RowDataToAvroConverter converter =
+                RowDataToAvroConverters.createConverter(
+                        mapping.getFlinkType(), mapping.getAvroSchema());
+
+        assertThat(mapping.getAvroData()).isEqualTo(converter.convert(mapping.getFlinkData()));
     }
 }

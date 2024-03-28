@@ -17,8 +17,11 @@ import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
-import io.confluent.flink.formats.converters.UnionUtil;
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.converters.avro.CommonMappings;
+import io.confluent.flink.formats.converters.avro.CommonMappings.TypeMapping;
+import io.confluent.flink.formats.converters.avro.CommonMappings.TypeMappingWithData;
+import io.confluent.flink.formats.converters.avro.util.UnionUtil;
 import io.confluent.flink.formats.registry.avro.converters.AvroToRowDataConverters.AvroToRowDataConverter;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -28,14 +31,18 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -336,16 +343,29 @@ class AvroToRowDataConvertersTest {
         assertThat(actual).isEqualTo(expected);
     }
 
-    @ParameterizedTest
-    @ArgumentsSource(UnionUtil.DataProvider.class)
-    void testUnion(Schema unionSchema, Object avroRecord, Object expectedRowData) {
-        // Given: Flink schema and converter
-        LogicalType flinkSchema = AvroToFlinkSchemaConverter.toFlinkSchema(unionSchema);
-        AvroToRowDataConverter converter =
-                AvroToRowDataConverters.createConverter(unionSchema, flinkSchema);
+    public static Stream<Arguments> unionTests() {
+        final List<TypeMapping> singleTypeMappings =
+                Stream.concat(
+                                CommonMappings.getNotNull().stream(),
+                                Stream.of(
+                                        new TypeMapping(
+                                                SchemaBuilder.builder()
+                                                        .enumeration("colors")
+                                                        .symbols("red", "blue"),
+                                                new VarCharType(false, VarCharType.MAX_LENGTH))))
+                        .collect(Collectors.toList());
+        return UnionUtil.createUnionTypeMappings(singleTypeMappings)
+                .map(UnionUtil::withData)
+                .map(Arguments::of);
+    }
 
-        // When: converting AVRO Record to Flink RowData
-        // Then:
-        assertThat(expectedRowData).isEqualTo(converter.convert(avroRecord));
+    @ParameterizedTest
+    @MethodSource("unionTests")
+    void testUnion(TypeMappingWithData mapping) {
+        AvroToRowDataConverter converter =
+                AvroToRowDataConverters.createConverter(
+                        mapping.getAvroSchema(), mapping.getFlinkType());
+
+        assertThat(mapping.getFlinkData()).isEqualTo(converter.convert(mapping.getAvroData()));
     }
 }
