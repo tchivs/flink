@@ -152,4 +152,10 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     public boolean canReduceExpression() {
         return false;
     }
+
+    @Override
+    public boolean isDeterministic() {
+        Preconditions.checkState(!configuredFunctionSpecs.isEmpty());
+        return configuredFunctionSpecs.get(0).isDeterministic();
+    }
 }

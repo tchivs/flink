@@ -76,6 +76,14 @@ public class MetadataExtractor {
                     TYPE_EXTRACTION_ERROR,
                     "Internal error. getTypeInference(...) should always be defined");
         }
+
+        boolean isDeterministic;
+        try {
+            isDeterministic = instance.isDeterministic();
+        } catch (Throwable t) {
+            throw new MetadataExtractionException(
+                    TYPE_EXTRACTION_ERROR, "Error thrown while running isDeterministic()");
+        }
         ExtractorDataTypeFactory dataTypeFactory = new ExtractorDataTypeFactory(classLoader);
         List<Signature> signatures;
         try {
@@ -87,7 +95,7 @@ public class MetadataExtractor {
                             ? t.getCause().getMessage()
                             : t.getMessage());
         }
-        return new Metadata(signatures);
+        return new Metadata(signatures, isDeterministic);
     }
 
     private MetadataExtractor() {}

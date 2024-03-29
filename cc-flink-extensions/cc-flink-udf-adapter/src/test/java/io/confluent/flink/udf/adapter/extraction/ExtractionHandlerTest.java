@@ -33,6 +33,7 @@ public class ExtractionHandlerTest {
         assertThat(response.getSignaturesCount()).isEqualTo(1);
         assertThat(response.getSignatures(0).getArgumentTypesList()).containsExactly("INT", "INT");
         assertThat(response.getSignatures(0).getReturnType()).isEqualTo("INT");
+        assertThat(response.getIsDeterministic()).isTrue();
     }
 
     @Test
@@ -58,5 +59,6 @@ public class ExtractionHandlerTest {
         assertThat(response.getSignatures(2).getArgumentTypesList())
                 .containsExactly("INT", "INT", "INT", "INT");
         assertThat(response.getSignatures(2).getReturnType()).isEqualTo("INT");
+        assertThat(response.getIsDeterministic()).isTrue();
     }
 }

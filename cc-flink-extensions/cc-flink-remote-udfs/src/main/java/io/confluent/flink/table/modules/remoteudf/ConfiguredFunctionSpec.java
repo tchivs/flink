@@ -27,6 +27,7 @@ public class ConfiguredFunctionSpec implements Serializable {
     private final String pluginId;
     private final String pluginVersionId;
     private final String className;
+    private final boolean isDeterministic;
     private final String catalog;
     private final String database;
     private final String name;
@@ -41,7 +42,8 @@ public class ConfiguredFunctionSpec implements Serializable {
             String returnType,
             String pluginId,
             String pluginVersionId,
-            String className) {
+            String className,
+            boolean isDeterministic) {
         this.organization = organization;
         this.environment = environment;
         this.catalog = catalog;
@@ -52,6 +54,7 @@ public class ConfiguredFunctionSpec implements Serializable {
         this.pluginId = pluginId;
         this.pluginVersionId = pluginVersionId;
         this.className = className;
+        this.isDeterministic = isDeterministic;
     }
 
     public RemoteUdfSpec createRemoteUdfSpec(DataTypeFactory typeFactory) {
@@ -61,6 +64,7 @@ public class ConfiguredFunctionSpec implements Serializable {
                 pluginId,
                 pluginVersionId,
                 className,
+                isDeterministic,
                 getReturnType(typeFactory),
                 getArgumentTypes(typeFactory));
     }
@@ -118,6 +122,14 @@ public class ConfiguredFunctionSpec implements Serializable {
         return className;
     }
 
+    public boolean isDeterministic() {
+        return isDeterministic;
+    }
+
+    public String getIsDeterministicAsString() {
+        return Boolean.toString(isDeterministic);
+    }
+
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -134,6 +146,7 @@ public class ConfiguredFunctionSpec implements Serializable {
         private String pluginId;
         private String pluginVersionId;
         private String className;
+        private Boolean isDeterministic;
 
         public Builder addArgumentTypes(String argumentTypes) {
             this.argumentTypes.add(argumentTypes);
@@ -191,6 +204,11 @@ public class ConfiguredFunctionSpec implements Serializable {
             return this;
         }
 
+        public Builder parseIsDeterministic(String isDeterministic) {
+            this.isDeterministic = Boolean.parseBoolean(isDeterministic);
+            return this;
+        }
+
         public List<ConfiguredFunctionSpec> build() {
             Preconditions.checkNotNull(organization);
             Preconditions.checkNotNull(environment);
@@ -203,6 +221,7 @@ public class ConfiguredFunctionSpec implements Serializable {
             Preconditions.checkNotNull(pluginId);
             Preconditions.checkNotNull(pluginVersionId);
             Preconditions.checkNotNull(className);
+            Preconditions.checkNotNull(isDeterministic);
             Preconditions.checkState(
                     argumentTypes.size() == returnTypes.size(),
                     "Args and results should be equal in size");
@@ -219,7 +238,8 @@ public class ConfiguredFunctionSpec implements Serializable {
                                 returnTypes.get(i),
                                 pluginId,
                                 pluginVersionId,
-                                className));
+                                className,
+                                isDeterministic));
             }
             return result;
         }

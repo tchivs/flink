@@ -119,4 +119,9 @@ public class RemoteScalarFunction extends ScalarFunction {
     public boolean canReduceExpression() {
         return false;
     }
+
+    @Override
+    public boolean isDeterministic() {
+        return remoteUdfSpec.isDeterministic();
+    }
 }

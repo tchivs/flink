@@ -49,6 +49,7 @@ public class AdapterPerformanceTest {
                     retType,
                     argTypes,
                     functionClass,
+                    true,
                     out);
             byte[] openPayloadBytes = out.getCopyOfBuffer();
             final ScalarFunctionHandler handler = new ScalarFunctionHandler();

@@ -14,15 +14,21 @@ import java.util.List;
 public class Metadata {
 
     private final List<Signature> signatures;
+    private final boolean isDeterministic;
 
-    public Metadata(List<Signature> signatures) {
+    public Metadata(List<Signature> signatures, boolean isDeterministic) {
         Preconditions.checkNotNull(signatures);
         this.signatures = signatures;
         this.signatures.sort(new SignatureComparator());
+        this.isDeterministic = isDeterministic;
     }
 
     public List<Signature> getSignatures() {
         return signatures;
+    }
+
+    public boolean isDeterministic() {
+        return isDeterministic;
     }
 
     // Class for ensuring we have a consistent order for signatures. Useful mostly for tests.

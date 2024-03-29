@@ -29,6 +29,7 @@ public class TestUtil {
             LogicalType retType,
             List<LogicalType> argTypes,
             String functionClass,
+            boolean isDeterministic,
             DataOutputSerializer out)
             throws Exception {
         new RemoteUdfSpec(
@@ -37,6 +38,7 @@ public class TestUtil {
                         pluginId,
                         pluginVersionId,
                         functionClass,
+                        isDeterministic,
                         DataTypeUtils.toInternalDataType(retType),
                         argTypes.stream()
                                 .map(DataTypeUtils::toInternalDataType)
@@ -51,7 +53,8 @@ public class TestUtil {
             String pluginVersionId,
             LogicalType retType,
             List<LogicalType> argTypes,
-            String functionClass)
+            String functionClass,
+            boolean isDeterministic)
             throws Exception {
         DataOutputSerializer out = new DataOutputSerializer(512);
         writeSerializedOpenPayload(
@@ -62,6 +65,7 @@ public class TestUtil {
                 retType,
                 argTypes,
                 functionClass,
+                isDeterministic,
                 out);
         return out.getCopyOfBuffer();
     }

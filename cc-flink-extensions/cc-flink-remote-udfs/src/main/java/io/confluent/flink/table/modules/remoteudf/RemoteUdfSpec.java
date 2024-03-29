@@ -38,6 +38,9 @@ public class RemoteUdfSpec implements Serializable {
     /** Name of the class that contains that implements the UDF. */
     private final String functionClassName;
 
+    /** If the function is deterministic. */
+    private final boolean isDeterministic;
+
     /** DataType for the return value of the UDF call. */
     private final DataType returnType;
 
@@ -50,6 +53,7 @@ public class RemoteUdfSpec implements Serializable {
             String pluginId,
             String pluginVersionId,
             String functionClassName,
+            boolean isDeterministic,
             DataType returnType,
             List<DataType> argumentTypes) {
         this.organization = organization;
@@ -57,6 +61,7 @@ public class RemoteUdfSpec implements Serializable {
         this.pluginId = pluginId;
         this.pluginVersionId = pluginVersionId;
         this.functionClassName = functionClassName;
+        this.isDeterministic = isDeterministic;
         this.returnType = returnType;
         this.argumentTypes = argumentTypes;
     }
@@ -79,6 +84,10 @@ public class RemoteUdfSpec implements Serializable {
 
     public String getFunctionClassName() {
         return functionClassName;
+    }
+
+    public boolean isDeterministic() {
+        return isDeterministic;
     }
 
     public DataType getReturnType() {
@@ -114,6 +123,7 @@ public class RemoteUdfSpec implements Serializable {
         out.writeUTF(pluginId);
         out.writeUTF(pluginVersionId);
         out.writeUTF(functionClassName);
+        out.writeBoolean(isDeterministic);
         out.writeUTF(stringifyDataType(returnType));
         out.writeInt(argumentTypes.size());
         for (DataType argumentType : argumentTypes) {
@@ -136,6 +146,7 @@ public class RemoteUdfSpec implements Serializable {
         String pluginId = in.readUTF();
         String pluginVersionId = in.readUTF();
         String functionClassName = in.readUTF();
+        boolean isDeterministic = in.readBoolean();
         DataType returnType = parseFromString(in.readUTF(), classLoader);
         int numArgs = in.readInt();
         List<DataType> argumentTypes = new ArrayList<>(numArgs);
@@ -148,6 +159,7 @@ public class RemoteUdfSpec implements Serializable {
                 pluginId,
                 pluginVersionId,
                 functionClassName,
+                isDeterministic,
                 returnType,
                 argumentTypes);
     }

@@ -28,6 +28,7 @@ public class MetadataExtractorTest {
                 .containsExactly("INT NOT NULL");
         assertThat(metadata.getSignatures().get(0).getSerializedReturnType())
                 .isEqualTo("VARCHAR(2147483647)");
+        assertThat(metadata.isDeterministic()).isTrue();
     }
 
     @Test
@@ -43,6 +44,7 @@ public class MetadataExtractorTest {
         assertThat(metadata.getSignatures().get(1).getSerializedArgumentTypes())
                 .containsExactly("BIGINT", "VARCHAR(2147483647)");
         assertThat(metadata.getSignatures().get(1).getSerializedReturnType()).isEqualTo("INT");
+        assertThat(metadata.isDeterministic()).isTrue();
     }
 
     @Test
@@ -77,6 +79,7 @@ public class MetadataExtractorTest {
         assertThat(metadata.getSignatures().get(1).getSerializedArgumentTypes())
                 .containsExactly("INT");
         assertThat(metadata.getSignatures().get(1).getSerializedReturnType()).isEqualTo("INT");
+        assertThat(metadata.isDeterministic()).isTrue();
     }
 
     @Test
@@ -87,6 +90,18 @@ public class MetadataExtractorTest {
         assertThat(metadata.getSignatures().size()).isEqualTo(1);
         assertThat(metadata.getSignatures().get(0).getSerializedArgumentTypes()).containsExactly();
         assertThat(metadata.getSignatures().get(0).getSerializedReturnType()).isEqualTo("INT");
+        assertThat(metadata.isDeterministic()).isTrue();
+    }
+
+    @Test
+    public void testNotDeterministic() throws Throwable {
+        Metadata metadata =
+                MetadataExtractor.extract(
+                        getClass().getClassLoader(), NonDeterministicFunction.class.getName());
+        assertThat(metadata.getSignatures().size()).isEqualTo(1);
+        assertThat(metadata.getSignatures().get(0).getSerializedArgumentTypes()).containsExactly();
+        assertThat(metadata.getSignatures().get(0).getSerializedReturnType()).isEqualTo("INT");
+        assertThat(metadata.isDeterministic()).isFalse();
     }
 
     /** Simple function. */
@@ -139,6 +154,18 @@ public class MetadataExtractorTest {
         @Override
         public TypeInference getTypeInference(DataTypeFactory typeFactory) {
             return null;
+        }
+    }
+
+    /** Not deterministic. */
+    public static class NonDeterministicFunction extends ScalarFunction {
+        public Integer eval() {
+            return null;
+        }
+
+        @Override
+        public boolean isDeterministic() {
+            return false;
         }
     }
 }

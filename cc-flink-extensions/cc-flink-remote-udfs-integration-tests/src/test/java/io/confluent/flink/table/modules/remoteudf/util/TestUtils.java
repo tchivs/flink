@@ -46,6 +46,7 @@ import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALO
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ENV_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_IS_DETERMINISTIC_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ORG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
@@ -189,6 +190,9 @@ public class TestUtils {
             udfConf.put(
                     FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_CLASS_NAME_FIELD,
                     "io.confluent.ExampleFunction");
+            udfConf.put(
+                    FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_IS_DETERMINISTIC_FIELD,
+                    "true");
             for (int i = 0; i < func.getArgTypes().size(); i++) {
                 udfConf.put(
                         FUNCTIONS_PREFIX

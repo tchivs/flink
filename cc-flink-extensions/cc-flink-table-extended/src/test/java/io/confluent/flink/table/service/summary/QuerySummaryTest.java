@@ -41,6 +41,7 @@ public class QuerySummaryTest {
                     .setPluginId("plugin")
                     .setPluginVersionId("v")
                     .setClassName("io.confluent.Foo")
+                    .parseIsDeterministic("true")
                     .addArgumentTypes(Collections.singletonList("INT"))
                     .addArgumentTypes(Collections.singletonList("STRING"))
                     .addReturnType("INT")
@@ -57,6 +58,7 @@ public class QuerySummaryTest {
                     .setPluginId("plugin")
                     .setPluginVersionId("v")
                     .setClassName("io.confluent.Foo")
+                    .parseIsDeterministic("true")
                     .addArgumentTypes(Collections.singletonList("INT"))
                     .addReturnType("INT")
                     .build();

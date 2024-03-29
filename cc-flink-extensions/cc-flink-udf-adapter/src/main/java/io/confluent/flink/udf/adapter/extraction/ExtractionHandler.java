@@ -40,6 +40,7 @@ public class ExtractionHandler implements RequestHandler {
             Metadata metadata =
                     MetadataExtractor.extract(
                             this.getClass().getClassLoader(), request.getClassName());
+            builder.setIsDeterministic(metadata.isDeterministic());
             for (ConfluentUdfExtractor.Signature signature : metadata.getSignatures()) {
                 builder.addSignatures(
                         Signature.newBuilder()

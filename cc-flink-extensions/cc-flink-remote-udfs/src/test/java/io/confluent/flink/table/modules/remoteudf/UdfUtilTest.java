@@ -20,6 +20,7 @@ import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALO
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CLASS_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_DATABASE_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ENV_FIELD;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_IS_DETERMINISTIC_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_NAME_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ORG_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_RETURN_TYPE_FIELD;
@@ -63,6 +64,7 @@ public class UdfUtilTest {
         udfConf.setString(FUNCTIONS_PREFIX + name + "." + PLUGIN_VERSION_ID_FIELD, "5678");
         udfConf.setString(
                 FUNCTIONS_PREFIX + name + "." + FUNCTION_CLASS_NAME_FIELD, "io.confluent.blah1");
+        udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_IS_DETERMINISTIC_FIELD, "true");
         return udfConf;
     }
 
@@ -77,6 +79,7 @@ public class UdfUtilTest {
         assertThat(functions.get(0).getFunctionCatalog()).isEqualTo("cat1");
         assertThat(functions.get(0).getFunctionDatabase()).isEqualTo("db1");
         assertThat(functions.get(0).getFunctionName()).isEqualTo("func");
+        assertThat(functions.get(0).isDeterministic()).isTrue();
         assertThat(functions.get(0).getConfiguredFunctionSpecs().size()).isEqualTo(2);
         assertThat(functions.get(0).getConfiguredFunctionSpecs().get(0).getArgumentTypes())
                 .isEqualTo("INTEGER");
@@ -94,6 +97,7 @@ public class UdfUtilTest {
                 .isEqualTo("1234");
         assertThat(functions.get(0).getConfiguredFunctionSpecs().get(1).getClassName())
                 .isEqualTo("io.confluent.blah1");
+        assertThat(functions.get(0).getConfiguredFunctionSpecs().get(1).isDeterministic()).isTrue();
         Map<String, String> config = UdfUtil.toConfiguration(functions.get(0));
         assertThat(config).containsExactlyInAnyOrderEntriesOf(udfConf.toMap());
     }
@@ -147,6 +151,14 @@ public class UdfUtilTest {
     }
 
     @Test
+    public void testMissingIsDeterministic() {
+        Configuration udfConf = createConfig();
+        udfConf.removeKey(FUNCTIONS_PREFIX + name + "." + FUNCTION_IS_DETERMINISTIC_FIELD);
+        assertThatThrownBy(() -> UdfUtil.extractUdfs(udfConf.toMap()))
+                .hasMessageContaining("Didn't find field isDeterministic");
+    }
+
+    @Test
     public void testMissingArgs() {
         Configuration udfConf = createConfig();
         udfConf.removeKey(FUNCTIONS_PREFIX + name + "." + FUNCTION_ARGUMENT_TYPES_FIELD);
@@ -170,5 +182,16 @@ public class UdfUtilTest {
         udfConf.removeKey(FUNCTIONS_PREFIX + name + "." + FUNCTION_RETURN_TYPE_FIELD);
         assertThatThrownBy(() -> UdfUtil.extractUdfs(udfConf.toMap()))
                 .hasMessageContaining("Didn't find field returnType");
+    }
+
+    @Test
+    public void testNotDeterministic() {
+        Configuration udfConf = createConfig();
+        udfConf.setString(FUNCTIONS_PREFIX + name + "." + FUNCTION_IS_DETERMINISTIC_FIELD, "false");
+        List<ConfiguredRemoteScalarFunction> functions = UdfUtil.extractUdfs(udfConf.toMap());
+        assertThat(functions).hasSize(1);
+        assertThat(functions.get(0).getConfiguredFunctionSpecs().get(0).isDeterministic())
+                .isFalse();
+        assertThat(functions.get(0).isDeterministic()).isFalse();
     }
 }

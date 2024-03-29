@@ -31,6 +31,7 @@ public class ConfiguredFunctionSpecTest {
                         .setPluginId("funcId")
                         .setPluginVersionId("versionId")
                         .setClassName("io.confluent.blah")
+                        .parseIsDeterministic("true")
                         .addArgumentTypes("INT")
                         .addReturnType("STRING")
                         .build();
@@ -45,6 +46,7 @@ public class ConfiguredFunctionSpecTest {
         assertThat(spec.get(0).getClassName()).isEqualTo("io.confluent.blah");
         assertThat(spec.get(0).getArgumentTypes()).isEqualTo("INT");
         assertThat(spec.get(0).getReturnType()).isEqualTo("STRING");
+        assertThat(spec.get(0).isDeterministic()).isTrue();
     }
 
     @Test
@@ -59,6 +61,7 @@ public class ConfiguredFunctionSpecTest {
                         .setPluginId("funcId")
                         .setPluginVersionId("versionId")
                         .setClassName("io.confluent.blah")
+                        .parseIsDeterministic("true")
                         .addArgumentTypes("INT")
                         .addArgumentTypes("STRING")
                         .addReturnType("STRING")
@@ -75,6 +78,7 @@ public class ConfiguredFunctionSpecTest {
         assertThat(spec.get(0).getClassName()).isEqualTo("io.confluent.blah");
         assertThat(spec.get(0).getArgumentTypes()).isEqualTo("INT");
         assertThat(spec.get(0).getReturnType()).isEqualTo("STRING");
+        assertThat(spec.get(0).isDeterministic()).isTrue();
         assertThat(spec.get(1).getCatalog()).isEqualTo("cat");
         assertThat(spec.get(1).getDatabase()).isEqualTo("db");
         assertThat(spec.get(1).getName()).isEqualTo("func");
@@ -83,6 +87,7 @@ public class ConfiguredFunctionSpecTest {
         assertThat(spec.get(1).getClassName()).isEqualTo("io.confluent.blah");
         assertThat(spec.get(1).getArgumentTypes()).isEqualTo("STRING");
         assertThat(spec.get(1).getReturnType()).isEqualTo("INT");
+        assertThat(spec.get(1).isDeterministic()).isTrue();
     }
 
     @Test
@@ -97,6 +102,7 @@ public class ConfiguredFunctionSpecTest {
                         .setPluginId("funcId")
                         .setPluginVersionId("versionId")
                         .setClassName("io.confluent.blah")
+                        .parseIsDeterministic("true")
                         .addArgumentTypes("INT")
                         .addArgumentTypes("STRING")
                         .addReturnType("STRING");
@@ -116,6 +122,7 @@ public class ConfiguredFunctionSpecTest {
                         .setPluginId("funcId")
                         .setPluginVersionId("versionId")
                         .setClassName("io.confluent.blah")
+                        .parseIsDeterministic("true")
                         .addArgumentTypes(Collections.emptyList())
                         .addReturnType("STRING")
                         .build();
@@ -130,5 +137,6 @@ public class ConfiguredFunctionSpecTest {
         assertThat(spec.get(0).getClassName()).isEqualTo("io.confluent.blah");
         assertThat(spec.get(0).getArgumentTypes()).isEqualTo("");
         assertThat(spec.get(0).getReturnType()).isEqualTo("STRING");
+        assertThat(spec.get(0).isDeterministic()).isTrue();
     }
 }

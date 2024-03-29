@@ -38,7 +38,8 @@ public class ScalarFunctionHandlerTest {
                         "pluginVersionUUID",
                         new VarCharType(Integer.MAX_VALUE),
                         Arrays.asList(new VarCharType()),
-                        IdentityScalarFunction.class.getName()),
+                        IdentityScalarFunction.class.getName(),
+                        true),
                 DUMMY_CONTEXT);
         RemoteUdfSerialization serializers = createSerializers(functionHandler);
         final int invocations = 10;
@@ -64,7 +65,8 @@ public class ScalarFunctionHandlerTest {
                         Arrays.asList(
                                 new VarCharType(Integer.MAX_VALUE),
                                 new VarCharType(Integer.MAX_VALUE)),
-                        ConcatFunction.class.getName()),
+                        ConcatFunction.class.getName(),
+                        true),
                 DUMMY_CONTEXT);
         RemoteUdfSerialization serializers = createSerializers(functionHandler);
         final int invocations = 10;
@@ -90,7 +92,8 @@ public class ScalarFunctionHandlerTest {
                         "pluginVersionUUID",
                         new IntType(),
                         Arrays.asList(new IntType(), new IntType()),
-                        SumScalarFunction.class.getName()),
+                        SumScalarFunction.class.getName(),
+                        true),
                 DUMMY_CONTEXT);
         RemoteUdfSerialization serializers = createSerializers(functionHandler);
         final int invocations = 10;
@@ -114,7 +117,8 @@ public class ScalarFunctionHandlerTest {
                         "pluginVersionUUID",
                         new VarCharType(Integer.MAX_VALUE),
                         Arrays.asList(new VarCharType()),
-                        HelloScalarFunction.class.getName()),
+                        HelloScalarFunction.class.getName(),
+                        true),
                 DUMMY_CONTEXT);
         RemoteUdfSerialization serializers = createSerializers(functionHandler);
         Assertions.assertTrue(
@@ -144,7 +148,8 @@ public class ScalarFunctionHandlerTest {
                                                     "pluginVersionUUID",
                                                     new IntType(),
                                                     Arrays.asList(new IntType(false)),
-                                                    NoMatchingScalarFunction.class.getName()),
+                                                    NoMatchingScalarFunction.class.getName(),
+                                                    true),
                                             DUMMY_CONTEXT);
                                 })
                         .getMessage()

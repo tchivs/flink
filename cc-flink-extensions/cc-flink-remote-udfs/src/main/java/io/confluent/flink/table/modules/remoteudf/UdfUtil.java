@@ -55,6 +55,7 @@ public class UdfUtil {
     public static final String PLUGIN_ID_FIELD = "pluginId";
     public static final String PLUGIN_VERSION_ID_FIELD = "pluginVersionId";
     public static final String FUNCTION_CLASS_NAME_FIELD = "className";
+    public static final String FUNCTION_IS_DETERMINISTIC_FIELD = "isDeterministic";
 
     private static final List<Field> ALL_FIELDS =
             Collections.unmodifiableList(
@@ -100,7 +101,11 @@ public class UdfUtil {
                             Field.of(
                                     FUNCTION_CLASS_NAME_FIELD,
                                     ConfiguredFunctionSpec.Builder::setClassName,
-                                    ConfiguredFunctionSpec::getClassName)));
+                                    ConfiguredFunctionSpec::getClassName),
+                            Field.of(
+                                    FUNCTION_IS_DETERMINISTIC_FIELD,
+                                    ConfiguredFunctionSpec.Builder::parseIsDeterministic,
+                                    ConfiguredFunctionSpec::getIsDeterministicAsString)));
 
     public static List<ConfiguredRemoteScalarFunction> extractUdfs(Map<String, String> config) {
         final Set<String> udfNames = extractUdfNames(config);

@@ -17,7 +17,6 @@ enum ErrorCode {
   NOT_SCALAR_FUNCTION = 3;
   NO_PUBLIC_NO_ARG_CONSTRUCTOR = 4;
   TYPE_EXTRACTION_ERROR = 5;
-  BAD_SIGNATURE_TYPE = 6;
 }
 
 message Error {
@@ -39,4 +38,5 @@ message Signature {
 message ExtractionResponse {
   Error error = 1;
   repeated Signature signatures = 2;
+  bool is_deterministic = 3;
 }
