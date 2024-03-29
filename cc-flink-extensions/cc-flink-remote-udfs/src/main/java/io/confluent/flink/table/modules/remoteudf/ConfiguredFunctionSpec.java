@@ -20,6 +20,7 @@ public class ConfiguredFunctionSpec implements Serializable {
 
     private static final long serialVersionUID = -6590842532566680559L;
     private static final String ARGUMENT_TYPE_DELIMITER = ";";
+    private static final boolean IS_DETERMINISTIC_DEFAULT = true;
     private final String argumentTypes;
     private final String returnType;
     private final String organization;
@@ -221,7 +222,6 @@ public class ConfiguredFunctionSpec implements Serializable {
             Preconditions.checkNotNull(pluginId);
             Preconditions.checkNotNull(pluginVersionId);
             Preconditions.checkNotNull(className);
-            Preconditions.checkNotNull(isDeterministic);
             Preconditions.checkState(
                     argumentTypes.size() == returnTypes.size(),
                     "Args and results should be equal in size");
@@ -239,7 +239,9 @@ public class ConfiguredFunctionSpec implements Serializable {
                                 pluginId,
                                 pluginVersionId,
                                 className,
-                                isDeterministic));
+                                isDeterministic != null
+                                        ? isDeterministic
+                                        : IS_DETERMINISTIC_DEFAULT));
             }
             return result;
         }

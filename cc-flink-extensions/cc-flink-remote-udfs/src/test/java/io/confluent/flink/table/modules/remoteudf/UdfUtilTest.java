@@ -154,8 +154,9 @@ public class UdfUtilTest {
     public void testMissingIsDeterministic() {
         Configuration udfConf = createConfig();
         udfConf.removeKey(FUNCTIONS_PREFIX + name + "." + FUNCTION_IS_DETERMINISTIC_FIELD);
-        assertThatThrownBy(() -> UdfUtil.extractUdfs(udfConf.toMap()))
-                .hasMessageContaining("Didn't find field isDeterministic");
+        List<ConfiguredRemoteScalarFunction> functions = UdfUtil.extractUdfs(udfConf.toMap());
+        // Default is true
+        assertThat(functions.get(0).isDeterministic()).isTrue();
     }
 
     @Test

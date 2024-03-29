@@ -102,7 +102,7 @@ public class UdfUtil {
                                     FUNCTION_CLASS_NAME_FIELD,
                                     ConfiguredFunctionSpec.Builder::setClassName,
                                     ConfiguredFunctionSpec::getClassName),
-                            Field.of(
+                            Field.ofOptional(
                                     FUNCTION_IS_DETERMINISTIC_FIELD,
                                     ConfiguredFunctionSpec.Builder::parseIsDeterministic,
                                     ConfiguredFunctionSpec::getIsDeterministicAsString)));
@@ -156,7 +156,7 @@ public class UdfUtil {
                     emptyField = false;
                 }
             }
-            if (emptyField) {
+            if (!field.optional && emptyField) {
                 LOG.error("Didn't find field " + field.name + " for udf " + udfName);
                 throw new FlinkRuntimeException(
                         "Didn't find field " + field.name + " for udf " + udfName);
@@ -270,25 +270,35 @@ public class UdfUtil {
         final Function<ConfiguredFunctionSpec, String> getField;
         final boolean variable;
         final boolean emptyOk;
+        private final boolean optional;
 
         public Field(
                 String name,
                 BiConsumer<ConfiguredFunctionSpec.Builder, String> consumer,
                 Function<ConfiguredFunctionSpec, String> getField,
                 boolean variable,
-                boolean emptyOk) {
+                boolean emptyOk,
+                boolean optional) {
             this.name = name;
             this.consumer = consumer;
             this.getField = getField;
             this.variable = variable;
             this.emptyOk = emptyOk;
+            this.optional = optional;
         }
 
         public static Field of(
                 String name,
                 BiConsumer<ConfiguredFunctionSpec.Builder, String> consumer,
                 Function<ConfiguredFunctionSpec, String> getField) {
-            return new Field(name, consumer, getField, false, false);
+            return new Field(name, consumer, getField, false, false, false);
+        }
+
+        public static Field ofOptional(
+                String name,
+                BiConsumer<ConfiguredFunctionSpec.Builder, String> consumer,
+                Function<ConfiguredFunctionSpec, String> getField) {
+            return new Field(name, consumer, getField, false, false, true);
         }
 
         public static Field ofVariable(
@@ -296,7 +306,7 @@ public class UdfUtil {
                 BiConsumer<ConfiguredFunctionSpec.Builder, String> variableConsumer,
                 Function<ConfiguredFunctionSpec, String> getField,
                 boolean emptyOk) {
-            return new Field(name, variableConsumer, getField, true, emptyOk);
+            return new Field(name, variableConsumer, getField, true, emptyOk, false);
         }
     }
 }
