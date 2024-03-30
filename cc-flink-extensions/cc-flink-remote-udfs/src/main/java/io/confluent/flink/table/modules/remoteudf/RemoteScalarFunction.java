@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.ScalarFunction;
@@ -91,7 +92,13 @@ public class RemoteScalarFunction extends ScalarFunction {
 
         metrics.instanceProvision();
         Preconditions.checkNotNull(remoteUdfSpec);
-        this.remoteUdfRuntime = RemoteUdfRuntime.open(configMap, remoteUdfSpec, metrics);
+        this.remoteUdfRuntime =
+                RemoteUdfRuntime.open(
+                        configMap,
+                        remoteUdfSpec,
+                        metrics,
+                        KafkaCredentialsCacheImpl.INSTANCE,
+                        context.getJobId());
     }
 
     @Override

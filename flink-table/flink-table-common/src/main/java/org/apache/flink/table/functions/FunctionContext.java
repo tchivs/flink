@@ -18,8 +18,10 @@
 
 package org.apache.flink.table.functions;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.ExecutionConfig.GlobalJobParameters;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.externalresource.ExternalResourceInfo;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
@@ -150,5 +152,13 @@ public class FunctionContext {
             return userClassLoader;
         }
         return context.getUserCodeClassLoader();
+    }
+
+    @Confluent
+    public JobID getJobId() {
+        if (context == null) {
+            throw new TableException("Cannot access runtime context");
+        }
+        return context.getJobId();
     }
 }

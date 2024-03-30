@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static io.confluent.flink.credentials.JobOptions.COMMA_SEPARATED_PRINCIPALS;
 import static io.confluent.flink.credentials.JobOptions.COMPUTE_POOL_ID;
+import static io.confluent.flink.credentials.JobOptions.CONFLUENT_UDF_PREFIX;
 import static io.confluent.flink.credentials.JobOptions.STATEMENT_ID_CRN;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_CHECK_PERIOD_MS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_EXPIRATION_MS;
@@ -181,14 +182,17 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
 
             List<String> principals = parsePrincipals(jobConfiguration, jobID.toHexString());
 
+            Map<String, String> udfOptions = jobConfiguration.get(CONFLUENT_UDF_PREFIX);
             JobCredentialsMetadata jobCredentialsMetadata =
                     new JobCredentialsMetadata(
                             jobID,
                             jobConfiguration.getString(STATEMENT_ID_CRN),
                             jobConfiguration.getString(COMPUTE_POOL_ID),
                             principals,
+                            !udfOptions.isEmpty(),
                             clock.absoluteTimeMillis(),
                             clock.absoluteTimeMillis());
+
             fetchToken(jobCredentialsMetadata);
         }
         // Find the jobs which are in need of updated credentials.

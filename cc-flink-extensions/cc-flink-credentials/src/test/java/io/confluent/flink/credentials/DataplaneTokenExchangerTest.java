@@ -29,8 +29,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +50,7 @@ public class DataplaneTokenExchangerTest {
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     Collections.singletonList("sa-123"),
+                    false,
                     0,
                     0);
 
@@ -56,6 +60,7 @@ public class DataplaneTokenExchangerTest {
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     Collections.singletonList("u-123"),
+                    false,
                     0,
                     0);
 
@@ -66,6 +71,17 @@ public class DataplaneTokenExchangerTest {
                     "computepool",
                     Arrays.stream(new String[] {"u-123", "pool-123", "pool-234", "group-123"})
                             .collect(Collectors.toList()),
+                    false,
+                    0,
+                    0);
+
+    private static final JobCredentialsMetadata UDF_METADATA =
+            new JobCredentialsMetadata(
+                    JobID.generate(),
+                    "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
+                    "computepool",
+                    Collections.singletonList("sa-123"),
+                    true,
                     0,
                     0);
 
@@ -112,29 +128,45 @@ public class DataplaneTokenExchangerTest {
     @Test
     public void testFetch_service_account_principal() {
         handler.withResponse(IssueFlinkAuthTokenResponse.newBuilder().setToken("abc").build());
-        DPATToken token = tokenExchanger.fetch(STATIC_CREDS, SA_PRINCIPAL_METADATA);
+        DPATTokens token = tokenExchanger.fetch(STATIC_CREDS, SA_PRINCIPAL_METADATA);
         assertThat(handler.getRequest().getServiceAccountId()).isEqualTo("sa-123");
         assertThat(token.getToken()).isEqualTo("abc");
+        assertThat(token.getUDFToken()).isEmpty();
     }
 
     @Test
     public void testFetch_user_principal() {
         handler.withResponse(IssueFlinkAuthTokenResponse.newBuilder().setToken("abc").build());
-        DPATToken token = tokenExchanger.fetch(STATIC_CREDS, USER_PRINCIPAL_METADATA);
+        DPATTokens token = tokenExchanger.fetch(STATIC_CREDS, USER_PRINCIPAL_METADATA);
         assertThat(handler.getRequest().getUserResourceId()).isEqualTo("u-123");
         AssertionsForClassTypes.assertThat(token.getToken()).isEqualTo("abc");
+        assertThat(token.getUDFToken()).isEmpty();
     }
 
     @Test
     public void testFetch_user_pools_principal() {
         handler.withResponse(IssueFlinkAuthTokenResponse.newBuilder().setToken("abc").build());
-        DPATToken token = tokenExchanger.fetch(STATIC_CREDS, USER_POOL_PRINCIPAL_METADATA);
+        DPATTokens token = tokenExchanger.fetch(STATIC_CREDS, USER_POOL_PRINCIPAL_METADATA);
         assertThat(handler.getRequest().getUserResourceId()).isEqualTo("u-123");
         assertThat(handler.getRequest().getIdentityPoolIdsCount()).isEqualTo(3);
         assertThat(handler.getRequest().getIdentityPoolIds(0)).isEqualTo("pool-123");
         assertThat(handler.getRequest().getIdentityPoolIds(1)).isEqualTo("pool-234");
         assertThat(handler.getRequest().getIdentityPoolIds(2)).isEqualTo("group-123");
         assertThat(token.getToken()).isEqualTo("abc");
+        assertThat(token.getUDFToken()).isEmpty();
+    }
+
+    @Test
+    public void testUdfs() {
+        handler.withResponse(IssueFlinkAuthTokenResponse.newBuilder().setToken("abc").build());
+        handler.withResponse(IssueFlinkAuthTokenResponse.newBuilder().setToken("def").build());
+        DPATTokens token = tokenExchanger.fetch(STATIC_CREDS, UDF_METADATA);
+        assertThat(handler.getRequest(0).getServiceAccountId()).isEqualTo("sa-123");
+        assertThat(handler.getRequest(0).getTarget()).isEmpty();
+        assertThat(handler.getRequest(1).getServiceAccountId()).isEqualTo("sa-123");
+        assertThat(handler.getRequest(1).getTarget()).isEqualTo("cc-secure-compute-gateway");
+        assertThat(token.getToken()).isEqualTo("abc");
+        assertThat(token.getUDFToken()).contains("def");
     }
 
     @Test
@@ -158,8 +190,8 @@ public class DataplaneTokenExchangerTest {
     /** The handler for the fake RPC server. */
     private static class Handler extends AuthDataplaneServiceGrpc.AuthDataplaneServiceImplBase {
 
-        private IssueFlinkAuthTokenRequest request;
-        private IssueFlinkAuthTokenResponse response;
+        private final List<IssueFlinkAuthTokenRequest> requests = new ArrayList<>();
+        private final LinkedList<IssueFlinkAuthTokenResponse> responses = new LinkedList<>();
         private boolean error;
         private long delayMs = -1;
 
@@ -176,7 +208,7 @@ public class DataplaneTokenExchangerTest {
         }
 
         public Handler withResponse(IssueFlinkAuthTokenResponse response) {
-            this.response = response;
+            this.responses.add(response);
             return this;
         }
 
@@ -184,7 +216,7 @@ public class DataplaneTokenExchangerTest {
         public void issueFlinkAuthToken(
                 IssueFlinkAuthTokenRequest request,
                 StreamObserver<IssueFlinkAuthTokenResponse> responseObserver) {
-            this.request = request;
+            this.requests.add(request);
             if (error) {
                 Status status =
                         Status.newBuilder()
@@ -200,12 +232,16 @@ public class DataplaneTokenExchangerTest {
                 } catch (InterruptedException e) {
                 }
             }
-            responseObserver.onNext(response);
+            responseObserver.onNext(responses.pop());
             responseObserver.onCompleted();
         }
 
         public IssueFlinkAuthTokenRequest getRequest() {
-            return request;
+            return requests.stream().findFirst().orElse(null);
+        }
+
+        public IssueFlinkAuthTokenRequest getRequest(int i) {
+            return requests.get(i);
         }
     }
 }

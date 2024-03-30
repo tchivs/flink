@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +80,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         new ArrayList<>(),
+                        false,
                         0,
                         10);
         decrypter = new MockCredentialDecrypter();
@@ -106,7 +108,7 @@ public class KafkaCredentialFetcherImplTest {
                                                 .build())
                                 .build());
         decrypter.withDecryptedResult("decrypted_secret".getBytes());
-        dpatTokenExchanger.withToken(new DPATToken("token"));
+        dpatTokenExchanger.withToken(new DPATTokens("token"));
     }
 
     @AfterEach
@@ -135,6 +137,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         saPrincipals,
+                        false,
                         0,
                         10);
         KafkaCredentials kafkaCredentials = fetcher.fetchToken(saJobCredentialsMetadata);
@@ -149,6 +152,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         Collections.singletonList("u-123"),
+                        false,
                         0,
                         10);
         KafkaCredentials kafkaCredentials = fetcher.fetchToken(userJobCredentialMetadata);
@@ -166,10 +170,28 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         userAndIdentityPoolPrincipals,
+                        false,
                         0,
                         10);
         KafkaCredentials kafkaCredentials = fetcher.fetchToken(userJobCredentialMetadata);
         assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
+    }
+
+    @Test
+    public void testFetch_success_withUDFs() {
+        dpatTokenExchanger.withToken(new DPATTokens("token", Optional.of("udf_token")));
+        JobCredentialsMetadata userJobCredentialMetadata =
+                new JobCredentialsMetadata(
+                        JobID.generate(),
+                        "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
+                        "computePoolId",
+                        Collections.singletonList("u-123"),
+                        true,
+                        0,
+                        10);
+        KafkaCredentials kafkaCredentials = fetcher.fetchToken(userJobCredentialMetadata);
+        assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
+        assertThat(kafkaCredentials.getUdfDpatToken()).contains("udf_token");
     }
 
     @Test
@@ -191,6 +213,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         userAndIdentityPoolPrincipals,
+                        false,
                         0,
                         10);
         handler.withError();
@@ -216,6 +239,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         userPrincipals,
+                        false,
                         0,
                         10);
         handler.withError();
@@ -234,6 +258,7 @@ public class KafkaCredentialFetcherImplTest {
                         "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                         "computePoolId",
                         userPrincipals,
+                        false,
                         0,
                         10);
         handler.withError();

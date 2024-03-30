@@ -37,7 +37,7 @@ public class DataplaneTokenExchanger implements TokenExchanger {
     }
 
     @Override
-    public DPATToken fetch(
+    public DPATTokens fetch(
             Pair<String, String> staticCredentials, JobCredentialsMetadata jobCredentialsMetadata) {
 
         Optional<String> serviceAccount = getServiceAccountPrincipal(jobCredentialsMetadata);
@@ -68,7 +68,20 @@ public class DataplaneTokenExchanger implements TokenExchanger {
                             .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
                             .issueFlinkAuthToken(request.build());
 
-            return new DPATToken(response.getToken());
+            // If the job contains UDFs, we need to fetch a separate token for that use.
+            Optional<String> udfToken = Optional.empty();
+            if (jobCredentialsMetadata.jobContainsUDFs()) {
+                LOG.info("Doing second request for UDF token (dataplane)");
+                request.setTarget("cc-secure-compute-gateway");
+
+                IssueFlinkAuthTokenResponse udfResponse =
+                        authDataplaneService
+                                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+                                .issueFlinkAuthToken(request.build());
+                udfToken = Optional.of(udfResponse.getToken());
+            }
+
+            return new DPATTokens(response.getToken(), udfToken);
         } catch (Throwable t) {
             LOG.error("Failed to fetch token (dataplane)", t);
             throw new FlinkRuntimeException("Failed to fetch token (dataplane)", t);

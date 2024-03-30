@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.confluent.flink.credentials.JobOptions.COMPUTE_POOL_ID;
+import static io.confluent.flink.credentials.JobOptions.CONFLUENT_UDF_PREFIX;
 import static io.confluent.flink.credentials.JobOptions.IDENTITY_POOL_ID;
 import static io.confluent.flink.credentials.JobOptions.STATEMENT_ID_CRN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -139,6 +140,9 @@ public class KafkaDelegationTokenProviderTest {
         assertThat(calls.get(0).getJobID()).isEqualTo(jobId1);
         assertThat(calls.get(1).getJobID()).isEqualTo(jobId2);
         assertThat(calls.get(2).getJobID()).isEqualTo(jobId1);
+        assertThat(calls.get(0).jobContainsUDFs()).isFalse();
+        assertThat(calls.get(1).jobContainsUDFs()).isFalse();
+        assertThat(calls.get(2).jobContainsUDFs()).isFalse();
     }
 
     @Test
@@ -263,5 +267,23 @@ public class KafkaDelegationTokenProviderTest {
         assertThat(credentials.size()).isEqualTo(2);
         assertThat(credentials).containsKey(jobId1);
         assertThat(credentials).containsKey(jobId2);
+    }
+
+    @Test
+    public void testFetch_withUdfs() throws Exception {
+        kafkaDPATCredentialFetcher.withResponse(creds1);
+        configuration1.setString(CONFLUENT_UDF_PREFIX.key() + ".abc.foo", "a");
+        configuration1.setString(CONFLUENT_UDF_PREFIX.key() + ".abc.bar", "b");
+        assertThat(provider.registerJob(jobId1, configuration1)).isTrue();
+        Map<JobID, KafkaCredentials> credentials = obtainCredentials();
+        assertThat(credentials.size()).isEqualTo(1);
+        assertThat(credentials).containsKey(jobId1);
+        assertThat(kafkaDPATCredentialFetcher.getFetchParametersForAllCalls()).hasSize(1);
+        assertThat(
+                        kafkaDPATCredentialFetcher
+                                .getFetchParametersForAllCalls()
+                                .get(0)
+                                .jobContainsUDFs())
+                .isTrue();
     }
 }

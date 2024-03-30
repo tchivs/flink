@@ -8,6 +8,9 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import java.util.Collections;
+import java.util.Map;
+
 /** The job options that are submitted along with a job to fetch credentials. */
 @Confluent
 public class JobOptions {
@@ -35,4 +38,10 @@ public class JobOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("The comma separated principals of the job");
+
+    public static final ConfigOption<Map<String, String>> CONFLUENT_UDF_PREFIX =
+            ConfigOptions.key("confluent.functions")
+                    .mapType()
+                    .defaultValue(Collections.emptyMap())
+                    .withDescription("The udf prefix for metadata submitted with the job");
 }

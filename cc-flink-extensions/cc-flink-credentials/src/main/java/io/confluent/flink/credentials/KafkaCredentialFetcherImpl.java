@@ -49,8 +49,8 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
     public KafkaCredentials fetchToken(JobCredentialsMetadata jobCredentialsMetadata) {
         Pair<String, String> ccAuthCredentials =
                 fetchStaticCredentialsForJob(jobCredentialsMetadata);
-        DPATToken dpat = exchangeForToken(ccAuthCredentials, jobCredentialsMetadata);
-        return new KafkaCredentials(dpat.getToken());
+        DPATTokens dpats = exchangeForToken(ccAuthCredentials, jobCredentialsMetadata);
+        return new KafkaCredentials(dpats.getToken(), dpats.getUDFToken());
     }
 
     private Pair<String, String> fetchStaticCredentialsForJob(
@@ -73,7 +73,7 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
         return Pair.of(apiKeyAndEncryptedSecret.getLeft(), secret);
     }
 
-    private DPATToken exchangeForToken(
+    private DPATTokens exchangeForToken(
             Pair<String, String> ccAuthCredentials, JobCredentialsMetadata jobCredentialsMetadata) {
         try {
             return tokenExchanger.fetch(ccAuthCredentials, jobCredentialsMetadata);

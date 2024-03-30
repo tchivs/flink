@@ -6,7 +6,7 @@ package io.confluent.flink.credentials.utils;
 
 import org.apache.flink.annotation.Confluent;
 
-import io.confluent.flink.credentials.DPATToken;
+import io.confluent.flink.credentials.DPATTokens;
 import io.confluent.flink.credentials.JobCredentialsMetadata;
 import io.confluent.flink.credentials.TokenExchanger;
 import org.apache.commons.lang3.tuple.Pair;
@@ -15,10 +15,10 @@ import org.apache.commons.lang3.tuple.Pair;
 @Confluent
 public class MockTokenExchanger implements TokenExchanger {
 
-    private DPATToken token;
+    private DPATTokens token;
     private boolean error;
 
-    public MockTokenExchanger withToken(DPATToken token) {
+    public MockTokenExchanger withToken(DPATTokens token) {
         this.token = token;
         return this;
     }
@@ -29,7 +29,7 @@ public class MockTokenExchanger implements TokenExchanger {
     }
 
     @Override
-    public DPATToken fetch(
+    public DPATTokens fetch(
             Pair<String, String> staticCredentials, JobCredentialsMetadata jobCredentialsMetadata) {
         if (error) {
             throw new RuntimeException("Exchange Error");

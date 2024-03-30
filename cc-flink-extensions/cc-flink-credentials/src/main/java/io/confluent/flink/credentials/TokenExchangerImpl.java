@@ -71,7 +71,7 @@ public class TokenExchangerImpl implements TokenExchanger {
         this.httpClient = httpClient;
     }
 
-    public DPATToken fetch(
+    public DPATTokens fetch(
             Pair<String, String> staticCredentials, JobCredentialsMetadata jobCredentialsMetadata) {
         URL url = null;
         try {
@@ -98,7 +98,7 @@ public class TokenExchangerImpl implements TokenExchanger {
                 LOG.info(
                         "Successfully exchange token for static credential {}",
                         staticCredentials.getLeft());
-                return new DPATToken(getTokenFromResponse(mapper, responseBody));
+                return new DPATTokens(getTokenFromResponse(mapper, responseBody));
             } else {
                 LOG.info(
                         "Unsuccessful response: {}, body {}, headers {}",

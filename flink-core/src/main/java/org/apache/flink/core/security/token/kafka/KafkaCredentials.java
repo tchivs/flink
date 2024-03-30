@@ -6,8 +6,11 @@ package org.apache.flink.core.security.token.kafka;
 
 import org.apache.flink.annotation.Confluent;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents credentials fetched for Kafka. These are represented by properties which override the
@@ -20,12 +23,24 @@ public class KafkaCredentials implements Serializable {
 
     private final String dpatToken;
 
+    // Is nullable to be Serializable
+    private final @Nullable String udfDpatToken;
+
     public KafkaCredentials(String dpatToken) {
+        this(dpatToken, Optional.empty());
+    }
+
+    public KafkaCredentials(String dpatToken, Optional<String> udfDpatToken) {
         this.dpatToken = dpatToken;
+        this.udfDpatToken = udfDpatToken.orElse(null);
     }
 
     public String getDpatToken() {
         return dpatToken;
+    }
+
+    public Optional<String> getUdfDpatToken() {
+        return Optional.ofNullable(udfDpatToken);
     }
 
     @Override
@@ -34,11 +49,12 @@ public class KafkaCredentials implements Serializable {
             return false;
         }
         KafkaCredentials that = (KafkaCredentials) o;
-        return Objects.equals(dpatToken, that.dpatToken);
+        return Objects.equals(dpatToken, that.dpatToken)
+                && Objects.equals(udfDpatToken, that.udfDpatToken);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(dpatToken);
+        return Objects.hash(dpatToken, udfDpatToken);
     }
 }

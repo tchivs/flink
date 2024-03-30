@@ -47,6 +47,7 @@ public class TokenExchangerImplTest {
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     Collections.singletonList("sa-123"),
+                    false,
                     0,
                     0);
 
@@ -56,6 +57,7 @@ public class TokenExchangerImplTest {
                     "crn://confluent.cloud/organization=e9eb4f2c-ef73-475c-ba7f-6b37a4ff00e5/environment=env-xx5q1x/flink-region=aws.us-west-2/statement=cl-jvu-1694189115-kafka2.0",
                     "computepool",
                     Collections.singletonList("u-123"),
+                    false,
                     0,
                     0);
 
@@ -66,6 +68,7 @@ public class TokenExchangerImplTest {
                     "computepool",
                     Arrays.stream(new String[] {"u-123", "pool-123", "pool-234", "group-123"})
                             .collect(Collectors.toList()),
+                    false,
                     0,
                     0);
 
@@ -117,7 +120,7 @@ public class TokenExchangerImplTest {
                                         "{\"token\":\"abc\", \"error\":null}"))
                         .build();
         httpClientMock.withResponse(response);
-        DPATToken token = exchanger.fetch(Pair.of("key", "secret"), SA_PRINCIPAL_METADATA);
+        DPATTokens token = exchanger.fetch(Pair.of("key", "secret"), SA_PRINCIPAL_METADATA);
         assertThat(token.getToken()).isEqualTo("abc");
     }
 
@@ -136,7 +139,7 @@ public class TokenExchangerImplTest {
                                         "{\"token\":\"abc\", \"error\":null}"))
                         .build();
         httpClientMock.withResponse(response);
-        DPATToken token = exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA);
+        DPATTokens token = exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA);
         assertThat(token.getToken()).isEqualTo("abc");
     }
 
@@ -155,7 +158,7 @@ public class TokenExchangerImplTest {
                                         "{\"token\":\"abc\", \"error\":null}"))
                         .build();
         httpClientMock.withResponse(response);
-        DPATToken token = exchanger.fetch(Pair.of("key", "secret"), USER_POOL_PRINCIPAL_METADATA);
+        DPATTokens token = exchanger.fetch(Pair.of("key", "secret"), USER_POOL_PRINCIPAL_METADATA);
         assertThat(token.getToken()).isEqualTo("abc");
     }
 
@@ -230,9 +233,9 @@ public class TokenExchangerImplTest {
                             .setResponseCode(200)
                             .setBody("{\"token\":\"abc\", \"error\":null}");
             mockWebServer.enqueue(response);
-            DPATToken dpatToken =
+            DPATTokens dpatTokens =
                     exchanger.fetch(Pair.of("key", "secret"), USER_PRINCIPAL_METADATA);
-            assertThat(dpatToken.getToken()).isEqualTo("abc");
+            assertThat(dpatTokens.getToken()).isEqualTo("abc");
         } finally {
             mockWebServer.close();
         }

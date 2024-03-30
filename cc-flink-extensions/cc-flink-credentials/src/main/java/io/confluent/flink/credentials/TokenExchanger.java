@@ -19,6 +19,6 @@ public interface TokenExchanger {
      * @param jobCredentialsMetadata The job credentials metadata
      * @return The token
      */
-    DPATToken fetch(
+    DPATTokens fetch(
             Pair<String, String> staticCredentials, JobCredentialsMetadata jobCredentialsMetadata);
 }

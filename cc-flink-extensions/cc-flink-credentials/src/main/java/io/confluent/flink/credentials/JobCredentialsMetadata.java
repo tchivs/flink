@@ -21,6 +21,7 @@ public class JobCredentialsMetadata implements Serializable {
     private final String statementIdCRN;
     private final String computePoolId;
     private final List<String> principals;
+    private final boolean jobContainsUDFs;
     private final long startTimeMs;
     private final long tokenUpdateTimeMs;
 
@@ -29,11 +30,13 @@ public class JobCredentialsMetadata implements Serializable {
             String statementIdCRN,
             String computePoolId,
             List<String> principals,
+            boolean jobContainsUDFs,
             long startTimeMs,
             long tokenUpdateTimeMs) {
         this.jobID = jobID;
         this.statementIdCRN = statementIdCRN;
         this.computePoolId = computePoolId;
+        this.jobContainsUDFs = jobContainsUDFs;
         this.startTimeMs = startTimeMs;
         this.tokenUpdateTimeMs = tokenUpdateTimeMs;
         this.principals = principals != null ? principals : Collections.emptyList();
@@ -65,7 +68,17 @@ public class JobCredentialsMetadata implements Serializable {
 
     public JobCredentialsMetadata withNewTokenUpdateTime(long tokenUpdateTimeMs) {
         return new JobCredentialsMetadata(
-                jobID, statementIdCRN, computePoolId, principals, startTimeMs, tokenUpdateTimeMs);
+                jobID,
+                statementIdCRN,
+                computePoolId,
+                principals,
+                jobContainsUDFs,
+                startTimeMs,
+                tokenUpdateTimeMs);
+    }
+
+    public boolean jobContainsUDFs() {
+        return jobContainsUDFs;
     }
 
     @Override
@@ -81,6 +94,8 @@ public class JobCredentialsMetadata implements Serializable {
                 + '\''
                 + ", principals="
                 + principals
+                + ", containsUDFs="
+                + jobContainsUDFs
                 + ", startTimeMs="
                 + startTimeMs
                 + ", tokenUpdateTimeMs="

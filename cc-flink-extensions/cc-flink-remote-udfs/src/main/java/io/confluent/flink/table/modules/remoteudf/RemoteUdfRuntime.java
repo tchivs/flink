@@ -4,7 +4,10 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Deadline;
+import org.apache.flink.core.security.token.kafka.KafkaCredentials;
+import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 
@@ -16,19 +19,31 @@ import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
 import io.confluent.secure.compute.gateway.v1.Error;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;
+import io.grpc.CallCredentials;
+import io.grpc.Metadata;
+import io.grpc.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.getUdfTaskFromSpec;
+import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 /**
  * This class encapsulates the runtime for interacting with remote UDFs, e.g. to call the remote
  * method.
  */
 public class RemoteUdfRuntime implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(RemoteUdfRuntime.class);
+
+    public static final Metadata.Key<String> AUTH_METADATA =
+            Metadata.Key.of("Authorization", ASCII_STRING_MARSHALLER);
 
     private static final int POLL_INTERVAL_MS = 500;
 
@@ -38,13 +53,17 @@ public class RemoteUdfRuntime implements AutoCloseable {
             String functionInstanceName,
             ApiClient apiClient,
             ComputeV1alphaFlinkUdfTask udfTask,
-            RemoteUdfMetrics metrics) {
+            RemoteUdfMetrics metrics,
+            KafkaCredentialsCache credentialsCache,
+            JobID jobID) {
         this.remoteUdfSerialization = remoteUdfSerialization;
         this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
         this.functionInstanceName = functionInstanceName;
         this.apiClient = apiClient;
         this.udfTask = udfTask;
         this.metrics = metrics;
+        this.credentialsCache = credentialsCache;
+        this.jobID = jobID;
     }
 
     /** Serialization methods. */
@@ -63,6 +82,12 @@ public class RemoteUdfRuntime implements AutoCloseable {
     /** Metrics object used to track events. */
     private final RemoteUdfMetrics metrics;
 
+    /** Where we store tokens used to access the compute platform. */
+    private final KafkaCredentialsCache credentialsCache;
+
+    /** The job id of the current job running this UDF. */
+    private final JobID jobID;
+
     /**
      * Calls the remote UDF.
      *
@@ -76,6 +101,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
         InvokeFunctionResponse invokeResponse =
                 remoteUdfGatewayConnection
                         .getUdfGateway()
+                        .withCallCredentials(new UdfCallCredentials(credentialsCache, jobID))
                         .invokeFunction(
                                 InvokeFunctionRequest.newBuilder()
                                         .setFuncInstanceName(functionInstanceName)
@@ -98,7 +124,11 @@ public class RemoteUdfRuntime implements AutoCloseable {
      *     instances.
      */
     public static RemoteUdfRuntime open(
-            Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec, RemoteUdfMetrics metrics)
+            Map<String, String> confMap,
+            RemoteUdfSpec remoteUdfSpec,
+            RemoteUdfMetrics metrics,
+            KafkaCredentialsCache credentialsCache,
+            JobID jobID)
             throws Exception {
         RemoteUdfSerialization remoteUdfSerialization =
                 new RemoteUdfSerialization(
@@ -129,7 +159,9 @@ public class RemoteUdfRuntime implements AutoCloseable {
                             udfTask.getMetadata().getName(),
                             apiClient,
                             udfTask,
-                            metrics);
+                            metrics,
+                            credentialsCache,
+                            jobID);
                 }
                 Thread.sleep(POLL_INTERVAL_MS);
             }
@@ -200,5 +232,46 @@ public class RemoteUdfRuntime implements AutoCloseable {
     private static void throwForError(Error error) throws RemoteUdfException {
         throw new RemoteUdfException(
                 error.getMessage(), error.getCode(), error.getMessageBytes().toByteArray());
+    }
+
+    private static class UdfCallCredentials extends CallCredentials {
+        private final KafkaCredentialsCache credentialsCache;
+        private final JobID jobId;
+
+        public UdfCallCredentials(KafkaCredentialsCache credentialsCache, JobID jobId) {
+            super();
+            this.credentialsCache = credentialsCache;
+            this.jobId = jobId;
+        }
+
+        /** Refreshes the token from the cache. */
+        @Override
+        public void applyRequestMetadata(
+                RequestInfo requestInfo, Executor appExecutor, MetadataApplier applier) {
+            appExecutor.execute(
+                    () -> {
+                        try {
+                            Optional<KafkaCredentials> credentials =
+                                    credentialsCache.getCredentials(jobId);
+                            String token =
+                                    credentials
+                                            .flatMap(KafkaCredentials::getUdfDpatToken)
+                                            .orElseThrow(
+                                                    () ->
+                                                            new RuntimeException(
+                                                                    "No token available"));
+
+                            Metadata metadata = new Metadata();
+                            metadata.put(AUTH_METADATA, "Bearer " + token);
+                            applier.apply(metadata);
+                        } catch (Exception e) {
+                            LOG.error("Error fetching credentials", e);
+                            applier.fail(Status.UNAUTHENTICATED.withCause(e));
+                        }
+                    });
+        }
+
+        @Override
+        public void thisUsesUnstableApi() {}
     }
 }
