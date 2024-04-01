@@ -110,6 +110,7 @@ Copyright 2024 Confluent Inc.
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-stub</artifactId>
 			<version>${grpc.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
 				<exclusion>
 					<groupId>com.google.errorprone</groupId>
@@ -122,6 +123,7 @@ Copyright 2024 Confluent Inc.
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-protobuf</artifactId>
 			<version>${grpc.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
 			<exclusions>
 				<exclusion>
 					<artifactId>protobuf-java</artifactId>
@@ -156,11 +158,7 @@ Copyright 2024 Confluent Inc.
 						<configuration>
 							<artifactSet>
 								<includes>
-									<include>org.apache.flink:*</include>
-									<include>org.apache.commons:*</include>
-									<include>com.google.protobuf:*</include>
-									<include>org.scala-lang:scala-library</include>
-									<include>io.confluent.flink:*</include>
+									<include>*:*</include>
 								</includes>
 							</artifactSet>
 							<relocations>
@@ -178,6 +176,7 @@ Copyright 2024 Confluent Inc.
 										<exclude>META-INF/*.SF</exclude>
 										<exclude>META-INF/*.DSA</exclude>
 										<exclude>META-INF/*.RSA</exclude>
+										<exclude>LICENSE</exclude>
 									</excludes>
 								</filter>
 							</filters>
