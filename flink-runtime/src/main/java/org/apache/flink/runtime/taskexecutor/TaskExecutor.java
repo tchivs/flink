@@ -1385,7 +1385,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
     @Override
     public CompletableFuture<Acknowledge> updateDelegationTokens(
             ResourceManagerId resourceManagerId, byte[] tokens) {
-        log.info(
+        log.debug(
                 "Receive update delegation tokens from resource manager with leader id {}.",
                 resourceManagerId);
 
