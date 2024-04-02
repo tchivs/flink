@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.operators.testutils.MockEnvironment;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
@@ -95,6 +96,7 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
                                 Collections.emptyList(),
                                 cancelStreamRegistry));
         BatchExecutionInternalTimeServiceManager.create(
+                UnregisteredMetricGroups.createUnregisteredTaskMetricGroup().getIOMetricGroup(),
                 stateBackend,
                 this.getClass().getClassLoader(),
                 new DummyKeyContext(),
@@ -140,6 +142,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
                         KEY_SERIALIZER, new KeyGroupRange(0, 1), new ExecutionConfig());
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
@@ -176,6 +180,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
                         KEY_SERIALIZER, new KeyGroupRange(0, 1), new ExecutionConfig());
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
@@ -205,6 +211,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
                         KEY_SERIALIZER, new KeyGroupRange(0, 1), new ExecutionConfig());
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
@@ -252,6 +260,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
         TestProcessingTimeService processingTimeService = new TestProcessingTimeService();
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
@@ -287,6 +297,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
         TestProcessingTimeService processingTimeService = new TestProcessingTimeService();
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
@@ -327,6 +339,8 @@ public class BatchExecutionInternalTimeServiceTest extends TestLogger {
         TestProcessingTimeService processingTimeService = new TestProcessingTimeService();
         InternalTimeServiceManager<Integer> timeServiceManager =
                 BatchExecutionInternalTimeServiceManager.create(
+                        UnregisteredMetricGroups.createUnregisteredTaskMetricGroup()
+                                .getIOMetricGroup(),
                         keyedStatedBackend,
                         this.getClass().getClassLoader(),
                         new DummyKeyContext(),
