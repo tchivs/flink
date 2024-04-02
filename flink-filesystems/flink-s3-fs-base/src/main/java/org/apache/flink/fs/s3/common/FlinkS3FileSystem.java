@@ -25,6 +25,7 @@ import org.apache.flink.core.fs.PathsCopyingFileSystem;
 import org.apache.flink.core.fs.RecoverableWriter;
 import org.apache.flink.core.fs.RefCountedFileWithStream;
 import org.apache.flink.core.fs.RefCountedTmpFileCreator;
+import org.apache.flink.fs.s3.common.token.AbstractS3DelegationTokenReceiver;
 import org.apache.flink.fs.s3.common.writer.S3AccessHelper;
 import org.apache.flink.fs.s3.common.writer.S3RecoverableWriter;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
@@ -33,6 +34,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 import org.apache.flink.util.function.FunctionWithException;
 
+import com.amazonaws.services.securitytoken.model.Credentials;
 import org.apache.hadoop.fs.FileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,9 +144,19 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         }
 
         private void configureEnvironment(Map<String, String> environment) {
-            maybeSetEnvironmentVariable(environment, "AWS_ACCESS_KEY_ID", accessArtifact);
-            maybeSetEnvironmentVariable(environment, "AWS_SECRET_ACCESS_KEY", secretArtifact);
-            maybeSetEnvironmentVariable(environment, "S3_ENDPOINT_URL", endpoint);
+            Credentials credentials = AbstractS3DelegationTokenReceiver.getCredentials();
+            if (credentials != null) {
+                maybeSetEnvironmentVariable(
+                        environment, "AWS_ACCESS_KEY_ID", credentials.getAccessKeyId());
+                maybeSetEnvironmentVariable(
+                        environment, "AWS_SECRET_ACCESS_KEY", credentials.getSecretAccessKey());
+                maybeSetEnvironmentVariable(
+                        environment, "AWS_SESSION_TOKEN", credentials.getSessionToken());
+            } else {
+                maybeSetEnvironmentVariable(environment, "AWS_ACCESS_KEY_ID", accessArtifact);
+                maybeSetEnvironmentVariable(environment, "AWS_SECRET_ACCESS_KEY", secretArtifact);
+                maybeSetEnvironmentVariable(environment, "S3_ENDPOINT_URL", endpoint);
+            }
         }
 
         private static void maybeSetEnvironmentVariable(
