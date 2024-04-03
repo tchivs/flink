@@ -75,6 +75,12 @@
             <td>If true, an async compaction of RocksDB is started after every restore after which we detect keys (including tombstones) in the database that are outside the key-groups range of the backend.</td>
         </tr>
         <tr>
+            <td><h5>state.backend.rocksdb.log.bridging</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Whether to use the same logging for RocksDB as for Flink (i.e. sl4j frontend). Overrides <code class="highlighter-rouge">state.backend.rocksdb.log.dir</code> but preserves <code class="highlighter-rouge">state.backend.rocksdb.log.level</code>.</td>
+        </tr>
+        <tr>
             <td><h5>state.backend.rocksdb.log.dir</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>

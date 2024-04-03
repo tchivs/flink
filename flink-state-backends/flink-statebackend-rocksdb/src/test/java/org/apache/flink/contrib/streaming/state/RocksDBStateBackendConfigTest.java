@@ -567,7 +567,13 @@ public class RocksDBStateBackendConfigTest {
 
             try (RocksDBResourceContainer optionsContainer =
                     new RocksDBResourceContainer(
-                            configuration, PredefinedOptions.DEFAULT, null, null, null, false)) {
+                            configuration,
+                            PredefinedOptions.DEFAULT,
+                            null,
+                            null,
+                            null,
+                            false,
+                            new JobID())) {
 
                 DBOptions dbOptions = optionsContainer.getDbOptions();
                 assertEquals(-1, dbOptions.maxOpenFiles());
@@ -621,7 +627,9 @@ public class RocksDBStateBackendConfigTest {
                 new RocksDBOptionsFactory() {
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 
@@ -651,7 +659,8 @@ public class RocksDBStateBackendConfigTest {
                         null,
                         null,
                         null,
-                        false)) {
+                        false,
+                        new JobID())) {
 
             final ColumnFamilyOptions columnFamilyOptions = optionsContainer.getColumnOptions();
             assertNotNull(columnFamilyOptions);
@@ -665,7 +674,8 @@ public class RocksDBStateBackendConfigTest {
                         null,
                         null,
                         null,
-                        false)) {
+                        false,
+                        new JobID())) {
 
             final ColumnFamilyOptions columnFamilyOptions = optionsContainer.getColumnOptions();
             assertNotNull(columnFamilyOptions);
@@ -679,7 +689,9 @@ public class RocksDBStateBackendConfigTest {
                 new RocksDBOptionsFactory() {
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 
@@ -954,7 +966,7 @@ public class RocksDBStateBackendConfigTest {
 
         @Override
         public DBOptions createDBOptions(
-                DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                DBOptions currentOptions, Collection<AutoCloseable> handlesToClose, JobID jobID) {
             return currentOptions.setMaxBackgroundJobs(backgroundJobs);
         }
 

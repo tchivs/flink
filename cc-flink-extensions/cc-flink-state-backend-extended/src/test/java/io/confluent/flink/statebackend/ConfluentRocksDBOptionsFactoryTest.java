@@ -4,6 +4,7 @@
 
 package io.confluent.flink.statebackend;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 
 import org.junit.jupiter.api.Test;
@@ -138,7 +139,7 @@ class ConfluentRocksDBOptionsFactoryTest {
                 optionsInit,
                 optionsCheck,
                 DBOptions::new,
-                (factory, opts) -> factory.createDBOptions(opts, new ArrayList<>()));
+                (factory, opts) -> factory.createDBOptions(opts, new ArrayList<>(), new JobID()));
     }
 
     private void checkCfOptions(

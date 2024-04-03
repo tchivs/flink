@@ -153,7 +153,7 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
     private transient File[] initializedDbBasePaths;
 
     /** JobID for uniquifying backup paths. */
-    private transient JobID jobId;
+    private transient JobID jobID;
 
     /** The index of the next directory to be used from {@link #initializedDbBasePaths}. */
     private transient int nextDirectory;
@@ -389,7 +389,7 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
             return;
         }
 
-        this.jobId = env.getJobID();
+        this.jobID = env.getJobID();
 
         // initialize the paths where the local RocksDB files should be stored
         if (localRocksDbDirectories == null) {
@@ -458,7 +458,7 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                 new File(
                         getNextStoragePath(),
                         "job_"
-                                + jobId
+                                + jobID
                                 + "_op_"
                                 + fileCompatibleIdentifier
                                 + "_uuid_"
@@ -920,7 +920,8 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                 rocksDbOptionsFactory,
                 sharedResources,
                 instanceBasePath,
-                enableStatistics);
+                enableStatistics,
+                jobID);
     }
 
     @Override

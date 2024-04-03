@@ -123,6 +123,17 @@ public class RocksDBConfigurableOptions implements Serializable {
                                             "There is no need to modify the RocksDB log level, unless for troubleshooting RocksDB.")
                                     .build());
 
+    public static final ConfigOption<Boolean> BRIDGE_LOGGING =
+            key("state.backend.rocksdb.log.bridging")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Whether to use the same logging for RocksDB as for Flink (i.e. sl4j frontend). Overrides %s but preserves %s.",
+                                            code(LOG_DIR.key()), code(LOG_LEVEL.key()))
+                                    .build());
+
     // --------------------------------------------------------------------------
     // Provided configurable ColumnFamilyOptions within Flink
     // --------------------------------------------------------------------------

@@ -4,9 +4,11 @@
 
 package io.confluent.flink.statebackend;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.contrib.streaming.state.ConfigurableRocksDBOptionsFactory;
+import org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions;
 import org.apache.flink.contrib.streaming.state.RocksDBOptionsFactory;
 
 import org.rocksdb.AccessHint;
@@ -102,6 +104,7 @@ public class ConfluentRocksDBOptionsFactory implements ConfigurableRocksDBOption
 
     private transient Map<String, String> dbOptions;
     private transient Map<String, String> cfOptions;
+    private transient boolean useLogBridging;
 
     @Override
     public RocksDBOptionsFactory configure(ReadableConfig configuration) {
@@ -124,14 +127,27 @@ public class ConfluentRocksDBOptionsFactory implements ConfigurableRocksDBOption
         this.dbOptions = dbOptions;
         this.cfOptions = cfOptions;
 
-        LOG.info("configured with DBOptions: {}, CFOptions: {}", dbOptions, cfOptions);
+        this.useLogBridging = configuration.get(RocksDBConfigurableOptions.BRIDGE_LOGGING);
+
+        LOG.info(
+                "configured with DBOptions: {}, CFOptions: {}, bridge logging: {}",
+                dbOptions,
+                cfOptions,
+                useLogBridging);
 
         return this;
     }
 
     @Override
-    public DBOptions createDBOptions(DBOptions opts, Collection<AutoCloseable> handlesToClose) {
-        return setOptions(dbOptions, opts, DB_OPTION_SETTERS);
+    public DBOptions createDBOptions(
+            DBOptions opts, Collection<AutoCloseable> handlesToClose, JobID jobID) {
+        opts = setOptions(dbOptions, opts, DB_OPTION_SETTERS);
+        if (this.useLogBridging) {
+            try (RocksDbSl4jLogger logger = new RocksDbSl4jLogger(opts, jobID)) {
+                opts.setLogger(logger);
+            }
+        }
+        return opts;
     }
 
     @Override

@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.util.function.ThrowingRunnable;
 
@@ -289,7 +290,9 @@ public class RocksDBResourceContainerTest {
 
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 
