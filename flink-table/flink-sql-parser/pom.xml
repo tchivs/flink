@@ -323,6 +323,14 @@ under the License.
 				</executions>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+
+				<configuration>
+					<suppressionsLocation combine.self="override">/tools/maven/suppressions-parser.xml</suppressionsLocation>
+				</configuration>
+			</plugin>
+			<plugin>
 				<!-- This must be run AFTER the fmpp-maven-plugin -->
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>javacc-maven-plugin</artifactId>
