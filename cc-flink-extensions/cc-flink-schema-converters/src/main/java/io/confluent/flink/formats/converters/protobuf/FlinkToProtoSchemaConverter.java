@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.protobuf;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
@@ -103,7 +104,8 @@ public class FlinkToProtoSchemaConverter {
                     .getFile()
                     .findMessageTypeByName(rowName);
         } catch (DescriptorValidationException e) {
-            throw new RuntimeException(e);
+            throw new ValidationException(
+                    "Failed to translate the provided schema to" + " a Protobuf descriptor", e);
         }
     }
 
@@ -295,8 +297,8 @@ public class FlinkToProtoSchemaConverter {
             case UNRESOLVED:
             case RAW:
             default:
-                throw new UnsupportedOperationException(
-                        "Unsupported to derive Schema for type: " + logicalType);
+                throw new ValidationException(
+                        "Unsupported to derive Protobuf Schema for type: " + logicalType);
         }
     }
 

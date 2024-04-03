@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.json;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
@@ -205,8 +206,8 @@ public class FlinkToJsonSchemaConverter {
             case UNRESOLVED:
             case RAW:
             default:
-                throw new UnsupportedOperationException(
-                        "Unsupported to derive Schema for type: " + logicalType);
+                throw new ValidationException(
+                        "Unsupported to derive JSON Schema for type: " + logicalType);
         }
     }
 
@@ -272,7 +273,7 @@ public class FlinkToJsonSchemaConverter {
                     .unprocessedProperties(
                             Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64));
         } else {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "JSON does not support TIME type with precision: "
                             + precision
                             + ", it only supports precision less than or equal to 6.");
@@ -287,7 +288,7 @@ public class FlinkToJsonSchemaConverter {
                     .unprocessedProperties(
                             Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64));
         } else {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "JSON does not support TIMESTAMP type "
                             + "with precision: "
                             + precision

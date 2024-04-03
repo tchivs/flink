@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.avro;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.DecimalType;
@@ -134,8 +135,8 @@ public class FlinkToAvroSchemaConverter {
             case UNRESOLVED:
             case RAW:
             default:
-                throw new UnsupportedOperationException(
-                        "Unsupported to derive Schema for type: " + logicalType);
+                throw new ValidationException(
+                        "Unsupported to derive an Avro Schema for type: " + logicalType);
         }
     }
 
@@ -185,7 +186,7 @@ public class FlinkToAvroSchemaConverter {
         } else if (precision <= 6) {
             return LogicalTypes.timeMicros().addToSchema(SchemaBuilder.builder().longType());
         } else {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "Avro does not support TIME type with precision: "
                             + precision
                             + ", it only supports precision less than or equal to 6.");
@@ -200,7 +201,7 @@ public class FlinkToAvroSchemaConverter {
         } else if (precision <= 6) {
             avroLogicalType = LogicalTypes.timestampMicros();
         } else {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "Avro does not support TIMESTAMP type "
                             + "with precision: "
                             + precision
@@ -217,7 +218,7 @@ public class FlinkToAvroSchemaConverter {
         } else if (precision <= 6) {
             avroLogicalType = LogicalTypes.localTimestampMicros();
         } else {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "Avro does not support TIMESTAMP_LTZ type "
                             + "with precision: "
                             + precision

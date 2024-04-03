@@ -316,7 +316,8 @@ public class JsonToFlinkSchemaConverter {
             return toFlinkSchemaWithCycleDetection(
                     ((ReferenceSchema) schema).getReferredSchema(), isOptional, cycleContext);
         } else {
-            throw new ValidationException("Unsupported schema type " + schema.getClass().getName());
+            throw new ValidationException(
+                    "Unsupported JSON schema type " + schema.getClass().getName());
         }
     }
 

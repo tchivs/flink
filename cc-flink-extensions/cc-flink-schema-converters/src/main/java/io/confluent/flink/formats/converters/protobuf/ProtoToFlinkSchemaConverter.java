@@ -5,6 +5,7 @@
 package io.confluent.flink.formats.converters.protobuf;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
@@ -224,8 +225,7 @@ public class ProtoToFlinkSchemaConverter {
                             return new LocalZonedTimestampType(true, 9);
                         default:
                             if (cycleContext.seenMessage.contains(fullName)) {
-                                throw new IllegalArgumentException(
-                                        "Cyclic schemas are not supported.");
+                                throw new ValidationException("Cyclic schemas are not supported.");
                             }
                             cycleContext.seenMessage.add(fullName);
                             final LogicalType recordSchema =
@@ -235,7 +235,7 @@ public class ProtoToFlinkSchemaConverter {
                     }
                 }
             default:
-                throw new IllegalArgumentException("Unknown schema type: " + schema.getType());
+                throw new ValidationException("Unknown Protobuf schema type: " + schema.getType());
         }
     }
 

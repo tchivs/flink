@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.converters.protobuf;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -64,7 +65,7 @@ public class ProtoToFlinkSchemaConverterTest {
                         () ->
                                 ProtoToFlinkSchemaConverter.toFlinkSchema(
                                         new ProtobufSchema(schemaStr).toDescriptor()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ValidationException.class)
                 .hasMessage("Cyclic schemas are not supported.");
     }
 

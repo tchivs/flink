@@ -6,6 +6,7 @@ package io.confluent.flink.formats.converters.avro;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
@@ -75,7 +76,7 @@ public class AvroToFlinkSchemaConverter {
                 schema.getType() == Type.UNION || schema.getType() == Type.RECORD;
         if (isNamedType) {
             if (cycleContext.seenSchemas.contains(schema)) {
-                throw new IllegalArgumentException("Cyclic schemas are not supported.");
+                throw new ValidationException("Cyclic schemas are not supported.");
             }
             cycleContext.seenSchemas.add(schema);
         }
@@ -109,7 +110,7 @@ public class AvroToFlinkSchemaConverter {
                     final int precision;
                     if (null != precisionNode) {
                         if (!(precisionNode instanceof Number)) {
-                            throw new IllegalStateException(
+                            throw new ValidationException(
                                     AVRO_LOGICAL_DECIMAL_PRECISION_PROP
                                             + " property must be a JSON Integer."
                                             + " https://avro.apache.org/docs/1.9.1/spec.html#Decimal");
@@ -146,7 +147,7 @@ public class AvroToFlinkSchemaConverter {
                 } else if (type.equalsIgnoreCase("int16")) {
                     return new SmallIntType(isOptional);
                 } else {
-                    throw new IllegalStateException(
+                    throw new ValidationException(
                             "Connect type annotation for Avro int field is null");
                 }
             case LONG:
@@ -178,7 +179,7 @@ public class AvroToFlinkSchemaConverter {
                     if (elemSchema.getFields().size() != 2
                             || elemSchema.getField(KEY_FIELD) == null
                             || elemSchema.getField(VALUE_FIELD) == null) {
-                        throw new IllegalStateException(
+                        throw new ValidationException(
                                 "Found map encoded as array of key-value pairs, but array "
                                         + "elements do not match the expected format.");
                     }
@@ -256,8 +257,8 @@ public class AvroToFlinkSchemaConverter {
                 return new NullType();
 
             default:
-                throw new IllegalStateException(
-                        "Couldn't translate unsupported schema type "
+                throw new ValidationException(
+                        "Couldn't translate unsupported Avro schema type "
                                 + schema.getType().getName()
                                 + ".");
         }
