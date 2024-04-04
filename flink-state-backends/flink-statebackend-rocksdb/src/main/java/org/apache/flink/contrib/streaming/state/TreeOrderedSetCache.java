@@ -33,6 +33,8 @@ public class TreeOrderedSetCache
 
     @Nonnull private final TreeSet<byte[]> treeSet;
 
+    private boolean wasLoaded = false;
+
     TreeOrderedSetCache(int maxSize) {
         this.maxSize = maxSize;
         this.treeSet = new TreeSet<>(LEXICOGRAPHIC_BYTE_COMPARATOR);
@@ -95,8 +97,10 @@ public class TreeOrderedSetCache
     @Override
     public void bulkLoadFromOrderedIterator(@Nonnull Iterator<byte[]> orderedIterator) {
         treeSet.clear();
-        for (int i = maxSize; --i >= 0 && orderedIterator.hasNext(); ) {
+        int size = wasLoaded ? maxSize : 1;
+        for (int i = size; --i >= 0 && orderedIterator.hasNext(); ) {
             treeSet.add(orderedIterator.next());
         }
+        wasLoaded = true;
     }
 }
