@@ -19,7 +19,6 @@ import io.confluent.flink.table.catalog.DatabaseInfo;
 
 import javax.annotation.Nullable;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -68,23 +67,13 @@ public abstract class InfoTableStreamProvider {
                 .filter(databaseFilter)
                 .flatMap(
                         databaseInfo -> {
-                            final List<String> tables;
                             try {
-                                tables = catalog.listTables(databaseInfo.getId());
+                                return catalog.listTables(databaseInfo.getId()).stream()
+                                        .map(t -> new TableInfo(catalogInfo, databaseInfo, t))
+                                        .filter(tableFilter);
                             } catch (DatabaseNotExistException e) {
                                 return Stream.empty();
                             }
-
-                            final List<String> views;
-                            try {
-                                views = catalog.listViews(databaseInfo.getId());
-                            } catch (DatabaseNotExistException e) {
-                                return Stream.empty();
-                            }
-
-                            return Stream.concat(tables.stream(), views.stream())
-                                    .map(t -> new TableInfo(catalogInfo, databaseInfo, t))
-                                    .filter(tableFilter);
                         })
                 // Filter in case the table gets deleted between listTables() and
                 // getTable(). This makes the implementation more lenient. Errors coming from the

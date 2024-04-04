@@ -500,8 +500,18 @@ public class InfoSchemaExecutionTest {
         }
 
         @Override
+        public List<String> listTables(String databaseName) throws DatabaseNotExistException {
+            // Include INFORMATION_SCHEMA views (i.e. virtual tables)
+            return Stream.of(
+                            InfoSchemaTables.listViewsByName(databaseName).stream(),
+                            InfoSchemaTables.listViewsById(databaseName).stream(),
+                            super.listTables(databaseName).stream())
+                    .flatMap(Function.identity())
+                    .collect(Collectors.toList());
+        }
+
+        @Override
         public List<String> listViews(String databaseName) throws DatabaseNotExistException {
-            // Include INFORMATION_SCHEMA views
             return Stream.of(
                             InfoSchemaTables.listViewsByName(databaseName).stream(),
                             InfoSchemaTables.listViewsById(databaseName).stream(),
@@ -512,7 +522,7 @@ public class InfoSchemaExecutionTest {
 
         @Override
         public CatalogBaseTable getTable(ObjectPath tablePath) throws TableNotExistException {
-            // Include INFORMATION_SCHEMA tables
+            // Include INFORMATION_SCHEMA tables (i.e. virtual tables)
             final Optional<CatalogView> infoSchemaById =
                     InfoSchemaTables.getViewById(catalogInfo, tablePath);
             if (infoSchemaById.isPresent()) {
