@@ -83,6 +83,9 @@ public class KeyGroupPartitionedPriorityQueue<
                         new InternalPriorityQueueComparator<>(elementPriorityComparator),
                         keyGroupRange.getNumberOfKeyGroups());
         for (int i = 0; i < keyGroupedHeaps.length; i++) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new RuntimeException(new InterruptedException());
+            }
             final PQ keyGroupSubHeap =
                     orderedCacheFactory.create(
                             firstKeyGroup + i,
