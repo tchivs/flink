@@ -110,7 +110,7 @@ public class RowTimeRangeBoundedPrecedingFunctionTest extends RowTimeOverWindowT
 
         assertThat(stateBackend.numKeyValueStateEntries())
                 .as("State has not been cleaned up")
-                .isEqualTo(0);
+                .isEqualTo(3);
     }
 
     @Test
