@@ -9,9 +9,9 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.binary.BinaryStringData;
 import org.apache.flink.util.Preconditions;
 
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfSerialization;
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfSpec;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.secure.compute.gateway.v1.Error;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;

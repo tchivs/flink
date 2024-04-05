@@ -11,6 +11,7 @@ import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

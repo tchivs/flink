@@ -31,6 +31,7 @@ import io.confluent.flink.table.modules.remoteudf.mock.MockedUdfGateway;
 import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContainer;
 import io.confluent.flink.table.modules.remoteudf.util.ApiServerUtils;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.grpc.Metadata;
 import io.grpc.Server;
 import io.grpc.ServerCall;

@@ -67,6 +67,12 @@ Copyright 2024 Confluent Inc.
 
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-udf-adapter-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
 			<artifactId>apiserver-client-java</artifactId>
 			<version>${apiserver.version}</version>
 			<exclusions>

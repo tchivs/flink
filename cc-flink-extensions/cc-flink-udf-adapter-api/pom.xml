@@ -18,6 +18,18 @@ Copyright 2024 Confluent Inc.
 
 	<dependencies>
 		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-table-common</artifactId>
+			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-table-runtime</artifactId>
+			<version>${project.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
 			<groupId>com.google.protobuf</groupId>
 			<artifactId>protobuf-java</artifactId>
 			<version>${protoc.version}</version>

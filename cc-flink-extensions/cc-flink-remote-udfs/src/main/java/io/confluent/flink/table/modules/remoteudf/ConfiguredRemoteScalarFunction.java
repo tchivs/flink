@@ -18,6 +18,7 @@ import org.apache.flink.table.types.logical.utils.LogicalTypeCasts;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

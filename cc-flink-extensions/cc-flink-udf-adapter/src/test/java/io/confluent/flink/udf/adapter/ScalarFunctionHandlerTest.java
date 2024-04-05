@@ -9,7 +9,7 @@ import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.VarCharType;
 
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.examples.HelloScalarFunction;
 import io.confluent.flink.udf.adapter.examples.SumScalarFunction;
 import org.junit.jupiter.api.Assertions;

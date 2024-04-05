@@ -2,7 +2,7 @@
  * Copyright 2023 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.remoteudf;
+package io.confluent.flink.udf.adapter.api;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;

@@ -8,6 +8,8 @@ import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Preconditions;
 
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;

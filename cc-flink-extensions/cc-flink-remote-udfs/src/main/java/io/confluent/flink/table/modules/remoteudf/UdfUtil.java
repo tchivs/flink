@@ -18,6 +18,8 @@ import io.confluent.flink.apiserver.client.model.ComputeV1alphaArtifact;
 import io.confluent.flink.apiserver.client.model.ComputeV1alphaEntryPoint;
 import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
 import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTaskSpec;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

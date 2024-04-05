@@ -9,8 +9,8 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.utils.DataTypeUtils;
 
 import com.google.protobuf.UnsafeByteOperations;
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfSerialization;
-import io.confluent.flink.table.modules.remoteudf.RemoteUdfSpec;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.function.runtime.core.Context;
 
 import java.util.List;

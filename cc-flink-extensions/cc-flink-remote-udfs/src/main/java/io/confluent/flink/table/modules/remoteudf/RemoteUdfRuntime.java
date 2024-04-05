@@ -16,6 +16,8 @@ import io.confluent.flink.apiserver.client.ApiClient;
 import io.confluent.flink.apiserver.client.ApiException;
 import io.confluent.flink.apiserver.client.ComputeV1alphaApi;
 import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.secure.compute.gateway.v1.Error;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;
