@@ -1139,8 +1139,10 @@ public class Task
      * <p>This method never blocks.
      */
     public void cancelExecution() {
-        LOG.info("Attempting to cancel task {} ({}).", taskNameWithSubtask, executionId);
-        cancelOrFailAndCancelInvokable(ExecutionState.CANCELING, null);
+        try (MdcUtils.MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobId))) {
+            LOG.info("Attempting to cancel task {} ({}).", taskNameWithSubtask, executionId);
+            cancelOrFailAndCancelInvokable(ExecutionState.CANCELING, null);
+        }
     }
 
     /**
@@ -1154,8 +1156,13 @@ public class Task
      */
     @Override
     public void failExternally(Throwable cause) {
-        LOG.info("Attempting to fail task externally {} ({}).", taskNameWithSubtask, executionId);
-        cancelOrFailAndCancelInvokable(ExecutionState.FAILED, cause);
+        try (MdcUtils.MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobId))) {
+            LOG.info(
+                    "Attempting to fail task externally {} ({}).",
+                    taskNameWithSubtask,
+                    executionId);
+            cancelOrFailAndCancelInvokable(ExecutionState.FAILED, cause);
+        }
     }
 
     private void cancelOrFailAndCancelInvokable(ExecutionState targetState, Throwable cause) {
