@@ -12,6 +12,7 @@ import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGr
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
 import com.google.protobuf.ByteString;
+import io.confluent.flink.credentials.utils.CallWithRetry;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,16 +34,19 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
     private final TokenExchanger tokenExchanger;
     private final CredentialDecrypter decrypter;
     private final long deadlineMs;
+    private final CallWithRetry callWithRetry;
 
     public KafkaCredentialFetcherImpl(
             FlinkCredentialServiceBlockingStub credentialService,
             TokenExchanger tokenExchanger,
             CredentialDecrypter decrypter,
-            long deadlineMs) {
+            long deadlineMs,
+            CallWithRetry callWithRetry) {
         this.credentialService = credentialService;
         this.tokenExchanger = tokenExchanger;
         this.decrypter = decrypter;
         this.deadlineMs = deadlineMs;
+        this.callWithRetry = callWithRetry;
     }
 
     @Override
@@ -116,10 +120,13 @@ public class KafkaCredentialFetcherImpl implements KafkaCredentialFetcher {
                 jobCredentialsMetadata.getStatementIdCRN());
 
         response =
-                credentialService
-                        .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
-                        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(md))
-                        .getCredentialV2(request);
+                callWithRetry.call(
+                        () ->
+                                credentialService
+                                        .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+                                        .withInterceptors(
+                                                MetadataUtils.newAttachHeadersInterceptor(md))
+                                        .getCredentialV2(request));
         apiKey = response.getFlinkCredentials().getApiKey();
         encryptedSecret = response.getFlinkCredentials().getEncryptedSecret();
         LOG.info(

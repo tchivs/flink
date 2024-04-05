@@ -19,6 +19,7 @@ import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsRequest;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsResponse;
 import com.google.protobuf.ByteString;
+import io.confluent.flink.credentials.utils.CallWithRetry;
 import io.confluent.flink.credentials.utils.MockCredentialDecrypter;
 import io.confluent.flink.credentials.utils.MockTokenExchanger;
 import io.grpc.ManagedChannel;
@@ -39,6 +40,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +56,7 @@ public class KafkaCredentialFetcherImplTest {
     private FlinkCredentialServiceBlockingStub flinkCredentialService;
     private MockTokenExchanger dpatTokenExchanger;
     private MockCredentialDecrypter decrypter;
+    private CallWithRetry callWithRetry;
     private Server server;
     private ManagedChannel channel;
     private Handler handler;
@@ -84,9 +87,14 @@ public class KafkaCredentialFetcherImplTest {
                         0,
                         10);
         decrypter = new MockCredentialDecrypter();
+        callWithRetry = new CallWithRetry(3, 300);
         fetcher =
                 new KafkaCredentialFetcherImpl(
-                        flinkCredentialService, dpatTokenExchanger, decrypter, DEFAULT_DEADLINE_MS);
+                        flinkCredentialService,
+                        dpatTokenExchanger,
+                        decrypter,
+                        DEFAULT_DEADLINE_MS,
+                        callWithRetry);
         handler.withResponse(
                         GetCredentialsResponse.newBuilder()
                                 .setFlinkCredentials(
@@ -287,13 +295,27 @@ public class KafkaCredentialFetcherImplTest {
     public void testFetch_deadline() {
         fetcher =
                 new KafkaCredentialFetcherImpl(
-                        flinkCredentialService, dpatTokenExchanger, decrypter, 10);
-        handler.withDelayedResponse(50);
+                        flinkCredentialService, dpatTokenExchanger, decrypter, 100, callWithRetry);
+        handler.withDelayedResponse(200);
+        handler.withDelayedResponse(200);
+        handler.withDelayedResponse(200);
         assertThatThrownBy(() -> fetcher.fetchToken(jobCredentialsMetadata))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Failed to do credential request for JobCredentials")
                 .cause()
                 .hasMessageContaining("DEADLINE_EXCEEDED");
+    }
+
+    @Test
+    public void testFetch_deadlineWithRecovery() {
+        fetcher =
+                new KafkaCredentialFetcherImpl(
+                        flinkCredentialService, dpatTokenExchanger, decrypter, 100, callWithRetry);
+        handler.withDelayedResponse(200);
+        handler.withDelayedResponse(200);
+        handler.withDelayedResponse(0);
+        KafkaCredentials kafkaCredentials = fetcher.fetchToken(jobCredentialsMetadata);
+        assertThat(kafkaCredentials.getDpatToken()).isEqualTo("token");
     }
 
     /** The handler for the fake RPC server. */
@@ -302,7 +324,7 @@ public class KafkaCredentialFetcherImplTest {
         private GetCredentialsResponse response;
         private GetCredentialResponseV2 responseV2;
         private boolean error;
-        private long delayMs = -1;
+        private ConcurrentLinkedQueue<Long> delaysMs = new ConcurrentLinkedQueue<>();
 
         public Handler() {}
 
@@ -312,7 +334,7 @@ public class KafkaCredentialFetcherImplTest {
         }
 
         public Handler withDelayedResponse(long delayMs) {
-            this.delayMs = delayMs;
+            this.delaysMs.add(delayMs);
             return this;
         }
 
@@ -334,9 +356,9 @@ public class KafkaCredentialFetcherImplTest {
                 responseObserver.onError(new RuntimeException("Server Error!"));
                 return;
             }
-            if (delayMs >= 0) {
+            if (!delaysMs.isEmpty()) {
                 try {
-                    Thread.sleep(delayMs);
+                    Thread.sleep(delaysMs.poll());
                 } catch (InterruptedException e) {
                 }
             }
@@ -352,9 +374,10 @@ public class KafkaCredentialFetcherImplTest {
                 responseObserver.onError(new RuntimeException("Server Error!"));
                 return;
             }
-            if (delayMs >= 0) {
+            if (!delaysMs.isEmpty()) {
                 try {
-                    Thread.sleep(delayMs);
+                    long delay = delaysMs.poll();
+                    Thread.sleep(delay);
                 } catch (InterruptedException e) {
                 }
             }

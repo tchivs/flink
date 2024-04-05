@@ -16,6 +16,7 @@ import org.apache.flink.util.clock.SystemClock;
 
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc.FlinkCredentialServiceBlockingStub;
+import io.confluent.flink.credentials.utils.CallWithRetry;
 import io.grpc.Channel;
 import io.grpc.ManagedChannelBuilder;
 import org.slf4j.Logger;
@@ -38,6 +39,8 @@ import static io.confluent.flink.credentials.JobOptions.CONFLUENT_UDF_PREFIX;
 import static io.confluent.flink.credentials.JobOptions.STATEMENT_ID_CRN;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_CHECK_PERIOD_MS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_EXPIRATION_MS;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_RETRY_BACKOFF_MS;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_RETRY_MAX_ATTEMPTS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_DEADLINE_MS;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_HOST;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
@@ -112,12 +115,17 @@ public class KafkaDelegationTokenProvider implements DelegationTokenProvider {
                 FlinkCredentialServiceGrpc.newBlockingStub(channel);
 
         TokenExchanger tokenExchanger = createTokenExchanger(configuration);
+        CallWithRetry callWithRetry =
+                new CallWithRetry(
+                        configuration.getInteger(CREDENTIAL_RETRY_MAX_ATTEMPTS),
+                        configuration.getLong(CREDENTIAL_RETRY_BACKOFF_MS));
         kafkaCredentialFetcher =
                 new KafkaCredentialFetcherImpl(
                         credentialService,
                         tokenExchanger,
                         credentialDecrypter,
-                        configuration.getLong(CREDENTIAL_SERVICE_DEADLINE_MS));
+                        configuration.getLong(CREDENTIAL_SERVICE_DEADLINE_MS),
+                        callWithRetry);
         expirationMs = configuration.getLong(CREDENTIAL_EXPIRATION_MS);
         checkPeriodMs = configuration.getLong(CREDENTIAL_CHECK_PERIOD_MS);
         LOG.info(

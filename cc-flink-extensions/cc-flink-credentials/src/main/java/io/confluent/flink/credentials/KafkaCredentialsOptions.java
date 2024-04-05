@@ -35,8 +35,22 @@ public class KafkaCredentialsOptions {
     public static final ConfigOption<Long> CREDENTIAL_SERVICE_DEADLINE_MS =
             ConfigOptions.key("confluent.credential.service.deadline.ms")
                     .longType()
-                    .defaultValue(Duration.ofSeconds(3).toMillis())
+                    .defaultValue(Duration.ofSeconds(6).toMillis())
                     .withDescription("The deadline when calling to Flink credential service");
+
+    public static final ConfigOption<Long> CREDENTIAL_RETRY_BACKOFF_MS =
+            ConfigOptions.key("confluent.credential.retry.backoff.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(1).toMillis())
+                    .withDescription("The base amount of time to backoff after a failure");
+
+    public static final ConfigOption<Integer> CREDENTIAL_RETRY_MAX_ATTEMPTS =
+            ConfigOptions.key("confluent.credential.retry.max.attempts")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The total number of attempts to use when retry fetches from "
+                                    + "the credential services");
 
     public static final ConfigOption<String> AUTH_SERVICE_SERVER =
             ConfigOptions.key("confluent.cc.gateway.service.server")
