@@ -802,6 +802,16 @@ class FactoryUtilTest {
         assertThat(modelTask).isEqualTo(task);
     }
 
+    @Test
+    void testGetInvalidModelTask() {
+        assertThatThrownBy(
+                        () ->
+                                FactoryUtil.getModelTask(
+                                        Collections.singletonMap("task", "somename")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Could not parse value 'somename' for key 'task'.");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Helper methods
     // --------------------------------------------------------------------------------------------
