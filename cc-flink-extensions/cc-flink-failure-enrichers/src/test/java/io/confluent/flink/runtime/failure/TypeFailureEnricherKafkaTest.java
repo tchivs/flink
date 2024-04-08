@@ -37,8 +37,6 @@ public class TypeFailureEnricherKafkaTest {
                         "test. " + "logicalCluster: CLUSTER_NOT_FOUND" + "!"),
                 "ERROR_CLASS_CODE",
                 "18",
-                "JOB_CANNOT_RESTART",
-                "",
                 "TYPE",
                 "USER",
                 "USER_ERROR_MSG",

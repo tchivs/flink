@@ -155,7 +155,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                 // This is meant to capture any exception that has "serializ" in the error message,
                 // such as "(de)serialize", "(de)serialization", or "(de)serializable"
                 SERIALIZE_MESSAGE,
-                Classification.of(Type.USER, Handling.FAIL, ErrorClass.SERIALIZATION_GENERAL),
+                Classification.of(Type.USER, Handling.RECOVER, ErrorClass.SERIALIZATION_GENERAL),
                 ConditionalClassification.of(
                         t ->
                                 t.getMessage() != null
@@ -180,7 +180,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                                         && t.getMessage()
                                                 .contains("a null value is being written into it"),
                         Type.USER,
-                        Handling.FAIL,
+                        Handling.RECOVER,
                         ErrorClass.TABLE_NULL_IN_NOT_NULL)),
         forSystemThrowable(
                 ArithmeticException.class,
@@ -195,11 +195,11 @@ public class TypeFailureEnricher implements FailureEnricher {
                                         && t.getMessage()
                                                 .matches(".*Topic .* not present in metadata.*"),
                         Type.USER,
-                        Handling.FAIL,
+                        Handling.RECOVER,
                         ErrorClass.KAFKA_TIMEOUT_TOPIC_NOT_PRESENT)),
         forUserThrowable(
                 UnknownTopicOrPartitionException.class,
-                Classification.of(Type.USER, Handling.FAIL, ErrorClass.KAFKA_UNKNOWN_PARTITION)),
+                Classification.of(Type.USER, Handling.RECOVER, ErrorClass.KAFKA_UNKNOWN_PARTITION)),
         forUserThrowable(
                 SaslAuthenticationException.class,
                 Classification.of(Type.SYSTEM, Handling.RECOVER, ErrorClass.KAFKA_SASL_AUTH),
@@ -209,7 +209,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                                         && t.getMessage()
                                                 .contains("logicalCluster: CLUSTER_NOT_FOUND"),
                         Type.USER,
-                        Handling.FAIL,
+                        Handling.RECOVER,
                         ErrorClass.KAFKA_SASL_AUTH_CLUSTER_NOT_FOUND)),
         // Schema Registry exceptions.
         forUserThrowable(
