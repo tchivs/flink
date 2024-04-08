@@ -71,7 +71,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionAttemptId;
 import static org.hamcrest.CoreMatchers.is;
@@ -213,47 +212,6 @@ public class JobExceptionsHandlerTest extends TestLogger {
                                 JobExceptionsHandler.toTaskManagerId(
                                         otherFailure.getTaskManagerLocation()))));
         assertFalse(response.getExceptionHistory().isTruncated());
-    }
-
-    @Test
-    public void testWithExceptionHistoryWithConcurrentGlobalFailures()
-            throws HandlerRequestException, ExecutionException, InterruptedException {
-        final RootExceptionHistoryEntry concurrentGlobalCause =
-                fromGlobalFailure(
-                        new RuntimeException("concurrent global exception #1"),
-                        System.currentTimeMillis());
-        final RootExceptionHistoryEntry someOtherFailure =
-                new RootExceptionHistoryEntry(
-                        new RuntimeException("exception #2"),
-                        System.currentTimeMillis(),
-                        CompletableFuture.completedFuture(Collections.singletonMap("key", "value")),
-                        "task name",
-                        new LocalTaskManagerLocation(),
-                        Collections.emptySet());
-        final Throwable rootException = new RuntimeException("global exception #0");
-        final long rootTimestamp = System.currentTimeMillis();
-        final RootExceptionHistoryEntry rootCause =
-                fromGlobalFailure(
-                        rootException, rootTimestamp, concurrentGlobalCause, someOtherFailure);
-
-        final ExecutionGraphInfo executionGraphInfo = createExecutionGraphInfo(rootCause);
-
-        final HandlerRequest<EmptyRequestBody> request =
-                createRequest(executionGraphInfo.getJobId(), 10);
-        final JobExceptionsInfoWithHistory response =
-                testInstance.handleRequest(request, executionGraphInfo);
-
-        final List<ExceptionInfo> concurrentExceptions =
-                response.getExceptionHistory().getEntries().stream()
-                        .map(RootExceptionInfo::getConcurrentExceptions)
-                        .flatMap(e -> e.stream())
-                        .collect(Collectors.toList());
-
-        assertThat(
-                response.getRootException(), is(ExceptionUtils.stringifyException(rootException)));
-        assertThat(response.getRootTimestamp(), is(rootTimestamp));
-
-        assertThat(concurrentExceptions, iterableWithSize(0));
     }
 
     @Test
@@ -573,15 +531,14 @@ public class JobExceptionsHandlerTest extends TestLogger {
                 Collections.emptyList());
     }
 
-    private static RootExceptionHistoryEntry fromGlobalFailure(
-            Throwable cause, long timestamp, ExceptionHistoryEntry... concurrentExceptions) {
+    private static RootExceptionHistoryEntry fromGlobalFailure(Throwable cause, long timestamp) {
         return new RootExceptionHistoryEntry(
                 cause,
                 timestamp,
                 FailureEnricherUtils.EMPTY_FAILURE_LABELS,
                 null,
                 null,
-                Arrays.asList(concurrentExceptions));
+                Collections.emptySet());
     }
 
     // -------- factory methods for instantiating new Matchers --------
