@@ -152,13 +152,13 @@ public class AvroToFlinkSchemaConverter {
                 }
             case LONG:
                 if (AVRO_LOGICAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
-                    return new TimestampType(isOptional, 3);
-                } else if (AVRO_LOGICAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
-                    return new TimestampType(isOptional, 6);
-                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
                     return new LocalZonedTimestampType(isOptional, 3);
-                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
+                } else if (AVRO_LOGICAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
                     return new LocalZonedTimestampType(isOptional, 6);
+                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
+                    return new TimestampType(isOptional, 3);
+                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
+                    return new TimestampType(isOptional, 6);
                 } else if (AVRO_LOGICAL_TIME_MICROS.equalsIgnoreCase(logicalType)) {
                     // TODO we support only precision of 3 in Flink runtime, because we store
                     // time as int representing millis of day

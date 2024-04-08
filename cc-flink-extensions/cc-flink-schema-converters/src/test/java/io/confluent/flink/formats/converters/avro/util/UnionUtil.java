@@ -236,6 +236,8 @@ public class UnionUtil {
                 return new GenericMapData(map);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return TimestampData.fromEpochMillis(10);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return TimestampData.fromEpochMillis(30);
             default:
                 throw new UnsupportedOperationException("Unsupported logical type: " + logicalType);
         }
@@ -254,11 +256,17 @@ public class UnionUtil {
             case DOUBLE:
                 return 1.0;
             case LONG:
-                if (avroLogicalType != null
-                        && avroLogicalType
-                                .getName()
-                                .equals(LogicalTypes.timestampMillis().getName())) {
-                    return 10L;
+                if (avroLogicalType != null) {
+                    final String avroLogicalTypeName = avroLogicalType.getName();
+                    if (avroLogicalTypeName.equals(LogicalTypes.timestampMillis().getName())) {
+                        return 30L;
+                    } else if (avroLogicalTypeName.equals(
+                            LogicalTypes.localTimestampMillis().getName())) {
+                        return 10L;
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Unsupported logical conversion: " + avroLogicalType.getName());
+                    }
                 } else {
                     return 1L;
                 }

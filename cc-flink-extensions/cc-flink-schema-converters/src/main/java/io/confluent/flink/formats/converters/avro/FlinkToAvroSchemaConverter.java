@@ -197,9 +197,9 @@ public class FlinkToAvroSchemaConverter {
         final int precision = logicalType.getPrecision();
         final org.apache.avro.LogicalType avroLogicalType;
         if (precision <= 3) {
-            avroLogicalType = LogicalTypes.timestampMillis();
+            avroLogicalType = LogicalTypes.localTimestampMillis();
         } else if (precision <= 6) {
-            avroLogicalType = LogicalTypes.timestampMicros();
+            avroLogicalType = LogicalTypes.localTimestampMicros();
         } else {
             throw new ValidationException(
                     "Avro does not support TIMESTAMP type "
@@ -214,9 +214,9 @@ public class FlinkToAvroSchemaConverter {
         final int precision = logicalType.getPrecision();
         final org.apache.avro.LogicalType avroLogicalType;
         if (precision <= 3) {
-            avroLogicalType = LogicalTypes.localTimestampMillis();
+            avroLogicalType = LogicalTypes.timestampMillis();
         } else if (precision <= 6) {
-            avroLogicalType = LogicalTypes.localTimestampMicros();
+            avroLogicalType = LogicalTypes.timestampMicros();
         } else {
             throw new ValidationException(
                     "Avro does not support TIMESTAMP_LTZ type "

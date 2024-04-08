@@ -11,6 +11,7 @@ import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.TimestampType;
@@ -134,6 +135,10 @@ public final class CommonMappings {
                                 new BooleanType(false))),
                 new TypeMapping(
                         LogicalTypes.timestampMillis()
+                                .addToSchema(SchemaBuilder.builder().longType()),
+                        new LocalZonedTimestampType(false, 3)),
+                new TypeMapping(
+                        LogicalTypes.localTimestampMillis()
                                 .addToSchema(SchemaBuilder.builder().longType()),
                         new TimestampType(false, 3)),
                 new TypeMapping(
