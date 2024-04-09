@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -355,6 +356,13 @@ class AvroToRowDataConvertersTest {
                                                 new VarCharType(false, VarCharType.MAX_LENGTH))))
                         .collect(Collectors.toList());
         return UnionUtil.createUnionTypeMappings(singleTypeMappings)
+                .flatMap(
+                        mapping ->
+                                Stream.concat(
+                                        Stream.of(mapping),
+                                        IntStream.range(0, 3)
+                                                .mapToObj(
+                                                        i -> UnionUtil.addNullToUnion(mapping, i))))
                 .map(UnionUtil::withData)
                 .map(Arguments::of);
     }

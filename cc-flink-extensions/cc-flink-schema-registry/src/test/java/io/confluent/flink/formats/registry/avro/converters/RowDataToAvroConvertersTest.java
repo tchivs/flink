@@ -38,7 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -257,7 +257,13 @@ class RowDataToAvroConvertersTest {
 
     public static Stream<Arguments> unionTests() {
         return UnionUtil.createUnionTypeMappings(CommonMappings.getNotNull())
-                .collect(Collectors.toList()).stream()
+                .flatMap(
+                        mapping ->
+                                Stream.concat(
+                                        Stream.of(mapping),
+                                        IntStream.range(0, 3)
+                                                .mapToObj(
+                                                        i -> UnionUtil.addNullToUnion(mapping, i))))
                 .map(UnionUtil::withData)
                 .map(Arguments::of);
     }

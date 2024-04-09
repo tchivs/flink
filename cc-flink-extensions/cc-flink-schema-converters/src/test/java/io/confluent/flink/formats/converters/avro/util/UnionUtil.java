@@ -22,6 +22,7 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.FieldAssembler;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -38,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -108,7 +110,7 @@ public class UnionUtil {
     }
 
     /** Adds a NULL type to a union at a specified position. */
-    private static TypeMapping addNullToUnion(TypeMapping typeMapping, int position) {
+    public static TypeMapping addNullToUnion(TypeMapping typeMapping, int position) {
         List<Schema> unionTypes = new ArrayList<>(typeMapping.getAvroSchema().getTypes());
         unionTypes.add(position, Schema.create(Schema.Type.NULL));
 
@@ -128,10 +130,16 @@ public class UnionUtil {
         // UNION_SCHEMA
         Schema unionSchema = mapping.getAvroSchema();
 
+        // UNION_TYPE_1, UNION_TYPE_2, ... FROM UNION_SCHEMA
+        List<Schema> types = unionSchema.getTypes();
+
+        boolean isNullable = types.size() == 3;
+
         // RECORD_SCHEMA[UNION_SCHEMA, UNION_SCHEMA]
         final String field1Name = "union_type_1";
         final String field2Name = "union_type_2";
-        Schema avroSchema =
+        final String nullFieldName = "union_type_null";
+        final FieldAssembler<Schema> recordAssembler =
                 SchemaBuilder.record("topLevelRow")
                         .namespace("io.confluent.test")
                         .fields()
@@ -140,44 +148,59 @@ public class UnionUtil {
                         .noDefault()
                         .name(field2Name)
                         .type(unionSchema)
-                        .noDefault()
-                        .endRecord();
+                        .noDefault();
 
-        // UNION_TYPE_1, UNION_TYPE_2, ... FROM UNION_SCHEMA
-        List<Schema> types = unionSchema.getTypes();
+        final Schema avroSchema;
+        if (isNullable) {
+            avroSchema =
+                    recordAssembler.name(nullFieldName).type(unionSchema).noDefault().endRecord();
+        } else {
+            avroSchema = recordAssembler.endRecord();
+        }
+
+        final List<Schema> nonNullAvroTypes =
+                types.stream().filter(t -> t.getType() != Type.NULL).collect(Collectors.toList());
 
         // RECORD[FIELD[UNION_TYPE_1],FIELD[UNION_TYPE_2]]
-        GenericRecord avroRecordWithUnionTypeFields =
+        final GenericRecordBuilder recordBuilder =
                 new GenericRecordBuilder(avroSchema)
-                        .set(field1Name, generateAvroFieldData(types.get(0)))
-                        .set(field2Name, generateAvroFieldData(types.get(1)))
-                        .build();
+                        .set(field1Name, generateAvroFieldData(nonNullAvroTypes.get(0)))
+                        .set(field2Name, generateAvroFieldData(nonNullAvroTypes.get(1)));
+
+        final GenericRecord avroRecordWithUnionTypeFields;
+        if (isNullable) {
+            avroRecordWithUnionTypeFields = recordBuilder.set(nullFieldName, null).build();
+        } else {
+            avroRecordWithUnionTypeFields = recordBuilder.build();
+        }
 
         // FLINK_SCHEMA
         List<LogicalType> flinkLogicalTypes = ((RowType) mapping.getFlinkType()).getChildren();
 
-        GenericRowData expectedRowData = new GenericRowData(2);
+        GenericRowData expectedRowData = new GenericRowData(isNullable ? 3 : 2);
         GenericRowData field1 = new GenericRowData(2);
         GenericRowData field2 = new GenericRowData(2);
         field1.setField(
                 0,
                 generateFlinkFieldData(
-                        flinkLogicalTypes.get(0), types.get(0).getType() == Type.ENUM));
+                        flinkLogicalTypes.get(0), nonNullAvroTypes.get(0).getType() == Type.ENUM));
         field2.setField(
                 1,
                 generateFlinkFieldData(
-                        flinkLogicalTypes.get(1), types.get(1).getType() == Type.ENUM));
+                        flinkLogicalTypes.get(1), nonNullAvroTypes.get(1).getType() == Type.ENUM));
         expectedRowData.setField(0, field1);
         expectedRowData.setField(1, field2);
 
+        final List<RowField> flinkFields = new ArrayList<>();
+        flinkFields.add(new RowField(field1Name, mapping.getFlinkType()));
+        flinkFields.add(new RowField(field2Name, mapping.getFlinkType()));
+
+        if (isNullable) {
+            flinkFields.add(new RowField(nullFieldName, mapping.getFlinkType()));
+        }
+
         return new TypeMappingWithData(
-                new TypeMapping(
-                        avroSchema,
-                        new RowType(
-                                false,
-                                Arrays.asList(
-                                        new RowField(field1Name, mapping.getFlinkType()),
-                                        new RowField(field2Name, mapping.getFlinkType())))),
+                new TypeMapping(avroSchema, new RowType(false, flinkFields)),
                 avroRecordWithUnionTypeFields,
                 expectedRowData);
     }

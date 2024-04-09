@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /** Tool class used to convert from {@link RowData} to Avro {@link GenericRecord}. */
@@ -102,22 +103,15 @@ public class RowDataToAvroConverters {
         if (!targetSchema.isUnion()) {
             return Optional.empty();
         }
-        final List<Schema> unionTypes = targetSchema.getTypes();
-        if (unionTypes.size() != 2) {
-            return Optional.empty();
-        }
+        final List<Schema> nonNullUnionTypes =
+                targetSchema.getTypes().stream()
+                        .filter(t -> t.getType() != Type.NULL)
+                        .collect(Collectors.toList());
 
-        final Schema firstType = unionTypes.get(0);
-        final Schema secondType = unionTypes.get(1);
-
-        if (firstType.getType() != Type.NULL && secondType.getType() != Type.NULL) {
-            return Optional.empty();
-        }
-
-        if (firstType.getType() == Type.NULL) {
-            return Optional.of(secondType);
+        if (nonNullUnionTypes.size() == 1) {
+            return Optional.of(nonNullUnionTypes.get(0));
         } else {
-            return Optional.of(firstType);
+            return Optional.of(Schema.createUnion(nonNullUnionTypes));
         }
     }
 
