@@ -41,15 +41,15 @@ public class RowTimeOverWindowTestBase {
                 }
             };
 
-    protected LogicalType[] inputFieldTypes =
+    protected static LogicalType[] inputFieldTypes =
             new LogicalType[] {VarCharType.STRING_TYPE, new BigIntType(), new BigIntType()};
-    protected LogicalType[] accTypes = new LogicalType[] {new BigIntType()};
+    protected static LogicalType[] accTypes = new LogicalType[] {new BigIntType()};
 
-    protected RowDataKeySelector keySelector =
+    protected static RowDataKeySelector keySelector =
             HandwrittenSelectorUtil.getRowDataSelector(new int[] {0}, inputFieldTypes);
-    protected TypeInformation<RowData> keyType = keySelector.getProducedType();
+    protected static TypeInformation<RowData> keyType = keySelector.getProducedType();
 
-    protected OneInputStreamOperatorTestHarness<RowData, RowData> createTestHarness(
+    protected static OneInputStreamOperatorTestHarness<RowData, RowData> createTestHarness(
             KeyedProcessOperator<RowData, RowData, RowData> operator) throws Exception {
         return new KeyedOneInputStreamOperatorTestHarness<>(operator, keySelector, keyType);
     }
