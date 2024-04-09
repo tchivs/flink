@@ -12,19 +12,29 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
+import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
+import org.apache.flink.table.catalog.ResolvedCatalogModel;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.modules.ml.MLPredictFunction;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -163,6 +173,73 @@ public class DefaultServiceTasksTest {
 
         assertThat(tableEnv.listFunctions().length)
                 .isGreaterThan(CoreProxyModule.PUBLIC_LIST.size());
+    }
+
+    @Test
+    void testConfigureMLFunctionModel() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap("confluent.ml-functions.enabled", "true"),
+                Service.SQL_SERVICE);
+
+        String[] functions = tableEnv.listFunctions();
+        assertThat(Arrays.asList(functions).contains(MLPredictFunction.NAME)).isTrue();
+    }
+
+    @Test
+    void testRegisterMLPredictFunction()
+            throws JsonProcessingException, NoSuchFieldException, IllegalAccessException {
+        // Create unresolved schema. DataType should be UnresolvedDataType
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
+
+        final ResolvedSchema resolvedInputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.STRING()));
+        final ResolvedSchema resovledOutputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("output"),
+                        Collections.singletonList(DataTypes.INT()));
+
+        final ResolvedCatalogModel resolvedCatalogModel =
+                ResolvedCatalogModel.of(
+                        CatalogModel.of(
+                                inputSchema,
+                                outputSchema,
+                                ImmutableMap.of(
+                                        "provider",
+                                        "openai",
+                                        "task",
+                                        ModelTask.CLASSIFICATION.name()),
+                                ""),
+                        resolvedInputSchema,
+                        resovledOutputSchema);
+
+        final TableEnvironmentImpl tableEnv =
+                (TableEnvironmentImpl)
+                        TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        final ObjectMapper mapper = new ObjectMapper();
+        final String serializedModel =
+                mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(resolvedCatalogModel.toProperties());
+
+        tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap("my_catalog.my_db.my_model_ML_PREDICT", serializedModel),
+                Service.JOB_SUBMISSION_SERVICE);
+
+        tableEnv.useCatalog("my_catalog");
+        tableEnv.useDatabase("my_db");
+        final String[] udfs = tableEnv.listUserDefinedFunctions();
+        assertThat(Arrays.asList(udfs).contains("my_model_ml_predict")).isTrue();
     }
 
     @Test

@@ -46,12 +46,17 @@ import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hasher;
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.modules.ml.MLEvaluateFunction;
+import io.confluent.flink.table.modules.ml.MLFunctionsModule;
+import io.confluent.flink.table.modules.ml.MLPredictFunction;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
@@ -69,6 +74,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -251,6 +257,11 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
+            tableEnvironment.loadModule("ml", new MLFunctionsModule());
+        }
+
+        if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_OTLP_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("otlp", OtlpFunctionsModule.INSTANCE);
         }
@@ -276,6 +287,51 @@ class DefaultServiceTasks implements ServiceTasks {
             for (ConfiguredRemoteScalarFunction function : functions) {
                 tableEnvironment.createTemporaryFunction(function.getPath(), function);
             }
+        }
+
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
+            // ML_PREDICT functions are rewritten and put into the config together with serialized
+            // model in sql service. We use temporary functions since permanent functions
+            // serialization has issues and need changes in FunctionCatalog which we don't want to
+            // modify in open source Flink
+            final ObjectMapper mapper = new ObjectMapper();
+            privateConfig
+                    .toMap()
+                    .forEach(
+                            (functionIdentifier, serializedObj) -> {
+                                String functionName = functionIdentifier.toUpperCase(Locale.ROOT);
+                                if (functionName.contains(MLPredictFunction.NAME)
+                                        || functionName.contains(MLEvaluateFunction.NAME)) {
+                                    Map<String, String> properties;
+                                    try {
+                                        properties =
+                                                mapper.readValue(
+                                                        serializedObj,
+                                                        new TypeReference<
+                                                                Map<String, String>>() {});
+                                    } catch (JsonProcessingException e) {
+                                        throw new IllegalArgumentException(
+                                                "Cannot deserialize ml function argument for "
+                                                        + "functionName: "
+                                                        + functionName);
+                                    }
+                                    if (functionName.contains(MLPredictFunction.NAME)) {
+                                        tableEnvironment.createTemporaryFunction(
+                                                functionIdentifier,
+                                                new MLPredictFunction(
+                                                        functionIdentifier, properties));
+                                    } else if (functionName.contains(MLEvaluateFunction.NAME)) {
+                                        tableEnvironment.createTemporaryFunction(
+                                                functionIdentifier,
+                                                new MLEvaluateFunction(
+                                                        functionIdentifier, properties));
+                                    } else {
+                                        throw new IllegalArgumentException(
+                                                "Unrecognized ML functionName: " + functionName);
+                                    }
+                                }
+                            });
         }
     }
 

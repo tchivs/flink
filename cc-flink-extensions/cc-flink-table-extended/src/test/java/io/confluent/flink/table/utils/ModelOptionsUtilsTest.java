@@ -1,0 +1,41 @@
+/*
+ * Copyright 2023 Confluent Inc.
+ */
+
+package io.confluent.flink.table.utils;
+
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.CatalogModel.ModelTask;
+
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/** Test for modelOptionsUtils class. */
+public class ModelOptionsUtilsTest {
+
+    @Test
+    void testGetProviderOption() {
+        ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
+        assert (modelOptionsUtils
+                .getProviderOption("ENDPOINT")
+                .equals("https://api.openai.com/v1/chat/completions"));
+        assert (modelOptionsUtils.getProviderOptionOrDefault("TEMPERATURE", "0.7").equals("0.7"));
+    }
+
+    @NotNull
+    private static ModelOptionsUtils getModelOptionsUtils() {
+        Map<String, String> modelOptions = new HashMap<>();
+        modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/chat/completions");
+        modelOptions.put("provider", "openai");
+        modelOptions.put("task", ModelTask.TEXT_GENERATION.name());
+
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+        return new ModelOptionsUtils(model, "OPENAI");
+    }
+}

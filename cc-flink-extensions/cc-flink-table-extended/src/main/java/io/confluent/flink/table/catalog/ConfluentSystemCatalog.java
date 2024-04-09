@@ -9,10 +9,12 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogFunction;
+import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.CatalogPartition;
 import org.apache.flink.table.catalog.CatalogPartitionSpec;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
@@ -288,6 +290,41 @@ public class ConfluentSystemCatalog implements ConfluentCatalog {
             CatalogPartitionSpec partitionSpec,
             CatalogColumnStatistics columnStatistics,
             boolean ignoreIfNotExists) {
+        throw new ValidationException("The catalog is immutable.");
+    }
+
+    @Override
+    public List<String> listModels(String databaseName) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public CatalogModel getModel(ObjectPath modelPath) throws ModelNotExistException {
+        throw new ModelNotExistException(INFO.getId(), modelPath);
+    }
+
+    @Override
+    public boolean modelExists(ObjectPath modelPath) {
+        return false;
+    }
+
+    @Override
+    public void dropModel(ObjectPath modelPath, boolean ignoreIfNotExists) {
+        throw new ValidationException("The catalog is immutable.");
+    }
+
+    @Override
+    public void renameModel(ObjectPath modelPath, String newModelName, boolean ignoreIfNotExists) {
+        throw new ValidationException("The catalog is immutable.");
+    }
+
+    @Override
+    public void createModel(ObjectPath modelPath, CatalogModel model, boolean ignoreIfExists) {
+        throw new ValidationException("The catalog is immutable.");
+    }
+
+    @Override
+    public void alterModel(ObjectPath modelPath, CatalogModel newModel, boolean ignoreIfNotExists) {
         throw new ValidationException("The catalog is immutable.");
     }
 }
