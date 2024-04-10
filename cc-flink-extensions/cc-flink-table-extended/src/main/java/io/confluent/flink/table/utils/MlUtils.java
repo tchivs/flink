@@ -19,10 +19,14 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
+import io.confluent.flink.credentials.CredentialDecrypter;
 import okhttp3.MediaType;
 import okhttp3.Response;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 /** Utilities for ML module. */
@@ -217,5 +221,19 @@ public class MlUtils {
             // This is to allow correct matching of the last dimension of an array.
             return shape.size() == 0 || (shape.size() == 1 && shape.get(0) == 1);
         }
+    }
+
+    /** Decrypt API key or other secrets. */
+    public static String decryptSecretWithComputePoolKey(
+            String secret, CredentialDecrypter decrypter) {
+        final byte[] decodedUserSecret = Base64.getDecoder().decode(secret);
+        return new String(decrypter.decrypt(decodedUserSecret), StandardCharsets.UTF_8);
+    }
+
+    public static String decryptSecret(String secret, Boolean isPlaintext) {
+        if (secret.isEmpty() || isPlaintext) {
+            return secret;
+        }
+        return decryptSecretWithComputePoolKey(secret, InMemoryCredentialDecrypterImpl.INSTANCE);
     }
 }

@@ -13,6 +13,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
+import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -45,7 +46,10 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         }
         supportedProvider.validateEndpoint(endpoint);
         // Azure ML can take either an API Key or an expiring token, but we only support API Key.
-        this.apiKey = modelOptionsUtils.getProviderOption("API_KEY");
+        this.apiKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
+                        modelOptionsUtils.isEncryptStrategyPlaintext());
         // The Azure ML Deployment Name is optional, but allows the user to distinguish between
         // two models that are deployed to the same endpoint.
         this.deploymentName = modelOptionsUtils.getProviderOptionOrDefault("deployment_name", "");

@@ -23,6 +23,7 @@ import io.confluent.flink.table.modules.ml.formats.DataSerializer;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
+import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -88,10 +89,20 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException("Invalid Sagemaker endpoint URI: " + e.getMessage());
         }
         // We sign the request with the access key, secret key, and optionally session token.
-        this.accessKey = modelOptionsUtils.getProviderOptionOrDefault("AWS_ACCESS_KEY_ID", "");
-        this.secretKey = modelOptionsUtils.getProviderOptionOrDefault("AWS_SECRET_ACCESS_KEY", "");
+        Boolean isPlaintext = modelOptionsUtils.isEncryptStrategyPlaintext();
+        this.accessKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("AWS_ACCESS_KEY_ID", ""),
+                        isPlaintext);
+        this.secretKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("AWS_SECRET_ACCESS_KEY", ""),
+                        isPlaintext);
         // A session token is optional, but needed for temporary credentials.
-        this.sessionToken = modelOptionsUtils.getProviderOptionOrDefault("AWS_SESSION_TOKEN", "");
+        this.sessionToken =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("AWS_SESSION_TOKEN", ""),
+                        isPlaintext);
         if (accessKey.isEmpty() || secretKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Sagemaker Models");

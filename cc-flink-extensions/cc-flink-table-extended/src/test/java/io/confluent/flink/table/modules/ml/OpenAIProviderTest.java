@@ -155,6 +155,7 @@ public class OpenAIProviderTest {
         modelOptions.put("AZUREOPENAI.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "AZUREOPENAI");
         modelOptions.put("TASK", ModelTask.TEXT_GENERATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
@@ -184,6 +185,7 @@ public class OpenAIProviderTest {
         modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/chat/completions");
         modelOptions.put("OPENAI.API_KEY", "fake-api-key");
         modelOptions.put("TASK", ModelTask.TEXT_GENERATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }
 }

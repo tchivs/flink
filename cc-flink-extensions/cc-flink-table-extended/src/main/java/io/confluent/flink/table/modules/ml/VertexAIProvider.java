@@ -16,6 +16,7 @@ import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
 import io.confluent.flink.table.modules.ml.formats.TFServingInputFormatter;
+import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -78,8 +79,11 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
 
         // Vertex AI API doesn't support API KEYs, we use a service account key to authenticate
         // and exchange it for a token.
-        String serviceKey = modelOptionsUtils.getProviderOption("SERVICE_KEY");
-        if (serviceKey == null) {
+        String serviceKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("SERVICE_KEY", ""),
+                        modelOptionsUtils.isEncryptStrategyPlaintext());
+        if (serviceKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "For Vertex AI model, SERVICE_KEY is required to authenticate the client");
         }

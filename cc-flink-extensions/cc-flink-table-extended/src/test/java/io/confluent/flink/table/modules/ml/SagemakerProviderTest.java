@@ -269,6 +269,7 @@ public class SagemakerProviderTest {
         modelOptions.put("SAGEMAKER.INPUT_FORMAT", inputFormat);
         modelOptions.put("SAGEMAKER.INPUT_CONTENT_TYPE", "application/x-custom");
         modelOptions.put("SAGEMAKER.OUTPUT_CONTENT_TYPE", "application/extra-custom");
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema =
                 Schema.newBuilder()
                         .column("input", "ARRAY<INT>")
@@ -285,6 +286,7 @@ public class SagemakerProviderTest {
     private static Request getRequestBinaryWithFormat(String inputFormat) {
         Map<String, String> modelOptions = getCommonModelOptions();
         modelOptions.put("SAGEMAKER.INPUT_FORMAT", inputFormat);
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema =
                 Schema.newBuilder().column("input", "ARRAY<INT>").column("input2", "BYTES").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
@@ -298,6 +300,7 @@ public class SagemakerProviderTest {
     private static CatalogModel getCatalogModel() {
         Map<String, String> modelOptions = getCommonModelOptions();
         modelOptions.put("SAGEMAKER.output_format", "tf-serving");
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
 
@@ -308,6 +311,7 @@ public class SagemakerProviderTest {
     private static CatalogModel getCatalogModelMultiType() {
         Map<String, String> modelOptions = getCommonModelOptions();
         modelOptions.put("SAGEMAKER.output_format", "tf-serving");
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema =
                 Schema.newBuilder()
                         .column("input", "STRING")
@@ -355,6 +359,7 @@ public class SagemakerProviderTest {
         modelOptions.put("SAGEMAKER.AWS_SECRET_ACCESS_KEY", "fake-secret-key");
         modelOptions.put("PROVIDER", "SAGEMAKER");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }
 }

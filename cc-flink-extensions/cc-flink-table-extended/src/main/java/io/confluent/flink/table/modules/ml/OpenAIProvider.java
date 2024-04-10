@@ -12,6 +12,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
+import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -55,7 +56,11 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             }
         }
         supportedProvider.validateEndpoint(endpoint);
-        this.apiKey = modelOptionsUtils.getProviderOptionOrDefault("API_KEY", "");
+        this.apiKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
+                        modelOptionsUtils.isEncryptStrategyPlaintext());
+
         if (apiKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     String.format("%s.API_KEY setting not found", namespace));

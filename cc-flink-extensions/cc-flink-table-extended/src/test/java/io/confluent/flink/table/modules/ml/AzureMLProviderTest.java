@@ -412,6 +412,7 @@ public class AzureMLProviderTest {
         modelOptions.put("AZUREML.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "AZURLML");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }
 }

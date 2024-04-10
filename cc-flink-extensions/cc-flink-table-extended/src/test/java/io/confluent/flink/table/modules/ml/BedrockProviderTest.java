@@ -132,6 +132,7 @@ public class BedrockProviderTest {
         modelOptions.put("BEDROCK.AWS_SECRET_ACCESS_KEY", "fake-secret-key");
         modelOptions.put("PROVIDER", "BEDROCK");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }
 }

@@ -112,6 +112,7 @@ public class GoogleAIProviderTest {
         modelOptions.put("GOOGLEAI.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "GOOGLEAI");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");

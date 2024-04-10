@@ -12,6 +12,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
+import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -45,7 +46,10 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
                         "ENDPOINT",
                         "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent");
         supportedProvider.validateEndpoint(urlBase);
-        this.apiKey = modelOptionsUtils.getProviderOptionOrDefault("API_KEY", "");
+        this.apiKey =
+                MlUtils.decryptSecret(
+                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
+                        modelOptionsUtils.isEncryptStrategyPlaintext());
         if (apiKey.isEmpty()) {
             // TODO: This exception should fire when the model is created, not when it is run.
             throw new FlinkRuntimeException("Model ML Predict requires an API key");

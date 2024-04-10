@@ -28,16 +28,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.OAEPParameterSpec;
-import javax.crypto.spec.PSource;
-
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.spec.MGF1ParameterSpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -49,6 +42,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.confluent.flink.table.modules.TestUtils.MockedInMemoryCredentialDecrypterImpl;
+import static io.confluent.flink.table.modules.TestUtils.createKeyPair;
+import static io.confluent.flink.table.modules.TestUtils.encryptMessage;
 import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -289,38 +285,5 @@ public class ConfluentAIFunctionsITCase extends AbstractTestBase {
                 0,
                 100,
                 TimeUnit.MILLISECONDS);
-    }
-
-    private static KeyPair createKeyPair() throws NoSuchAlgorithmException {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-        kpg.initialize(2048);
-        return kpg.generateKeyPair();
-    }
-
-    private static byte[] encryptMessage(String message, java.security.PublicKey pubKey)
-            throws Exception {
-        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPPadding");
-        OAEPParameterSpec oaepParams =
-                new OAEPParameterSpec(
-                        "SHA-256",
-                        "MGF1",
-                        new MGF1ParameterSpec("SHA-256"),
-                        PSource.PSpecified.DEFAULT);
-        cipher.init(Cipher.ENCRYPT_MODE, pubKey, oaepParams);
-        return cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static class MockedInMemoryCredentialDecrypterImpl
-            extends InMemoryCredentialDecrypterImpl {
-        final byte[] privateKey;
-
-        MockedInMemoryCredentialDecrypterImpl(byte[] privateKey) {
-            this.privateKey = privateKey;
-        }
-
-        @Override
-        protected byte[] readPrivateKey() {
-            return privateKey;
-        }
     }
 }

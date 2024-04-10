@@ -17,6 +17,8 @@ public class ModelOptionsUtils {
     public static final String PROVIDER_OPTION_KEY = "PROVIDER";
     private final String namespace;
     private final Map<String, String> caseInsensitiveModelOptions;
+    // todo: matrix-74 Have a central place define all model constant
+    private static final String ENCRYPT_STRATEGY = "confluent.model.secret.encrypt_strategy";
 
     public static String getProvider(Map<String, String> caseSensitiveModelOptions) {
         return caseSensitiveModelOptions.entrySet().stream()
@@ -66,5 +68,13 @@ public class ModelOptionsUtils {
                     }
                 });
         return options;
+    }
+
+    public Boolean isEncryptStrategyPlaintext() {
+        String encryptStrategy = caseInsensitiveModelOptions.get(ENCRYPT_STRATEGY);
+        if (encryptStrategy == null) {
+            return false;
+        }
+        return encryptStrategy.equalsIgnoreCase("plaintext");
     }
 }

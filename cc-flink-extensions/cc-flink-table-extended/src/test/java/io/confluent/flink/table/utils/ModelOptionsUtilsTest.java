@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** Test for modelOptionsUtils class. */
 public class ModelOptionsUtilsTest {
 
@@ -26,12 +28,19 @@ public class ModelOptionsUtilsTest {
         assert (modelOptionsUtils.getProviderOptionOrDefault("TEMPERATURE", "0.7").equals("0.7"));
     }
 
+    @Test
+    void testIsEncryptStrategyPlaintext() {
+        ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
+        assertThat(modelOptionsUtils.isEncryptStrategyPlaintext()).isTrue();
+    }
+
     @NotNull
     private static ModelOptionsUtils getModelOptionsUtils() {
         Map<String, String> modelOptions = new HashMap<>();
         modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/chat/completions");
         modelOptions.put("provider", "openai");
         modelOptions.put("task", ModelTask.TEXT_GENERATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
 
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();

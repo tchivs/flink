@@ -342,6 +342,7 @@ public class VertexAIProviderTest {
         modelOptions.put("VERTEXAI.SERVICE_KEY", "fake-service-key");
         modelOptions.put("PROVIDER", "VERTEXAI");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }
 }
