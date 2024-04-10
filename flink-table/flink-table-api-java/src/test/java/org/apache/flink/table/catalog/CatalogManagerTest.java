@@ -41,7 +41,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -300,16 +302,20 @@ class CatalogManagerTest {
                 CatalogModel.of(
                         Schema.derived(),
                         Schema.derived(),
-                        ImmutableMap.of("provider", "openai", "task", "TEXT_GENERATION"),
+                        ImmutableMap.of("provider", "azure", "endpoint", "some-endpoint"),
                         "model1 comment"),
                 ObjectIdentifier.of(
                         catalogManager.getCurrentCatalog(),
                         catalogManager.getCurrentDatabase(),
                         "model1"),
                 false);
+        Map<String, String> expectedOptions = new HashMap<>();
+        expectedOptions.put("provider", "azure");
+        expectedOptions.put("endpoint", "some-endpoint");
         AlterModelEvent alterEvent = alterFuture.get(10, TimeUnit.SECONDS);
         assertThat(alterEvent.identifier().getObjectName()).isEqualTo("model1");
         assertThat(alterEvent.newModel().getComment()).isEqualTo("model1 comment");
+        assertThat(alterEvent.newModel().getOptions()).isEqualTo(expectedOptions);
         assertThat(alterEvent.ignoreIfNotExists()).isFalse();
 
         // Drop a model

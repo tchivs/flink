@@ -20,7 +20,6 @@ package org.apache.flink.table.catalog;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.exceptions.ModelAlreadyExistException;
@@ -167,13 +166,18 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
                         outputSchema,
                         new HashMap<String, String>() {
                             {
-                                put("task", "clustering");
-                                put("provider", "openai");
+                                put("task", "regression"); // Changed option
+                                put("endpoint", "some-endpoint"); // New option
                             }
                         },
-                        "new model");
+                        null);
         catalog.alterModel(modelPath1, newModel, false);
-        assertThat(catalog.getModel(modelPath1).getComment()).isEqualTo("new model");
+        assertThat(catalog.getModel(modelPath1).getComment()).isNull();
+        Map<String, String> expectedOptions = new HashMap<>();
+        expectedOptions.put("task", "regression");
+        expectedOptions.put("provider", "openai");
+        expectedOptions.put("endpoint", "some-endpoint");
+        assertThat(catalog.getModel(modelPath1).getOptions()).isEqualTo(expectedOptions);
     }
 
     @Test
@@ -223,32 +227,6 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
                         "new model");
         // Nothing happens since ignoreIfNotExists is true
         catalog.alterModel(modelPath1, newModel, true);
-    }
-
-    @Test
-    public void testAlterModelMissingKind() throws Exception {
-        catalog.createDatabase(db1, createDb(), false);
-        catalog.createModel(modelPath1, createModel(), false);
-        assertThat(catalog.getModel(modelPath1)).isNotNull();
-        Schema inputSchema =
-                Schema.newBuilder()
-                        .column("a", DataTypes.INT())
-                        .column("b", DataTypes.STRING())
-                        .build();
-        Schema outputSchema = Schema.newBuilder().column("label", DataTypes.STRING()).build();
-        CatalogModel newModel =
-                CatalogModel.of(
-                        inputSchema,
-                        outputSchema,
-                        new HashMap<String, String>() {
-                            {
-                                put("task", "clustering");
-                            }
-                        },
-                        "new model");
-        assertThatThrownBy(() -> catalog.alterModel(modelPath1, newModel, false))
-                .isInstanceOf(ValidationException.class)
-                .hasMessage("'provider' must be specified for model.");
     }
 
     // ------ tables ------

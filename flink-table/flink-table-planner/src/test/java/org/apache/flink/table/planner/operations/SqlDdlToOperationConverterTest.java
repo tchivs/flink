@@ -377,7 +377,7 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
             assertThat(alterModelRenameOperation.getNewModelIdentifier())
                     .isEqualTo(expectedNewIdentifier);
         }
-        // test alter model properties
+        // test alter model properties with existing key: 'k1'
         Operation operation =
                 parse("alter model if exists cat1.db1.m1 set ('k1' = 'v1_altered', 'K2' = 'V2')");
         Map<String, String> expectedModelProperties = new HashMap<>();
@@ -385,8 +385,20 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
         expectedModelProperties.put("K2", "V2");
 
         assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
-        final AlterModelOptionsOperation alterModelPropertiesOperation =
+        AlterModelOptionsOperation alterModelPropertiesOperation =
                 (AlterModelOptionsOperation) operation;
+        assertThat(alterModelPropertiesOperation.getModelIdentifier())
+                .isEqualTo(expectedIdentifier);
+        assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
+                .isEqualTo(expectedModelProperties);
+
+        // test alter model properties without keys
+        operation = parse("alter model if exists cat1.db1.m1 set ('k3' = 'v3')");
+        expectedModelProperties.clear();
+        expectedModelProperties.put("K3", "v3");
+
+        assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
+        alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
         assertThat(alterModelPropertiesOperation.getModelIdentifier())
                 .isEqualTo(expectedIdentifier);
         assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())

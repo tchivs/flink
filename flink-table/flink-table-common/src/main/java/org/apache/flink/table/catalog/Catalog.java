@@ -883,16 +883,22 @@ public interface Catalog {
     /**
      * Modifies an existing model. Note that the new and old {@link CatalogModel} must be of the
      * same kind. For example, this doesn't allow altering a remote model to import model or native
-     * model, and vice versa.
+     * model, and vice versa. Note that the newModel contains only changes. Current alter model
+     * syntax supports alter properties and rename. This call is for altering model properties.
+     * Therefore, the newModel's properties are only changed properties. It's up to catalog
+     * implementation to apply the changes. The reason for this behavior is that this doesn't
+     * dictate how catalog implementation should handle model alteration. For example, it can do
+     * Read-modify-write or merge in place etc.
      *
      * @param modelPath path of the model to be modified
-     * @param newModel the new CatalogModel definition
+     * @param modelChange the CatalogModel containing only changes
      * @param ignoreIfNotExists flag to specify behavior when the model does not exist: if set to
      *     false, throw an exception, if set to true, do nothing.
      * @throws ModelNotExistException if the model does not exist
      * @throws CatalogException in case of any runtime exception
      */
-    default void alterModel(ObjectPath modelPath, CatalogModel newModel, boolean ignoreIfNotExists)
+    default void alterModel(
+            ObjectPath modelPath, CatalogModel modelChange, boolean ignoreIfNotExists)
             throws ModelNotExistException, CatalogException {
         throw new UnsupportedOperationException(
                 String.format(

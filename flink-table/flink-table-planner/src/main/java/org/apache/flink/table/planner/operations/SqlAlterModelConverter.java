@@ -20,8 +20,10 @@ package org.apache.flink.table.planner.operations;
 
 import org.apache.flink.sql.parser.ddl.SqlAlterModel;
 import org.apache.flink.sql.parser.ddl.SqlTableOption;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
+import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
@@ -58,7 +60,6 @@ public class SqlAlterModelConverter {
             throw new ValidationException(
                     String.format("Model %s doesn't exist.", modelIdentifier));
         }
-        ResolvedCatalogModel resolvedCatalogModel = optionalResolvedCatalogModel.get();
         if (sqlAlterModel.getNewModelName() != null) {
             // Rename model
             UnresolvedIdentifier newUnresolvedIdentifier =
@@ -69,11 +70,13 @@ public class SqlAlterModelConverter {
                     modelIdentifier, newModelIdentifier, sqlAlterModel.ifModelExists());
         } else if (sqlAlterModel.getModelOptionList() != null) {
             Map<String, String> changeModelOptions = getModelOptions(sqlAlterModel);
-            Map<String, String> newModelOptions = new HashMap<>(resolvedCatalogModel.getOptions());
-            newModelOptions.putAll(changeModelOptions);
             return new AlterModelOptionsOperation(
                     modelIdentifier,
-                    resolvedCatalogModel.copy(newModelOptions),
+                    CatalogModel.of(
+                            Schema.newBuilder().build(),
+                            Schema.newBuilder().build(),
+                            changeModelOptions,
+                            null),
                     sqlAlterModel.ifModelExists());
         } else {
             throw new ValidationException(

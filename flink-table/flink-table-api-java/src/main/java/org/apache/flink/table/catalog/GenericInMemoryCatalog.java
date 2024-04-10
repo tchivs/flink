@@ -405,10 +405,11 @@ public class GenericInMemoryCatalog extends AbstractCatalog {
     }
 
     @Override
-    public void alterModel(ObjectPath modelPath, CatalogModel newModel, boolean ignoreIfNotExists)
+    public void alterModel(
+            ObjectPath modelPath, CatalogModel modelChange, boolean ignoreIfNotExists)
             throws ModelNotExistException {
         checkNotNull(modelPath);
-        checkNotNull(newModel);
+        checkNotNull(modelChange);
 
         CatalogModel existingModel = models.get(modelPath);
         if (existingModel == null) {
@@ -419,15 +420,23 @@ public class GenericInMemoryCatalog extends AbstractCatalog {
         }
 
         ModelKind existModelKind = FactoryUtil.getModelKind(existingModel.getOptions());
-        ModelKind newModelKind = FactoryUtil.getModelKind(newModel.getOptions());
+        ModelKind newModelKind = null;
+        try {
+            newModelKind = FactoryUtil.getModelKind(modelChange.getOptions());
+        } catch (Exception e) {
+            // ModelKind not changed. Do nothing.
+        }
 
-        if (existModelKind != newModelKind) {
+        if (newModelKind != null && existModelKind != newModelKind) {
             throw new CatalogException(
                     String.format(
                             "Model types don't match. Existing model is '%s' and new model is '%s'.",
                             existModelKind, newModelKind));
         }
-        models.put(modelPath, newModel.copy());
+
+        Map<String, String> newOptions = new HashMap<>(existingModel.getOptions());
+        newOptions.putAll(modelChange.getOptions());
+        models.put(modelPath, existingModel.copy(newOptions));
     }
 
     @Override

@@ -83,7 +83,7 @@ public interface CatalogModel {
      *
      * @return a copy of the CatalogModel instance with new model options.
      */
-    CatalogModel copy(Map<String, String> modelOptions);
+    CatalogModel copy(Map<String, String> options);
 
     /**
      * Creates a basic implementation of this interface.

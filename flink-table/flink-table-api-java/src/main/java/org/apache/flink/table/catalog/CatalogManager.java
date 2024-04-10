@@ -1377,16 +1377,18 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
     /**
      * Alters a model in a given fully qualified path.
      *
-     * @param model The model to put in the given path
+     * @param modelChange The model containing only changes
      * @param objectIdentifier The fully qualified path where to alter the model.
      * @param ignoreIfNotExists If false exception will be thrown if the model to be altered does
      *     not exist.
      */
     public void alterModel(
-            CatalogModel model, ObjectIdentifier objectIdentifier, boolean ignoreIfNotExists) {
+            CatalogModel modelChange,
+            ObjectIdentifier objectIdentifier,
+            boolean ignoreIfNotExists) {
         execute(
                 (catalog, path) -> {
-                    ResolvedCatalogModel resolvedModel = resolveCatalogModel(model);
+                    ResolvedCatalogModel resolvedModel = resolveCatalogModel(modelChange);
                     catalog.alterModel(path, resolvedModel, ignoreIfNotExists);
                     catalogModificationListeners.forEach(
                             listener ->
