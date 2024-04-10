@@ -9,13 +9,14 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import io.confluent.flink.apiserver.client.ApiException;
 import io.confluent.flink.apiserver.client.CoreV1Api;
 import io.confluent.flink.apiserver.client.model.ApisMetaV1ObjectMeta;
-import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
+import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.flink.apiserver.client.model.CoreV1Environment;
 import io.confluent.flink.apiserver.client.model.CoreV1EnvironmentSpec;
 import io.confluent.flink.apiserver.client.model.CoreV1Org;
 import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContainer;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 /** Common utilities for the ApiServer. */
@@ -59,27 +60,29 @@ public class ApiServerUtils {
         }
     }
 
-    public static Collection<ComputeV1alphaFlinkUdfTask> listPendingUdfTasks(
+    public static Collection<ComputeV1FlinkUdfTask> listPendingUdfTasks(
             ApiServerContainer container, String org, String env) throws Exception {
         try {
-            return container.getComputeV1alphaApi()
-                    .listComputeV1alphaFlinkUdfTasks(
-                            env, org, null, null, "status.phase=Pending", null, 1)
-                    .getItems().stream()
-                    .collect(Collectors.toSet());
+            return new HashSet<>(
+                    container
+                            .getComputeV1Api()
+                            .listComputeV1FlinkUdfTasks(
+                                    env, org, null, null, "status.phase=Pending", null, 1)
+                            .getItems());
         } catch (ApiException e) {
             throw new Exception(e.getResponseBody(), e);
         }
     }
 
-    public static Collection<ComputeV1alphaFlinkUdfTask> listRunningUdfTasks(
+    public static Collection<ComputeV1FlinkUdfTask> listRunningUdfTasks(
             ApiServerContainer container, String org, String env) throws Exception {
         try {
-            return container.getComputeV1alphaApi()
-                    .listComputeV1alphaFlinkUdfTasks(
-                            env, org, null, null, "status.phase=Running", null, 1)
-                    .getItems().stream()
-                    .collect(Collectors.toSet());
+            return new HashSet<>(
+                    container
+                            .getComputeV1Api()
+                            .listComputeV1FlinkUdfTasks(
+                                    env, org, null, null, "status.phase=Running", null, 1)
+                            .getItems());
         } catch (ApiException e) {
             throw new Exception(e.getResponseBody(), e);
         }

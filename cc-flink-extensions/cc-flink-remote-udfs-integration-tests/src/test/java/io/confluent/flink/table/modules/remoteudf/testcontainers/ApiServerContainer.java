@@ -5,10 +5,10 @@
 package io.confluent.flink.table.modules.remoteudf.testcontainers;
 
 import io.confluent.flink.apiserver.client.ApiClient;
-import io.confluent.flink.apiserver.client.ComputeV1alphaApi;
+import io.confluent.flink.apiserver.client.ComputeV1Api;
 import io.confluent.flink.apiserver.client.CoreV1Api;
 import io.confluent.flink.apiserver.client.SqlV1Api;
-import io.confluent.flink.apiserver.client.SqlV2alphaApi;
+import io.confluent.flink.apiserver.client.SqlV2Api;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -26,8 +26,8 @@ public class ApiServerContainer extends GenericContainer<ApiServerContainer> {
 
     private CoreV1Api coreV1Api;
     private SqlV1Api sqlV1Api;
-    private SqlV2alphaApi sqlV2alphaApi;
-    private ComputeV1alphaApi computeV1alphaApi;
+    private SqlV2Api sqlV2Api;
+    private ComputeV1Api computeV1Api;
     private static final int PORT = 8080;
 
     public ApiServerContainer() {
@@ -49,8 +49,8 @@ public class ApiServerContainer extends GenericContainer<ApiServerContainer> {
 
         coreV1Api = new CoreV1Api(apiClient);
         sqlV1Api = new SqlV1Api(apiClient);
-        sqlV2alphaApi = new SqlV2alphaApi(apiClient);
-        computeV1alphaApi = new ComputeV1alphaApi(apiClient);
+        sqlV2Api = new SqlV2Api(apiClient);
+        computeV1Api = new ComputeV1Api(apiClient);
 
         System.out.println("ApiServer started at " + getHostAddress());
     }
@@ -77,11 +77,11 @@ public class ApiServerContainer extends GenericContainer<ApiServerContainer> {
         return sqlV1Api;
     }
 
-    public SqlV2alphaApi getSqlV2alphaApi() {
-        return sqlV2alphaApi;
+    public SqlV2Api getSqlV2Api() {
+        return sqlV2Api;
     }
 
-    public ComputeV1alphaApi getComputeV1alphaApi() {
-        return computeV1alphaApi;
+    public ComputeV1Api getComputeV1Api() {
+        return computeV1Api;
     }
 }

@@ -14,8 +14,8 @@ import org.apache.flink.util.Preconditions;
 import com.google.protobuf.ByteString;
 import io.confluent.flink.apiserver.client.ApiClient;
 import io.confluent.flink.apiserver.client.ApiException;
-import io.confluent.flink.apiserver.client.ComputeV1alphaApi;
-import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
+import io.confluent.flink.apiserver.client.ComputeV1Api;
+import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.secure.compute.gateway.v1.Error;
@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
-import static io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTaskStatus.PhaseEnum.RUNNING;
+import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.getUdfTaskFromSpec;
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -54,7 +54,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             RemoteUdfGatewayConnection remoteUdfGatewayConnection,
             String functionInstanceName,
             ApiClient apiClient,
-            ComputeV1alphaFlinkUdfTask udfTask,
+            ComputeV1FlinkUdfTask udfTask,
             RemoteUdfMetrics metrics,
             KafkaCredentialsCache credentialsCache,
             JobID jobID) {
@@ -79,7 +79,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
     private final ApiClient apiClient;
 
     /** The UDF task ready to take calls. */
-    private final ComputeV1alphaFlinkUdfTask udfTask;
+    private final ComputeV1FlinkUdfTask udfTask;
 
     /** Metrics object used to track events. */
     private final RemoteUdfMetrics metrics;
@@ -139,12 +139,12 @@ public class RemoteUdfRuntime implements AutoCloseable {
 
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
-            ComputeV1alphaFlinkUdfTask udfTask =
+            ComputeV1FlinkUdfTask udfTask =
                     getUdfTaskFromSpec(confMap, remoteUdfSpec, remoteUdfSerialization);
 
             ApiClient apiClient = getApiClient(confMap);
-            ComputeV1alphaApi computeV1alphaApi = new ComputeV1alphaApi(apiClient);
-            computeV1alphaApi.createComputeV1alphaFlinkUdfTask(
+            ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
+            computeV1Api.createComputeV1FlinkUdfTask(
                     udfTask.getMetadata().getEnvironment(),
                     udfTask.getMetadata().getOrg(),
                     udfTask);
@@ -152,7 +152,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             // TODO FRT-353 integrate with Watch API
             Deadline deadline = Deadline.fromNow(Duration.ofMinutes(2));
             while (deadline.hasTimeLeft()) {
-                udfTask = getUdfTask(computeV1alphaApi, udfTask);
+                udfTask = getUdfTask(computeV1Api, udfTask);
                 if (udfTask.getStatus().getPhase() == RUNNING) {
                     remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask);
                     return new RemoteUdfRuntime(
@@ -178,10 +178,9 @@ public class RemoteUdfRuntime implements AutoCloseable {
         }
     }
 
-    private static ComputeV1alphaFlinkUdfTask getUdfTask(
-            ComputeV1alphaApi computeV1alphaApi, ComputeV1alphaFlinkUdfTask udfTask)
-            throws ApiException {
-        return computeV1alphaApi.readComputeV1alphaFlinkUdfTask(
+    private static ComputeV1FlinkUdfTask getUdfTask(
+            ComputeV1Api computeV1Api, ComputeV1FlinkUdfTask udfTask) throws ApiException {
+        return computeV1Api.readComputeV1FlinkUdfTask(
                 udfTask.getMetadata().getEnvironment(),
                 udfTask.getMetadata().getName(),
                 udfTask.getMetadata().getOrg(),
@@ -201,10 +200,10 @@ public class RemoteUdfRuntime implements AutoCloseable {
     }
 
     /** Deletes the UdfTask from the ApiServer. */
-    private static void deleteUdfTask(ApiClient apiClient, ComputeV1alphaFlinkUdfTask udfTask)
+    private static void deleteUdfTask(ApiClient apiClient, ComputeV1FlinkUdfTask udfTask)
             throws ApiException {
-        ComputeV1alphaApi computeV1alphaApi = new ComputeV1alphaApi(apiClient);
-        computeV1alphaApi.deleteComputeV1alphaFlinkUdfTask(
+        ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
+        computeV1Api.deleteComputeV1FlinkUdfTask(
                 udfTask.getMetadata().getEnvironment(),
                 udfTask.getMetadata().getName(),
                 udfTask.getMetadata().getOrg());

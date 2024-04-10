@@ -6,7 +6,7 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.util.Preconditions;
 
-import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
+import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
@@ -44,7 +44,7 @@ public class RemoteUdfGatewayConnection implements Closeable {
      *     Status.
      * @return the open connection.
      */
-    public static RemoteUdfGatewayConnection open(ComputeV1alphaFlinkUdfTask udfTask)
+    public static RemoteUdfGatewayConnection open(ComputeV1FlinkUdfTask udfTask)
             throws SSLException {
         Preconditions.checkArgument(
                 !udfTask.getStatus().getEndpoint().getHost().isEmpty(),

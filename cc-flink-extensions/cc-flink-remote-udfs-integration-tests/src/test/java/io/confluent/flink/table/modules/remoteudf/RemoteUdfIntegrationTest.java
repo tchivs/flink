@@ -24,8 +24,8 @@ import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTask;
-import io.confluent.flink.apiserver.client.model.ComputeV1alphaFlinkUdfTaskStatus;
+import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
+import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedFunctionWithTypes;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedUdfGateway;
 import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContainer;
@@ -124,10 +124,10 @@ public class RemoteUdfIntegrationTest {
 
         public void run() {
             try {
-                Collection<ComputeV1alphaFlinkUdfTask> udfTasks =
+                Collection<ComputeV1FlinkUdfTask> udfTasks =
                         ApiServerUtils.listPendingUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
-                if (udfTasks.size() > 0) {
-                    ComputeV1alphaFlinkUdfTask udfTask = udfTasks.iterator().next();
+                if (!udfTasks.isEmpty()) {
+                    ComputeV1FlinkUdfTask udfTask = udfTasks.iterator().next();
                     // Make sure metadata from Payload is properly propagated
                     RemoteUdfSpec udfSpec =
                             RemoteUdfSpec.deserialize(
@@ -137,13 +137,12 @@ public class RemoteUdfIntegrationTest {
                     testUdfGateway.registerUdfSpec(udfSpec);
 
                     // Set to Running to move to GW invocation
-                    udfTask.getStatus()
-                            .setPhase(ComputeV1alphaFlinkUdfTaskStatus.PhaseEnum.RUNNING);
+                    udfTask.getStatus().setPhase(ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING);
                     udfTask.getStatus().getEndpoint().setHost(GW_HOST);
                     udfTask.getStatus().getEndpoint().setPort(GW_PORT);
                     apiServerContainer
-                            .getComputeV1alphaApi()
-                            .updateComputeV1alphaFlinkUdfTaskStatus(
+                            .getComputeV1Api()
+                            .updateComputeV1FlinkUdfTaskStatus(
                                     TEST_ENV, udfTask.getMetadata().getName(), TEST_ORG, udfTask);
                 }
             } catch (Exception e) {
@@ -213,7 +212,7 @@ public class RemoteUdfIntegrationTest {
         Row row = results.get(0);
         Assertions.assertEquals("str:[1, test, 4]", row.getField(0));
 
-        Collection<ComputeV1alphaFlinkUdfTask> udfTasks =
+        Collection<ComputeV1FlinkUdfTask> udfTasks =
                 ApiServerUtils.listRunningUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
         Assertions.assertEquals(0, udfTasks.size());
 
