@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.functions.FunctionContext;
@@ -26,7 +27,7 @@ public class RemoteScalarFunction extends ScalarFunction {
     private static final Logger LOG = LoggerFactory.getLogger(RemoteScalarFunction.class);
 
     /** Config map for the remote UDF runtime. */
-    private final Map<String, String> configMap;
+    private final Configuration config;
 
     /** The specification of the remote UDF, e.g. class name, argument and return value types. */
     private final RemoteUdfSpec remoteUdfSpec;
@@ -44,7 +45,7 @@ public class RemoteScalarFunction extends ScalarFunction {
             Map<String, String> confMap, RemoteUdfSpec remoteUdfSpec, Clock clock) {
         Preconditions.checkNotNull(confMap);
         Preconditions.checkNotNull(remoteUdfSpec);
-        this.configMap = confMap;
+        this.config = Configuration.fromMap(confMap);
         this.remoteUdfSpec = remoteUdfSpec;
         this.clock = clock;
     }
@@ -95,7 +96,7 @@ public class RemoteScalarFunction extends ScalarFunction {
         Preconditions.checkNotNull(remoteUdfSpec);
         this.remoteUdfRuntime =
                 RemoteUdfRuntime.open(
-                        configMap,
+                        config,
                         remoteUdfSpec,
                         metrics,
                         KafkaCredentialsCacheImpl.INSTANCE,

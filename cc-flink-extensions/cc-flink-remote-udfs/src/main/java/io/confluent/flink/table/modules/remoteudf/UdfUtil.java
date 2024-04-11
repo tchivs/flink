@@ -5,6 +5,7 @@
 package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.inference.TypeStrategies;
@@ -210,12 +211,12 @@ public class UdfUtil {
     }
 
     static ComputeV1FlinkUdfTask getUdfTaskFromSpec(
-            Map<String, String> config,
+            Configuration config,
             RemoteUdfSpec remoteUdfSpec,
             RemoteUdfSerialization remoteUdfSerialization)
             throws IOException {
-        String pluginId = config.getOrDefault(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "");
-        String versionId = config.getOrDefault(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "");
+        String pluginId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID);
+        String versionId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID);
         Preconditions.checkArgument(!pluginId.isEmpty(), "PluginId must be set");
         Preconditions.checkArgument(!versionId.isEmpty(), "VersionId must be set");
 

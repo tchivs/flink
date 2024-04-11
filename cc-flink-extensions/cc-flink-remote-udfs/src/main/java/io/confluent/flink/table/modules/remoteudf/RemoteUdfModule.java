@@ -9,6 +9,7 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -20,6 +21,26 @@ public class RemoteUdfModule implements Module {
 
     public static final String CONFLUENT_REMOTE_UDF_PREFIX = "confluent.remote-udf.";
 
+    public static final ConfigOption<Integer> GATEWAY_SERVICE_DEADLINE_SEC =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "gateway.deadline.sec")
+                    .intType()
+                    .defaultValue(60)
+                    .withDescription(
+                            "The deadline when calling to the secure gateway (in seconds)");
+
+    public static final ConfigOption<Long> GATEWAY_RETRY_BACKOFF_MS =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "gateway.retry.backoff.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(1).toMillis())
+                    .withDescription(
+                            "The base amount of time to backoff after a secure gateway invocation failure");
+
+    public static final ConfigOption<Integer> GATEWAY_RETRY_MAX_ATTEMPTS =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "gateway.retry.max.attempts")
+                    .intType()
+                    .defaultValue(5)
+                    .withDescription(
+                            "The total number of attempts to use when retry invoking the secure gateway");
     public static final ConfigOption<String> CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER =
             ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "apiserver")
                     .stringType()

@@ -4,9 +4,11 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
+import io.confluent.flink.table.modules.remoteudf.utils.CallWithRetry;
 import io.confluent.secure.compute.gateway.v1.SecureComputeGatewayGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
@@ -16,6 +18,9 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.util.InsecureTrustManagerFactor
 import javax.net.ssl.SSLException;
 
 import java.io.Closeable;
+
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.GATEWAY_RETRY_BACKOFF_MS;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.GATEWAY_RETRY_MAX_ATTEMPTS;
 
 /** Encapsulates a gRPC connection to communicate with remote UDF service gateway. */
 public class RemoteUdfGatewayConnection implements Closeable {
@@ -28,13 +33,23 @@ public class RemoteUdfGatewayConnection implements Closeable {
     /** Gateway to invoke remote UDFs. */
     private SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway;
 
+    /** Gateway to invoke remote UDFs with retry. */
+    private final CallWithRetry callWithRetry;
+
+    /** Deadline for the gateway service. */
+    private final int deadlineSeconds;
+
     private RemoteUdfGatewayConnection(
             String udfGatewayTarget,
             ManagedChannel channel,
-            SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway) {
+            SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway,
+            CallWithRetry retryCall,
+            int deadlineSeconds) {
         this.udfGatewayTarget = udfGatewayTarget;
         this.channel = channel;
         this.udfGateway = udfGateway;
+        this.callWithRetry = retryCall;
+        this.deadlineSeconds = deadlineSeconds;
     }
 
     /**
@@ -42,10 +57,11 @@ public class RemoteUdfGatewayConnection implements Closeable {
      *
      * @param udfTask containing the gateway target address (e.g. localhost:5001) as part of its
      *     Status.
+     * @param config containing the retry configuration.
      * @return the open connection.
      */
-    public static RemoteUdfGatewayConnection open(ComputeV1FlinkUdfTask udfTask)
-            throws SSLException {
+    public static RemoteUdfGatewayConnection open(
+            ComputeV1FlinkUdfTask udfTask, Configuration config) throws SSLException {
         Preconditions.checkArgument(
                 !udfTask.getStatus().getEndpoint().getHost().isEmpty(),
                 "Gateway Host not configured!");
@@ -70,7 +86,14 @@ public class RemoteUdfGatewayConnection implements Closeable {
         SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub gateway =
                 Preconditions.checkNotNull(SecureComputeGatewayGrpc.newBlockingStub(channel));
 
-        return new RemoteUdfGatewayConnection(udfGatewayTarget, channel, gateway);
+        CallWithRetry retryCall =
+                new CallWithRetry(
+                        config.getInteger(GATEWAY_RETRY_MAX_ATTEMPTS),
+                        config.getLong(GATEWAY_RETRY_BACKOFF_MS));
+        int deadlineSeconds = config.getInteger(RemoteUdfModule.GATEWAY_SERVICE_DEADLINE_SEC);
+
+        return new RemoteUdfGatewayConnection(
+                udfGatewayTarget, channel, gateway, retryCall, deadlineSeconds);
     }
 
     /** Closes the connection. */
@@ -81,6 +104,14 @@ public class RemoteUdfGatewayConnection implements Closeable {
 
     public SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub getUdfGateway() {
         return udfGateway;
+    }
+
+    public CallWithRetry getCallWithRetry() {
+        return callWithRetry;
+    }
+
+    public int getDeadlineSeconds() {
+        return deadlineSeconds;
     }
 
     @Override

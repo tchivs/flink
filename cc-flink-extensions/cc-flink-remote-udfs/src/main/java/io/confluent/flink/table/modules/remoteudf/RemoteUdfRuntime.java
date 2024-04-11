@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Deadline;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
 import org.apache.flink.util.IOUtils;
@@ -28,9 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
@@ -100,15 +101,27 @@ public class RemoteUdfRuntime implements AutoCloseable {
     public Object callRemoteUdf(Object[] args) throws Exception {
         ByteString serializedArguments = remoteUdfSerialization.serializeArguments(args);
         metrics.bytesToUdf(serializedArguments.size());
+        // TRAFFIC-11799: Avoid transient connectivity issues for EA
         InvokeFunctionResponse invokeResponse =
                 remoteUdfGatewayConnection
-                        .getUdfGateway()
-                        .withCallCredentials(new UdfCallCredentials(credentialsCache, jobID))
-                        .invokeFunction(
-                                InvokeFunctionRequest.newBuilder()
-                                        .setFuncInstanceName(functionInstanceName)
-                                        .setPayload(serializedArguments)
-                                        .build());
+                        .getCallWithRetry()
+                        .call(
+                                () ->
+                                        remoteUdfGatewayConnection
+                                                .getUdfGateway()
+                                                .withDeadlineAfter(
+                                                        remoteUdfGatewayConnection
+                                                                .getDeadlineSeconds(),
+                                                        TimeUnit.SECONDS)
+                                                .withCallCredentials(
+                                                        new UdfCallCredentials(
+                                                                credentialsCache, jobID))
+                                                .invokeFunction(
+                                                        InvokeFunctionRequest.newBuilder()
+                                                                .setFuncInstanceName(
+                                                                        functionInstanceName)
+                                                                .setPayload(serializedArguments)
+                                                                .build()));
 
         checkAndHandleError(invokeResponse);
         ByteString serializedResult = invokeResponse.getPayload();
@@ -119,14 +132,14 @@ public class RemoteUdfRuntime implements AutoCloseable {
     /**
      * Opens the runtime. This includes opening a connection to the gateway.
      *
-     * @param confMap
+     * @param config the configuration for the runtime.
      * @param remoteUdfSpec the specification of the UDF.
      * @return an open runtime.
      * @throws Exception on any error, e.g. from the connection or failing to create function
      *     instances.
      */
     public static RemoteUdfRuntime open(
-            Map<String, String> confMap,
+            Configuration config,
             RemoteUdfSpec remoteUdfSpec,
             RemoteUdfMetrics metrics,
             KafkaCredentialsCache credentialsCache,
@@ -140,9 +153,9 @@ public class RemoteUdfRuntime implements AutoCloseable {
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
             ComputeV1FlinkUdfTask udfTask =
-                    getUdfTaskFromSpec(confMap, remoteUdfSpec, remoteUdfSerialization);
+                    getUdfTaskFromSpec(config, remoteUdfSpec, remoteUdfSerialization);
 
-            ApiClient apiClient = getApiClient(confMap);
+            ApiClient apiClient = getApiClient(config);
             ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
             computeV1Api.createComputeV1FlinkUdfTask(
                     udfTask.getMetadata().getEnvironment(),
@@ -154,7 +167,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             while (deadline.hasTimeLeft()) {
                 udfTask = getUdfTask(computeV1Api, udfTask);
                 if (udfTask.getStatus().getPhase() == RUNNING) {
-                    remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask);
+                    remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask, config);
                     return new RemoteUdfRuntime(
                             remoteUdfSerialization,
                             remoteUdfGatewayConnection,
@@ -210,9 +223,8 @@ public class RemoteUdfRuntime implements AutoCloseable {
     }
 
     /** Returns the ApiClient for the given configuration. */
-    private static ApiClient getApiClient(Map<String, String> config) {
-        String apiServerEndpoint =
-                config.getOrDefault(CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(), "");
+    private static ApiClient getApiClient(Configuration config) {
+        String apiServerEndpoint = config.getString(CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER);
         Preconditions.checkArgument(
                 !apiServerEndpoint.isEmpty(), "ApiServer target not configured!");
         ApiClient apiClient = new ApiClient().setBasePath(apiServerEndpoint);
