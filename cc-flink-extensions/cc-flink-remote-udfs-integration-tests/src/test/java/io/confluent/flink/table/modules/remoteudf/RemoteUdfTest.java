@@ -84,6 +84,22 @@ public class RemoteUdfTest extends AbstractTestBase {
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
     }
 
+    /* This is important to check otherwise a '-' char in the identifier would fail the job*/
+    @Test
+    public void testEscapingIdentifiersForCatalogDatabaseNames() throws Exception {
+        MockedFunctionWithTypes[] testFunctionWithHyphen =
+                new MockedFunctionWithTypes[] {
+                    new MockedFunctionWithTypes("remote-4", new String[] {"INT"}, "STRING")
+                };
+        // SQL service controls remote UDFs using config params
+        final TableEnvironment tableEnv =
+                TestUtils.getSqlServiceTableEnvironment(testFunctionWithHyphen, true, false);
+
+        final ForegroundJobResultPlan plan =
+                foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.`remote-4`(1)");
+        assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
+    }
+
     @Test
     public void testRemoteUdfsEnabled_useCatalogDb() throws Exception {
         // SQL service controls remote UDFs using config params

@@ -15,6 +15,7 @@ import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.inference.TypeStrategies;
 import org.apache.flink.table.types.inference.TypeStrategy;
 import org.apache.flink.table.types.logical.utils.LogicalTypeCasts;
+import org.apache.flink.table.utils.EncodingUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -26,6 +27,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Class which parses configs to return a list of remote Udfs which can be used for planning. It's
@@ -88,7 +91,9 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     }
 
     public String getPath() {
-        return getFunctionCatalog() + "." + getFunctionDatabase() + "." + getFunctionName();
+        return Stream.of(getFunctionCatalog(), getFunctionDatabase(), getFunctionName())
+                .map(EncodingUtils::escapeIdentifier)
+                .collect(Collectors.joining("."));
     }
 
     @Override

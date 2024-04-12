@@ -83,7 +83,7 @@ public class QuerySummaryTest {
                 .containsExactlyInAnyOrder(ExpressionKind.INPUT_REF, ExpressionKind.OTHER);
 
         assertThat(querySummary.getUdfCalls()).hasSize(1);
-        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("a.b.c");
+        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
         assertThat(querySummary.getUdfCalls().iterator().next().getResourceConfigs().size())
                 .isGreaterThan(0);
 
@@ -197,7 +197,7 @@ public class QuerySummaryTest {
                 querySummary.getUdfCalls().stream()
                         .map(call -> call.getPath())
                         .collect(Collectors.toList());
-        assertThat(names).containsExactlyInAnyOrder("a.b.c", "a.b.d");
+        assertThat(names).containsExactlyInAnyOrder("`a`.`b`.`c`", "`a`.`b`.`d`");
     }
 
     @Test
@@ -215,7 +215,7 @@ public class QuerySummaryTest {
                         QueryProperty.SINGLE_SINK);
 
         assertThat(querySummary.getUdfCalls()).hasSize(1);
-        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("a.b.c");
+        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
     }
 
     private static void createTable(TableEnvironment env, String name, Boundedness boundedness)
