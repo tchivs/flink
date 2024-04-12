@@ -17,9 +17,11 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.ICloseableRegistry;
 import org.apache.flink.core.fs.PathsCopyingFileSystem;
 import org.apache.flink.core.fs.PathsCopyingFileSystem.CopyTask;
 import org.apache.flink.runtime.state.IncrementalKeyedStateHandle.HandleAndLocalPath;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
@@ -60,6 +63,11 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         super(restoringThreadNum);
     }
 
+    @VisibleForTesting
+    RocksDBStateDownloader(ExecutorService executorService) {
+        super(executorService);
+    }
+
     /**
      * Transfer all state data to the target directory, as specified in the download requests.
      *
@@ -68,7 +76,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
      */
     public void transferAllStateDataToDirectory(
             Collection<StateHandleDownloadSpec> downloadRequests,
-            CloseableRegistry closeableRegistry)
+            ICloseableRegistry closeableRegistry)
             throws Exception {
 
         // We use this closer for fine-grained shutdown of all parallel downloading.
@@ -78,14 +86,27 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         try {
             // We have to wait for all futures to be completed, to make sure in
             // case of failure that we will clean up all the files
-            FutureUtils.completeAll(
+            FutureUtils.ConjunctFuture<Void> downloadFuture =
+                    FutureUtils.completeAll(
                             createDownloadRunnables(downloadRequests, internalCloser).stream()
                                     .map(
                                             runnable ->
                                                     CompletableFuture.runAsync(
                                                             runnable, executorService))
-                                    .collect(Collectors.toList()))
-                    .get();
+                                    .collect(Collectors.toList()));
+            Exception interruptedException = null;
+            while (!downloadFuture.isDone()) {
+                try {
+                    downloadFuture.get();
+                } catch (InterruptedException e) {
+                    LOG.warn("Interrupted while waiting for state download, continue waiting");
+                    interruptedException = interruptedException == null ? e : interruptedException;
+                }
+            }
+            if (interruptedException != null) {
+                Thread.currentThread().interrupt();
+                throw interruptedException;
+            }
         } catch (Exception e) {
             downloadRequests.stream()
                     .map(StateHandleDownloadSpec::getDownloadDestination)

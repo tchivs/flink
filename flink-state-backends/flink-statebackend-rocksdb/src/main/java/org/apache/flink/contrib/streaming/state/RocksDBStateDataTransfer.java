@@ -31,13 +31,16 @@ class RocksDBStateDataTransfer implements Closeable {
     protected final ExecutorService executorService;
 
     RocksDBStateDataTransfer(int threadNum) {
-        if (threadNum > 1) {
-            executorService =
-                    Executors.newFixedThreadPool(
-                            threadNum, new ExecutorThreadFactory("Flink-RocksDBStateDataTransfer"));
-        } else {
-            executorService = newDirectExecutorService();
-        }
+        this(
+                threadNum > 1
+                        ? Executors.newFixedThreadPool(
+                                threadNum,
+                                new ExecutorThreadFactory("Flink-RocksDBStateDataTransfer"))
+                        : newDirectExecutorService());
+    }
+
+    RocksDBStateDataTransfer(ExecutorService executorService) {
+        this.executorService = executorService;
     }
 
     @Override
