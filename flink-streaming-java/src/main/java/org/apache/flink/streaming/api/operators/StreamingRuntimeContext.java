@@ -42,6 +42,7 @@ import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.externalresource.ExternalResourceInfoProvider;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
+import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -259,5 +260,14 @@ public class StreamingRuntimeContext extends AbstractRuntimeUDFContext {
      */
     public CheckpointingMode getCheckpointMode() {
         return streamConfig.getCheckpointMode();
+    }
+
+    /**
+     * Returns the task memory manager.
+     *
+     * @return the taks memory manager
+     */
+    public MemoryManager getMemoryManager() {
+        return taskEnvironment.getMemoryManager();
     }
 }
