@@ -151,9 +151,10 @@ public class PluginFileSystemFactory implements FileSystemFactory {
         }
 
         @Override
-        public void copyFiles(List<CopyTask> copyTasks) throws IOException {
+        public void copyFiles(List<CopyTask> copyTasks, ICloseableRegistry closeableRegistry)
+                throws IOException {
             try (TemporaryClassLoaderContext ignored = TemporaryClassLoaderContext.of(loader)) {
-                ((PathsCopyingFileSystem) inner).copyFiles(copyTasks);
+                ((PathsCopyingFileSystem) inner).copyFiles(copyTasks, closeableRegistry);
             }
         }
 

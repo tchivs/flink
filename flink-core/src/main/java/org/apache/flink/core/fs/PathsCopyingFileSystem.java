@@ -65,9 +65,10 @@ public interface PathsCopyingFileSystem extends IFileSystem {
     /**
      * List of {@link CopyTask} to copy in batch by this {@link PathsCopyingFileSystem}. In case of
      * an exception some files might have been already copied fully or partially. Caller should
-     * clean this up.
+     * clean this up. Copy can be interrupted by the {@link CloseableRegistry}.
      */
-    void copyFiles(List<CopyTask> copyTasks) throws IOException;
+    void copyFiles(List<CopyTask> copyTasks, ICloseableRegistry closeableRegistry)
+            throws IOException;
 
     @Override
     default boolean canCopyPaths() {

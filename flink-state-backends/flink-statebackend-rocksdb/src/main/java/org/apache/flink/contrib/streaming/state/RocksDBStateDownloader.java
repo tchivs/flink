@@ -156,7 +156,9 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             checkState(srcFileSystem.canCopyPaths());
             runnables.add(
                     createDownloadRunnableUsingCopyFiles(
-                            (PathsCopyingFileSystem) srcFileSystem, filesToDownload));
+                            (PathsCopyingFileSystem) srcFileSystem,
+                            filesToDownload,
+                            closeableRegistry));
         }
 
         return runnables;
@@ -179,9 +181,11 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
     }
 
     private Runnable createDownloadRunnableUsingCopyFiles(
-            PathsCopyingFileSystem fileSystem, List<CopyTask> copyTasks) {
+            PathsCopyingFileSystem fileSystem,
+            List<CopyTask> copyTasks,
+            CloseableRegistry closeableRegistry) {
         LOG.debug("Using copy paths for {} of file system [{}]", copyTasks, fileSystem);
-        return ThrowingRunnable.unchecked(() -> fileSystem.copyFiles(copyTasks));
+        return ThrowingRunnable.unchecked(() -> fileSystem.copyFiles(copyTasks, closeableRegistry));
     }
 
     private Runnable createDownloadRunnableUsingStreams(

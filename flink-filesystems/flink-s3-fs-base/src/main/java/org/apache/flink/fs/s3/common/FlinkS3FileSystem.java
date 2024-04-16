@@ -21,6 +21,7 @@ package org.apache.flink.fs.s3.common;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.EntropyInjectingFileSystem;
 import org.apache.flink.core.fs.FileSystemKind;
+import org.apache.flink.core.fs.ICloseableRegistry;
 import org.apache.flink.core.fs.PathsCopyingFileSystem;
 import org.apache.flink.core.fs.RecoverableWriter;
 import org.apache.flink.core.fs.RefCountedFileWithStream;
@@ -29,7 +30,8 @@ import org.apache.flink.fs.s3.common.token.AbstractS3DelegationTokenReceiver;
 import org.apache.flink.fs.s3.common.writer.S3AccessHelper;
 import org.apache.flink.fs.s3.common.writer.S3RecoverableWriter;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
-import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FileUtils;
+import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 import org.apache.flink.util.function.FunctionWithException;
@@ -41,23 +43,22 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.flink.fs.s3.common.AbstractS3FileSystemFactory.ACCESS_KEY;
 import static org.apache.flink.fs.s3.common.AbstractS3FileSystemFactory.ENDPOINT;
@@ -78,6 +79,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class FlinkS3FileSystem extends HadoopFileSystem
         implements EntropyInjectingFileSystem, PathsCopyingFileSystem {
     private static final Logger LOG = LoggerFactory.getLogger(FlinkS3FileSystem.class);
+
+    private static final long PROCESS_KILL_SLEEP_TIME_MS = 50L;
 
     @Nullable private final String entropyInjectionKey;
 
@@ -249,13 +252,14 @@ public class FlinkS3FileSystem extends HadoopFileSystem
     }
 
     @Override
-    public void copyFiles(List<CopyTask> copyTasks) throws IOException {
+    public void copyFiles(List<CopyTask> copyTasks, ICloseableRegistry closeableRegistry)
+            throws IOException {
         checkState(canCopyPaths(), "#downloadFiles has been called illegally");
         List<String> artefacts = new ArrayList<>();
         artefacts.add(s5CmdConfiguration.path);
         artefacts.addAll(s5CmdConfiguration.args);
         artefacts.add("run");
-        castSpell(convertToSpells(copyTasks).iterator(), artefacts.toArray(new String[0]));
+        castSpell(convertToSpells(copyTasks), closeableRegistry, artefacts.toArray(new String[0]));
     }
 
     private List<String> convertToSpells(List<CopyTask> copyTasks) throws IOException {
@@ -271,64 +275,110 @@ public class FlinkS3FileSystem extends HadoopFileSystem
         return spells;
     }
 
-    private void castSpell(Iterator<String> spells, String... artefacts) throws IOException {
+    private void castSpell(
+            List<String> spells, ICloseableRegistry closeableRegistry, String... artefacts)
+            throws IOException {
         LOG.info("Casting spell: {}", Arrays.toString(artefacts));
-        StringBuilder stdOutputContent = new StringBuilder();
         int exitCode = 0;
+        final AtomicReference<IOException> maybeCloseableRegistryException =
+                new AtomicReference<>();
+
+        // Setup temporary working directory for the process
+        File tmpWorkingDir = new File(localTmpDir, "s5cmd_" + UUID.randomUUID());
+        Path tmpWorkingPath = Files.createDirectories(tmpWorkingDir.toPath());
+
         try {
-            ProcessBuilder hogwart = new ProcessBuilder(artefacts);
+            // Redirect the process input/output to files. Communicating directly through a
+            // stream can lead to blocking and undefined behavior if the underlying process is
+            // killed (known Java problem).
+            ProcessBuilder hogwart = new ProcessBuilder(artefacts).directory(tmpWorkingDir);
             s5CmdConfiguration.configureEnvironment(hogwart.environment());
-            Process wizard = hogwart.redirectErrorStream(true).start();
+            File inScrolls = new File(tmpWorkingDir, "s5cmd_input");
+            Preconditions.checkState(inScrolls.createNewFile());
+            File outScrolls = new File(tmpWorkingDir, "s5cmd_output");
+            Preconditions.checkState(outScrolls.createNewFile());
 
-            try (BufferedReader stdOutput =
-                    new BufferedReader(new InputStreamReader(wizard.getInputStream()))) {
+            FileUtils.writeFileUtf8(inScrolls, String.join(System.lineSeparator(), spells));
 
-                String stdOutLine;
-                @Nullable IOException firstException = null;
-                try (BufferedWriter stdIn =
-                        new BufferedWriter(new OutputStreamWriter(wizard.getOutputStream()))) {
-                    while (spells.hasNext()) {
-                        stdIn.write(spells.next());
-                        stdIn.newLine();
-                        while (stdOutput.ready()) {
-                            stdOutLine = stdOutput.readLine();
-                            if (stdOutLine != null) {
-                                stdOutputContent.append(stdOutLine);
-                            }
-                        }
-                    }
-                } catch (IOException e) {
-                    firstException = e;
-                }
+            final Process wizard =
+                    hogwart.redirectErrorStream(true)
+                            .redirectInput(inScrolls)
+                            .redirectOutput(outScrolls)
+                            .start();
 
-                // Try to read output even in case of an exception to get a better error message.
-                // Before reading output we also have to first send EOF on the stdIn, otherwise a
-                // deadlock could potentially happen.
-                try {
-                    while ((stdOutLine = stdOutput.readLine()) != null) {
-                        stdOutputContent.append(stdOutLine);
-                    }
-                } catch (IOException secondException) {
-                    throw ExceptionUtils.firstOrSuppressed(secondException, firstException);
-                }
+            try (Closeable ignore =
+                    closeableRegistry.registerCloseableTemporarily(
+                            () -> {
+                                maybeCloseableRegistryException.set(
+                                        new IOException(
+                                                "Copy process destroyed by CloseableRegistry."));
+                                destroyProcess(wizard);
+                            })) {
+                exitCode = wizard.waitFor();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                destroyProcess(wizard);
+                throw new IOException(createSpellErrorMessage(exitCode, outScrolls, artefacts), e);
+            } catch (IOException e) {
+                destroyProcess(wizard);
+                throw new IOException(createSpellErrorMessage(exitCode, outScrolls, artefacts), e);
             }
-            exitCode = wizard.waitFor();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(
-                    createSpellErrorMessage(exitCode, stdOutputContent, artefacts), e);
-        } catch (IOException e) {
-            throw new IOException(
-                    createSpellErrorMessage(exitCode, stdOutputContent, artefacts), e);
-        }
-
-        if (exitCode != 0) {
-            throw new IOException(createSpellErrorMessage(exitCode, stdOutputContent, artefacts));
+            if (exitCode != 0) {
+                throw new IOException(
+                        createSpellErrorMessage(exitCode, outScrolls, artefacts),
+                        maybeCloseableRegistryException.get());
+            }
+        } finally {
+            IOUtils.deleteFileQuietly(tmpWorkingPath);
         }
     }
 
-    private String createSpellErrorMessage(
-            int exitCode, StringBuilder stdOutputContent, String... artefacts) {
+    private static void destroyProcess(Process processToDestroy) {
+
+        LOG.info("Destroying s5cmd copy process.");
+        processToDestroy.destroy();
+
+        // Needed for some operating systems to destroy the process
+        IOUtils.closeAllQuietly(
+                processToDestroy.getInputStream(),
+                processToDestroy.getOutputStream(),
+                processToDestroy.getErrorStream());
+
+        sleepForProcessTermination(processToDestroy);
+
+        if (!processToDestroy.isAlive()) {
+            // We are done.
+            return;
+        }
+        LOG.info("Forcibly destroying s5cmd copy process.");
+        processToDestroy.destroyForcibly();
+
+        sleepForProcessTermination(processToDestroy);
+
+        if (processToDestroy.isAlive()) {
+            LOG.warn("Could not destroy s5cmd copy process.");
+        }
+    }
+
+    private static void sleepForProcessTermination(Process processToDestroy) {
+        if (processToDestroy.isAlive()) {
+            try {
+                // Give the process a little bit of time to gracefully shut down
+                Thread.sleep(PROCESS_KILL_SLEEP_TIME_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private String createSpellErrorMessage(int exitCode, File outFile, String... artefacts) {
+        String output = "Unknown: cannot read copy process output.";
+        try {
+            output = FileUtils.readFileUtf8(outFile);
+        } catch (IOException e) {
+            LOG.info("Error while reading s5cmd output from file {}.", outFile, e);
+        }
+
         return new StringBuilder()
                 .append("Failed to cast s5cmd spell [")
                 .append(String.join(" ", artefacts))
@@ -338,7 +388,7 @@ public class FlinkS3FileSystem extends HadoopFileSystem
                 .append(s5CmdConfiguration)
                 .append("]")
                 .append(" maybe due to:\n")
-                .append(stdOutputContent)
+                .append(output)
                 .toString();
     }
 

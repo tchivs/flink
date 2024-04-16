@@ -50,9 +50,10 @@ public class SafetyNetWrapperFileSystem extends FileSystem
     }
 
     @Override
-    public void copyFiles(List<CopyTask> copyTasks) throws IOException {
+    public void copyFiles(List<CopyTask> copyTasks, ICloseableRegistry closeableRegistry)
+            throws IOException {
         checkState(canCopyPaths());
-        ((PathsCopyingFileSystem) unsafeFileSystem).copyFiles(copyTasks);
+        ((PathsCopyingFileSystem) unsafeFileSystem).copyFiles(copyTasks, closeableRegistry);
     }
 
     @Override
