@@ -10,10 +10,12 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.functions.ScalarFunction;
 
 import io.confluent.flink.table.modules.remoteudf.ConfiguredFunctionSpec;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
+import io.confluent.flink.table.service.BackgroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ResultPlanUtils;
 import org.junit.jupiter.api.Test;
@@ -122,6 +124,37 @@ public class QuerySummaryTest {
     }
 
     @Test
+    void testSourceAndSinkIdentifierTags() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        createTable(env, "unbounded_source", Boundedness.CONTINUOUS_UNBOUNDED);
+        createTableSink(env, "unbounded_sink");
+
+        QuerySummary querySummary =
+                assertPropertiesBackgroundQuery(
+                        env,
+                        "INSERT INTO unbounded_sink SELECT * FROM unbounded_source",
+                        QueryProperty.APPEND_ONLY,
+                        QueryProperty.BACKGROUND);
+
+        final NodeSummary sinkSummary = querySummary.getNodes().get(0);
+        assertThat(sinkSummary).extracting(NodeSummary::getKind).isEqualTo(NodeKind.SINK);
+        assertThat(sinkSummary.getTag(NodeTag.TABLE_IDENTIFIER, ObjectIdentifier.class))
+                .isNotNull()
+                .isEqualTo(
+                        ObjectIdentifier.of(
+                                "default_catalog", "default_database", "unbounded_sink"));
+
+        final NodeSummary sourceSummary = sinkSummary.getInputs().get(0);
+        assertThat(sourceSummary).extracting(NodeSummary::getKind).isEqualTo(NodeKind.SOURCE_SCAN);
+        assertThat(sourceSummary.getTag(NodeTag.TABLE_IDENTIFIER, ObjectIdentifier.class))
+                .isNotNull()
+                .isEqualTo(
+                        ObjectIdentifier.of(
+                                "default_catalog", "default_database", "unbounded_source"));
+    }
+
+    @Test
     void testUpsertKeys() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
@@ -218,13 +251,8 @@ public class QuerySummaryTest {
         assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
     }
 
-    private static void createTable(TableEnvironment env, String name, Boundedness boundedness)
-            throws Exception {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", "datagen");
-        if (boundedness == Boundedness.BOUNDED) {
-            options.put("number-of-rows", "10");
-        }
+    private static void createConfluentCatalogTable(
+            TableEnvironment env, String name, Map<String, String> options) throws Exception {
         ResultPlanUtils.createConfluentCatalogTable(
                 env,
                 name,
@@ -237,9 +265,33 @@ public class QuerySummaryTest {
                 Collections.emptyMap());
     }
 
+    private static void createTable(TableEnvironment env, String name, Boundedness boundedness)
+            throws Exception {
+        final Map<String, String> options = new HashMap<>();
+        options.put("connector", "datagen");
+        if (boundedness == Boundedness.BOUNDED) {
+            options.put("number-of-rows", "10");
+        }
+        createConfluentCatalogTable(env, name, options);
+    }
+
+    private static void createTableSink(TableEnvironment env, String name) throws Exception {
+        final Map<String, String> options = new HashMap<>();
+        options.put("connector", "blackhole");
+        createConfluentCatalogTable(env, name, options);
+    }
+
     private static QuerySummary assertProperties(
             TableEnvironment env, String sql, QueryProperty... properties) throws Exception {
         final ForegroundJobResultPlan plan = ResultPlanUtils.foregroundJob(env, sql);
+        final QuerySummary querySummary = plan.getQuerySummary();
+        assertThat(querySummary.getProperties()).contains(properties);
+        return querySummary;
+    }
+
+    private static QuerySummary assertPropertiesBackgroundQuery(
+            TableEnvironment env, String sql, QueryProperty... properties) throws Exception {
+        final BackgroundJobResultPlan plan = ResultPlanUtils.backgroundJob(env, sql);
         final QuerySummary querySummary = plan.getQuerySummary();
         assertThat(querySummary.getProperties()).contains(properties);
         return querySummary;
