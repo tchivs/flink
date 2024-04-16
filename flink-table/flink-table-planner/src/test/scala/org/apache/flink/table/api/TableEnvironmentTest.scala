@@ -2699,8 +2699,9 @@ class TableEnvironmentTest {
         |)
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ValidationException])
-      .hasMessageContaining("Model `default_catalog`.`default_database`.`M1` doesn't exist.")
+      .isInstanceOf(classOf[ModelException])
+      .hasMessageContaining(
+        "Could not execute ALTER  MODEL default_catalog.default_database.M1 SET")
   }
 
   @Test
@@ -2746,8 +2747,9 @@ class TableEnvironmentTest {
         |ALTER MODEL M1 RENAME TO M2
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ValidationException])
-      .hasMessageContaining("Model `default_catalog`.`default_database`.`M1` doesn't exist.")
+      .isInstanceOf(classOf[ModelException])
+      .hasMessageContaining(
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
   }
 
   @Test
@@ -2894,8 +2896,9 @@ class TableEnvironmentTest {
         |ALTER MODEL M1 RENAME TO M2
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ValidationException])
-      .hasMessageContaining("Model `default_catalog`.`default_database`.`M1` doesn't exist.")
+      .isInstanceOf(classOf[ModelException])
+      .hasMessageContaining(
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
   }
 
   @Test

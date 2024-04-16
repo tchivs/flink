@@ -27,7 +27,6 @@ import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
-import org.apache.flink.table.operations.NopOperation;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.AlterModelOptionsOperation;
 import org.apache.flink.table.operations.ddl.AlterModelRenameOperation;
@@ -53,13 +52,6 @@ public class SqlAlterModelConverter {
         ObjectIdentifier modelIdentifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
         Optional<ResolvedCatalogModel> optionalResolvedCatalogModel =
                 catalogManager.getModel(modelIdentifier);
-        if (!optionalResolvedCatalogModel.isPresent()) {
-            if (sqlAlterModel.ifModelExists()) {
-                return new NopOperation();
-            }
-            throw new ValidationException(
-                    String.format("Model %s doesn't exist.", modelIdentifier));
-        }
         if (sqlAlterModel.getNewModelName() != null) {
             // Rename model
             UnresolvedIdentifier newUnresolvedIdentifier =
