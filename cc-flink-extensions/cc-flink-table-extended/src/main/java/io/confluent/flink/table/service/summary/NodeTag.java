@@ -12,6 +12,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalCalc;
+import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalSink;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalTableSourceScan;
 import org.apache.flink.table.planner.plan.schema.TableSourceTable;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
@@ -96,6 +97,16 @@ public enum NodeTag {
                             scanTableSource
                                     .getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE)
                                     .isBounded());
+                });
+
+        addNodeTagExtraction(
+                map,
+                NodeKind.SINK,
+                (rel, tags) -> {
+                    final StreamPhysicalSink sink = (StreamPhysicalSink) rel;
+                    final ContextResolvedTable contextTable = sink.contextResolvedTable();
+
+                    tags.put(NodeTag.TABLE_IDENTIFIER, contextTable.getIdentifier());
                 });
 
         return map;
