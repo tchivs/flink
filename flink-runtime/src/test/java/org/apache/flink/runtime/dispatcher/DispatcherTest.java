@@ -1641,6 +1641,7 @@ public class DispatcherTest extends AbstractDispatcherTest {
                                                         jobGraph.getName(),
                                                         JobStatus.RUNNING,
                                                         null,
+                                                        "{}",
                                                         null,
                                                         System.currentTimeMillis(),
                                                         jobGraph.getVertices(),
