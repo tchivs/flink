@@ -22,6 +22,8 @@ import okhttp3.Response;
 
 import java.util.Map;
 
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
+
 /** Implements Model Runtime for Google AI Studio models, not to be confused with Vertex AI. */
 public class GoogleAIProvider implements MLModelRuntimeProvider {
     private final MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.GOOGLEAI;
@@ -48,8 +50,8 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
         supportedProvider.validateEndpoint(urlBase);
         this.apiKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
-                        modelOptionsUtils.isEncryptStrategyPlaintext());
+                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
+                        modelOptionsUtils.getEncryptStrategy());
         if (apiKey.isEmpty()) {
             // TODO: This exception should fire when the model is created, not when it is run.
             throw new FlinkRuntimeException("Model ML Predict requires an API key");

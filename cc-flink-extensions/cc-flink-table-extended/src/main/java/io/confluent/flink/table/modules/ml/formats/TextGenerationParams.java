@@ -8,6 +8,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 
 import java.util.Arrays;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 
 /** Common parameters for text generation. */
 public class TextGenerationParams {
-    private static final String PARAMS_PREFIX = "PARAMS.";
+    private static final String PARAMS_PREFIX = MLModelCommonConstants.PARAMS_PREFIX;
     private boolean hasChatParams = false;
     private Map<StandardChatParams, ParameterRef> chatParams = new HashMap<>();
     private Map<SpecialParams, String> specialParams = new HashMap<>();

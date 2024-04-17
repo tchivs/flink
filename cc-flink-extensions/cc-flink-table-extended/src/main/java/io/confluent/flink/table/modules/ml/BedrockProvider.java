@@ -35,6 +35,11 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_ACCESS_KEY_ID;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SECRET_ACCESS_KEY;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SESSION_TOKEN;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
+
 /** Implements Model Runtime for AWS Bedrock API. */
 public class BedrockProvider implements MLModelRuntimeProvider {
     private final CatalogModel model;
@@ -58,7 +63,7 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.BEDROCK;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
-        this.endpoint = modelOptionsUtils.getProviderOption("ENDPOINT");
+        this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
         if (endpoint == null) {
             throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
         }
@@ -77,20 +82,20 @@ public class BedrockProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException("Invalid Bedrock endpoint URI: " + e.getMessage());
         }
         // We sign the request with the access key, secret key, and optionally session token.
-        Boolean isPlaintext = modelOptionsUtils.isEncryptStrategyPlaintext();
+        String encryptStrategy = modelOptionsUtils.getEncryptStrategy();
         this.accessKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("AWS_ACCESS_KEY_ID", ""),
-                        isPlaintext);
+                        modelOptionsUtils.getProviderOptionOrDefault(AWS_ACCESS_KEY_ID, ""),
+                        encryptStrategy);
         this.secretKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("AWS_SECRET_ACCESS_KEY", ""),
-                        isPlaintext);
+                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SECRET_ACCESS_KEY, ""),
+                        encryptStrategy);
         // A session token is optional, but needed for temporary credentials.
         this.sessionToken =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("AWS_SESSION_TOKEN", ""),
-                        isPlaintext);
+                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SESSION_TOKEN, ""),
+                        encryptStrategy);
         if (accessKey.isEmpty() || secretKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Bedrock Models");

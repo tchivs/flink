@@ -1,19 +1,5 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2024 Confluent Inc.
  */
 
 package io.confluent.flink.table.modules.ml;
@@ -25,44 +11,62 @@ import java.net.URL;
 /** enum for supported ML model providers. */
 public enum MLModelSupportedProviders {
     // OpenAI endpoints look like https://api.openai.com/v1/chat/completions
-    OPENAI("OPENAI", "https://api\\.openai\\.com/.*"),
+    OPENAI("OPENAI", "https://api\\.openai\\.com/.*", "https://api.openai.com/v1/chat/completions"),
     // Azure ML endpoints look like https://ENDPOINT.REGION.inference.ml.azure.com/score
     // Azure AI endpoints look like https://ENDPOINT.REGION.inference.ai.azure.com/v1/completions
     // (or /v1/chat/completions)
-    AZUREML("AZUREML", "https://[\\w-]+\\.[\\w-]+\\.inference\\.(ml|ai)\\.azure\\.com/.*"),
+    AZUREML("AZUREML", "https://[\\w-]+\\.[\\w-]+\\.inference\\.(ml|ai)\\.azure\\.com/.*", ""),
     // Azure OpenAI endpoints look like
     // https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=DATE
-    AZUREOPENAI("AZUREOPENAI", "https://[\\w-]+\\.openai\\.azure\\.com/openai/deployments/.+/.*"),
+    AZUREOPENAI(
+            "AZUREOPENAI", "https://[\\w-]+\\.openai\\.azure\\.com/openai/deployments/.+/.*", ""),
     // AWS Bedrock endpoints look like
     // https://bedrock-runtime.REGION.amazonaws.com/model/MODEL-NAME/invoke
     BEDROCK(
             "BEDROCK",
-            "https://bedrock-runtime(-fips)?\\.[\\w-]+\\.amazonaws\\.com/model/.+/invoke"),
+            "https://bedrock-runtime(-fips)?\\.[\\w-]+\\.amazonaws\\.com/model/.+/invoke/?",
+            ""),
     // AWS Sagemaker endpoints look like
     // https://runtime.sagemaker.REGION.amazonaws.com/endpoints/ENDPOINT/invocations
     SAGEMAKER(
             "SAGEMAKER",
-            "https://runtime(-fips)?\\.sagemaker\\.[\\w-]+\\.amazonaws\\.com/endpoints/.+/invocations/?"),
+            "https://runtime(-fips)?\\.sagemaker\\.[\\w-]+\\.amazonaws\\.com/endpoints/.+/invocations/?",
+            ""),
     // Google AI endpoints look like
     // https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
-    GOOGLEAI("GOOGLEAI", "https://generativelanguage.googleapis.com/.*"),
+    GOOGLEAI(
+            "GOOGLEAI",
+            "https://generativelanguage.googleapis.com/.*",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"),
     // Vertex AI endpoints look like
     // https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/endpoints/ENDPOINT:predict
     VERTEXAI(
             "VERTEXAI",
-            "https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/endpoints/.+(:predict|:rawPredict)?"),
+            "https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/endpoints/.+(:predict|:rawPredict)?",
+            ""),
     ;
 
     private final String providerName;
     private final String endpointValidation;
+    private final String defaultEndpoint;
 
-    MLModelSupportedProviders(String providerName, String endpointValidation) {
+    MLModelSupportedProviders(
+            String providerName, String endpointValidation, String defaultEndpoint) {
         this.providerName = providerName;
         this.endpointValidation = endpointValidation;
+        this.defaultEndpoint = defaultEndpoint;
     }
 
     public String getProviderName() {
         return providerName;
+    }
+
+    public String getEndpointValidation() {
+        return endpointValidation;
+    }
+
+    public String getDefaultEndpoint() {
+        return defaultEndpoint;
     }
 
     public void validateEndpoint(String endpoint) {

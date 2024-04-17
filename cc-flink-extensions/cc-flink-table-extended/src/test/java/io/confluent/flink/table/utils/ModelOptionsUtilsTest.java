@@ -8,6 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
+import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
@@ -29,9 +30,16 @@ public class ModelOptionsUtilsTest {
     }
 
     @Test
-    void testIsEncryptStrategyPlaintext() {
+    void testGetEncryptStrategyPlaintext() {
         ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
-        assertThat(modelOptionsUtils.isEncryptStrategyPlaintext()).isTrue();
+        assertThat(modelOptionsUtils.getEncryptStrategy())
+                .isEqualTo(MLModelCommonConstants.PLAINTEXT);
+    }
+
+    @Test
+    void testGetDefaultVersion() {
+        ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
+        assertThat(modelOptionsUtils.getDefaultVersion()).isEqualTo("10");
     }
 
     @NotNull
@@ -40,7 +48,9 @@ public class ModelOptionsUtilsTest {
         modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/chat/completions");
         modelOptions.put("provider", "openai");
         modelOptions.put("task", ModelTask.TEXT_GENERATION.name());
-        modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
+        modelOptions.put(
+                "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", MLModelCommonConstants.PLAINTEXT);
+        modelOptions.put("default_version", "10");
 
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();

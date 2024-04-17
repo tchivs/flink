@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PLAINTEXT;
+
 /** Utilities for ML module. */
 public class MlUtils {
 
@@ -230,8 +232,8 @@ public class MlUtils {
         return new String(decrypter.decrypt(decodedUserSecret), StandardCharsets.UTF_8);
     }
 
-    public static String decryptSecret(String secret, Boolean isPlaintext) {
-        if (secret.isEmpty() || isPlaintext) {
+    public static String decryptSecret(String secret, String encryptStrategy) {
+        if (secret.isEmpty() || encryptStrategy.equalsIgnoreCase(PLAINTEXT)) {
             return secret;
         }
         return decryptSecretWithComputePoolKey(secret, InMemoryCredentialDecrypterImpl.INSTANCE);

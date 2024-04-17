@@ -27,6 +27,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Map;
 
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.SERVICE_KEY;
+
 /** Implements Model Runtime for GCP Vertex AI. */
 public class VertexAIProvider implements MLModelRuntimeProvider {
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -44,7 +47,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.VERTEXAI;
         final String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
-        String rawEndpoint = modelOptionsUtils.getProviderOption("ENDPOINT");
+        String rawEndpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
         if (rawEndpoint == null) {
             throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
         }
@@ -81,8 +84,8 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         // and exchange it for a token.
         String serviceKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("SERVICE_KEY", ""),
-                        modelOptionsUtils.isEncryptStrategyPlaintext());
+                        modelOptionsUtils.getProviderOptionOrDefault(SERVICE_KEY, ""),
+                        modelOptionsUtils.getEncryptStrategy());
         if (serviceKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "For Vertex AI model, SERVICE_KEY is required to authenticate the client");

@@ -708,6 +708,15 @@ public final class FactoryUtil {
             Set<String> deprecatedOptionKeys) {
         final Set<String> remainingOptionKeys = new HashSet<>(allOptionKeys);
         remainingOptionKeys.removeAll(consumedOptionKeys);
+        validateRemainOptionKeys(
+                factoryIdentifier, consumedOptionKeys, deprecatedOptionKeys, remainingOptionKeys);
+    }
+
+    public static void validateRemainOptionKeys(
+            String factoryIdentifier,
+            Set<String> consumedOptionKeys,
+            Set<String> deprecatedOptionKeys,
+            Set<String> remainingOptionKeys) {
         if (!remainingOptionKeys.isEmpty()) {
             throw new ValidationException(
                     String.format(

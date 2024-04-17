@@ -6,7 +6,6 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,6 +20,9 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import java.util.Map;
+
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Implements Model Runtime for Azure ML API. */
 public class AzureMLProvider implements MLModelRuntimeProvider {
@@ -40,16 +42,13 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.AZUREML;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
-        this.endpoint = modelOptionsUtils.getProviderOption("ENDPOINT");
-        if (endpoint == null) {
-            throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
-        }
+        this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
         supportedProvider.validateEndpoint(endpoint);
         // Azure ML can take either an API Key or an expiring token, but we only support API Key.
         this.apiKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
-                        modelOptionsUtils.isEncryptStrategyPlaintext());
+                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
+                        modelOptionsUtils.getEncryptStrategy());
         // The Azure ML Deployment Name is optional, but allows the user to distinguish between
         // two models that are deployed to the same endpoint.
         this.deploymentName = modelOptionsUtils.getProviderOptionOrDefault("deployment_name", "");

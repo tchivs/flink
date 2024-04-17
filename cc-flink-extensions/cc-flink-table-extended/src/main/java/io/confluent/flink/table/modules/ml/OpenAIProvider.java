@@ -21,6 +21,9 @@ import okhttp3.Response;
 
 import java.util.Map;
 
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
+
 /** Implements Model Runtime for OpenAI. */
 public class OpenAIProvider implements MLModelRuntimeProvider {
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -46,10 +49,10 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
         if (supportedProvider == MLModelSupportedProviders.OPENAI) {
             this.endpoint =
                     modelOptionsUtils.getProviderOptionOrDefault(
-                            "ENDPOINT", "https://api.openai.com/v1/chat/completions");
+                            ENDPOINT, MLModelSupportedProviders.OPENAI.getDefaultEndpoint());
         } else {
             // Azure OpenAI API doesn't get a default endpoint.
-            this.endpoint = modelOptionsUtils.getProviderOption("ENDPOINT");
+            this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
             if (endpoint == null) {
                 throw new FlinkRuntimeException(
                         String.format("%s.ENDPOINT setting not found", namespace));
@@ -58,8 +61,8 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
         supportedProvider.validateEndpoint(endpoint);
         this.apiKey =
                 MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault("API_KEY", ""),
-                        modelOptionsUtils.isEncryptStrategyPlaintext());
+                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
+                        modelOptionsUtils.getEncryptStrategy());
 
         if (apiKey.isEmpty()) {
             throw new FlinkRuntimeException(
