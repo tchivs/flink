@@ -10,10 +10,14 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 
 import static io.confluent.flink.table.modules.ml.RemoteModelValidator.validateCreateModelOptions;
 import static org.apache.flink.util.CollectionUtil.entry;
@@ -101,6 +105,17 @@ public class RemoteModelValidatorTest {
     }
 
     @Test
+    void testNotAllowConfluentOption() {
+        testCreateModelError(
+                "CREATE MODEL t WITH ("
+                        + "'PROVIDER' = 'vertexai',"
+                        + "'TASK' = 'text_generation',"
+                        + "'CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY' = 'kms',"
+                        + "'vertexai.service_key' = 'key')",
+                "Unsupported options:" + "\n" + "\n" + "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY");
+    }
+
+    @Test
     void testNotAllowedParamsLevelOption() {
         testCreateModelError(
                 "CREATE MODEL t WITH ("
@@ -124,14 +139,13 @@ public class RemoteModelValidatorTest {
     @Test
     void testGetPublicOptions() {
         Map<String, String> options =
-                testCreateModelOptions(
-                        "CREATE MODEL t WITH ("
-                                + "'provider' = 'openai',"
-                                + "'task' = 'text_generation',"
-                                + "'openai.api_key' = 'key',"
-                                + "'openai.endpoint' = 'endpoint',"
-                                + "'openai.system_prompt' = 'count prime numbers',"
-                                + "'confluent.model.secret.encrypt_strategy' = 'plaintext')");
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "endpoint",
+                        "openai.system_prompt", "count prime numbers",
+                        "confluent.model.secret.encrypt_strategy", "plaintext");
         Map<String, String> publicOptions = RemoteModelValidator.getPublicOptions(options);
         assertThat(publicOptions)
                 .doesNotContainEntry("CONFLUETN.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
@@ -140,24 +154,23 @@ public class RemoteModelValidatorTest {
     @Test
     void testGetPrivateOptions() {
         Map<String, String> options =
-                testCreateModelOptions(
-                        "CREATE MODEL t WITH ("
-                                + "'provider' = 'sagemaker',"
-                                + "'task' = 'text_generation',"
-                                + "'sagemaker.aws_access_key_id' = 'key_id',"
-                                + "'sagemaker.aws_secret_access_key' = 'secret_key',"
-                                + "'sagemaker.endpoint' = 'endpoint',"
-                                + "'sagemaker.aws_session_token' = 'session_token',"
-                                + "'confluent.model.secret.encrypt_strategy' = 'plaintext')");
+                ImmutableMap.of(
+                        "provider", "sagemaker",
+                        "task", "text_generation",
+                        "sagemaker.aws_access_key_id", "key_id",
+                        "sagemaker.aws_secret_access_key", "secret_key",
+                        "sagemaker.endpoint", "endpoint",
+                        "sagemaker.aws_session_token", "session_token",
+                        "confluent.model.secret.encrypt_strategy", "plaintext");
         Map<String, String> privateOptions = RemoteModelValidator.getPrivateOptions(options);
         assertThat(privateOptions)
-                .containsOnly(entry("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext"));
+                .containsOnly(entry("confluent.model.secret.encrypt_strategy", "plaintext"));
     }
 
     @Test
     void testCaseInsentiveOptions() {
         Map<String, String> options =
-                Map.of(
+                ImmutableMap.of(
                         "pRoVidEr", "sagemaker",
                         "task", "text_generation",
                         "sAgEmaKer.Aws_ACCESS_keY_id", "key_id",
@@ -176,21 +189,39 @@ public class RemoteModelValidatorTest {
     @Test
     void testGetSecretOptions() {
         Map<String, String> options =
-                testCreateModelOptions(
-                        "CREATE MODEL t WITH ("
-                                + "'provider' = 'sagemaker',"
-                                + "'task' = 'text_generation',"
-                                + "'sagemaker.aws_access_key_id' = 'key_id',"
-                                + "'sagemaker.aws_secret_access_key' = 'secret_key',"
-                                + "'sagemaker.endpoint' = 'endpoint',"
-                                + "'sagemaker.aws_session_token' = 'session_token',"
-                                + "'confluent.model.secret.encrypt_strategy' = 'plaintext')");
+                ImmutableMap.of(
+                        "provider", "sagemaker",
+                        "task", "text_generation",
+                        "sagemaker.aws_access_key_id", "key_id",
+                        "sagemaker.aws_secret_access_key", "secret_key",
+                        "sagemaker.endpoint", "endpoint",
+                        "sagemaker.aws_session_token", "session_token",
+                        "confluent.model.secret.encrypt_strategy", "plaintext");
         Map<String, String> secretOptions = RemoteModelValidator.getSecretOptions(options);
         assertThat(secretOptions)
                 .containsOnly(
-                        entry("SAGEMAKER.AWS_ACCESS_KEY_ID", "key_id"),
-                        entry("SAGEMAKER.AWS_SECRET_ACCESS_KEY", "secret_key"),
-                        entry("SAGEMAKER.AWS_SESSION_TOKEN", "session_token"));
+                        entry("sagemaker.aws_access_key_id", "key_id"),
+                        entry("sagemaker.aws_secret_access_key", "secret_key"),
+                        entry("sagemaker.aws_session_token", "session_token"));
+    }
+
+    @Test
+    void testGetAllSecretKeys() {
+        Set<String> keys = RemoteModelValidator.getAllSecretOptionsKeys();
+        Set<String> expected =
+                ImmutableSet.of(
+                        AzureMLRemoteModelOptions.API_KEY.key(),
+                        AzureOpenAIRemoteModelOptions.API_KEY.key(),
+                        BedrockRemoteModelOptions.ACCESS_KEY_ID.key(),
+                        BedrockRemoteModelOptions.SECRET_KEY.key(),
+                        BedrockRemoteModelOptions.SESSION_TOKEN.key(),
+                        GoogleAIRemoteModelOptions.API_KEY.key(),
+                        OpenAIRemoteModelOptions.API_KEY.key(),
+                        SageMakerRemoteModelOptions.ACCESS_KEY_ID.key(),
+                        SageMakerRemoteModelOptions.SECRET_KEY.key(),
+                        SageMakerRemoteModelOptions.SESSION_TOKEN.key(),
+                        VertexAIRemoteModelOptions.SERVICE_KEY.key());
+        assertThat(keys).isEqualTo(expected);
     }
 
     private void testCreateModelError(String sql, String error) {

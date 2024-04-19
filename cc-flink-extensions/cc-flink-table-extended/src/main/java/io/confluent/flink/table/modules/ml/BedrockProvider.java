@@ -19,7 +19,6 @@ import com.amazonaws.http.HttpMethodName;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -34,10 +33,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_ACCESS_KEY_ID;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SECRET_ACCESS_KEY;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SESSION_TOKEN;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Implements Model Runtime for AWS Bedrock API. */
@@ -57,9 +54,12 @@ public class BedrockProvider implements MLModelRuntimeProvider {
     private final MediaType contentType;
     private final String acceptedContentType;
     private final Map<String, String> headers;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public BedrockProvider(CatalogModel model) {
+    public BedrockProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.BEDROCK;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
@@ -84,18 +84,20 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         // We sign the request with the access key, secret key, and optionally session token.
         String encryptStrategy = modelOptionsUtils.getEncryptStrategy();
         this.accessKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_ACCESS_KEY_ID, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(BedrockRemoteModelOptions.ACCESS_KEY_ID.key());
         this.secretKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SECRET_ACCESS_KEY, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(BedrockRemoteModelOptions.SECRET_KEY.key());
+
         // A session token is optional, but needed for temporary credentials.
         this.sessionToken =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SESSION_TOKEN, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(BedrockRemoteModelOptions.SESSION_TOKEN.key());
+
         if (accessKey.isEmpty() || secretKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Bedrock Models");

@@ -25,6 +25,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
 import io.confluent.flink.table.utils.MlUtils;
 import okhttp3.Request;
 import okio.Buffer;
@@ -45,7 +46,10 @@ public class OpenAIProviderTest {
     void testBadEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("OPENAI.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new OpenAIProvider(model, provider))
+        assertThatThrownBy(
+                        () ->
+                                new OpenAIProvider(
+                                        model, provider, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be a valid URL");
     }
@@ -54,7 +58,10 @@ public class OpenAIProviderTest {
     void testWrongEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("OPENAI.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new OpenAIProvider(model, provider))
+        assertThatThrownBy(
+                        () ->
+                                new OpenAIProvider(
+                                        model, provider, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -62,7 +69,8 @@ public class OpenAIProviderTest {
     @Test
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
-        OpenAIProvider openAIProvider = new OpenAIProvider(model, provider);
+        OpenAIProvider openAIProvider =
+                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -83,7 +91,10 @@ public class OpenAIProviderTest {
     void testGetRequestAzure() throws Exception {
         CatalogModel model = getCatalogModelAzure();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(model, MLModelSupportedProviders.AZUREOPENAI);
+                new OpenAIProvider(
+                        model,
+                        MLModelSupportedProviders.AZUREOPENAI,
+                        new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -104,7 +115,8 @@ public class OpenAIProviderTest {
     @Test
     void testGetRequestSystemPrompt() throws Exception {
         CatalogModel model = getCatalogModelSystemPrompt();
-        OpenAIProvider openAIProvider = new OpenAIProvider(model, provider);
+        OpenAIProvider openAIProvider =
+                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -125,7 +137,8 @@ public class OpenAIProviderTest {
     @Test
     void testBadResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        OpenAIProvider openAIProvider = new OpenAIProvider(model, provider);
+        OpenAIProvider openAIProvider =
+                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () -> openAIProvider.getContentFromResponse(MlUtils.makeResponse(response)))
@@ -137,7 +150,8 @@ public class OpenAIProviderTest {
     @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        OpenAIProvider openAIProvider = new OpenAIProvider(model, provider);
+        OpenAIProvider openAIProvider =
+                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
         String response =
                 "{\"choices\":[{\"message\":{\"role\":\"user\",\"content\":\"output-text\"}}]}";
         Row row = openAIProvider.getContentFromResponse(MlUtils.makeResponse(response));

@@ -11,7 +11,6 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import io.confluent.flink.credentials.CredentialDecrypter;
-import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
 import org.junit.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -28,6 +27,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 /** Tests for MlUtils class. */
 public class MlUtilsTest {
+    private static final String PLAINTEXT = "plaintext";
 
     @ParameterizedTest
     @MethodSource("getTestTypes")
@@ -74,27 +74,13 @@ public class MlUtilsTest {
     }
 
     @Test
-    public void testDecryptPlaintext() {
-        final String plainText = MLModelCommonConstants.PLAINTEXT;
-        assertThat(MlUtils.decryptSecret(plainText, "plaintext")).isEqualTo(plainText);
-    }
-
-    @Test
-    public void testEmptySecret() {
-        final String emptySecret = "";
-        assertThat(MlUtils.decryptSecret(emptySecret, "plaintext")).isEqualTo(emptySecret);
-        assertThat(MlUtils.decryptSecret(emptySecret, "kms")).isEqualTo(emptySecret);
-    }
-
-    @Test
     public void testDecryptWithComputePoolKey() throws Exception {
-        final String plainText = MLModelCommonConstants.PLAINTEXT;
         final KeyPair keyPair = createKeyPair();
         final String encryptedSecret =
-                Base64.getEncoder().encodeToString(encryptMessage(plainText, keyPair.getPublic()));
+                Base64.getEncoder().encodeToString(encryptMessage(PLAINTEXT, keyPair.getPublic()));
         final CredentialDecrypter decrypter =
                 new MockedInMemoryCredentialDecrypterImpl(keyPair.getPrivate().getEncoded());
         assertThat(MlUtils.decryptSecretWithComputePoolKey(encryptedSecret, decrypter))
-                .isEqualTo(plainText);
+                .isEqualTo(PLAINTEXT);
     }
 }

@@ -12,7 +12,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -20,8 +19,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import java.util.Map;
+import java.util.Objects;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Implements Model Runtime for OpenAI. */
@@ -35,9 +34,15 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
     private final String apiKey;
     private final String endpoint;
     private final MLModelSupportedProviders provider;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public OpenAIProvider(CatalogModel model, MLModelSupportedProviders supportedProvider) {
+    public OpenAIProvider(
+            CatalogModel model,
+            MLModelSupportedProviders supportedProvider,
+            SecretDecrypterProvider secretDecrypterProvider) {
         this.provider = supportedProvider;
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
         ModelKind modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
         if (!modelKind.equals(CatalogModel.ModelKind.REMOTE)) {
             throw new FlinkRuntimeException(
@@ -50,19 +55,30 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             this.endpoint =
                     modelOptionsUtils.getProviderOptionOrDefault(
                             ENDPOINT, MLModelSupportedProviders.OPENAI.getDefaultEndpoint());
-        } else {
+        } else if (supportedProvider == MLModelSupportedProviders.AZUREOPENAI) {
             // Azure OpenAI API doesn't get a default endpoint.
             this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
             if (endpoint == null) {
                 throw new FlinkRuntimeException(
                         String.format("%s.ENDPOINT setting not found", namespace));
             }
+        } else {
+            throw new IllegalArgumentException("Unsupported openai provider: " + supportedProvider);
         }
+
         supportedProvider.validateEndpoint(endpoint);
-        this.apiKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
-                        modelOptionsUtils.getEncryptStrategy());
+
+        if (supportedProvider == MLModelSupportedProviders.OPENAI) {
+            this.apiKey =
+                    secretDecrypterProvider
+                            .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                            .decryptFromKey(OpenAIRemoteModelOptions.API_KEY.key());
+        } else {
+            this.apiKey =
+                    secretDecrypterProvider
+                            .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                            .decryptFromKey(AzureOpenAIRemoteModelOptions.API_KEY.key());
+        }
 
         if (apiKey.isEmpty()) {
             throw new FlinkRuntimeException(

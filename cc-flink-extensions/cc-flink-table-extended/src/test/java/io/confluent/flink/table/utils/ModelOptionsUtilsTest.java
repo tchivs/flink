@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
-import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
+import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ public class ModelOptionsUtilsTest {
     void testGetEncryptStrategyPlaintext() {
         ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
         assertThat(modelOptionsUtils.getEncryptStrategy())
-                .isEqualTo(MLModelCommonConstants.PLAINTEXT);
+                .isEqualTo(EncryptionStrategy.PLAINTEXT.name());
     }
 
     @Test
@@ -49,7 +49,7 @@ public class ModelOptionsUtilsTest {
         modelOptions.put("provider", "openai");
         modelOptions.put("task", ModelTask.TEXT_GENERATION.name());
         modelOptions.put(
-                "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", MLModelCommonConstants.PLAINTEXT);
+                "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", EncryptionStrategy.PLAINTEXT.name());
         modelOptions.put("default_version", "10");
 
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();

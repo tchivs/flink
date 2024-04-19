@@ -12,7 +12,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -20,8 +19,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import java.util.Map;
+import java.util.Objects;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Implements Model Runtime for Azure ML API. */
@@ -36,19 +35,24 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
     private final OutputParser outputParser;
     private final MediaType contentType;
     private final String acceptedContentType;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public AzureMLProvider(CatalogModel model) {
+    public AzureMLProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.AZUREML;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
         this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
         supportedProvider.validateEndpoint(endpoint);
+
         // Azure ML can take either an API Key or an expiring token, but we only support API Key.
         this.apiKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
-                        modelOptionsUtils.getEncryptStrategy());
+                secretDecrypterProvider
+                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .decryptFromKey(AzureMLRemoteModelOptions.API_KEY.key());
+
         // The Azure ML Deployment Name is optional, but allows the user to distinguish between
         // two models that are deployed to the same endpoint.
         this.deploymentName = modelOptionsUtils.getProviderOptionOrDefault("deployment_name", "");

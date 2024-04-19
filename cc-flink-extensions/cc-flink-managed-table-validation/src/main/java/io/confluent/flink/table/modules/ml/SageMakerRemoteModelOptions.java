@@ -7,12 +7,13 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+
 import java.util.Set;
 
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_ACCESS_KEY_ID;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SECRET_ACCESS_KEY;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SESSION_TOKEN;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Options for SageMaker remote model. */
 public class SageMakerRemoteModelOptions extends RemoteModelOptions {
@@ -49,11 +50,12 @@ public class SageMakerRemoteModelOptions extends RemoteModelOptions {
                     .withDescription("The system prompt for the SageMaker model.");
 
     private final Set<ConfigOption<?>> requiredProviderLevelOptions =
-            Set.of(ACCESS_KEY_ID, SECRET_KEY, ENDPOINT);
+            ImmutableSet.of(ACCESS_KEY_ID, SECRET_KEY, ENDPOINT);
 
     private final Set<ConfigOption<?>> optionalProviderLevelOptions =
-            Set.of(SESSION_TOKEN, SYSTEM_PROMPT);
-    private final Set<ConfigOption<?>> secrets = Set.of(ACCESS_KEY_ID, SECRET_KEY, SESSION_TOKEN);
+            ImmutableSet.of(SESSION_TOKEN, SYSTEM_PROMPT);
+    private final Set<ConfigOption<?>> secrets =
+            ImmutableSet.of(ACCESS_KEY_ID, SECRET_KEY, SESSION_TOKEN);
     private final String paramsPrefix = NAMESPACE + "." + MLModelCommonConstants.PARAMS_PREFIX;
 
     @Override

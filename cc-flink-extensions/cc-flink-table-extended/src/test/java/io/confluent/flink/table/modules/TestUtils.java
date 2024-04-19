@@ -4,7 +4,14 @@
 
 package io.confluent.flink.table.modules;
 
+import org.apache.flink.table.catalog.CatalogModel;
+
 import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
+import io.confluent.flink.table.modules.ml.PlainTextDecrypter;
+import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
+import io.confluent.flink.table.modules.ml.SecretDecrypter;
+import io.confluent.flink.table.modules.ml.SecretDecrypterProvider;
+import io.confluent.flink.table.utils.ModelOptionsUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.OAEPParameterSpec;
@@ -49,6 +56,51 @@ public class TestUtils {
         @Override
         protected byte[] readPrivateKey() {
             return privateKey;
+        }
+    }
+
+    /**
+     * Mock for {@link io.confluent.flink.table.modules.ml.FlinkCredentialServiceSecretDecrypter}.
+     */
+    public static class MockFlinkCredentialServiceDecrypter implements SecretDecrypter {
+        private final ModelOptionsUtils modelOptionsUtils;
+
+        public MockFlinkCredentialServiceDecrypter(CatalogModel model) {
+            modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+        }
+
+        @Override
+        public String decryptFromKey(String secretKey) {
+            String secret = modelOptionsUtils.getOption(secretKey);
+            if (secret == null || secret.isEmpty()) {
+                return "";
+            }
+            return "decypted-" + secret;
+        }
+
+        @Override
+        public EncryptionStrategy supportedStrategy() {
+            return EncryptionStrategy.KMS;
+        }
+    }
+
+    /** Mock for {@link io.confluent.flink.table.modules.ml.SecretDecrypterProvider}. */
+    public static class MockSecretDecypterProvider implements SecretDecrypterProvider {
+        private final CatalogModel model;
+
+        public MockSecretDecypterProvider(CatalogModel model) {
+            this.model = model;
+        }
+
+        @Override
+        public SecretDecrypter getDecrypter(String decryptStrategy) {
+            if (decryptStrategy == null
+                    || decryptStrategy.equalsIgnoreCase(EncryptionStrategy.PLAINTEXT.name())) {
+                return new PlainTextDecrypter(model);
+            } else if (decryptStrategy.equalsIgnoreCase(EncryptionStrategy.KMS.name())) {
+                return new MockFlinkCredentialServiceDecrypter(model);
+            }
+            throw new IllegalArgumentException("Not supported " + decryptStrategy);
         }
     }
 }

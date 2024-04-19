@@ -13,32 +13,25 @@ import java.util.Set;
 
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PARAMS_PREFIX;
 
-/** Options for GoogleAI remote model. */
-public class GoogleAIRemoteModelOptions extends RemoteModelOptions {
-    private static final String NAMESPACE = MLModelSupportedProviders.GOOGLEAI.getProviderName();
+/** Options for Azure OpenAI remote model. */
+public class AzureMLRemoteModelOptions extends RemoteModelOptions {
+    public static final String NAMESPACE = MLModelSupportedProviders.AZUREML.getProviderName();
 
     public static final ConfigOption<String> API_KEY =
             ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.API_KEY)
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The API key for the googleAI model.");
+                    .withDescription("The API key for the AzureML model.");
 
     public static final ConfigOption<String> ENDPOINT =
             ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.ENDPOINT)
                     .stringType()
-                    .defaultValue(MLModelSupportedProviders.GOOGLEAI.getDefaultEndpoint())
-                    .withDescription("The endpoint of the remote ML model.");
-
-    public static final ConfigOption<String> SYSTEM_PROMPT =
-            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.SYSTEM_PROMPT)
-                    .stringType()
                     .noDefaultValue()
-                    .withDescription("The system prompt for the googleAI model.");
+                    .withDescription("The endpoint of the remote ML model.");
 
     private final Set<ConfigOption<?>> requiredProviderLevelOptions =
             ImmutableSet.of(API_KEY, ENDPOINT);
-    private final Set<ConfigOption<?>> optionalProviderLevelOptions =
-            ImmutableSet.of(SYSTEM_PROMPT);
+    private final Set<ConfigOption<?>> optionalProviderLevelOptions = ImmutableSet.of();
     private final Set<ConfigOption<?>> secrets = ImmutableSet.of(API_KEY);
     private final String paramsPrefix = NAMESPACE + "." + PARAMS_PREFIX;
 

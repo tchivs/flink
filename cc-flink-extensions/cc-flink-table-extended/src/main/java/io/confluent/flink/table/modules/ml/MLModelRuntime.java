@@ -41,33 +41,39 @@ public class MLModelRuntime implements AutoCloseable {
         if (modelProvider.isEmpty()) {
             throw new FlinkRuntimeException("Model PROVIDER option not specified");
         }
+
+        final SecretDecrypterProvider secretDecrypterProvider =
+                new SecretDecrypterProviderImpl(model);
+
         if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())) {
             // OpenAI through their own API, not to be confused with the Azure OpenAI API.
-            return new OpenAIProvider(model, MLModelSupportedProviders.OPENAI);
+            return new OpenAIProvider(
+                    model, MLModelSupportedProviders.OPENAI, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.GOOGLEAI.getProviderName())) {
             // Any of the Google AI models through their makersuite or generativeapi endpoints.
-            return new GoogleAIProvider(model);
+            return new GoogleAIProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.VERTEXAI.getProviderName())) {
             // GCP Vertex AI models.
-            return new VertexAIProvider(model);
+            return new VertexAIProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.SAGEMAKER.getProviderName())) {
             // AWS Sagemaker models.
-            return new SagemakerProvider(model);
+            return new SagemakerProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.BEDROCK.getProviderName())) {
             // AWS Bedrock models.
-            return new BedrockProvider(model);
+            return new BedrockProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.AZUREML.getProviderName())) {
             // Azure ML models.
-            return new AzureMLProvider(model);
+            return new AzureMLProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.AZUREOPENAI.getProviderName())) {
             // Azure Open AI is just a special case of Open AI.
-            return new OpenAIProvider(model, MLModelSupportedProviders.AZUREOPENAI);
+            return new OpenAIProvider(
+                    model, MLModelSupportedProviders.AZUREOPENAI, secretDecrypterProvider);
         } else {
             throw new UnsupportedOperationException(
                     "Model provider not supported: " + modelProvider);

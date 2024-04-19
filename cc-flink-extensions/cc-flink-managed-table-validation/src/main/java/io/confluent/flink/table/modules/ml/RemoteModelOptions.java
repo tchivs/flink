@@ -8,11 +8,11 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+
 import java.util.Set;
 
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT_STRATEGY;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PROVIDER;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.TASK;
 
 /** Base options for remote ML model. */
 public abstract class RemoteModelOptions {
@@ -64,16 +64,16 @@ public abstract class RemoteModelOptions {
         }
     }
 
-    private final Set<ConfigOption<?>> requiredToplevelOptions = Set.of(TASK, PROVIDER);
+    private final Set<ConfigOption<?>> requiredToplevelOptions = ImmutableSet.of(TASK, PROVIDER);
 
-    private final Set<ConfigOption<?>> optionalTopLevelOptions = Set.of(CONFLUENT_ENCRYPT_STRATEGY);
+    private final Set<ConfigOption<?>> publicOptionalTopLevelOptions = ImmutableSet.of();
 
     public Set<ConfigOption<?>> getRequiredToplevelOptions() {
         return requiredToplevelOptions;
     }
 
-    public Set<ConfigOption<?>> getOptionalTopLevelOptions() {
-        return optionalTopLevelOptions;
+    public Set<ConfigOption<?>> getPublicOptionalTopLevelOptions() {
+        return publicOptionalTopLevelOptions;
     }
 
     public abstract Set<ConfigOption<?>> getRequiredProviderLevelOptions();

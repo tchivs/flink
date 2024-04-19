@@ -25,6 +25,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
 import io.confluent.flink.table.utils.MlUtils;
 import okhttp3.Request;
 import okio.Buffer;
@@ -44,7 +45,7 @@ public class GoogleAIProviderTest {
     void testBadEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("GOOGLEAI.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new GoogleAIProvider(model))
+        assertThatThrownBy(() -> new GoogleAIProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be a valid URL");
     }
@@ -53,7 +54,7 @@ public class GoogleAIProviderTest {
     void testWrongEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("GOOGLEAI.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new GoogleAIProvider(model))
+        assertThatThrownBy(() -> new GoogleAIProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -61,7 +62,8 @@ public class GoogleAIProviderTest {
     @Test
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
-        GoogleAIProvider googleAIProvider = new GoogleAIProvider(model);
+        GoogleAIProvider googleAIProvider =
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = googleAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -79,7 +81,8 @@ public class GoogleAIProviderTest {
     @Test
     void testBadResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        GoogleAIProvider googleAIProvider = new GoogleAIProvider(model);
+        GoogleAIProvider googleAIProvider =
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -93,7 +96,8 @@ public class GoogleAIProviderTest {
     @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        GoogleAIProvider googleAIProvider = new GoogleAIProvider(model);
+        GoogleAIProvider googleAIProvider =
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response =
                 "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"output-text\"}]}}]}";

@@ -12,7 +12,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -21,8 +20,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import java.util.Map;
-
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
+import java.util.Objects;
 
 /** Implements Model Runtime for Google AI Studio models, not to be confused with Vertex AI. */
 public class GoogleAIProvider implements MLModelRuntimeProvider {
@@ -33,8 +31,11 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
     private final String acceptedContentType;
     private final String apiKey;
     private final String endpoint;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public GoogleAIProvider(CatalogModel model) {
+    public GoogleAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
         final String namespace = supportedProvider.getProviderName();
         final ModelKind modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
         if (!modelKind.equals(CatalogModel.ModelKind.REMOTE)) {
@@ -49,9 +50,10 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
                         "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent");
         supportedProvider.validateEndpoint(urlBase);
         this.apiKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(API_KEY, ""),
-                        modelOptionsUtils.getEncryptStrategy());
+                secretDecrypterProvider
+                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .decryptFromKey(GoogleAIRemoteModelOptions.API_KEY.key());
+
         if (apiKey.isEmpty()) {
             // TODO: This exception should fire when the model is created, not when it is run.
             throw new FlinkRuntimeException("Model ML Predict requires an API key");

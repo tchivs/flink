@@ -16,7 +16,6 @@ import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
 import io.confluent.flink.table.modules.ml.formats.TFServingInputFormatter;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -26,9 +25,9 @@ import okhttp3.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.SERVICE_KEY;
 
 /** Implements Model Runtime for GCP Vertex AI. */
 public class VertexAIProvider implements MLModelRuntimeProvider {
@@ -41,9 +40,13 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
     private final OutputParser outputParser;
     private final MediaType contentType;
     private final String acceptedContentType;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public VertexAIProvider(CatalogModel model) {
+    public VertexAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
+
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.VERTEXAI;
         final String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
@@ -83,9 +86,9 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         // Vertex AI API doesn't support API KEYs, we use a service account key to authenticate
         // and exchange it for a token.
         String serviceKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(SERVICE_KEY, ""),
-                        modelOptionsUtils.getEncryptStrategy());
+                secretDecrypterProvider
+                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .decryptFromKey(VertexAIRemoteModelOptions.SERVICE_KEY.key());
         if (serviceKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "For Vertex AI model, SERVICE_KEY is required to authenticate the client");

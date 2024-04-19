@@ -11,6 +11,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
 import io.confluent.flink.table.utils.MlUtils;
 import okhttp3.Request;
 import okio.Buffer;
@@ -29,7 +30,7 @@ public class BedrockProviderTest {
     void testBadEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("BEDROCK.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new BedrockProvider(model))
+        assertThatThrownBy(() -> new BedrockProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be a valid URL");
     }
@@ -38,7 +39,7 @@ public class BedrockProviderTest {
     void testWrongEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("BEDROCK.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new BedrockProvider(model))
+        assertThatThrownBy(() -> new BedrockProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -46,7 +47,8 @@ public class BedrockProviderTest {
     @Test
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
-        BedrockProvider bedrockProvider = new BedrockProvider(model);
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -61,7 +63,8 @@ public class BedrockProviderTest {
     @Test
     void testBadResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        BedrockProvider bedrockProvider = new BedrockProvider(model);
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -74,7 +77,8 @@ public class BedrockProviderTest {
     @Test
     void testErrorResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        BedrockProvider bedrockProvider = new BedrockProvider(model);
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"ErrorCode\":[\"Model not found or something.\"]}";
         assertThatThrownBy(
                         () ->
@@ -87,7 +91,8 @@ public class BedrockProviderTest {
     @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        BedrockProvider bedrockProvider = new BedrockProvider(model);
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"results\":[{\"outputText\":\"output-text\"}]}";
         Row row = bedrockProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -109,7 +114,8 @@ public class BedrockProviderTest {
                         .build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        BedrockProvider bedrockProvider = new BedrockProvider(model);
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc"};
         return bedrockProvider.getRequest(args);
     }

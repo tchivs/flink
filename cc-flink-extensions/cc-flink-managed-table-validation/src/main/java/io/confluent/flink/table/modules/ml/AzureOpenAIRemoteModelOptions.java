@@ -7,10 +7,10 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+
 import java.util.Set;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.API_KEY;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PARAMS_PREFIX;
 
 /** Options for Azure OpenAI remote model. */
@@ -35,9 +35,11 @@ public class AzureOpenAIRemoteModelOptions extends OpenAIRemoteModelOptions {
                     .noDefaultValue()
                     .withDescription("The system prompt for the Azure OpenAI model.");
 
-    private final Set<ConfigOption<?>> requiredProviderLevelOptions = Set.of(API_KEY, ENDPOINT);
-    private final Set<ConfigOption<?>> optionalProviderLevelOptions = Set.of(SYSTEM_PROMPT);
-    private final Set<ConfigOption<?>> secrets = Set.of(API_KEY);
+    private final Set<ConfigOption<?>> requiredProviderLevelOptions =
+            ImmutableSet.of(API_KEY, ENDPOINT);
+    private final Set<ConfigOption<?>> optionalProviderLevelOptions =
+            ImmutableSet.of(SYSTEM_PROMPT);
+    private final Set<ConfigOption<?>> secrets = ImmutableSet.of(API_KEY);
     private final String paramsPrefix = NAMESPACE + "." + PARAMS_PREFIX;
 
     @Override

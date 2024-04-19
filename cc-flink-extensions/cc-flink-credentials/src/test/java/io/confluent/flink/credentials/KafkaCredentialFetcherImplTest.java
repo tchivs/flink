@@ -13,11 +13,8 @@ import org.apache.flink.util.TestLoggerExtension;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc.FlinkCredentialServiceBlockingStub;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialV2;
-import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentials;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialRequestV2;
 import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialResponseV2;
-import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsRequest;
-import cloud.confluent.ksql_api_service.flinkcredential.GetCredentialsResponse;
 import com.google.protobuf.ByteString;
 import io.confluent.flink.credentials.utils.CallWithRetry;
 import io.confluent.flink.credentials.utils.MockCredentialDecrypter;
@@ -95,26 +92,16 @@ public class KafkaCredentialFetcherImplTest {
                         decrypter,
                         DEFAULT_DEADLINE_MS,
                         callWithRetry);
-        handler.withResponse(
-                        GetCredentialsResponse.newBuilder()
-                                .setFlinkCredentials(
-                                        FlinkCredentials.newBuilder()
-                                                .setApiKey("api_key")
-                                                .setEncryptedSecret(
-                                                        ByteString.copyFrom(
-                                                                "secret", StandardCharsets.UTF_8))
-                                                .build())
-                                .build())
-                .withResponseV2(
-                        GetCredentialResponseV2.newBuilder()
-                                .setFlinkCredentials(
-                                        FlinkCredentialV2.newBuilder()
-                                                .setApiKey("api_key")
-                                                .setEncryptedSecret(
-                                                        ByteString.copyFrom(
-                                                                "secret", StandardCharsets.UTF_8))
-                                                .build())
-                                .build());
+        handler.withResponseV2(
+                GetCredentialResponseV2.newBuilder()
+                        .setFlinkCredentials(
+                                FlinkCredentialV2.newBuilder()
+                                        .setApiKey("api_key")
+                                        .setEncryptedSecret(
+                                                ByteString.copyFrom(
+                                                        "secret", StandardCharsets.UTF_8))
+                                        .build())
+                        .build());
         decrypter.withDecryptedResult("decrypted_secret".getBytes());
         dpatTokenExchanger.withToken(new DPATTokens("token"));
     }
@@ -321,7 +308,6 @@ public class KafkaCredentialFetcherImplTest {
     /** The handler for the fake RPC server. */
     public static class Handler extends FlinkCredentialServiceGrpc.FlinkCredentialServiceImplBase {
 
-        private GetCredentialsResponse response;
         private GetCredentialResponseV2 responseV2;
         private boolean error;
         private ConcurrentLinkedQueue<Long> delaysMs = new ConcurrentLinkedQueue<>();
@@ -338,32 +324,9 @@ public class KafkaCredentialFetcherImplTest {
             return this;
         }
 
-        public Handler withResponse(GetCredentialsResponse response) {
-            this.response = response;
-            return this;
-        }
-
         public Handler withResponseV2(GetCredentialResponseV2 response) {
             this.responseV2 = response;
             return this;
-        }
-
-        @Override
-        public void getCredentials(
-                GetCredentialsRequest request,
-                StreamObserver<GetCredentialsResponse> responseObserver) {
-            if (error) {
-                responseObserver.onError(new RuntimeException("Server Error!"));
-                return;
-            }
-            if (!delaysMs.isEmpty()) {
-                try {
-                    Thread.sleep(delaysMs.poll());
-                } catch (InterruptedException e) {
-                }
-            }
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
         }
 
         @Override

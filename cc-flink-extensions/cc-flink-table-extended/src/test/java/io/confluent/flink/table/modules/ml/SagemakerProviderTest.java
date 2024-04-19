@@ -25,6 +25,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
 import io.confluent.flink.table.utils.MlUtils;
 import okhttp3.Request;
 import okio.Buffer;
@@ -45,7 +46,8 @@ public class SagemakerProviderTest {
     void testBadEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("SAGEMAKER.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new SagemakerProvider(model))
+        assertThatThrownBy(
+                        () -> new SagemakerProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be a valid URL");
     }
@@ -54,7 +56,8 @@ public class SagemakerProviderTest {
     void testLocalhostEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("SAGEMAKER.ENDPOINT", "https://localhost/wrong");
-        assertThatThrownBy(() -> new SagemakerProvider(model))
+        assertThatThrownBy(
+                        () -> new SagemakerProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -63,7 +66,8 @@ public class SagemakerProviderTest {
     void testWrongEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("SAGEMAKER.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new SagemakerProvider(model))
+        assertThatThrownBy(
+                        () -> new SagemakerProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -71,7 +75,8 @@ public class SagemakerProviderTest {
     @Test
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = sagemakerProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -87,7 +92,8 @@ public class SagemakerProviderTest {
     @Test
     void testGetRequestMultiInput() throws Exception {
         CatalogModel model = getCatalogModelMultiType();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         Object[] args =
                 new Object[] {
                     "input-text-prompt",
@@ -120,7 +126,8 @@ public class SagemakerProviderTest {
     @Test
     void testBadResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -133,7 +140,8 @@ public class SagemakerProviderTest {
     @Test
     void testErrorResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"ErrorCode\":[\"Model not found or something.\"]}";
         assertThatThrownBy(
                         () ->
@@ -146,7 +154,8 @@ public class SagemakerProviderTest {
     @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[\"output-text\"]}";
         Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -158,7 +167,8 @@ public class SagemakerProviderTest {
     @Test
     void testParseResponseWithObject() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\"}]}";
         Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -170,7 +180,8 @@ public class SagemakerProviderTest {
     @Test
     void testParseResponseExtraOutput() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\",\"score\":0.9}]}";
         Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -182,7 +193,8 @@ public class SagemakerProviderTest {
     @Test
     void testParseResponseMissingOutput() throws Exception {
         CatalogModel model = getCatalogModel();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"not-output\":\"output-text\",\"score\":0.9}]}";
         assertThatThrownBy(
@@ -196,7 +208,8 @@ public class SagemakerProviderTest {
     @Test
     void testParseResponseMultiType() throws Exception {
         CatalogModel model = getCatalogModelMultiType();
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response =
                 "{\"predictions\":[{\"output\":\"output-text\",\"output2\":3,\"output3\":5.0,"
@@ -277,7 +290,8 @@ public class SagemakerProviderTest {
                         .build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc"};
         return sagemakerProvider.getRequest(args);
     }
@@ -291,7 +305,8 @@ public class SagemakerProviderTest {
                 Schema.newBuilder().column("input", "ARRAY<INT>").column("input2", "BYTES").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        SagemakerProvider sagemakerProvider = new SagemakerProvider(model);
+        SagemakerProvider sagemakerProvider =
+                new SagemakerProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc".getBytes()};
         return sagemakerProvider.getRequest(args);
     }

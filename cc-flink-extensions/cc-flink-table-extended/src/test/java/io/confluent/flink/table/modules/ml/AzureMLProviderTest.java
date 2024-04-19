@@ -29,6 +29,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
 import io.confluent.flink.table.utils.MlUtils;
 import okhttp3.Request;
 import okio.Buffer;
@@ -49,7 +50,7 @@ public class AzureMLProviderTest {
     void testBadEndpoint() throws Exception {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("AZUREML.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new AzureMLProvider(model))
+        assertThatThrownBy(() -> new AzureMLProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be a valid URL");
     }
@@ -61,7 +62,7 @@ public class AzureMLProviderTest {
                 .put(
                         "AZUREML.ENDPOINT",
                         "http://fake-endpoint.fakeregion.inference.ml.azure.com/score");
-        assertThatThrownBy(() -> new AzureMLProvider(model))
+        assertThatThrownBy(() -> new AzureMLProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to be https");
     }
@@ -73,7 +74,7 @@ public class AzureMLProviderTest {
                 .put(
                         "AZUREML.ENDPOINT",
                         "https://fake-endpoint-mydomain.com/something.fakeregion.inference.ml.azure.com/score");
-        assertThatThrownBy(() -> new AzureMLProvider(model))
+        assertThatThrownBy(() -> new AzureMLProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -81,7 +82,8 @@ public class AzureMLProviderTest {
     @Test
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = azureMLProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -99,7 +101,8 @@ public class AzureMLProviderTest {
     @Test
     void testGetRequestMultiInput() throws Exception {
         CatalogModel model = getCatalogModelMultiType();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args =
                 new Object[] {
                     "input-text-prompt", // STRING
@@ -140,7 +143,8 @@ public class AzureMLProviderTest {
     @Test
     void testBadResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -153,7 +157,8 @@ public class AzureMLProviderTest {
     @Test
     void testErrorResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         String response = "{\"message\":[\"Model not found or something.\"]}";
         assertThatThrownBy(
                         () ->
@@ -166,7 +171,8 @@ public class AzureMLProviderTest {
     @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "[\"output-text\"]";
         Row row = azureMLProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -178,7 +184,8 @@ public class AzureMLProviderTest {
     @Test
     void testParseResponseMissingOutput() throws Exception {
         CatalogModel model = getCatalogModel();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "[]";
         assertThatThrownBy(
@@ -193,7 +200,8 @@ public class AzureMLProviderTest {
     @Test
     void testParseResponseMultiType() throws Exception {
         CatalogModel model = getCatalogModelMultiType();
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "[[\"foo\"]]";
         Row row = azureMLProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -340,7 +348,8 @@ public class AzureMLProviderTest {
         Schema inputSchema = Schema.newBuilder().column("input", "ARRAY<INT>").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}};
         return azureMLProvider.getRequest(args);
     }
@@ -353,7 +362,8 @@ public class AzureMLProviderTest {
                 Schema.newBuilder().column("input", "ARRAY<INT>").column("input2", "BYTES").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc".getBytes()};
         return azureMLProvider.getRequest(args);
     }
@@ -365,7 +375,8 @@ public class AzureMLProviderTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
-        AzureMLProvider azureMLProvider = new AzureMLProvider(model);
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"text-string"};
         return azureMLProvider.getRequest(args);
     }

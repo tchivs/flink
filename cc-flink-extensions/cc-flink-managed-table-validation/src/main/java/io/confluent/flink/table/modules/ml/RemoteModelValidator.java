@@ -9,14 +9,17 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.MODEL_PRIVATE_PREFIX;
+import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.CONFLUENT_PRIVATE_PREFIX;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PROVIDER;
 import static org.apache.flink.table.factories.FactoryUtil.validateFactoryOptions;
 import static org.apache.flink.table.factories.FactoryUtil.validateRemainOptionKeys;
@@ -27,23 +30,22 @@ import static org.apache.flink.table.factories.FactoryUtil.validateUnconsumedKey
  */
 public class RemoteModelValidator {
 
-    private static final List<String> PRIVATE_PREFIXES;
-
-    static {
-        PRIVATE_PREFIXES = List.of(MODEL_PRIVATE_PREFIX);
-    }
+    private static final List<String> PRIVATE_PREFIXES = ImmutableList.of(CONFLUENT_PRIVATE_PREFIX);
 
     public static Map<String, String> validateCreateModelOptions(
             String modelIdentifier, Map<String, String> options) {
-        Map<String, String> caseInsensitiveOptions = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        caseInsensitiveOptions.putAll(options);
-        final String provider = caseInsensitiveOptions.get(PROVIDER);
+        Map<String, String> uppercaseOptions =
+                options.entrySet().stream()
+                        .collect(
+                                Collectors.toMap(
+                                        entry -> entry.getKey().toUpperCase(), Entry::getValue));
+        final String provider = uppercaseOptions.get(PROVIDER);
         if (provider == null) {
             throw new IllegalArgumentException("'" + PROVIDER + "' is not set");
         }
         final PublicRemoteModelFactory factory =
                 new PublicRemoteModelFactory(modelIdentifier, provider);
-        final RemoteModelHelper helper = new RemoteModelHelper(factory, options);
+        final RemoteModelHelper helper = new RemoteModelHelper(factory, uppercaseOptions);
         helper.validate();
         final Configuration validatedOptions = helper.getOptions();
         return validatedOptions.toMap();
@@ -85,10 +87,26 @@ public class RemoteModelValidator {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    /** Get all secret options from all providers. */
+    public static Set<String> getAllSecretOptionsKeys() {
+        Set<String> keys = new HashSet<>();
+        for (MLModelSupportedProviders providers : MLModelSupportedProviders.values()) {
+            RemoteModelOptions options =
+                    RemoteModelOptionsFactory.createRemoteModelOptions(providers.getProviderName());
+            keys.addAll(
+                    options.getSecretOptions().stream()
+                            .map(ConfigOption::key)
+                            .collect(Collectors.toSet()));
+        }
+        return keys;
+    }
+
     private static class RemoteModelOptionsFactory {
         public static RemoteModelOptions createRemoteModelOptions(String provider) {
             MLModelSupportedProviders modelProvider = getModelProvider(provider);
             switch (modelProvider) {
+                case AZUREML:
+                    return new AzureMLRemoteModelOptions();
                 case AZUREOPENAI:
                     return new AzureOpenAIRemoteModelOptions();
                 case OPENAI:
@@ -137,7 +155,7 @@ public class RemoteModelValidator {
             RemoteModelOptions modelOptions =
                     RemoteModelOptionsFactory.createRemoteModelOptions(provider);
             final Set<ConfigOption<?>> options = new HashSet<>();
-            options.addAll(modelOptions.getOptionalTopLevelOptions());
+            options.addAll(modelOptions.getPublicOptionalTopLevelOptions());
             options.addAll(modelOptions.getOptionalProviderLevelOptions());
             return options;
         }
@@ -196,12 +214,8 @@ public class RemoteModelValidator {
                 validateUnconsumedKeys(
                         factoryIdentifier, remainingOptionKeys, deprecatedOptionKeys);
             }
-            remainingOptionKeys.forEach(
-                    key -> {
-                        if (key.startsWith(allowedPrefix)) {
-                            remainingOptionKeys.remove(key);
-                        }
-                    });
+            remainingOptionKeys.removeIf(
+                    key -> key.toUpperCase().startsWith(allowedPrefix.toUpperCase()));
             validateRemainOptionKeys(
                     factoryIdentifier,
                     consumedOptionKeys,

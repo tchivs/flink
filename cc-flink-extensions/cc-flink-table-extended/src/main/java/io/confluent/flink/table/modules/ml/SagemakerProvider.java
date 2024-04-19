@@ -23,7 +23,6 @@ import io.confluent.flink.table.modules.ml.formats.DataSerializer;
 import io.confluent.flink.table.modules.ml.formats.InputFormatter;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.modules.ml.formats.OutputParser;
-import io.confluent.flink.table.utils.MlUtils;
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -39,10 +38,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_ACCESS_KEY_ID;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SECRET_ACCESS_KEY;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.AWS_SESSION_TOKEN;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOINT;
 
 /** Implements Model Runtime for Sagemaker API. */
@@ -69,9 +66,13 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
     private final MediaType contentType;
     private final String acceptedContentType;
     private final Map<String, String> headers;
+    private final SecretDecrypterProvider secretDecrypterProvider;
 
-    public SagemakerProvider(CatalogModel model) {
+    public SagemakerProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
+        this.secretDecrypterProvider =
+                Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
+
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.SAGEMAKER;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
@@ -96,18 +97,20 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
         // We sign the request with the access key, secret key, and optionally session token.
         String encryptStrategy = modelOptionsUtils.getEncryptStrategy();
         this.accessKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_ACCESS_KEY_ID, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(SageMakerRemoteModelOptions.ACCESS_KEY_ID.key());
         this.secretKey =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SECRET_ACCESS_KEY, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(SageMakerRemoteModelOptions.SECRET_KEY.key());
+
         // A session token is optional, but needed for temporary credentials.
         this.sessionToken =
-                MlUtils.decryptSecret(
-                        modelOptionsUtils.getProviderOptionOrDefault(AWS_SESSION_TOKEN, ""),
-                        encryptStrategy);
+                secretDecrypterProvider
+                        .getDecrypter(encryptStrategy)
+                        .decryptFromKey(SageMakerRemoteModelOptions.SESSION_TOKEN.key());
+
         if (accessKey.isEmpty() || secretKey.isEmpty()) {
             throw new FlinkRuntimeException(
                     "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Sagemaker Models");

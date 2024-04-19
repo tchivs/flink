@@ -12,6 +12,8 @@ import org.apache.flink.table.factories.FactoryUtil;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_HOST;
+import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.DEFAULT_VERSION;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT_STRATEGY;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PROVIDER;
@@ -78,5 +80,23 @@ public class ModelOptionsUtils {
 
     public String getDefaultVersion() {
         return caseInsensitiveModelOptions.get(DEFAULT_VERSION);
+    }
+
+    public String getCredentialServiceHost() {
+        return caseInsensitiveModelOptions.get(CREDENTIAL_SERVICE_HOST.key());
+    }
+
+    public int getCredentialServicePort() {
+        try {
+            String port = caseInsensitiveModelOptions.get(CREDENTIAL_SERVICE_PORT.key());
+            return Integer.parseInt(port);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    CREDENTIAL_SERVICE_PORT.key() + " should be a number", e);
+        }
+    }
+
+    public String getOption(final String key) {
+        return caseInsensitiveModelOptions.get(key);
     }
 }
