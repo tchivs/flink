@@ -25,7 +25,6 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.ObjectIdentifier;
-import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.AlterModelOptionsOperation;
@@ -36,7 +35,6 @@ import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 /** Helper class for converting {@link SqlAlterModel} to {@link AlterModelOptionsOperation}. */
 public class SqlAlterModelConverter {
@@ -50,8 +48,6 @@ public class SqlAlterModelConverter {
         UnresolvedIdentifier unresolvedIdentifier =
                 UnresolvedIdentifier.of(sqlAlterModel.fullModelName());
         ObjectIdentifier modelIdentifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
-        Optional<ResolvedCatalogModel> optionalResolvedCatalogModel =
-                catalogManager.getModel(modelIdentifier);
         if (sqlAlterModel.getNewModelName() != null) {
             // Rename model
             UnresolvedIdentifier newUnresolvedIdentifier =
