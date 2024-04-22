@@ -30,6 +30,11 @@ public class MLFunctionsModule implements Module {
                                 MLEvaluateFunction.NAME,
                                 new MLEvaluateFunction(
                                         MLEvaluateFunction.NAME, Collections.emptyMap()));
+                        put(
+                                MLEvaluateAllFunction.NAME,
+                                new MLEvaluateAllFunction(
+                                        MLEvaluateAllFunction.NAME,
+                                        new ModelVersions("", Collections.emptyMap())));
                     }
                 };
     }

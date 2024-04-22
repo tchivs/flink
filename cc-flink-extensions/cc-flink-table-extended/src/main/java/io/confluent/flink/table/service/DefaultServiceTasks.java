@@ -5,6 +5,7 @@
 package io.confluent.flink.table.service;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.FallbackKey;
@@ -54,9 +55,11 @@ import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
 import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
+import io.confluent.flink.table.modules.ml.MLEvaluateAllFunction;
 import io.confluent.flink.table.modules.ml.MLEvaluateFunction;
 import io.confluent.flink.table.modules.ml.MLFunctionsModule;
 import io.confluent.flink.table.modules.ml.MLPredictFunction;
+import io.confluent.flink.table.modules.ml.ModelVersions;
 import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
@@ -291,7 +294,7 @@ class DefaultServiceTasks implements ServiceTasks {
 
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
-            // ML_PREDICT functions are rewritten and put into the config together with serialized
+            // ML functions are rewritten and put into the config together with serialized
             // model in sql service. We use temporary functions since permanent functions
             // serialization has issues and need changes in FunctionCatalog which we don't want to
             // modify in open source Flink
@@ -301,8 +304,8 @@ class DefaultServiceTasks implements ServiceTasks {
                     .forEach(
                             (functionIdentifier, serializedObj) -> {
                                 String functionName = functionIdentifier.toUpperCase(Locale.ROOT);
-                                if (functionName.contains(MLPredictFunction.NAME)
-                                        || functionName.contains(MLEvaluateFunction.NAME)) {
+                                if (functionName.endsWith(MLPredictFunction.NAME)
+                                        || functionName.endsWith(MLEvaluateFunction.NAME)) {
                                     Map<String, String> properties;
                                     try {
                                         properties =
@@ -316,12 +319,12 @@ class DefaultServiceTasks implements ServiceTasks {
                                                         + "functionName: "
                                                         + functionName);
                                     }
-                                    if (functionName.contains(MLPredictFunction.NAME)) {
+                                    if (functionName.endsWith(MLPredictFunction.NAME)) {
                                         tableEnvironment.createTemporaryFunction(
                                                 functionIdentifier,
                                                 new MLPredictFunction(
                                                         functionIdentifier, properties));
-                                    } else if (functionName.contains(MLEvaluateFunction.NAME)) {
+                                    } else if (functionName.endsWith(MLEvaluateFunction.NAME)) {
                                         tableEnvironment.createTemporaryFunction(
                                                 functionIdentifier,
                                                 new MLEvaluateFunction(
@@ -330,6 +333,38 @@ class DefaultServiceTasks implements ServiceTasks {
                                         throw new IllegalArgumentException(
                                                 "Unrecognized ML functionName: " + functionName);
                                     }
+                                }
+                                if (functionName.endsWith(MLEvaluateAllFunction.NAME)) {
+                                    Map<String, Tuple2<Boolean, Map<String, String>>>
+                                            serializedModelAllVersions;
+                                    try {
+                                        serializedModelAllVersions =
+                                                mapper.readValue(
+                                                        serializedObj,
+                                                        new TypeReference<
+                                                                Map<
+                                                                        String,
+                                                                        Tuple2<
+                                                                                Boolean,
+                                                                                Map<
+                                                                                        String,
+                                                                                        String>>>>() {});
+                                    } catch (JsonProcessingException e) {
+                                        throw new IllegalArgumentException(
+                                                "Cannot deserialize ml function argument for "
+                                                        + "functionName: "
+                                                        + functionName);
+                                    }
+                                    String modelName =
+                                            functionName.replace(
+                                                    "_" + MLEvaluateAllFunction.NAME, "");
+                                    tableEnvironment.createTemporaryFunction(
+                                            functionIdentifier,
+                                            new MLEvaluateAllFunction(
+                                                    functionIdentifier,
+                                                    new ModelVersions(
+                                                            modelName,
+                                                            serializedModelAllVersions)));
                                 }
                             });
         }
