@@ -47,12 +47,42 @@ public class BedrockRemoteModelOptions extends RemoteModelOptions {
             ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.SYSTEM_PROMPT)
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The system prompt for the Bedrock model.");
+                    .withDescription("The system prompt for the text generation model.");
+
+    public static final ConfigOption<String> INPUT_FORMAT =
+            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.INPUT_FORMAT)
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The input format for the remote ML model.");
+
+    public static final ConfigOption<String> INPUT_CONTENT_TYPE =
+            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.INPUT_CONTENT_TYPE)
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The input content type for the remote ML model.");
+
+    public static final ConfigOption<String> OUTPUT_FORMAT =
+            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.OUTPUT_FORMAT)
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The output format for the remote ML model.");
+
+    public static final ConfigOption<String> OUTPUT_CONTENT_TYPE =
+            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.OUTPUT_CONTENT_TYPE)
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The output content type for the remote ML model.");
 
     private final Set<ConfigOption<?>> requiredProviderLevelOptions =
             ImmutableSet.of(ACCESS_KEY_ID, SECRET_KEY, ENDPOINT);
     private final Set<ConfigOption<?>> optionalProviderLevelOptions =
-            ImmutableSet.of(SESSION_TOKEN, SYSTEM_PROMPT);
+            ImmutableSet.of(
+                    SESSION_TOKEN,
+                    SYSTEM_PROMPT,
+                    INPUT_FORMAT,
+                    INPUT_CONTENT_TYPE,
+                    OUTPUT_FORMAT,
+                    OUTPUT_CONTENT_TYPE);
     private final Set<ConfigOption<?>> secrets =
             ImmutableSet.of(ACCESS_KEY_ID, SECRET_KEY, SESSION_TOKEN);
     private final String paramsPrefix = NAMESPACE + "." + MLModelCommonConstants.PARAMS_PREFIX;
@@ -73,7 +103,7 @@ public class BedrockRemoteModelOptions extends RemoteModelOptions {
     }
 
     @Override
-    public String getparamsPrefix() {
+    public String getParamsPrefix() {
         return paramsPrefix;
     }
 }

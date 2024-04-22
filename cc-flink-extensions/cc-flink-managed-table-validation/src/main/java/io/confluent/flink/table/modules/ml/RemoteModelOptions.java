@@ -18,7 +18,7 @@ import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT
 public abstract class RemoteModelOptions {
 
     // --------------------------------------------------------------------------------------------
-    // PUBLIC - GLOBAL FOR ALL TABLES VIA SET COMMAND
+    // PUBLIC - TOP LEVEL CONFIG
     // --------------------------------------------------------------------------------------------
 
     public static final ConfigOption<ModelTask> TASK =
@@ -82,5 +82,5 @@ public abstract class RemoteModelOptions {
 
     public abstract Set<ConfigOption<?>> getSecretOptions();
 
-    public abstract String getparamsPrefix();
+    public abstract String getParamsPrefix();
 }

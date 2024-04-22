@@ -4,16 +4,9 @@
 
 package io.confluent.flink.table.modules.ml;
 
-import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.TableEnvironment;
-import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.ResolvedCatalogModel;
-import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
-
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -23,117 +16,147 @@ import static io.confluent.flink.table.modules.ml.RemoteModelValidator.validateC
 import static org.apache.flink.util.CollectionUtil.entry;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /** Tests for {@link RemoteModelValidator}. */
 public class RemoteModelValidatorTest {
 
-    private static TableEnvironment tableEnv;
-
-    @BeforeAll
-    static void beforeAll() {
-        tableEnv = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-    }
-
     @Test
     void testInvalidProviderOptions() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'provider' = 'unknown',"
-                        + "'task' = 'text-generation',"
-                        + "'unknown.provider' = 'random')",
-                "Unsupported 'PROVIDER': unknown");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "unknown",
+                        "task", "text_generation",
+                        "unknown.api_key", "key");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("Unsupported 'PROVIDER': unknown");
     }
 
     @Test
     void testMissingProviderOptions() {
-        testCreateModelError(
-                "CREATE MODEL t WITH (" + "'task' = 'text-generation')", "'PROVIDER' is not set");
+        Map<String, String> options = ImmutableMap.of("task", "text_generation");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("'PROVIDER' is not set");
     }
 
     @Test
     void testMissingTopLevelOptions() {
-        testCreateModelError(
-                "CREATE MODEL t WITH (" + "'provider' = 'openai'," + "'openai.api_key' = 'key')",
-                "One or more required options are missing.");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "openai.api_key", "key");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("One or more required options are missing.");
     }
 
     @Test
     void testMissingProviderLevelOptions() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'task' = 'text_generation',"
-                        + "'provider' = 'bedrock',"
-                        + "'bedrock.endpoint' = 'endpoint',"
-                        + "'bedrock.aws_access_key_id' = 'key_id')",
-                "BEDROCK.AWS_SECRET_ACCESS_KEY");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "bedrock",
+                        "task", "text_generation",
+                        "bedrock.endpoint", "endpoint",
+                        "bedrock.aws_access_key_id", "key_id");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("BEDROCK.AWS_SECRET_ACCESS_KEY");
     }
 
     @Test
     void testExtraTopLevelOptions() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'PROVIDER' = 'openai',"
-                        + "'TASK' = 'text_generation',"
-                        + "'OPENAI.api_key' = 'key',"
-                        + "'system_prompt' = 'count prime numbers',"
-                        + "'proxy' = 'proxy')",
-                "Unsupported options:" + "\n" + "\n" + "PROXY");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "endpoint",
+                        "openai.system_prompt", "count prime numbers",
+                        "proxy", "proxy");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("Unsupported options:" + "\n" + "\n" + "PROXY");
     }
 
     @Test
     void testExtraProviderLevelOption() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'PROVIDER' = 'vertexai',"
-                        + "'TASK' = 'text_generation',"
-                        + "'vertexai.service_key' = 'key',"
-                        + "'vertexai.proxy' = 'proxy')",
-                "Unsupported options:" + "\n" + "\n" + "VERTEXAI.PROXY");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "vertexai",
+                        "task", "text_generation",
+                        "vertexai.service_key", "key",
+                        "vertexai.endpoint", "endpoint",
+                        "vertexai.proxy", "endpoint");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining("Unsupported options:" + "\n" + "\n" + "VERTEXAI.PROXY");
     }
 
     @Test
     void testAllowParamsLevelOption() {
         Map<String, String> options =
-                testCreateModelOptions(
-                        "CREATE MODEL t WITH ("
-                                + "'PROVIDER' = 'vertexai',"
-                                + "'TASK' = 'text_generation',"
-                                + "'vertexai.service_key' = 'key',"
-                                + "'vertexai.params.temp' = '0.7')");
-        assertThat(options).containsEntry("VERTEXAI.PARAMS.TEMP", "0.7");
+                Map.of(
+                        "provider", "vertexai",
+                        "task", "text_generation",
+                        "vertexai.service_key", "key",
+                        "vertexai.endpoint", "endpoint",
+                        "vertexai.params.temp", "0.7");
+        validateCreateModelOptions("m1", options);
     }
 
     @Test
     void testNotAllowConfluentOption() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'PROVIDER' = 'vertexai',"
-                        + "'TASK' = 'text_generation',"
-                        + "'CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY' = 'kms',"
-                        + "'vertexai.service_key' = 'key')",
-                "Unsupported options:" + "\n" + "\n" + "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "endpoint",
+                        "confluent.model.secret.encrypt_strategy", "kms");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining(
+                        "Unsupported options:"
+                                + "\n"
+                                + "\n"
+                                + "CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY");
     }
 
     @Test
     void testNotAllowedParamsLevelOption() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'PROVIDER' = 'vertexai',"
-                        + "'TASK' = 'text_generation',"
-                        + "'vertexai.service_key' = 'key',"
-                        + "'vertexai.parameters.temp' = '0.7')",
-                "Unsupported options:" + "\n" + "\n" + "VERTEXAI.PARAMETERS.TEMP");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "endpoint",
+                        "openai.parameters.temp", "0.7");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining(
+                        "Unsupported options:" + "\n" + "\n" + "OPENAI.PARAMETERS.TEMP");
     }
 
     @Test
     void testAzureOpenAIOption() {
-        testCreateModelError(
-                "CREATE MODEL t WITH ("
-                        + "'provider' = 'azureopenai',"
-                        + "'taSk' = 'text_generation',"
-                        + "'azureopenai.api_key' = 'key')",
-                "Missing required options are:" + "\n" + "\n" + "AZUREOPENAI.ENDPOINT");
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "azureopenai",
+                        "task", "text_generation",
+                        "azureopenai.api_key", "key");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .hasMessageContaining(
+                        "Missing required options are:" + "\n" + "\n" + "AZUREOPENAI.ENDPOINT");
+    }
+
+    @Test
+    void testSageMakerOption() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "sagemaker",
+                        "task", "text_generation",
+                        "sagemaker.aws_access_key_id", "key_id",
+                        "sagemaker.aws_secret_access_key", "secret_key",
+                        "sagemaker.endpoint", "endpoint",
+                        "sagemaker.custom_attributes", "c000b4f9-df62-4c85-a0bf-7c525f9104a4",
+                        "sagemaker.inference_id", "inference_id",
+                        "sagemaker.target_variant", "variant1",
+                        "sagemaker.target_model", "model.tar.gz",
+                        "sagemaker.target_container_host_name", "secondContainer");
+        validateCreateModelOptions("m1", options);
     }
 
     @Test
@@ -165,6 +188,56 @@ public class RemoteModelValidatorTest {
         Map<String, String> privateOptions = RemoteModelValidator.getPrivateOptions(options);
         assertThat(privateOptions)
                 .containsOnly(entry("confluent.model.secret.encrypt_strategy", "plaintext"));
+    }
+
+    @Test
+    void testAzureMLOptionalProviderOptions() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "azureml",
+                        "task", "text_generation",
+                        "azureml.api_key", "key_id",
+                        "azureml.endpoint", "endpoint",
+                        "azureml.output_format", "output_format",
+                        "azureml.output_content_type", "output_content_type",
+                        "azureml.deployment_name", "deployment_name");
+        Map<String, String> publicOption = RemoteModelValidator.getPublicOptions(options);
+        assertThat(publicOption).contains(entry("azureml.deployment_name", "deployment_name"));
+    }
+
+    @Test
+    void testSageMakerOptionalProviderOptions() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "sagemaker",
+                        "task", "classification",
+                        "sagemaker.aws_access_key_id", "key_id",
+                        "sagemaker.aws_secret_access_key", "secret_key",
+                        "sagemaker.endpoint", "endpoint",
+                        "sagemaker.custom_attributes", "custom_attributes",
+                        "sagemaker.inference_id", "inference_id",
+                        "sagemaker.target_variant", "target_variant",
+                        "sagemaker.target_model", "target_model");
+        Map<String, String> publicOptions = RemoteModelValidator.getPublicOptions(options);
+        assertThat(publicOptions)
+                .contains(
+                        entry("sagemaker.custom_attributes", "custom_attributes"),
+                        entry("sagemaker.inference_id", "inference_id"),
+                        entry("sagemaker.target_variant", "target_variant"),
+                        entry("sagemaker.target_model", "target_model"));
+    }
+
+    @Test
+    void testVertexAIOptionalProviderOptions() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "vertexai",
+                        "task", "classification",
+                        "vertexai.endpoint", "endpoint",
+                        "vertexai.api_key", "key");
+        assertThatThrownBy(() -> RemoteModelValidator.validateCreateModelOptions("m1", options))
+                .hasMessageContaining(
+                        "Missing required options are:" + "\n" + "\n" + "VERTEXAI.SERVICE_KEY");
     }
 
     @Test
@@ -222,25 +295,5 @@ public class RemoteModelValidatorTest {
                         SageMakerRemoteModelOptions.SESSION_TOKEN.key(),
                         VertexAIRemoteModelOptions.SERVICE_KEY.key());
         assertThat(keys).isEqualTo(expected);
-    }
-
-    private void testCreateModelError(String sql, String error) {
-        assertThatThrownBy(() -> testCreateModelOptions(sql)).hasMessageContaining(error);
-    }
-
-    private Map<String, String> testCreateModelOptions(String sql) {
-        try {
-            tableEnv.executeSql(sql);
-            final ResolvedCatalogModel catalogModel =
-                    (ResolvedCatalogModel)
-                            tableEnv.getCatalog(tableEnv.getCurrentCatalog())
-                                    .orElseThrow(IllegalArgumentException::new)
-                                    .getModel(new ObjectPath(tableEnv.getCurrentDatabase(), "t"));
-            return validateCreateModelOptions("t", catalogModel.getOptions());
-        } catch (ModelNotExistException e) {
-            return fail(e);
-        } finally {
-            tableEnv.executeSql("DROP MODEL IF EXISTS t");
-        }
     }
 }

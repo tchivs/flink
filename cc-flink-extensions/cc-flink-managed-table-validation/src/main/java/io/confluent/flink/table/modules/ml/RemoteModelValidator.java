@@ -163,7 +163,7 @@ public class RemoteModelValidator {
         public String paramsPrefix() {
             RemoteModelOptions modelOptions =
                     RemoteModelOptionsFactory.createRemoteModelOptions(provider);
-            return modelOptions.getparamsPrefix();
+            return modelOptions.getParamsPrefix();
         }
     }
 
