@@ -55,6 +55,7 @@ import org.apache.flink.util.SerializedThrowable;
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.concurrent.Executors;
 
+import org.assertj.core.api.Assertions;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
@@ -64,6 +65,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -71,9 +73,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionAttemptId;
+import static org.assertj.core.api.HamcrestCondition.matching;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
@@ -216,44 +218,44 @@ public class JobExceptionsHandlerTest extends TestLogger {
     }
 
     @Test
-    public void testWithExceptionHistoryWithConcurrentGlobalFailures()
+    public void testWithExceptionHistoryAndConcurrentGlobalFailure()
             throws HandlerRequestException, ExecutionException, InterruptedException {
-        final RootExceptionHistoryEntry concurrentGlobalCause =
-                fromGlobalFailure(
-                        new RuntimeException("concurrent global exception #1"),
-                        System.currentTimeMillis());
-        final RootExceptionHistoryEntry someOtherFailure =
-                new RootExceptionHistoryEntry(
-                        new RuntimeException("exception #2"),
-                        System.currentTimeMillis(),
-                        CompletableFuture.completedFuture(Collections.singletonMap("key", "value")),
-                        "task name",
-                        new LocalTaskManagerLocation(),
-                        Collections.emptySet());
-        final Throwable rootException = new RuntimeException("global exception #0");
-        final long rootTimestamp = System.currentTimeMillis();
+        final ExceptionHistoryEntry otherFailure =
+                ExceptionHistoryEntry.createGlobal(
+                        new RuntimeException("exception #1"),
+                        CompletableFuture.completedFuture(Collections.emptyMap()));
         final RootExceptionHistoryEntry rootCause =
                 fromGlobalFailure(
-                        rootException, rootTimestamp, concurrentGlobalCause, someOtherFailure);
+                        new RuntimeException("exception #0"),
+                        System.currentTimeMillis(),
+                        Collections.singleton(otherFailure));
 
         final ExecutionGraphInfo executionGraphInfo = createExecutionGraphInfo(rootCause);
-
         final HandlerRequest<EmptyRequestBody> request =
                 createRequest(executionGraphInfo.getJobId(), 10);
         final JobExceptionsInfoWithHistory response =
                 testInstance.handleRequest(request, executionGraphInfo);
 
-        final List<ExceptionInfo> concurrentExceptions =
-                response.getExceptionHistory().getEntries().stream()
-                        .map(RootExceptionInfo::getConcurrentExceptions)
-                        .flatMap(e -> e.stream())
-                        .collect(Collectors.toList());
-
-        assertThat(
-                response.getRootException(), is(ExceptionUtils.stringifyException(rootException)));
-        assertThat(response.getRootTimestamp(), is(rootTimestamp));
-
-        assertThat(concurrentExceptions, iterableWithSize(0));
+        Assertions.assertThat(response.getExceptionHistory().getEntries())
+                .hasSize(1)
+                .satisfies(
+                        matching(
+                                contains(
+                                        historyContainsGlobalFailure(
+                                                rootCause.getException(),
+                                                rootCause.getTimestamp(),
+                                                matchesFailure(
+                                                        otherFailure.getException(),
+                                                        otherFailure.getTimestamp(),
+                                                        otherFailure.getFailureLabelsFuture(),
+                                                        otherFailure.getFailingTaskName(),
+                                                        JobExceptionsHandler.toString(
+                                                                otherFailure
+                                                                        .getTaskManagerLocation()),
+                                                        JobExceptionsHandler.toTaskManagerId(
+                                                                otherFailure
+                                                                        .getTaskManagerLocation()))))));
+        Assertions.assertThat(response.getExceptionHistory().isTruncated()).isFalse();
     }
 
     @Test
@@ -573,15 +575,21 @@ public class JobExceptionsHandlerTest extends TestLogger {
                 Collections.emptyList());
     }
 
+    private static RootExceptionHistoryEntry fromGlobalFailure(Throwable cause, long timestamp) {
+        return fromGlobalFailure(cause, timestamp, Collections.emptySet());
+    }
+
     private static RootExceptionHistoryEntry fromGlobalFailure(
-            Throwable cause, long timestamp, ExceptionHistoryEntry... concurrentExceptions) {
+            Throwable cause,
+            long timestamp,
+            Collection<ExceptionHistoryEntry> concurrentExceptions) {
         return new RootExceptionHistoryEntry(
                 cause,
                 timestamp,
                 FailureEnricherUtils.EMPTY_FAILURE_LABELS,
                 null,
                 null,
-                Arrays.asList(concurrentExceptions));
+                concurrentExceptions);
     }
 
     // -------- factory methods for instantiating new Matchers --------

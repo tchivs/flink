@@ -99,6 +99,12 @@ Copyright 2023 Confluent Inc.
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<!-- Optional commons-compress dependency -->
+			<groupId>commons-codec</groupId>
+			<artifactId>commons-codec</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-table-extended_2.12</artifactId>
 			<version>${project.version}</version>
