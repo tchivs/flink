@@ -4,6 +4,8 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.table.api.ValidationException;
+
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
@@ -19,6 +21,36 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 /** Tests for {@link RemoteModelValidator}. */
 public class RemoteModelValidatorTest {
+
+    @Test
+    void testUppercaseOptionsThrow() {
+        Map<String, String> map = ImmutableMap.of("key", "value", "Key", "value");
+        assertThatThrownBy(() -> RemoteModelValidator.uppercaseOptions(map))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Options contains both uppercase and lowercase of key: 'Key'");
+    }
+
+    @Test
+    void testLowercaseOptionsThrow() {
+        Map<String, String> map = ImmutableMap.of("key", "value", "Key", "value");
+        assertThatThrownBy(() -> RemoteModelValidator.lowercaseOptions(map))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Options contains both uppercase and lowercase of key: 'Key'");
+    }
+
+    @Test
+    void testUppercaseOptions() {
+        Map<String, String> map = ImmutableMap.of("key1", "value1", "Key2", "value2");
+        assertThat(RemoteModelValidator.uppercaseOptions(map))
+                .isEqualTo(ImmutableMap.of("KEY1", "value1", "KEY2", "value2"));
+    }
+
+    @Test
+    void testLowercaseOptions() {
+        Map<String, String> map = ImmutableMap.of("KEY1", "Value1", "KeY2", "value2");
+        assertThat(RemoteModelValidator.lowercaseOptions(map))
+                .isEqualTo(ImmutableMap.of("key1", "Value1", "key2", "value2"));
+    }
 
     @Test
     void testInvalidProviderOptions() {

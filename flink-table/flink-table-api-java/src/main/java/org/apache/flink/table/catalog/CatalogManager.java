@@ -1461,7 +1461,6 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
         } else {
             resolvedOutputSchema = model.getOutputSchema().resolve(schemaResolver);
         }
-        // TODO: Validate the properties here?
         return ResolvedCatalogModel.of(model, resolvedInputSchema, resolvedOutputSchema);
     }
 
@@ -1485,10 +1484,15 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
                 command.execute(catalog.get(), objectIdentifier.toObjectPath());
             } catch (TableAlreadyExistException
                     | TableNotExistException
+                    | ModelNotExistException
                     | DatabaseNotExistException e) {
                 throw new ValidationException(getErrorMessage(objectIdentifier, commandName), e);
             } catch (Exception e) {
-                throw new TableException(getErrorMessage(objectIdentifier, commandName), e);
+                if (commandName.contains("Model")) {
+                    throw new ModelException(getErrorMessage(objectIdentifier, commandName), e);
+                } else {
+                    throw new TableException(getErrorMessage(objectIdentifier, commandName), e);
+                }
             }
         } else if (!ignoreNoCatalog) {
             throw new ValidationException(

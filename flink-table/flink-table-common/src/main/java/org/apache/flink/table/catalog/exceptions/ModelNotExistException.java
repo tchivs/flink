@@ -25,13 +25,23 @@ import org.apache.flink.table.catalog.ObjectPath;
 @PublicEvolving
 public class ModelNotExistException extends Exception {
 
-    private static final String MSG = "Model %s does not exist in Catalog %s.";
+    private static final String MSG = "Model '`%s`.`%s`.`%s`' does not exist.";
+    private static final String MSG_WITHOUT_CATALOG = "Model '`%s`.`%s`' does not exist.";
 
     public ModelNotExistException(String catalogName, ObjectPath modelPath) {
         this(catalogName, modelPath, null);
     }
 
     public ModelNotExistException(String catalogName, ObjectPath modelPath, Throwable cause) {
-        super(String.format(MSG, modelPath.getFullName(), catalogName), cause);
+        super(formatMsg(catalogName, modelPath), cause);
+    }
+
+    private static String formatMsg(String catalogName, ObjectPath modelPath) {
+        if (catalogName != null) {
+            return String.format(
+                    MSG, catalogName, modelPath.getDatabaseName(), modelPath.getObjectName());
+        }
+        return String.format(
+                MSG_WITHOUT_CATALOG, modelPath.getDatabaseName(), modelPath.getObjectName());
     }
 }

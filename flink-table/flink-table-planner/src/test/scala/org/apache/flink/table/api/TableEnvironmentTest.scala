@@ -2699,9 +2699,9 @@ class TableEnvironmentTest {
         |)
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ModelException])
+      .isInstanceOf(classOf[ValidationException])
       .hasMessageContaining(
-        "Could not execute ALTER  MODEL default_catalog.default_database.M1 SET")
+        "Could not execute AlterModel in path `default_catalog`.`default_database`.`M1`")
   }
 
   @Test

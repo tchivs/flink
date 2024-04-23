@@ -7,12 +7,14 @@ package io.confluent.flink.table.utils;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.sql.parser.error.SqlValidateException;
+import org.apache.flink.table.api.ModelException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.TableNotExistException;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
@@ -78,6 +80,8 @@ public final class ClassifiedException {
                             ValidationException.class,
                             SqlValidateException.class,
                             DatabaseNotExistException.class,
+                            ModelException.class,
+                            ModelNotExistException.class,
                             TableNotExistException.class,
                             TableAlreadyExistException.class,
                             SqlValidatorException.class));
@@ -260,12 +264,43 @@ public final class ClassifiedException {
                 Handler.forwardCauseOnly("Could not execute AlterTable", ExceptionKind.USER));
 
         putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.forwardCauseOnly("Could not execute CreateModel", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.forwardCauseOnly("Could not execute CreateModel", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.forwardCauseOnly("Could not execute AlterModel", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.forwardCauseOnly("Could not execute AlterModel", ExceptionKind.USER));
+
+        putClassifiedException(
                 CodeLocation.inClass(CatalogManager.class, TableException.class),
                 Handler.rewriteMessage(
                         "in any of the catalogs",
                         ExceptionKind.USER,
                         message ->
                                 message.substring(0, message.indexOf(" in any of the catalogs"))
+                                        + "."));
+
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ModelException.class),
+                Handler.rewriteMessage(
+                        "in any of the catalogs",
+                        ExceptionKind.USER,
+                        message ->
+                                message.substring(0, message.indexOf(" in any of the catalogs"))
+                                        + "."));
+
+        putClassifiedException(
+                CodeLocation.ofClass(ModelNotExistException.class),
+                Handler.rewriteMessage(
+                        "does not exist in Catalog",
+                        ExceptionKind.USER,
+                        message ->
+                                message.substring(0, message.indexOf(" does not exist in Catalog"))
                                         + "."));
 
         putClassifiedException(

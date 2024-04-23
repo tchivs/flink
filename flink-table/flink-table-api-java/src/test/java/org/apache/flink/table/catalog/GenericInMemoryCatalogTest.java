@@ -136,7 +136,7 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
         catalog.createDatabase(db1, createDb(), false);
         assertThatThrownBy(() -> assertThat(catalog.getModel(modelPath1)).isNotNull())
                 .isInstanceOf(ModelNotExistException.class)
-                .hasMessage("Model db1.m1 does not exist in Catalog test-catalog.");
+                .hasMessage("Model '`test-catalog`.`db1`.`m1`' does not exist.");
     }
 
     @Test
@@ -202,7 +202,7 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
                         "new model");
         assertThatThrownBy(() -> catalog.alterModel(modelPath1, newModel, false))
                 .isInstanceOf(ModelNotExistException.class)
-                .hasMessage("Model db1.m1 does not exist in Catalog test-catalog.");
+                .hasMessage("Model '`test-catalog`.`db1`.`m1`' does not exist.");
     }
 
     @Test

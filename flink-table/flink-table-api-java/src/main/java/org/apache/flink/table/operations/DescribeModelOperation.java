@@ -19,7 +19,6 @@
 package org.apache.flink.table.operations;
 
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.internal.TableResultInternal;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
@@ -28,7 +27,6 @@ import org.apache.flink.table.types.DataType;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.apache.flink.table.api.internal.TableResultUtils.buildTableResult;
 
@@ -66,14 +64,7 @@ public class DescribeModelOperation implements Operation, ExecutableOperation {
     @Override
     public TableResultInternal execute(Context ctx) {
         // DESCRIBE MODEL <model> shows input/output schema if any.
-        Optional<ResolvedCatalogModel> modelOpt = ctx.getCatalogManager().getModel(sqlIdentifier);
-        if (!modelOpt.isPresent()) {
-            throw new ValidationException(
-                    String.format(
-                            "Model with the identifier '%s' doesn't exist.",
-                            sqlIdentifier.asSummaryString()));
-        }
-        ResolvedCatalogModel model = modelOpt.get();
+        ResolvedCatalogModel model = ctx.getCatalogManager().getModelOrError(sqlIdentifier);
         final String[] headers = {"inputs", "outputs"};
         final DataType[] types = {DataTypes.STRING(), DataTypes.STRING()};
         // We only ever return a single row.

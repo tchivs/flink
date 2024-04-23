@@ -127,6 +127,19 @@ public class ClassifiedExceptionTest {
                         .executeSql("INSERT INTO t SELECT 1")
                         .expectExactUserError(
                                 "Cannot find table '`default_catalog`.`default_database`.`t`'."),
+
+                // ---
+                TestSpec.test("not find model")
+                        .executeSql("DESCRIBE MODEL `m`")
+                        .expectExactUserError(
+                                "Cannot find model '`default_catalog`.`default_database`.`m`'."),
+
+                // ---
+                TestSpec.test("not find model for alter")
+                        .executeSql("ALTER MODEL `m` SET ('task' = 'classification')")
+                        .expectExactUserError(
+                                "Model '`default_catalog`.`default_database`.`m`' does not exist."),
+
                 // ---
                 TestSpec.test("unsupported scripts")
                         .executeSql("SELECT 1; SELECT 1;")

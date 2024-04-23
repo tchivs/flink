@@ -6,13 +6,16 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -32,13 +35,50 @@ public class RemoteModelValidator {
 
     private static final List<String> PRIVATE_PREFIXES = ImmutableList.of(CONFLUENT_PRIVATE_PREFIX);
 
+    /**
+     * Upper case options keys. ValidationExeption if options contains both uppercase and lowercase
+     * for same key.
+     *
+     * @param options Options to uppercase
+     * @return Map with uppercase key
+     */
+    public static Map<String, String> uppercaseOptions(Map<String, String> options) {
+        return changeOptionsCase(options, true);
+    }
+
+    /**
+     * Lower case options keys. ValidationExeption if options contains both uppercase and lowercase
+     * for same key.
+     *
+     * @param options Options to uppercase
+     * @return Map with lowercase key
+     */
+    public static Map<String, String> lowercaseOptions(Map<String, String> options) {
+        return changeOptionsCase(options, false);
+    }
+
+    public static Map<String, String> changeOptionsCase(
+            Map<String, String> options, boolean uppercase) {
+        Map<String, String> newOptions = new HashMap<>();
+        for (Entry<String, String> option : options.entrySet()) {
+            String key =
+                    uppercase
+                            ? option.getKey().toUpperCase(Locale.ROOT)
+                            : option.getKey().toLowerCase(Locale.ROOT);
+            if (newOptions.containsKey(key)) {
+                throw new ValidationException(
+                        "Options contains both uppercase and lowercase of key: '"
+                                + option.getKey()
+                                + "'");
+            }
+            newOptions.put(key, option.getValue());
+        }
+        return newOptions;
+    }
+
     public static Map<String, String> validateCreateModelOptions(
             String modelIdentifier, Map<String, String> options) {
-        Map<String, String> uppercaseOptions =
-                options.entrySet().stream()
-                        .collect(
-                                Collectors.toMap(
-                                        entry -> entry.getKey().toUpperCase(), Entry::getValue));
+        Map<String, String> uppercaseOptions = uppercaseOptions(options);
         final String provider = uppercaseOptions.get(PROVIDER);
         if (provider == null) {
             throw new IllegalArgumentException("'" + PROVIDER + "' is not set");

@@ -43,4 +43,6 @@ public class MLModelCommonConstants {
     public static final String MODEL_NAME = "CONFLUENT.MODEL.NAME";
     public static final String MODEL_VERSION = "CONFLUENT.MODEL.VERSION";
     public static final String MODEL_KMS_KEY_VERSION_PREFIX = "CONFLUENT.MODEL.SECRET.KEY_VERSION";
+    public static final String CREDENTIAL_SERVICE_HOST = "CONFLUENT.CREDENTIAL.SERVICE.HOST";
+    public static final String CREDENTIAL_SERVICE_PORT = "CONFLUENT.CREDENTIAL.SERVICE.PORT";
 }

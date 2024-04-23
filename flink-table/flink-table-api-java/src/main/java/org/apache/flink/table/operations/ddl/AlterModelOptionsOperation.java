@@ -18,7 +18,6 @@
 
 package org.apache.flink.table.operations.ddl;
 
-import org.apache.flink.table.api.ModelException;
 import org.apache.flink.table.api.internal.TableResultImpl;
 import org.apache.flink.table.api.internal.TableResultInternal;
 import org.apache.flink.table.catalog.CatalogModel;
@@ -72,12 +71,8 @@ public class AlterModelOptionsOperation implements AlterOperation {
 
     @Override
     public TableResultInternal execute(Context ctx) {
-        try {
-            ctx.getCatalogManager()
-                    .alterModel(getCatalogModel(), getModelIdentifier(), ignoreIfNotExists());
-            return TableResultImpl.TABLE_RESULT_OK;
-        } catch (Exception e) {
-            throw new ModelException(String.format("Could not execute %s", asSummaryString()), e);
-        }
+        ctx.getCatalogManager()
+                .alterModel(getCatalogModel(), getModelIdentifier(), ignoreIfNotExists());
+        return TableResultImpl.TABLE_RESULT_OK;
     }
 }
