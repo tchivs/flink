@@ -15,6 +15,7 @@ import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
+import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.operations.Operation;
@@ -22,6 +23,7 @@ import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,6 +39,7 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -191,8 +194,7 @@ public class DefaultServiceTasksTest {
     }
 
     @Test
-    void testRegisterMLPredictFunction()
-            throws JsonProcessingException, NoSuchFieldException, IllegalAccessException {
+    void testRegisterMLPredictFunction() throws JsonProcessingException {
         // Create unresolved schema. DataType should be UnresolvedDataType
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
@@ -229,17 +231,200 @@ public class DefaultServiceTasksTest {
                 mapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(resolvedCatalogModel.toProperties());
 
+        ObjectIdentifier objectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_PREDICT");
         tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
         INSTANCE.configureEnvironment(
                 tableEnv,
                 Collections.emptyMap(),
-                Collections.singletonMap("my_catalog.my_db.my_model_ML_PREDICT", serializedModel),
+                Collections.singletonMap(objectIdentifier.toString(), serializedModel),
                 Service.JOB_SUBMISSION_SERVICE);
 
         tableEnv.useCatalog("my_catalog");
         tableEnv.useDatabase("my_db");
         final String[] udfs = tableEnv.listUserDefinedFunctions();
         assertThat(Arrays.asList(udfs).contains("my_model_ml_predict")).isTrue();
+    }
+
+    @Test
+    void testRegisterMLEvaluateFunction() throws JsonProcessingException {
+        // Create unresolved schema. DataType should be UnresolvedDataType
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
+
+        final ResolvedSchema resolvedInputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.STRING()));
+        final ResolvedSchema resovledOutputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("output"),
+                        Collections.singletonList(DataTypes.INT()));
+
+        final ResolvedCatalogModel resolvedCatalogModel =
+                ResolvedCatalogModel.of(
+                        CatalogModel.of(
+                                inputSchema,
+                                outputSchema,
+                                ImmutableMap.of(
+                                        "provider",
+                                        "openai",
+                                        "task",
+                                        ModelTask.CLASSIFICATION.name()),
+                                ""),
+                        resolvedInputSchema,
+                        resovledOutputSchema);
+
+        final TableEnvironmentImpl tableEnv =
+                (TableEnvironmentImpl)
+                        TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        final ObjectMapper mapper = new ObjectMapper();
+        final String serializedModel =
+                mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(resolvedCatalogModel.toProperties());
+
+        ObjectIdentifier objectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_EVALUATE");
+        tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap(objectIdentifier.toString(), serializedModel),
+                Service.JOB_SUBMISSION_SERVICE);
+
+        tableEnv.useCatalog("my_catalog");
+        tableEnv.useDatabase("my_db");
+        final String[] udfs = tableEnv.listUserDefinedFunctions();
+        assertThat(Arrays.asList(udfs).contains("my_model_ml_evaluate")).isTrue();
+    }
+
+    @Test
+    void testRegisterMLEvaluateAllFunction() throws JsonProcessingException {
+        // Create unresolved schema. DataType should be UnresolvedDataType
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
+
+        final ResolvedSchema resolvedInputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.STRING()));
+        final ResolvedSchema resovledOutputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("output"),
+                        Collections.singletonList(DataTypes.INT()));
+
+        final ResolvedCatalogModel resolvedCatalogModel =
+                ResolvedCatalogModel.of(
+                        CatalogModel.of(
+                                inputSchema,
+                                outputSchema,
+                                ImmutableMap.of(
+                                        "provider",
+                                        "openai",
+                                        "task",
+                                        ModelTask.CLASSIFICATION.name()),
+                                ""),
+                        resolvedInputSchema,
+                        resovledOutputSchema);
+
+        final TableEnvironmentImpl tableEnv =
+                (TableEnvironmentImpl)
+                        TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        final ObjectMapper mapper = new ObjectMapper();
+        Map<String, Map<Boolean, Map<String, String>>> modelVersion = new HashMap<>();
+        modelVersion.put("1", ImmutableMap.of(true, resolvedCatalogModel.toProperties()));
+        ObjectIdentifier objectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_EVALUATE_ALL");
+        tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
+
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap(
+                        objectIdentifier.toString(),
+                        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(modelVersion)),
+                Service.JOB_SUBMISSION_SERVICE);
+
+        tableEnv.useCatalog("my_catalog");
+        tableEnv.useDatabase("my_db");
+        final String[] udfs = tableEnv.listUserDefinedFunctions();
+        assertThat(Arrays.asList(udfs).contains("my_model_ml_evaluate_all")).isTrue();
+    }
+
+    @Test
+    void testRegisterAllMLFunctions() throws JsonProcessingException {
+        // Create unresolved schema. DataType should be UnresolvedDataType
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
+
+        final ResolvedSchema resolvedInputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.STRING()));
+        final ResolvedSchema resovledOutputSchema =
+                ResolvedSchema.physical(
+                        Collections.singletonList("output"),
+                        Collections.singletonList(DataTypes.INT()));
+
+        final ResolvedCatalogModel resolvedCatalogModel =
+                ResolvedCatalogModel.of(
+                        CatalogModel.of(
+                                inputSchema,
+                                outputSchema,
+                                ImmutableMap.of(
+                                        "provider",
+                                        "openai",
+                                        "task",
+                                        ModelTask.CLASSIFICATION.name()),
+                                ""),
+                        resolvedInputSchema,
+                        resovledOutputSchema);
+
+        final TableEnvironmentImpl tableEnv =
+                (TableEnvironmentImpl)
+                        TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        final ObjectMapper mapper = new ObjectMapper();
+        Map<String, Map<Boolean, Map<String, String>>> modelVersion = new HashMap<>();
+        modelVersion.put("1", ImmutableMap.of(true, resolvedCatalogModel.toProperties()));
+        ObjectIdentifier evalAllObjectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_EVAlUATE_ALL");
+
+        final String serializedModel =
+                mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(resolvedCatalogModel.toProperties());
+
+        ObjectIdentifier predictObjectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_PREdICT");
+
+        ObjectIdentifier evaluateObjectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_model_ML_EVALuATE");
+
+        tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
+
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                ImmutableMap.of(
+                        evalAllObjectIdentifier.toString(),
+                        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(modelVersion),
+                        predictObjectIdentifier.toString(),
+                        serializedModel,
+                        evaluateObjectIdentifier.toString(),
+                        serializedModel),
+                Service.JOB_SUBMISSION_SERVICE);
+
+        tableEnv.useCatalog("my_catalog");
+        tableEnv.useDatabase("my_db");
+        final String[] udfs = tableEnv.listUserDefinedFunctions();
+        assertThat(new HashSet<>(Arrays.asList(udfs)))
+                .isEqualTo(
+                        ImmutableSet.of(
+                                "my_model_ml_evaluate_all",
+                                "my_model_ml_predict",
+                                "my_model_ml_evaluate"));
     }
 
     @Test

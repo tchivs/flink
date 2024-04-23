@@ -79,6 +79,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -304,38 +305,12 @@ class DefaultServiceTasks implements ServiceTasks {
                     .forEach(
                             (functionIdentifier, serializedObj) -> {
                                 String functionName = functionIdentifier.toUpperCase(Locale.ROOT);
-                                if (functionName.endsWith(MLPredictFunction.NAME)
-                                        || functionName.endsWith(MLEvaluateFunction.NAME)) {
-                                    Map<String, String> properties;
-                                    try {
-                                        properties =
-                                                mapper.readValue(
-                                                        serializedObj,
-                                                        new TypeReference<
-                                                                Map<String, String>>() {});
-                                    } catch (JsonProcessingException e) {
-                                        throw new IllegalArgumentException(
-                                                "Cannot deserialize ml function argument for "
-                                                        + "functionName: "
-                                                        + functionName);
-                                    }
-                                    if (functionName.endsWith(MLPredictFunction.NAME)) {
-                                        tableEnvironment.createTemporaryFunction(
-                                                functionIdentifier,
-                                                new MLPredictFunction(
-                                                        functionIdentifier, properties));
-                                    } else if (functionName.endsWith(MLEvaluateFunction.NAME)) {
-                                        tableEnvironment.createTemporaryFunction(
-                                                functionIdentifier,
-                                                new MLEvaluateFunction(
-                                                        functionIdentifier, properties));
-                                    } else {
-                                        throw new IllegalArgumentException(
-                                                "Unrecognized ML functionName: " + functionName);
-                                    }
-                                }
-                                if (functionName.endsWith(MLEvaluateAllFunction.NAME)) {
-                                    Map<String, Tuple2<Boolean, Map<String, String>>>
+                                // Check MLEvaluateAllFunction first using contains because
+                                // MLEvaluate function name ('ML_EVALUATE') is a subset of
+                                // MLEvaluateAllFunction's name ('ML_EVALUATE_ALL')
+                                // TODO (MATRIX-108): more rigorous match
+                                if (functionName.contains(MLEvaluateAllFunction.NAME)) {
+                                    Map<String, Map<Boolean, Map<String, String>>>
                                             serializedModelAllVersions;
                                     try {
                                         serializedModelAllVersions =
@@ -344,7 +319,7 @@ class DefaultServiceTasks implements ServiceTasks {
                                                         new TypeReference<
                                                                 Map<
                                                                         String,
-                                                                        Tuple2<
+                                                                        Map<
                                                                                 Boolean,
                                                                                 Map<
                                                                                         String,
@@ -358,13 +333,48 @@ class DefaultServiceTasks implements ServiceTasks {
                                     String modelName =
                                             functionName.replace(
                                                     "_" + MLEvaluateAllFunction.NAME, "");
+                                    Map<String, Tuple2<Boolean, Map<String, String>>>
+                                            modelVersions = new HashMap<>();
+                                    for (Entry<String, Map<Boolean, Map<String, String>>> entry :
+                                            serializedModelAllVersions.entrySet()) {
+                                        Entry<Boolean, Map<String, String>> value =
+                                                entry.getValue().entrySet().iterator().next();
+                                        modelVersions.put(
+                                                entry.getKey(),
+                                                Tuple2.of(value.getKey(), value.getValue()));
+                                    }
+
                                     tableEnvironment.createTemporaryFunction(
                                             functionIdentifier,
                                             new MLEvaluateAllFunction(
                                                     functionIdentifier,
-                                                    new ModelVersions(
-                                                            modelName,
-                                                            serializedModelAllVersions)));
+                                                    new ModelVersions(modelName, modelVersions)));
+                                } else if (functionName.contains(MLPredictFunction.NAME)
+                                        || functionName.contains(MLEvaluateFunction.NAME)) {
+                                    Map<String, String> properties;
+                                    try {
+                                        properties =
+                                                mapper.readValue(
+                                                        serializedObj,
+                                                        new TypeReference<
+                                                                Map<String, String>>() {});
+                                    } catch (JsonProcessingException e) {
+                                        throw new IllegalArgumentException(
+                                                "Cannot deserialize ml function argument for "
+                                                        + "functionName: "
+                                                        + functionName);
+                                    }
+                                    if (functionName.contains(MLPredictFunction.NAME)) {
+                                        tableEnvironment.createTemporaryFunction(
+                                                functionIdentifier,
+                                                new MLPredictFunction(
+                                                        functionIdentifier, properties));
+                                    } else if (functionName.contains(MLEvaluateFunction.NAME)) {
+                                        tableEnvironment.createTemporaryFunction(
+                                                functionIdentifier,
+                                                new MLEvaluateFunction(
+                                                        functionIdentifier, properties));
+                                    }
                                 }
                             });
         }
