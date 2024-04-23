@@ -53,6 +53,7 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_VERSION;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
+import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_MAX_MESSAGE_SIZE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_MODE;
@@ -789,6 +790,9 @@ public class ConfluentManagedTableUtils {
         }
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
+
+        options.getOptional(KAFKA_MAX_MESSAGE_SIZE)
+                .ifPresent(maxSize -> properties.put("max.message.bytes", maxSize));
 
         // Maximum transaction timeout (15 min) as allowed by CCloud
         properties.setProperty("transaction.timeout.ms", "900000");
