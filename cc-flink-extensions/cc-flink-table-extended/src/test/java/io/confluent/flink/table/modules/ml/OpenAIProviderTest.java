@@ -109,8 +109,7 @@ public class OpenAIProviderTest {
         request.body().writeTo(buffer);
         assertThat(buffer.readUtf8())
                 .isEqualTo(
-                        "{\"model\":\"gpt-3.5-turbo\",\"messages\":["
-                                + "{\"role\":\"user\",\"content\":\"input-text-prompt\"}]}");
+                        "{\"messages\":[{\"role\":\"user\",\"content\":\"input-text-prompt\"}]}");
     }
 
     @Test

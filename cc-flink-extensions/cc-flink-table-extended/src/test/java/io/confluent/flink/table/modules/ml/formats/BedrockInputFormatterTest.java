@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.ml.formats;
 
 import org.apache.flink.table.api.Schema;
 
+import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -21,7 +22,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "AI21 Complete", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "AI21 Complete",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -34,7 +38,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "Amazon Titan Text", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "Amazon Titan Text",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -50,7 +57,8 @@ public class BedrockInputFormatterTest {
                 new SinglePromptInputFormatter(
                         inputSchema.getColumns(),
                         "Anthropic Completions",
-                        getTextGenerationParams());
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -63,7 +71,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "Anthropic Messages", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "Anthropic Messages",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -75,7 +86,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "Bedrock Llama", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "Bedrock Llama",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -88,7 +102,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "Cohere Generate", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "Cohere Generate",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
@@ -102,7 +119,10 @@ public class BedrockInputFormatterTest {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
                 new SinglePromptInputFormatter(
-                        inputSchema.getColumns(), "Mistral Completions", getTextGenerationParams());
+                        inputSchema.getColumns(),
+                        "Mistral Completions",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(

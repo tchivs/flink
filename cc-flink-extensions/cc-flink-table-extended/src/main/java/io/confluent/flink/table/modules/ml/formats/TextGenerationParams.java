@@ -329,7 +329,8 @@ public class TextGenerationParams {
     public void linkModelVersion(ObjectNode node, String fieldName, String defaultValue) {
         if (specialParams.containsKey(SpecialParams.MODEL_VERSION)) {
             node.put(fieldName, specialParams.get(SpecialParams.MODEL_VERSION));
-        } else {
+        } else if (defaultValue != null) {
+            // We allow empty defaults, but not null.
             node.put(fieldName, defaultValue);
         }
     }

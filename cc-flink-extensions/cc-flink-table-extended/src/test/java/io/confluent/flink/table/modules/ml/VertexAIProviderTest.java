@@ -71,7 +71,7 @@ public class VertexAIProviderTest {
                                         model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "For VERTEXAI endpoint expected to match https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/endpoints/.+(:predict|:rawPredict)?, got fake-endpoint");
+                        "For VERTEXAI endpoint expected to match https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/(endpoints|publishers)/.+(:predict|:rawPredict|:generateContent|:streamGenerateContent|:streamRawPredict)?, got fake-endpoint");
     }
 
     @Test
@@ -102,6 +102,47 @@ public class VertexAIProviderTest {
         Buffer buffer = new Buffer();
         request.body().writeTo(buffer);
         assertThat(buffer.readUtf8()).isEqualTo("{\"instances\":[\"input-text-prompt\"]}");
+    }
+
+    @Test
+    void testGetRequestGemini() throws Exception {
+        CatalogModel model = getGeminiCatalogModel();
+        VertexAIProvider vertexAIProvider =
+                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = vertexAIProvider.getRequest(args);
+        // Check that the request verb was properly changed.
+        assertThat(request.url().toString())
+                .isEqualTo(
+                        "https://region-aiplatform.googleapis.com/v1/projects/1234/locations/us-central1/publishers/google/models/gemini-1.0-pro:generateContent");
+        assertThat(request.method()).isEqualTo("POST");
+        assertThat(request.body().contentType().toString()).isEqualTo("application/json");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Check that the request used the gemini format by default.
+        assertThat(buffer.readUtf8())
+                .isEqualTo("{\"contents\":[{\"parts\":[{\"text\":\"input-text-prompt\"}]}]}");
+    }
+
+    @Test
+    void testGetRequestAnthropic() throws Exception {
+        CatalogModel model = getAnthropicCatalogModel();
+        VertexAIProvider vertexAIProvider =
+                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = vertexAIProvider.getRequest(args);
+        // Check that the request verb was properly changed.
+        assertThat(request.url().toString())
+                .isEqualTo(
+                        "https://region-aiplatform.googleapis.com/v1/projects/1234/locations/us-central1/publishers/anthropic/models/whatever:rawPredict");
+        assertThat(request.method()).isEqualTo("POST");
+        assertThat(request.body().contentType().toString()).isEqualTo("application/json");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Check that the request used the anthropic messages format by default.
+        assertThat(buffer.readUtf8())
+                .isEqualTo(
+                        "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"input-text-prompt\"}]}],\"anthropic_version\":\"vertex-2023-10-16\"}");
     }
 
     @Test
@@ -305,6 +346,30 @@ public class VertexAIProviderTest {
     @NotNull
     private static CatalogModel getCatalogModel() {
         Map<String, String> modelOptions = getCommonModelOptions();
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+    }
+
+    @NotNull
+    private static CatalogModel getGeminiCatalogModel() {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put(
+                "VERTEXAI.ENDPOINT",
+                "https://region-aiplatform.googleapis.com/v1/projects/1234/locations/us-central1/publishers/google/models/gemini-1.0-pro:streamGenerateContent");
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+    }
+
+    @NotNull
+    private static CatalogModel getAnthropicCatalogModel() {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put(
+                "VERTEXAI.ENDPOINT",
+                "https://region-aiplatform.googleapis.com/v1/projects/1234/locations/us-central1/publishers/anthropic/models/whatever:streamRawPredict");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
 

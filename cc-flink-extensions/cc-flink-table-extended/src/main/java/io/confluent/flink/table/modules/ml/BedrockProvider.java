@@ -109,10 +109,10 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         }
         signer.setServiceName("bedrock");
 
-        // Titan Text is the default not because it is the most common, but because it is the
-        // Amazon's house-built model. TODO: Determine this from the model id?
+        // We pick a default format based on the model id in the endpoint, but users can override.
         String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", "amazon-titan-text");
+                modelOptionsUtils.getProviderOptionOrDefault(
+                        "input_format", pickDefaultFormat(endpoint));
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
@@ -128,6 +128,45 @@ public class BedrockProvider implements MLModelRuntimeProvider {
                         "output_content_type", outputParser.acceptedContentTypes());
         // Precalculate the headers.
         headers = getHeaders();
+    }
+
+    private String pickDefaultFormat(String endpoint) {
+        // Pull the model id from the endpoint.
+        // https://bedrock-runtime.REGION.amazonaws.com/model/MODEL-NAME/invoke
+        String modelId = endpoint.split("/model/")[1].split("/")[0];
+        // The model id are formatted as PROVIDER.MODEL_NAME, so we can use the provider to pick
+        // the default format.
+        String provider = modelId.split("\\.")[0].toLowerCase();
+        String defaultInputFormat = "AMAZON-TITAN-TEXT";
+        switch (provider) {
+            case "amazon":
+                defaultInputFormat = "AMAZON-TITAN-TEXT";
+                break;
+            case "ai21":
+                defaultInputFormat = "AI21-COMPLETE";
+                break;
+            case "anthropic":
+                // Old models default to ANTHROPIC-COMPLETIONS, all others including claude v3 and
+                // anything newer default to ANTHROPIC-MESSAGES.
+                if (modelId.equals("anthropic.claude-v2:1")
+                        || modelId.equals("anthropic.claude-v2")
+                        || modelId.equals("anthropic.claude-instant-v1")) {
+                    defaultInputFormat = "ANTHROPIC-COMPLETIONS";
+                } else {
+                    defaultInputFormat = "ANTHROPIC-MESSAGES";
+                }
+                break;
+            case "cohere":
+                defaultInputFormat = "COHERE-GENERATE";
+                break;
+            case "meta":
+                defaultInputFormat = "BEDROCK-LLAMA";
+                break;
+            case "mistral":
+                defaultInputFormat = "MISTRAL-COMPLETIONS";
+                break;
+        }
+        return defaultInputFormat;
     }
 
     @Override

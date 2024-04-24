@@ -11,6 +11,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
 import io.confluent.flink.table.utils.MlUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,7 @@ public class SinglePromptInputFormatter implements InputFormatter {
     private transient ObjectMapper mapper = new ObjectMapper();
     private final SinglePromptFormatter formatter;
     private final ObjectNode staticNode;
+    private final MLModelSupportedProviders provider;
 
     private interface SinglePromptFormatter {
         ObjectNode createStaticJson(TextGenerationParams params);
@@ -36,9 +38,11 @@ public class SinglePromptInputFormatter implements InputFormatter {
     public SinglePromptInputFormatter(
             List<Schema.UnresolvedColumn> inputColumns,
             String modelName,
-            TextGenerationParams params) {
+            TextGenerationParams params,
+            MLModelSupportedProviders provider) {
         this.inputColumns = inputColumns;
         this.params = params;
+        this.provider = provider;
         MLFormatterUtil.enforceSingleStringInput(inputColumns, modelName);
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
@@ -146,9 +150,13 @@ public class SinglePromptInputFormatter implements InputFormatter {
                         params.linkMaxTokens(node, "max_tokens");
                         params.linkStopSequences(node, "stop_sequences");
                         params.linkSystemPrompt(node, "system");
-                        // TODO: Pick the default based on the provider? Vertex is currently
-                        // "vertex-2023-10-16"
-                        params.linkModelVersion(node, "anthropic_version", "bedrock-2023-05-31");
+                        String defaultVersion = null;
+                        if (provider == MLModelSupportedProviders.VERTEXAI) {
+                            defaultVersion = "vertex-2023-10-16";
+                        } else if (provider == MLModelSupportedProviders.BEDROCK) {
+                            defaultVersion = "bedrock-2023-05-31";
+                        }
+                        params.linkModelVersion(node, "anthropic_version", defaultVersion);
                         return node;
                     }
 
@@ -243,8 +251,13 @@ public class SinglePromptInputFormatter implements InputFormatter {
                     @Override
                     public ObjectNode createStaticJson(TextGenerationParams params) {
                         ObjectNode node = mapper.createObjectNode();
-                        // Model id is required, so default to gpt-3.5-turbo unless specified.
-                        params.linkModelVersion(node, "model", "gpt-3.5-turbo");
+                        // Model id is required for the OpenAI provider (but not Azure OpenAI),
+                        // so we default to gpt-3.5-turbo unless specified.
+                        String defaultModel = null;
+                        if (provider == MLModelSupportedProviders.OPENAI) {
+                            defaultModel = "gpt-3.5-turbo";
+                        }
+                        params.linkModelVersion(node, "model", defaultModel);
                         params.linkTemperature(node, "temperature");
                         params.linkTopP(node, "top_p");
                         params.linkMaxTokens(node, "max_tokens");

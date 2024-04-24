@@ -71,7 +71,7 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
     public SagemakerProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
         this.secretDecrypterProvider =
-                Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
+                Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
 
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.SAGEMAKER;
         String namespace = supportedProvider.getProviderName();

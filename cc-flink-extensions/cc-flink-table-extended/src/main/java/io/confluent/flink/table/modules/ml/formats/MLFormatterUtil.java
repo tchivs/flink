@@ -8,7 +8,9 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
 import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.ModelOptionsUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,10 @@ public class MLFormatterUtil {
         Map<String, String> modelOptions = model.getOptions();
         List<Schema.UnresolvedColumn> inputColumns = model.getInputSchema().getColumns();
         List<Schema.UnresolvedColumn> outputColumns = model.getOutputSchema().getColumns();
+        String modelProvider = ModelOptionsUtils.getProvider(model.getOptions());
+        // The provider string has already been validated so valueOf should never throw.
+        MLModelSupportedProviders provider =
+                MLModelSupportedProviders.valueOf(modelProvider.toUpperCase());
         // Split the format into possibly two parts separated by a colon.
         String[] parts = format.split(":", 2);
         String wrapper = parts.length > 1 ? parts[1] : null;
@@ -74,35 +80,58 @@ public class MLFormatterUtil {
                 return new JsonObjectInputFormatter(inputColumns, "input_data");
             case "AI21COMPLETE":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "AI21 Complete", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "AI21 Complete",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "AMAZONTITANTEXT":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "Amazon Titan Text", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "Amazon Titan Text",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "ANTHROPICCOMPLETIONS":
                 return new SinglePromptInputFormatter(
                         inputColumns,
                         "Anthropic Completions",
-                        new TextGenerationParams(modelOptions));
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "ANTHROPICMESSAGES":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "Anthropic Messages", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "Anthropic Messages",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "BEDROCKLLAMA":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "Bedrock Llama", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "Bedrock Llama",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "COHEREGENERATE":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "Cohere Generate", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "Cohere Generate",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "GEMINIGENERATE":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "Gemini Generate", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "Gemini Generate",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "MISTRALCOMPLETIONS":
                 return new SinglePromptInputFormatter(
                         inputColumns,
                         "Mistral Completions",
-                        new TextGenerationParams(modelOptions));
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "OPENAICHAT":
                 return new SinglePromptInputFormatter(
-                        inputColumns, "OpenAI Chat", new TextGenerationParams(modelOptions));
+                        inputColumns,
+                        "OpenAI Chat",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             default:
                 throw new FlinkRuntimeException("Unsupported ML Model input format: " + format);
         }

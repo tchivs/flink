@@ -58,9 +58,14 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         this.deploymentName = modelOptionsUtils.getProviderOptionOrDefault("deployment_name", "");
         // By default, we use the Pandas DataFrame Split format for input, with Azure ML's slight
         // variation of the top level node name.
+        String defaultInputFormat = "azureml-pandas-dataframe";
+        // If the endpoint looks like an Azure AI endpoint, we default to the openai chat format.
+        // Almost all of the Azure AI endpoints seem to use that format.
+        if (endpoint.contains("inference.ai.azure.com")) {
+            defaultInputFormat = "openai-chat";
+        }
         String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "input_format", "azureml-pandas-dataframe");
+                modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(

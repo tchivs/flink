@@ -90,6 +90,81 @@ public class BedrockProviderTest {
     }
 
     @Test
+    void testGetRequestAI21() throws Exception {
+        CatalogModel model = getEndpointModel("ai21.whatever");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        // Check that the request is created correctly.
+        assertThat(request.url().toString())
+                .isEqualTo(
+                        "https://bedrock-runtime.us-west-2.amazonaws.com/model/ai21.whatever/invoke/");
+        assertThat(request.method()).isEqualTo("POST");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the AI21-COMPLETE format.
+        assertThat(buffer.readUtf8()).isEqualTo("{\"prompt\":\"input-text-prompt\"}");
+    }
+
+    @Test
+    void testGetRequestAnthropic() throws Exception {
+        CatalogModel model = getEndpointModel("anthropic.whatever");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the ANTHROPIC-MESSAGES format.
+        assertThat(buffer.readUtf8())
+                .isEqualTo(
+                        "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\","
+                                + "\"text\":\"input-text-prompt\"}]}],\"anthropic_version\":\"bedrock-2023-05-31\"}");
+    }
+
+    @Test
+    void testGetRequestCohere() throws Exception {
+        CatalogModel model = getEndpointModel("cohere.whatever");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the COHERE-GENERATE format.
+        assertThat(buffer.readUtf8())
+                .isEqualTo(
+                        "{\"prompt\":\"input-text-prompt\",\"stream\":false,\"num_generations\":1}");
+    }
+
+    @Test
+    void testGetRequestMeta() throws Exception {
+        CatalogModel model = getEndpointModel("meta.whatever");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the BEDROCK-LLAMA format.
+        assertThat(buffer.readUtf8()).isEqualTo("{\"prompt\":\"input-text-prompt\"}");
+    }
+
+    @Test
+    void testGetRequestMistral() throws Exception {
+        CatalogModel model = getEndpointModel("mistral.whatever");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the MISTRAL-COMPLETIONS format.
+        assertThat(buffer.readUtf8()).isEqualTo("{\"prompt\":\"input-text-prompt\"}");
+    }
+
+    @Test
     void testParseResponse() throws Exception {
         CatalogModel model = getCatalogModel();
         BedrockProvider bedrockProvider =
@@ -119,6 +194,20 @@ public class BedrockProviderTest {
                 new BedrockProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc"};
         return bedrockProvider.getRequest(args);
+    }
+
+    @NotNull
+    private static CatalogModel getEndpointModel(String endpointModel) {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put(
+                "BEDROCK.ENDPOINT",
+                "https://bedrock-runtime.us-west-2.amazonaws.com/model/"
+                        + endpointModel
+                        + "/invoke");
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
     }
 
     @NotNull

@@ -41,9 +41,11 @@ public enum MLModelSupportedProviders {
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"),
     // Vertex AI endpoints look like
     // https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/endpoints/ENDPOINT:predict
+    // Published Generative AI model endpoints look like
+    // https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/publishers/PUBLISHER/models/MODEL:generateContent
     VERTEXAI(
             "VERTEXAI",
-            "https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/endpoints/.+(:predict|:rawPredict)?",
+            "https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/(endpoints|publishers)/.+(:predict|:rawPredict|:generateContent|:streamGenerateContent|:streamRawPredict)?",
             ""),
     ;
 

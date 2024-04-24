@@ -343,6 +343,22 @@ public class AzureMLProviderTest {
         assertThat(binary).isEqualTo(new byte[] {0x03, 0x00, 0x00, 0x00, 0x61, 0x62, 0x63});
     }
 
+    @Test
+    void testGetRequestChat() throws Exception {
+        CatalogModel model = getAICatalogModel();
+        AzureMLProvider azureMLProvider =
+                new AzureMLProvider(model, new MockSecretDecypterProvider(model));
+        Object[] args = new Object[] {"text-string"};
+        Request request = azureMLProvider.getRequest(args);
+        // Request should have defaulted to openai-chat format.
+        assertThat(request.body().contentType().toString()).isEqualTo("application/json");
+        assertThat(request.headers().get("Accept")).isEqualTo("application/json");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        assertThat(buffer.readUtf8())
+                .isEqualTo("{\"messages\":[{\"role\":\"user\",\"content\":\"text-string\"}]}");
+    }
+
     @NotNull
     private static Request getRequestWithFormat(String inputFormat) {
         Map<String, String> modelOptions = getCommonModelOptions();
@@ -381,6 +397,16 @@ public class AzureMLProviderTest {
                 new AzureMLProvider(model, new MockSecretDecypterProvider(model));
         Object[] args = new Object[] {"text-string"};
         return azureMLProvider.getRequest(args);
+    }
+
+    @NotNull
+    private static CatalogModel getAICatalogModel() {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put(
+                "AZUREML.ENDPOINT", "https://fake-endpoint.region.inference.ai.azure.com/score");
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
     }
 
     @NotNull
@@ -423,7 +449,7 @@ public class AzureMLProviderTest {
         modelOptions.put(
                 "AZUREML.ENDPOINT", "https://fake-endpoint.region.inference.ml.azure.com/score");
         modelOptions.put("AZUREML.API_KEY", "fake-api-key");
-        modelOptions.put("PROVIDER", "AZURLML");
+        modelOptions.put("PROVIDER", "AZUREML");
         modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;

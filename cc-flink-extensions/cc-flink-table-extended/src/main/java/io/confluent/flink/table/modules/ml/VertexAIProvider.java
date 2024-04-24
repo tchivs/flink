@@ -45,7 +45,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
     public VertexAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
         this.secretDecrypterProvider =
-                Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
+                Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
 
         MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.VERTEXAI;
         final String namespace = supportedProvider.getProviderName();
@@ -55,8 +55,17 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
         }
         supportedProvider.validateEndpoint(rawEndpoint, true);
+        Boolean isPublishedModel = rawEndpoint.contains("/publishers/");
+        // Pull out the name of the publisher from the endpoint url.
+        String publisher =
+                isPublishedModel
+                        ? rawEndpoint.split("/publishers/")[1].split("/")[0].toUpperCase()
+                        : "";
+
         String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", "tf-serving");
+                modelOptionsUtils.getProviderOptionOrDefault(
+                        "input_format",
+                        pickDefaultFormat(rawEndpoint, isPublishedModel, publisher));
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
@@ -71,17 +80,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "output_content_type", outputParser.acceptedContentTypes());
 
-        // if the raw endpoint doesn't end in :predict or :rawPredict, we add :predict
-        // for TF Serving models, and :rawPredict for other inputs. We won't override the user's
-        // choice of rawPredict, but we will switch predict to rawPredict if necessary.
-        if (!rawEndpoint.endsWith(":predict") && !rawEndpoint.endsWith(":rawPredict")) {
-            rawEndpoint = rawEndpoint + ":predict";
-        }
-        Boolean isTfServing = inputFormatter instanceof TFServingInputFormatter;
-        if (!isTfServing && rawEndpoint.endsWith(":predict")) {
-            rawEndpoint = rawEndpoint.replace(":predict", ":rawPredict");
-        }
-        this.endpoint = rawEndpoint;
+        this.endpoint = fixEndpointVerb(rawEndpoint, isPublishedModel, publisher);
 
         // Vertex AI API doesn't support API KEYs, we use a service account key to authenticate
         // and exchange it for a token.
@@ -99,6 +98,66 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         } catch (IOException e) {
             throw new RuntimeException("Unable to create client for Vertex AI endpoint: " + e);
         }
+    }
+
+    private String pickDefaultFormat(
+            String rawEndpoint, Boolean isPublishedModel, String publisher) {
+        String defaultInputFormat = "tf-serving";
+        if (isPublishedModel) {
+            switch (publisher) {
+                case "ANTHROPIC":
+                    defaultInputFormat = "ANTHROPIC-MESSAGES";
+                    break;
+                case "GOOGLE":
+                default:
+                    defaultInputFormat = "GEMINI-GENERATE";
+            }
+        }
+        return defaultInputFormat;
+    }
+
+    private String fixEndpointVerb(String rawEndpoint, Boolean isPublishedModel, String publisher) {
+        if (isPublishedModel) {
+            // Google published models use :generateContent instead of :predict
+            // Anthropic models use :rawPredict
+            // We replace :streamGenerateContent with :generateContent and
+            // :streamRawPredict with :rawPredict as we don't want to stream the output.
+            rawEndpoint =
+                    rawEndpoint
+                            .replace(":streamGenerateContent", ":generateContent")
+                            .replace(":streamRawPredict", ":rawPredict");
+            if (!rawEndpoint.endsWith(":predict")
+                    && !rawEndpoint.endsWith(":rawPredict")
+                    && !rawEndpoint.endsWith(":generateContent")) {
+                switch (publisher.toLowerCase()) {
+                    case "anthropic":
+                        rawEndpoint = rawEndpoint + ":rawPredict";
+                        break;
+                    case "google":
+                    default:
+                        rawEndpoint = rawEndpoint + ":generateContent";
+                }
+            }
+        } else {
+            // These models don't support :generateContent, so we replace it with :predict
+            rawEndpoint =
+                    rawEndpoint
+                            .replace(":generateContent", ":predict")
+                            .replace(":streamGenerateContent", ":predict");
+            // streamRawPredict is not supported, so we replace it with rawPredict
+            rawEndpoint = rawEndpoint.replace(":streamRawPredict", ":rawPredict");
+            // if the raw endpoint doesn't end in :predict or :rawPredict, we add :predict
+            // for TF Serving models, and :rawPredict for other inputs. We won't override the user's
+            // choice of rawPredict, but we will switch predict to rawPredict if necessary.
+            if (!rawEndpoint.endsWith(":predict") && !rawEndpoint.endsWith(":rawPredict")) {
+                rawEndpoint = rawEndpoint + ":predict";
+            }
+            Boolean isTfServing = inputFormatter instanceof TFServingInputFormatter;
+            if (!isTfServing && rawEndpoint.endsWith(":predict")) {
+                rawEndpoint = rawEndpoint.replace(":predict", ":rawPredict");
+            }
+        }
+        return rawEndpoint;
     }
 
     @VisibleForTesting
