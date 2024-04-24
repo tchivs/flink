@@ -32,7 +32,8 @@ public class BedrockProviderTest {
         model.getOptions().put("BEDROCK.ENDPOINT", "fake-endpoint");
         assertThatThrownBy(() -> new BedrockProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For BEDROCK endpoint expected to match https://bedrock-runtime(-fips)?\\.[\\w-]+\\.amazonaws\\.com/model/.+/invoke/?, got fake-endpoint");
     }
 
     @Test

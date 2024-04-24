@@ -54,7 +54,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         if (rawEndpoint == null) {
             throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
         }
-        supportedProvider.validateEndpoint(rawEndpoint);
+        supportedProvider.validateEndpoint(rawEndpoint, true);
         String inputFormat =
                 modelOptionsUtils.getProviderOptionOrDefault("input_format", "tf-serving");
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);

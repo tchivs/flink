@@ -66,7 +66,7 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             throw new IllegalArgumentException("Unsupported openai provider: " + supportedProvider);
         }
 
-        supportedProvider.validateEndpoint(endpoint);
+        supportedProvider.validateEndpoint(endpoint, true);
 
         if (supportedProvider == MLModelSupportedProviders.OPENAI) {
             this.apiKey =

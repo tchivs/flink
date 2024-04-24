@@ -51,7 +51,8 @@ public class OpenAIProviderTest {
                                 new OpenAIProvider(
                                         model, provider, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For OPENAI endpoint expected to match https://api\\.openai\\.com/.*, got fake-endpoint");
     }
 
     @Test

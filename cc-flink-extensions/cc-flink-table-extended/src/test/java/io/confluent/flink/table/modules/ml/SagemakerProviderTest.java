@@ -49,7 +49,8 @@ public class SagemakerProviderTest {
         assertThatThrownBy(
                         () -> new SagemakerProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For SAGEMAKER endpoint expected to match https://runtime(-fips)?\\.sagemaker\\.[\\w-]+\\.amazonaws\\.com/endpoints/.+/invocations/?, got fake-endpoint");
     }
 
     @Test

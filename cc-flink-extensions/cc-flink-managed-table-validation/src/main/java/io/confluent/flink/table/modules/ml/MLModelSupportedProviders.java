@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import java.net.URL;
@@ -69,44 +70,59 @@ public enum MLModelSupportedProviders {
         return defaultEndpoint;
     }
 
-    public void validateEndpoint(String endpoint) {
+    public void validateEndpoint(String endpoint, boolean runtime) {
         // These should be covered by the regex, but for security reasons we explictly check that
         // the endpoints aren't for localhost, confluent.cloud, or any raw IP, and are https.
         if (endpoint.startsWith("http:")) {
-            throw new FlinkRuntimeException(
+            final String msg =
                     String.format(
-                            "For %s endpoint expected to be https, got %s",
-                            providerName, endpoint));
+                            "For %s endpoint, the protocol should be https, got %s",
+                            providerName, endpoint);
+            if (runtime) {
+                throw new FlinkRuntimeException(msg);
+            } else {
+                throw new ValidationException(msg);
+            }
         }
-        URL url;
+
+        String errorMsg =
+                String.format(
+                        "For %s endpoint expected to match %s, got %s",
+                        providerName, endpointValidation, endpoint);
+        URL url = null;
         try {
             url = new URL(endpoint);
         } catch (Exception e) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "For %s endpoint expected to be a valid URL, got %s",
-                            providerName, endpoint));
+            throwEndpointValidationException(runtime, errorMsg, e);
         }
         String hostname = url.getHost();
         if (hostname.equals("localhost") || hostname.endsWith(".confluent.cloud")) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "For %s endpoint expected to match %s, got %s",
-                            providerName, endpointValidation, endpoint));
+            throwEndpointValidationException(runtime, errorMsg);
         }
         // Deny any hostname that looks like an IP address.
         if (hostname.matches("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$")) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "For %s endpoint expected to match %s, got %s",
-                            providerName, endpointValidation, endpoint));
+            throwEndpointValidationException(runtime, errorMsg);
         }
 
         if (!endpoint.matches(endpointValidation)) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "For %s endpoint expected to match %s, got %s",
-                            providerName, endpointValidation, endpoint));
+            throwEndpointValidationException(runtime, errorMsg);
         }
+    }
+
+    private void throwEndpointValidationException(boolean runtime, String msg) {
+        throwEndpointValidationException(runtime, msg, null);
+    }
+
+    private void throwEndpointValidationException(boolean runtime, String msg, Exception e) {
+        if (runtime) {
+            if (e == null) {
+                throw new FlinkRuntimeException(msg);
+            }
+            throw new FlinkRuntimeException(msg, e);
+        }
+        if (e == null) {
+            throw new ValidationException(msg);
+        }
+        throw new ValidationException(msg, e);
     }
 }

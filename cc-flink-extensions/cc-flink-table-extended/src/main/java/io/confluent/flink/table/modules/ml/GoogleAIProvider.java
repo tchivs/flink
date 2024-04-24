@@ -48,7 +48,7 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "ENDPOINT",
                         "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent");
-        supportedProvider.validateEndpoint(urlBase);
+        supportedProvider.validateEndpoint(urlBase, true);
         this.apiKey =
                 secretDecrypterProvider
                         .getDecrypter(modelOptionsUtils.getEncryptStrategy())

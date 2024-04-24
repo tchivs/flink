@@ -4,13 +4,20 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.api.ValidationException;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
+import io.confluent.flink.table.modules.ml.RemoteModelValidator.RemoteModelOptionsFactory;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,6 +28,75 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 /** Tests for {@link RemoteModelValidator}. */
 public class RemoteModelValidatorTest {
+
+    // <Provider, <valid, invalid>>
+    public static Collection<Tuple2<String, Tuple2<List<String>, List<String>>>> endpoints() {
+        List<Tuple2<String, Tuple2<List<String>, List<String>>>> ret =
+                ImmutableList.of(
+                        Tuple2.of(
+                                MLModelSupportedProviders.AZUREML.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://ENDPOINT.REGION.inference.ml.azure.com/score",
+                                                "https://ENDPOINT.REGION.inference.ai.azure.com/v1/completions"),
+                                        ImmutableList.of(
+                                                "http://ENDPOINT.REGION.inference.ml.azure.com/score",
+                                                "https://region.inference.ml.azure.com/score"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.AZUREOPENAI.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=DATE"),
+                                        ImmutableList.of(
+                                                "http://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=DATE",
+                                                "openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=DATE"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.BEDROCK.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://bedrock-runtime.REGION.amazonaws.com/model/MODEL-NAME/invoke"),
+                                        ImmutableList.of(
+                                                "http://bedrock-runtime.REGION.amazonaws.com/model/MODEL-NAME/invoke",
+                                                "https://REGION.amazonaws.com/model/MODEL-NAME/invoke"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.GOOGLEAI.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"),
+                                        ImmutableList.of(
+                                                "http://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+                                                "https://googleapis.com/v1beta/models/gemini-pro:generateContent"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.OPENAI.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://api.openai.com/v1/chat/completions"),
+                                        ImmutableList.of(
+                                                "http://api.openai.com/v1/chat/completions",
+                                                "https://something.api.openai.com/v1/chat/completions"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.SAGEMAKER.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://runtime.sagemaker.REGION.amazonaws.com/endpoints/ENDPOINT/invocations"),
+                                        ImmutableList.of(
+                                                "http://runtime.sagemaker.REGION.amazonaws.com/endpoints/ENDPOINT/invocations",
+                                                "https://runtime.sagemaker.REGION.amazonaws.com.other.com/endpoints/ENDPOINT/invocations"))),
+                        Tuple2.of(
+                                MLModelSupportedProviders.VERTEXAI.name(),
+                                Tuple2.of(
+                                        ImmutableList.of(
+                                                "https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/endpoints/ENDPOINT:predict"),
+                                        ImmutableList.of(
+                                                "http://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/endpoints/ENDPOINT:predict",
+                                                "https://aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/endpoints/ENDPOINT:predict"))));
+
+        if (ret.size() != MLModelSupportedProviders.values().length) {
+            throw new IllegalArgumentException("Missing providers");
+        }
+
+        return ret;
+    }
 
     @Test
     void testUppercaseOptionsThrow() {
@@ -60,13 +136,16 @@ public class RemoteModelValidatorTest {
                         "task", "text_generation",
                         "unknown.api_key", "key");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
-                .hasMessageContaining("Unsupported 'PROVIDER': unknown");
+                .isInstanceOf(ValidationException.class)
+                .hasMessage(
+                        "Unsupported PROVIDER: 'unknown'. Supported providers are [OPENAI, AZUREML, AZUREOPENAI, BEDROCK, SAGEMAKER, GOOGLEAI, VERTEXAI]");
     }
 
     @Test
     void testMissingProviderOptions() {
         Map<String, String> options = ImmutableMap.of("task", "text_generation");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("'PROVIDER' is not set");
     }
 
@@ -77,6 +156,7 @@ public class RemoteModelValidatorTest {
                         "provider", "openai",
                         "openai.api_key", "key");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("One or more required options are missing.");
     }
 
@@ -89,6 +169,7 @@ public class RemoteModelValidatorTest {
                         "bedrock.endpoint", "endpoint",
                         "bedrock.aws_access_key_id", "key_id");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("BEDROCK.AWS_SECRET_ACCESS_KEY");
     }
 
@@ -103,7 +184,56 @@ public class RemoteModelValidatorTest {
                         "openai.system_prompt", "count prime numbers",
                         "proxy", "proxy");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Unsupported options:" + "\n" + "\n" + "PROXY");
+    }
+
+    @Test
+    void testInvalidEndpoint() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "http://api.openai.com/",
+                        "openai.system_prompt", "count prime numbers");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "For OPENAI endpoint, the protocol should be https, got http://api.openai.com/");
+    }
+
+    @Test
+    void testValidEndpoint() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider", "openai",
+                        "task", "text_generation",
+                        "openai.api_key", "key",
+                        "openai.endpoint", "https://api.openai.com/",
+                        "openai.system_prompt", "count prime numbers");
+        validateCreateModelOptions("m1", options);
+    }
+
+    @ParameterizedTest
+    @MethodSource("endpoints")
+    void testEndpointValidationAll(
+            Tuple2<String, Tuple2<List<String>, List<String>>> providerTest) {
+        String provider = providerTest.f0;
+        RemoteModelOptions modelOptions =
+                RemoteModelOptionsFactory.createRemoteModelOptions(provider);
+        for (String validEndpoint : providerTest.f1.f0) {
+            modelOptions.getProvider().validateEndpoint(validEndpoint, false);
+        }
+
+        for (String inValidEndpoint : providerTest.f1.f1) {
+            assertThatThrownBy(
+                            () ->
+                                    modelOptions
+                                            .getProvider()
+                                            .validateEndpoint(inValidEndpoint, false))
+                    .isInstanceOf(ValidationException.class);
+        }
     }
 
     @Test
@@ -116,17 +246,19 @@ public class RemoteModelValidatorTest {
                         "vertexai.endpoint", "endpoint",
                         "vertexai.proxy", "endpoint");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Unsupported options:" + "\n" + "\n" + "VERTEXAI.PROXY");
     }
 
     @Test
     void testAllowParamsLevelOption() {
         Map<String, String> options =
-                Map.of(
+                ImmutableMap.of(
                         "provider", "vertexai",
                         "task", "text_generation",
                         "vertexai.service_key", "key",
-                        "vertexai.endpoint", "endpoint",
+                        "vertexai.endpoint",
+                                "https://uscentral-1-aiplatform.googleapis.com/v1/projects/matrix/locations/uscentral-1/endpoints/ENDPOINT:predict",
                         "vertexai.params.temp", "0.7");
         validateCreateModelOptions("m1", options);
     }
@@ -141,6 +273,7 @@ public class RemoteModelValidatorTest {
                         "openai.endpoint", "endpoint",
                         "confluent.model.secret.encrypt_strategy", "kms");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
                         "Unsupported options:"
                                 + "\n"
@@ -158,6 +291,7 @@ public class RemoteModelValidatorTest {
                         "openai.endpoint", "endpoint",
                         "openai.parameters.temp", "0.7");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
                         "Unsupported options:" + "\n" + "\n" + "OPENAI.PARAMETERS.TEMP");
     }
@@ -170,6 +304,7 @@ public class RemoteModelValidatorTest {
                         "task", "text_generation",
                         "azureopenai.api_key", "key");
         assertThatThrownBy(() -> validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
                         "Missing required options are:" + "\n" + "\n" + "AZUREOPENAI.ENDPOINT");
     }
@@ -182,7 +317,8 @@ public class RemoteModelValidatorTest {
                         "task", "text_generation",
                         "sagemaker.aws_access_key_id", "key_id",
                         "sagemaker.aws_secret_access_key", "secret_key",
-                        "sagemaker.endpoint", "endpoint",
+                        "sagemaker.endpoint",
+                                "https://runtime.sagemaker.us-west-2.amazonaws.com/endpoints/matrix/invocations",
                         "sagemaker.custom_attributes", "c000b4f9-df62-4c85-a0bf-7c525f9104a4",
                         "sagemaker.inference_id", "inference_id",
                         "sagemaker.target_variant", "variant1",
@@ -268,6 +404,7 @@ public class RemoteModelValidatorTest {
                         "vertexai.endpoint", "endpoint",
                         "vertexai.api_key", "key");
         assertThatThrownBy(() -> RemoteModelValidator.validateCreateModelOptions("m1", options))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
                         "Missing required options are:" + "\n" + "\n" + "VERTEXAI.SERVICE_KEY");
     }

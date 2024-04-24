@@ -12,6 +12,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -81,7 +82,7 @@ public class RemoteModelValidator {
         Map<String, String> uppercaseOptions = uppercaseOptions(options);
         final String provider = uppercaseOptions.get(PROVIDER);
         if (provider == null) {
-            throw new IllegalArgumentException("'" + PROVIDER + "' is not set");
+            throw new ValidationException("'" + PROVIDER + "' is not set");
         }
         final PublicRemoteModelFactory factory =
                 new PublicRemoteModelFactory(modelIdentifier, provider);
@@ -141,7 +142,8 @@ public class RemoteModelValidator {
         return keys;
     }
 
-    private static class RemoteModelOptionsFactory {
+    /** Factory to create RemoteModelOptions. */
+    public static class RemoteModelOptionsFactory {
         public static RemoteModelOptions createRemoteModelOptions(String provider) {
             MLModelSupportedProviders modelProvider = getModelProvider(provider);
             switch (modelProvider) {
@@ -160,19 +162,18 @@ public class RemoteModelValidator {
                 case SAGEMAKER:
                     return new SageMakerRemoteModelOptions();
                 default:
-                    throw new IllegalArgumentException(
-                            "Unsupported '" + PROVIDER + "': " + provider);
+                    throw new ValidationException("Unsupported '" + PROVIDER + "': " + provider);
             }
         }
     }
 
     private static class PublicRemoteModelFactory implements DynamicTableFactory {
         private final String modelIdentifier;
-        private final String provider;
+        private final RemoteModelOptions modelOptions;
 
         private PublicRemoteModelFactory(String modelIdentifier, String provider) {
             this.modelIdentifier = modelIdentifier;
-            this.provider = provider;
+            this.modelOptions = RemoteModelOptionsFactory.createRemoteModelOptions(provider);
         }
 
         @Override
@@ -182,8 +183,6 @@ public class RemoteModelValidator {
 
         @Override
         public Set<ConfigOption<?>> requiredOptions() {
-            RemoteModelOptions modelOptions =
-                    RemoteModelOptionsFactory.createRemoteModelOptions(provider);
             final Set<ConfigOption<?>> options = new HashSet<>();
             options.addAll(modelOptions.getRequiredToplevelOptions());
             options.addAll(modelOptions.getRequiredProviderLevelOptions());
@@ -192,8 +191,6 @@ public class RemoteModelValidator {
 
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
-            RemoteModelOptions modelOptions =
-                    RemoteModelOptionsFactory.createRemoteModelOptions(provider);
             final Set<ConfigOption<?>> options = new HashSet<>();
             options.addAll(modelOptions.getPublicOptionalTopLevelOptions());
             options.addAll(modelOptions.getOptionalProviderLevelOptions());
@@ -201,9 +198,11 @@ public class RemoteModelValidator {
         }
 
         public String paramsPrefix() {
-            RemoteModelOptions modelOptions =
-                    RemoteModelOptionsFactory.createRemoteModelOptions(provider);
             return modelOptions.getParamsPrefix();
+        }
+
+        public RemoteModelOptions getModelOptions() {
+            return modelOptions;
         }
     }
 
@@ -214,7 +213,13 @@ public class RemoteModelValidator {
                 return supportedProvider;
             }
         }
-        throw new IllegalArgumentException("Unsupported '" + PROVIDER + "': " + provider);
+        throw new ValidationException(
+                "Unsupported "
+                        + PROVIDER
+                        + ": '"
+                        + provider
+                        + "'. Supported providers are "
+                        + Arrays.toString(MLModelSupportedProviders.values()));
     }
 
     private static class RemoteModelHelper
@@ -238,6 +243,7 @@ public class RemoteModelValidator {
                     consumedOptionKeys,
                     deprecatedOptionKeys,
                     factory.paramsPrefix());
+            validateEndpoint();
         }
 
         /** Validate unconsumed options keys with skipping allowed prefix. */
@@ -261,6 +267,10 @@ public class RemoteModelValidator {
                     consumedOptionKeys,
                     deprecatedOptionKeys,
                     remainingOptionKeys);
+        }
+
+        private void validateEndpoint() {
+            factory.getModelOptions().validateEndpoint(allOptions, false);
         }
     }
 }

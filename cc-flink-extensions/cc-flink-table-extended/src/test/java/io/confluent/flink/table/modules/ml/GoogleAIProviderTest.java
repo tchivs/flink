@@ -47,7 +47,8 @@ public class GoogleAIProviderTest {
         model.getOptions().put("GOOGLEAI.ENDPOINT", "fake-endpoint");
         assertThatThrownBy(() -> new GoogleAIProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For GOOGLEAI endpoint expected to match https://generativelanguage.googleapis.com/.*, got fake-endpoint");
     }
 
     @Test

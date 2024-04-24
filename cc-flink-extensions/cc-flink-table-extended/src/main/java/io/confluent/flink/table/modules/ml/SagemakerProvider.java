@@ -80,7 +80,7 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
         if (endpoint == null) {
             throw new FlinkRuntimeException(namespace + ".endpoint setting not found");
         }
-        supportedProvider.validateEndpoint(endpoint);
+        supportedProvider.validateEndpoint(endpoint, true);
         try {
             // if the endpoint didn't end with a slash, add it. This is required by the AWS Signer.
             if (!endpoint.endsWith("/")) {

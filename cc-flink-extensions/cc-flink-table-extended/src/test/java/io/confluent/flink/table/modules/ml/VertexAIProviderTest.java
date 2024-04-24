@@ -70,7 +70,8 @@ public class VertexAIProviderTest {
                                 new MockVertexAIProvider(
                                         model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For VERTEXAI endpoint expected to match https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/endpoints/.+(:predict|:rawPredict)?, got fake-endpoint");
     }
 
     @Test

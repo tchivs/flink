@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
@@ -83,4 +84,8 @@ public abstract class RemoteModelOptions {
     public abstract Set<ConfigOption<?>> getSecretOptions();
 
     public abstract String getParamsPrefix();
+
+    public abstract void validateEndpoint(Configuration configuration, boolean runtime);
+
+    public abstract MLModelSupportedProviders getProvider();
 }

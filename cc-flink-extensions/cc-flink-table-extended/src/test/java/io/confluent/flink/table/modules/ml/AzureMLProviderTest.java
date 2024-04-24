@@ -52,7 +52,8 @@ public class AzureMLProviderTest {
         model.getOptions().put("AZUREML.ENDPOINT", "fake-endpoint");
         assertThatThrownBy(() -> new AzureMLProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be a valid URL");
+                .hasMessage(
+                        "For AZUREML endpoint expected to match https://[\\w-]+\\.[\\w-]+\\.inference\\.(ml|ai)\\.azure\\.com/.*, got fake-endpoint");
     }
 
     @Test
@@ -64,7 +65,8 @@ public class AzureMLProviderTest {
                         "http://fake-endpoint.fakeregion.inference.ml.azure.com/score");
         assertThatThrownBy(() -> new AzureMLProvider(model, new MockSecretDecypterProvider(model)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("expected to be https");
+                .hasMessage(
+                        "For AZUREML endpoint, the protocol should be https, got http://fake-endpoint.fakeregion.inference.ml.azure.com/score");
     }
 
     @Test

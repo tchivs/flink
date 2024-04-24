@@ -45,7 +45,7 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
         this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
-        supportedProvider.validateEndpoint(endpoint);
+        supportedProvider.validateEndpoint(endpoint, true);
 
         // Azure ML can take either an API Key or an expiring token, but we only support API Key.
         this.apiKey =
