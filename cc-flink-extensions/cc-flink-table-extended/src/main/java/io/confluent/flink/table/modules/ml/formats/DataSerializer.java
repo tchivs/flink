@@ -493,7 +493,7 @@ public class DataSerializer {
                                             mapper, node.get(fieldName), field));
                         }
                     } catch (Throwable t) {
-                        throw new RuntimeException(
+                        throw new FlinkRuntimeException(
                                 String.format("Fail to serialize at field: %s.", fieldName), t);
                     }
                 }
@@ -512,7 +512,7 @@ public class DataSerializer {
                             sb.append(",");
                         }
                     } catch (Throwable t) {
-                        throw new RuntimeException(
+                        throw new FlinkRuntimeException(
                                 String.format("Fail to serialize at field: %s.", fieldNames[i]), t);
                     }
                 }
@@ -805,8 +805,7 @@ public class DataSerializer {
                         if (!object.canConvertToInt()) {
                             // Int Overflow
                             throw new IOException(
-                                    "ML Predict failed to deserialize an int32 from a json field: "
-                                            + object);
+                                    "ML Predict could not convert json field to int32, possible overflow.");
                         }
                         return object.intValue();
                     }
@@ -841,8 +840,7 @@ public class DataSerializer {
                         if (!object.canConvertToLong()) {
                             // Int Overflow
                             throw new IOException(
-                                    "ML Predict failed to deserialize a long from a json field: "
-                                            + object);
+                                    "ML Predict could not convert json field to int64, possible overflow.");
                         }
                         return object.longValue();
                     }

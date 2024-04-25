@@ -91,7 +91,7 @@ public class GoogleAIProviderTest {
                                         MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
-                        "Expected object field /candidates/0/content/parts/0/text not found in response");
+                        "Expected object field /candidates/0/content/parts/0/text not found in json response");
     }
 
     @Test

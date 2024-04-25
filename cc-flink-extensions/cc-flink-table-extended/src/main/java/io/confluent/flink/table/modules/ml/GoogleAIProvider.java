@@ -101,4 +101,9 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
     public Row getContentFromResponse(Response response) {
         return outputParser.parse(response);
     }
+
+    @Override
+    public String maskSecrets(String message) {
+        return message.replaceAll(apiKey, "*****");
+    }
 }

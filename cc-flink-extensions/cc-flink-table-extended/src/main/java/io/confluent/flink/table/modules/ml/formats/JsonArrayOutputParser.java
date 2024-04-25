@@ -92,12 +92,10 @@ public class JsonArrayOutputParser implements OutputParser {
         try {
             jsonNode = mapper.readTree(responseString);
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Error parsing ML Predict response: " + e) {};
+            throw new FlinkRuntimeException("Failed to parse ML Predict response as json.") {};
         }
         if (!jsonNode.isArray()) {
-            throw new FlinkRuntimeException(
-                    "Expected ML predictions to be returned as a JSON array, but got: "
-                            + responseString);
+            throw new FlinkRuntimeException("ML prediction response was not a JSON array");
         }
         // If there is only one output, and it is an array, we will just use that array.
         // This is likely to be the most common use case.
@@ -120,10 +118,7 @@ public class JsonArrayOutputParser implements OutputParser {
                 row.setField(i, getRowFieldFromJson(prediction, i));
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
-                        "Error deserializing ML Prediction response: "
-                                + response
-                                + ": "
-                                + e.getMessage());
+                        "Error deserializing ML Prediction response: " + e.getMessage());
             }
         }
 

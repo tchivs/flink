@@ -144,7 +144,7 @@ public class OpenAIProviderTest {
                         () -> openAIProvider.getContentFromResponse(MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
-                        "Expected object field /choices/0/message/content not found in response");
+                        "Expected object field /choices/0/message/content not found in json response");
     }
 
     @Test

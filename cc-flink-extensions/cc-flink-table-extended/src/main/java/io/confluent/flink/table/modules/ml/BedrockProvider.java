@@ -210,4 +210,12 @@ public class BedrockProvider implements MLModelRuntimeProvider {
     public Row getContentFromResponse(Response response) {
         return outputParser.parse(response);
     }
+
+    @Override
+    public String maskSecrets(String message) {
+        // None of these ever actually appear in the request/response, but we mask them anyway.
+        return message.replaceAll(accessKey, "*****")
+                .replaceAll(secretKey, "*****")
+                .replaceAll(sessionToken, "*****");
+    }
 }

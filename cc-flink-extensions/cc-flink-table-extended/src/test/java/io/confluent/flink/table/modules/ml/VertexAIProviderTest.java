@@ -197,7 +197,7 @@ public class VertexAIProviderTest {
                                 vertexAIProvider.getContentFromResponse(
                                         MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("No predictions found in ML Predict response");
+                .hasMessageContaining("No '/predictions' field found in ML Predict response");
     }
 
     @Test

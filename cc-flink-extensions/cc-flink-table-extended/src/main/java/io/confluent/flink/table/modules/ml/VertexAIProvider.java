@@ -199,4 +199,10 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
     public Row getContentFromResponse(Response response) {
         return outputParser.parse(response);
     }
+
+    @Override
+    public String maskSecrets(String message) {
+        // These tokens are short-lived, but we mask it if it hasn't been refreshed.
+        return message.replaceAll(getAccessToken(), "*****");
+    }
 }

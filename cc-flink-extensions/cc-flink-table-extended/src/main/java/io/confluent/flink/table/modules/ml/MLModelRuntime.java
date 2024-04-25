@@ -11,6 +11,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
 import io.confluent.flink.table.utils.ModelOptionsUtils;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -88,14 +89,87 @@ public class MLModelRuntime implements AutoCloseable {
                         .writeTimeout(timeout, TimeUnit.MILLISECONDS)
                         .connectTimeout(timeout, TimeUnit.MILLISECONDS)
                         .callTimeout(timeout, TimeUnit.MILLISECONDS)
+                        .addInterceptor(
+                                new ModelRetryInterceptor(4, Duration.ofSeconds(2).toMillis()))
                         .build();
         return new MLModelRuntime(model, httpClient);
+    }
+
+    /** Interceptor to retry requests on quota errors. */
+    public static class ModelRetryInterceptor implements Interceptor {
+        private int maxRetries;
+        private long retryWait;
+
+        public ModelRetryInterceptor(int maxRetries, long retryWaitMilliseconds) {
+            this.maxRetries = maxRetries;
+            this.retryWait = retryWaitMilliseconds;
+        }
+
+        @Override
+        public Response intercept(Chain chain) throws java.io.IOException {
+            // Retry the request if the response is a quota or unavailable error, up to maxRetries
+            // times, using exponential backoff. All other errors are passed through.
+            int retryCount = 0;
+            Response response = null;
+            while (retryCount <= maxRetries) {
+                Request request = chain.request();
+                response = chain.proceed(request);
+                if ((response.code() == 429 || response.code() == 503) && retryCount < maxRetries) {
+                    response.close();
+                    // If the response has a retry-after header, we are polite and use that as the
+                    // wait time and set this as the last retry.
+                    long waitTime = retryWait * (1 << retryCount);
+                    if (response.header("Retry-After") != null) {
+                        try {
+                            // We won't wait more than 60 seconds, regardless of how nicely the
+                            // server asks. We also won't wait less than the default wait time.
+                            waitTime =
+                                    Math.min(
+                                            Math.max(
+                                                    Long.parseLong(response.header("Retry-After"))
+                                                            * 1000,
+                                                    retryWait),
+                                            Duration.ofSeconds(60).toMillis());
+                        } catch (NumberFormatException e) {
+                            // If the Retry-After header is not a number, just wait the default and
+                            // do one last retry.
+                            // The HTTP spec allows it to be a date, which we don't support.
+                        }
+                        retryCount = maxRetries - 1;
+                    }
+                    try {
+                        Thread.sleep(waitTime);
+                    } catch (InterruptedException e) {
+                        throw new java.io.IOException("Interrupted while waiting to retry", e);
+                    }
+                    retryCount++;
+                } else {
+                    return response;
+                }
+            }
+            return response;
+        }
     }
 
     @Override
     public void close() throws Exception {
         this.httpClient.dispatcher().executorService().shutdown();
         this.httpClient.connectionPool().evictAll();
+    }
+
+    public String maskInputs(String message, Object[] args) {
+        message = provider.maskSecrets(message);
+        // Mask any substrings in message that appear in args.
+        for (Object arg : args) {
+            if (arg instanceof String) {
+                message = message.replaceAll((String) arg, "*****");
+            }
+        }
+        // Limit the size of the response string for errors.
+        if (message.length() > 300) {
+            message = message.substring(0, 300) + "...";
+        }
+        return message;
     }
 
     public Row run(Object[] args) throws Exception {
@@ -109,6 +183,8 @@ public class MLModelRuntime implements AutoCloseable {
                     try {
                         if (responseBody != null) {
                             responseString = responseBody.string().trim();
+                            // Mask any sensitive information in the response string.
+                            responseString = maskInputs(responseString, args);
                         }
                     } catch (Exception e) {
                         // ignored.

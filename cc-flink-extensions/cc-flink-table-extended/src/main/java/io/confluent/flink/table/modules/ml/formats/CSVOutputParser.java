@@ -77,7 +77,7 @@ public class CSVOutputParser implements OutputParser {
                             .with(CsvParser.Feature.WRAP_AS_ARRAY)
                             .readValues(responseString);
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Error parsing ML Predict response: " + e);
+            throw new FlinkRuntimeException("Could not parse ML Predict response as CSV.");
         }
 
         // We only look at the first row, since we don't support batching.
@@ -85,7 +85,8 @@ public class CSVOutputParser implements OutputParser {
         try {
             rowList = it.next();
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Error parsing ML Predict response: " + e);
+            throw new FlinkRuntimeException(
+                    "Could not parse line 1 of ML Predict response as CSV.");
         }
 
         if (rowList == null) {

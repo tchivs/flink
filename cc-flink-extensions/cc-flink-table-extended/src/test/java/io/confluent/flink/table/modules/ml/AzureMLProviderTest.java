@@ -153,7 +153,7 @@ public class AzureMLProviderTest {
                                 azureMLProvider.getContentFromResponse(
                                         MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Expected ML predictions to be returned as a JSON array");
+                .hasMessageContaining("ML prediction response was not a JSON array");
     }
 
     @Test
@@ -167,7 +167,7 @@ public class AzureMLProviderTest {
                                 azureMLProvider.getContentFromResponse(
                                         MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Model not found or something");
+                .hasMessageContaining("ML prediction response was not a JSON array");
     }
 
     @Test

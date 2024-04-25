@@ -76,7 +76,7 @@ public class TFServingOutputParser implements OutputParser {
                 throw new FlinkRuntimeException("Remote ML Predict error: " + error) {};
             }
             throw new FlinkRuntimeException(
-                    "No predictions found in ML Predict response: " + responseString) {};
+                    String.format("No '%s' field found in ML Predict response.", topLevelNode)) {};
         }
         // The predictions field should be an array of objects, but we only care about the first
         // one since we don't support batching.
@@ -89,10 +89,9 @@ public class TFServingOutputParser implements OutputParser {
                 final JsonNode field = prediction.get(fieldName);
                 if (field == null) {
                     throw new FlinkRuntimeException(
-                            "Field "
-                                    + fieldName
-                                    + " not found in remote ML Prediction response: "
-                                    + prediction) {};
+                            String.format(
+                                    "Field %s not found in remote ML Prediction response",
+                                    fieldName)) {};
                 }
 
                 try {
@@ -111,7 +110,7 @@ public class TFServingOutputParser implements OutputParser {
                 row.setField(0, getRowFieldFromJson(prediction, 0));
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
-                        "Error deserializing Vertex AI prediction response: " + e.getMessage());
+                        "Error deserializing TF Serving prediction response: " + e.getMessage());
             }
         } else {
             throw new FlinkRuntimeException(

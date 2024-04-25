@@ -17,4 +17,6 @@ public interface MLModelRuntimeProvider {
     public Request getRequest(Object[] args);
 
     public Row getContentFromResponse(Response response);
+
+    public String maskSecrets(String message);
 }

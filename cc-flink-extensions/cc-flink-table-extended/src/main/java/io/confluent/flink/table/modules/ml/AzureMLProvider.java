@@ -104,6 +104,11 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
     }
 
     @Override
+    public String maskSecrets(String message) {
+        return message.replaceAll(apiKey, "*****");
+    }
+
+    @Override
     public Row getContentFromResponse(Response response) {
         return outputParser.parse(response);
     }

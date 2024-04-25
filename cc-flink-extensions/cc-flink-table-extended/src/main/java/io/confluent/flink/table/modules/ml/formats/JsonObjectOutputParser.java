@@ -79,8 +79,8 @@ public class JsonObjectOutputParser implements OutputParser {
             if (outerNode == null || outerNode instanceof MissingNode) {
                 throw new FlinkRuntimeException(
                         String.format(
-                                "Error parsing ML Predict response: Expected object field %s not found in response: %s",
-                                objectWrapper, responseString));
+                                "Error parsing ML Predict response: Expected object field %s not found in json response.",
+                                objectWrapper));
             }
         }
 

@@ -239,7 +239,8 @@ public class TritonOutputParserTest {
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"UINT64\",\"shape\":[1],\"data\":[9223372036854775809]}]}";
         assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("ML Predict failed to deserialize a long from");
+                .hasMessageContaining(
+                        "ML Predict could not convert json field to int64, possible overflow");
     }
 
     @Test
