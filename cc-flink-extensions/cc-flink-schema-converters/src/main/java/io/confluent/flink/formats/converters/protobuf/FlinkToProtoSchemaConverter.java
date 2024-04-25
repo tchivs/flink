@@ -9,6 +9,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
@@ -200,6 +201,12 @@ public class FlinkToProtoSchemaConverter {
                 builder.setType(Type.TYPE_BYTES);
                 return builder.build();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                final LocalZonedTimestampType timestampLtzType =
+                        (LocalZonedTimestampType) logicalType;
+                if (timestampLtzType.getPrecision() != 9) {
+                    throw new ValidationException(
+                            "Protobuf supports only precision of 9 for TIMESTAMP_LTZ type.");
+                }
                 builder.setType(Type.TYPE_MESSAGE);
                 builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIMESTAMP_TYPE));
                 dependencies.add(CommonConstants.PROTOBUF_TIMESTAMP_LOCATION);
