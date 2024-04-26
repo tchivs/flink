@@ -76,7 +76,7 @@ class CompactionTracker {
         return isShuttingDown;
     }
 
-    public void close() {
+    public synchronized void close() {
         isShuttingDown = true;
     }
 
