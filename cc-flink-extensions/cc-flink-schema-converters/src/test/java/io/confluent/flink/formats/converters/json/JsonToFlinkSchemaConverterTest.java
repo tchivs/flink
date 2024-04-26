@@ -100,6 +100,30 @@ public class JsonToFlinkSchemaConverterTest {
                 .hasMessage("Cyclic schemas are not supported.");
     }
 
+    @Test
+    void testJsonTuples() {
+        String schemaStr =
+                "{\n"
+                        + "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n"
+                        + "  \"title\": \"IdentifyUserMessage\",\n"
+                        + "  \"type\": \"object\",\n"
+                        + "  \"properties\": {\n"
+                        + "    \"msg\": {\n"
+                        + "      \"type\": \"array\",\n"
+                        + "      \"items\": [{\"type\": \"string\"}]\n"
+                        + "    }\n"
+                        + "  },\n"
+                        + "}";
+        JSONObject rawSchema = new JSONObject(new JSONTokener(new StringReader(schemaStr)));
+        assertThatThrownBy(
+                        () ->
+                                JsonToFlinkSchemaConverter.toFlinkSchema(
+                                        SchemaLoader.load(rawSchema)))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage(
+                        "JSON tuples (i.e. arrays that contain items of different types) are not supported");
+    }
+
     static TypeMapping unionDifferentStruct() {
         final Map<String, Object> numberSchemaProps = new HashMap<>();
         numberSchemaProps.put("connect.index", 0);

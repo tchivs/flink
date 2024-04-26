@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.converters.json;
 
+import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DecimalType;
@@ -142,6 +143,12 @@ public final class CommonMappings {
     }
 
     public static Stream<TypeMapping> get() {
+        return getPrimitiveTypes()
+                .flatMap(t -> Stream.of(t, toNullable(t)))
+                .flatMap(t -> Stream.of(t, toArrayType(t)));
+    }
+
+    private static Stream<TypeMapping> getPrimitiveTypes() {
         return Stream.of(
                 new TypeMapping(FLOAT64_SCHEMA, new DoubleType(false)),
                 new TypeMapping(INT64_SCHEMA, new BigIntType(false)),
@@ -150,28 +157,9 @@ public final class CommonMappings {
                 new TypeMapping(FLOAT32_SCHEMA, new FloatType(false)),
                 new TypeMapping(BYTES_SCHEMA, new VarBinaryType(false, VarBinaryType.MAX_LENGTH)),
                 new TypeMapping(
-                        StringSchema.builder().build(),
-                        new VarCharType(false, VarCharType.MAX_LENGTH)),
-                new TypeMapping(nullable(FLOAT64_SCHEMA), new DoubleType()),
-                new TypeMapping(nullable(INT64_SCHEMA), new BigIntType()),
-                new TypeMapping(nullable(INT32_SCHEMA), new IntType()),
-                new TypeMapping(nullable(BooleanSchema.builder().build()), new BooleanType()),
-                new TypeMapping(nullable(FLOAT32_SCHEMA), new FloatType()),
-                new TypeMapping(
-                        nullable(BYTES_SCHEMA), new VarBinaryType(true, VarBinaryType.MAX_LENGTH)),
-                new TypeMapping(
-                        nullable(StringSchema.builder().build()),
-                        new VarCharType(true, VarCharType.MAX_LENGTH)),
-                new TypeMapping(
                         MAP_STRING_TINYINT_SCHEMA,
                         new MapType(
                                 false,
-                                new VarCharType(false, VarCharType.MAX_LENGTH),
-                                new TinyIntType(false))),
-                new TypeMapping(
-                        nullable(MAP_STRING_TINYINT_SCHEMA),
-                        new MapType(
-                                true,
                                 new VarCharType(false, VarCharType.MAX_LENGTH),
                                 new TinyIntType(false))),
                 new TypeMapping(TIMESTAMP_SCHEMA, new LocalZonedTimestampType(false, 3)),
@@ -193,6 +181,17 @@ public final class CommonMappings {
                                 false,
                                 Collections.singletonList(
                                         new RowField("decimal", new DecimalType(10, 2))))));
+    }
+
+    private static TypeMapping toNullable(TypeMapping mapping) {
+        return new TypeMapping(
+                nullable(mapping.getJsonSchema()), mapping.getFlinkType().copy(true));
+    }
+
+    private static TypeMapping toArrayType(TypeMapping mapping) {
+        return new TypeMapping(
+                ArraySchema.builder().allItemSchema(mapping.getJsonSchema()).build(),
+                new ArrayType(false, mapping.getFlinkType()));
     }
 
     private static Schema decimalSchema() {

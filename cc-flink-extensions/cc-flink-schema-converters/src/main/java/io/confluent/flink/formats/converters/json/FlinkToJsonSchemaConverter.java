@@ -193,7 +193,7 @@ public class FlinkToJsonSchemaConverter {
             case ARRAY:
                 ArrayType arrayType = (ArrayType) logicalType;
                 return ArraySchema.builder()
-                        .addItemSchema(fromFlinkSchema(arrayType.getElementType(), rowName));
+                        .allItemSchema(fromFlinkSchema(arrayType.getElementType(), rowName));
             case MULTISET:
                 return convertMultiset((MultisetType) logicalType, rowName);
             case TIMESTAMP_WITHOUT_TIME_ZONE:

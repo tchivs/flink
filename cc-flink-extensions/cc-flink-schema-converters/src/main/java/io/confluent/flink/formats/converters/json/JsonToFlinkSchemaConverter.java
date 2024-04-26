@@ -245,13 +245,17 @@ public class JsonToFlinkSchemaConverter {
             return new RowType(isOptionalRow, fields);
         } else if (schema instanceof ArraySchema) {
             ArraySchema arraySchema = (ArraySchema) schema;
-            org.everit.json.schema.Schema itemsSchema = arraySchema.getAllItemSchema();
-            if (itemsSchema == null) {
+            org.everit.json.schema.Schema allItemSchema = arraySchema.getAllItemSchema();
+            if (allItemSchema == null) {
+                if (arraySchema.getItemSchemas() != null) {
+                    throw new ValidationException(
+                            "JSON tuples (i.e. arrays that contain items of different types) are not supported");
+                }
                 throw new ValidationException("Array schema did not specify the items type");
             }
             String type = (String) arraySchema.getUnprocessedProperties().get(CONNECT_TYPE_PROP);
-            if (CONNECT_TYPE_MAP.equals(type) && itemsSchema instanceof ObjectSchema) {
-                ObjectSchema objectSchema = (ObjectSchema) itemsSchema;
+            if (CONNECT_TYPE_MAP.equals(type) && allItemSchema instanceof ObjectSchema) {
+                ObjectSchema objectSchema = (ObjectSchema) allItemSchema;
                 return new MapType(
                         isOptional,
                         toFlinkSchemaWithCycleDetection(
@@ -265,7 +269,7 @@ public class JsonToFlinkSchemaConverter {
             } else {
                 return new ArrayType(
                         isOptional,
-                        toFlinkSchemaWithCycleDetection(itemsSchema, false, cycleContext));
+                        toFlinkSchemaWithCycleDetection(allItemSchema, false, cycleContext));
             }
         } else if (schema instanceof ObjectSchema) {
             ObjectSchema objectSchema = (ObjectSchema) schema;
