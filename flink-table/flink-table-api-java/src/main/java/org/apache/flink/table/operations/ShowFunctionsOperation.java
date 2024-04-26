@@ -49,6 +49,7 @@ public class ShowFunctionsOperation implements ShowOperation {
 
     private final FunctionScope functionScope;
     private final String preposition;
+
     private final String catalogName;
     private final String databaseName;
     // different like type such as like, ilike
@@ -209,5 +210,13 @@ public class ShowFunctionsOperation implements ShowOperation {
         }
 
         return buildStringArrayResult("function name", rows);
+    }
+
+    public String getCatalogName() {
+        return catalogName;
+    }
+
+    public String getDatabaseName() {
+        return databaseName;
     }
 }
