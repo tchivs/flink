@@ -333,6 +333,10 @@ public class RowDataToJsonConverters {
                             node.set(
                                     fieldName,
                                     fieldConverters[i].convert(mapper, node.get(fieldName), field));
+                        } else {
+                            // we need to clear the field potentially set by processing the previous
+                            // record
+                            node.remove(fieldName);
                         }
                     } catch (Throwable t) {
                         throw new RuntimeException(
