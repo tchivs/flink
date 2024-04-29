@@ -23,6 +23,7 @@ import java.util.List;
 import static io.confluent.flink.table.modules.TestUtils.MockedInMemoryCredentialDecrypterImpl;
 import static io.confluent.flink.table.modules.TestUtils.createKeyPair;
 import static io.confluent.flink.table.modules.TestUtils.encryptMessage;
+import static io.confluent.flink.table.modules.TestUtils.verifySignature;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 /** Tests for MlUtils class. */
@@ -82,5 +83,25 @@ public class MlUtilsTest {
                 new MockedInMemoryCredentialDecrypterImpl(keyPair.getPrivate().getEncoded());
         assertThat(MlUtils.decryptSecretWithComputePoolKey(encryptedSecret, decrypter))
                 .isEqualTo(PLAINTEXT);
+    }
+
+    @Test
+    public void testSignData() throws Exception {
+        final String data = "hello";
+        final KeyPair keyPair = createKeyPair();
+        final CredentialDecrypter decrypter =
+                new MockedInMemoryCredentialDecrypterImpl(keyPair.getPrivate().getEncoded());
+        final byte[] signature = MlUtils.signData(data, decrypter);
+        assertThat(verifySignature(data, signature, keyPair.getPublic())).isTrue();
+    }
+
+    @Test
+    public void testVerificationFailure() throws Exception {
+        final String data = "hello";
+        final KeyPair keyPair = createKeyPair();
+        final CredentialDecrypter decrypter =
+                new MockedInMemoryCredentialDecrypterImpl(keyPair.getPrivate().getEncoded());
+        final byte[] signature = MlUtils.signData(data, decrypter);
+        assertThat(verifySignature("bad data", signature, keyPair.getPublic())).isFalse();
     }
 }

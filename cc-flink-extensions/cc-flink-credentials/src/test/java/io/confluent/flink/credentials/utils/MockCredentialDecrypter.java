@@ -34,4 +34,11 @@ public class MockCredentialDecrypter implements CredentialDecrypter {
         }
         return result;
     }
+
+    public byte[] sign(byte[] data) {
+        if (error) {
+            throw new RuntimeException("Signing error");
+        }
+        return result;
+    }
 }

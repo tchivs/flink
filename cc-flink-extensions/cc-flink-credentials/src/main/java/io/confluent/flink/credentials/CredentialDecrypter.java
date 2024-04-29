@@ -7,7 +7,10 @@ package io.confluent.flink.credentials;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.configuration.Configuration;
 
-/** A class that can decrypt static credentials returned by Flink Credential Service. */
+/**
+ * A class that can decrypt static credentials returned by Flink Credential Service as well as sign
+ * data using private key.
+ */
 @Confluent
 public interface CredentialDecrypter {
 
@@ -25,4 +28,12 @@ public interface CredentialDecrypter {
      * @return The plain text value
      */
     byte[] decrypt(byte[] value);
+
+    /**
+     * Sign data.
+     *
+     * @param data The data to sign
+     * @return The signed signature
+     */
+    byte[] sign(byte[] data);
 }

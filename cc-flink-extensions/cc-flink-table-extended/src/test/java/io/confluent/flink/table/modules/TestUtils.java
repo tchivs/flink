@@ -21,7 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
 import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
 
 /** Test utilities for encryption and decryption. */
 public class TestUtils {
@@ -42,6 +44,16 @@ public class TestUtils {
                         PSource.PSpecified.DEFAULT);
         cipher.init(Cipher.ENCRYPT_MODE, pubKey, oaepParams);
         return cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static boolean verifySignature(
+            String data, byte[] signature, java.security.PublicKey pubKey) throws Exception {
+        Signature privateSignature = Signature.getInstance("SHA256withRSA/PSS");
+        privateSignature.setParameter(
+                new PSSParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, 32, 1));
+        privateSignature.initVerify(pubKey);
+        privateSignature.update(data.getBytes(StandardCharsets.UTF_8));
+        return privateSignature.verify(signature);
     }
 
     /** Mocked CredentialDecrypter. */

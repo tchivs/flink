@@ -238,4 +238,12 @@ public class MlUtils {
     public static String decryptWithComputePoolSecret(byte[] secret) {
         return decryptSecretWithComputePoolKey(secret, InMemoryCredentialDecrypterImpl.INSTANCE);
     }
+
+    public static byte[] signData(String data) {
+        return signData(data, InMemoryCredentialDecrypterImpl.INSTANCE);
+    }
+
+    public static byte[] signData(String data, CredentialDecrypter decrypter) {
+        return decrypter.sign(data.getBytes(StandardCharsets.UTF_8));
+    }
 }

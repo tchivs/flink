@@ -20,7 +20,7 @@ import static io.confluent.flink.credentials.KafkaCredentialsOptions.MOUNTED_SEC
 
 /**
  * Reads a secret which is locally mounted in the JM pod, and uses that to decrypt the API key from
- * the FCP Credential Service.
+ * the FCP Credential Service. It can also sign data using the private key.
  */
 public class FileCredentialDecrypterImpl extends AbstractCredentialDecrypterImpl {
     public static final FileCredentialDecrypterImpl INSTANCE = new FileCredentialDecrypterImpl();

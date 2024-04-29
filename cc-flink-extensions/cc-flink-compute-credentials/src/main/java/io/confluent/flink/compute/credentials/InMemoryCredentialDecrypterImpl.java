@@ -15,7 +15,7 @@ import java.util.Optional;
 
 /**
  * Reads a secret which is cached in memory on the TM from the JM, and uses that to decrypt the API
- * key from the FCP Credential Service.
+ * key from the FCP Credential Service. It can also sign data using the private key.
  */
 @Confluent
 public class InMemoryCredentialDecrypterImpl extends AbstractCredentialDecrypterImpl

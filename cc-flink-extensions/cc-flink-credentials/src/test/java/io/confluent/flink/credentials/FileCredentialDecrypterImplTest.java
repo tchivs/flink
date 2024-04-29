@@ -26,7 +26,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
 import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
 
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.MOUNTED_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,5 +99,18 @@ public class FileCredentialDecrypterImplTest {
         assertThatThrownBy(() -> decrypter.init(configuration))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Couldn't read private key");
+    }
+
+    @Test
+    public void testSign() throws Exception {
+        decrypter.init(configuration);
+        String data = "hello";
+        byte[] signature = decrypter.sign(data.getBytes(StandardCharsets.UTF_8));
+        Signature privateSignature = Signature.getInstance("SHA256withRSA/PSS");
+        privateSignature.setParameter(
+                new PSSParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, 32, 1));
+        privateSignature.initVerify(kp.getPublic());
+        privateSignature.update(data.getBytes(StandardCharsets.UTF_8));
+        assertThat(privateSignature.verify(signature)).isTrue();
     }
 }
