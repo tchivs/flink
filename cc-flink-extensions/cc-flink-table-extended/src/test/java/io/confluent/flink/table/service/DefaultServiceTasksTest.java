@@ -62,6 +62,28 @@ public class DefaultServiceTasksTest {
     }
 
     @Test
+    void testCompileForegroundQueryPointInTime() throws Exception {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inBatchMode());
+        ResultPlanUtils.createConfluentCatalogTable(
+                tableEnv,
+                "source",
+                Schema.newBuilder()
+                        .column("user", DataTypes.STRING())
+                        .column("amount", DataTypes.INT())
+                        .column("ts", DataTypes.TIMESTAMP_LTZ(3))
+                        .build(),
+                Map.of("connector", "datagen", "number-of-rows", "10"),
+                Collections.emptyMap());
+
+        final ForegroundJobResultPlan plan =
+                ResultPlanUtils.foregroundJob(
+                        tableEnv, "SELECT SUM(amount) FROM source GROUP BY user");
+
+        assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
+    }
+
+    @Test
     void testCompileBackgroundQueries() throws Exception {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());

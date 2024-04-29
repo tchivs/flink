@@ -32,7 +32,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.operations.ModifyOperation;
 import org.apache.flink.table.operations.QueryOperation;
 import org.apache.flink.table.operations.SinkModifyOperation;
-import org.apache.flink.table.planner.delegation.StreamPlanner;
+import org.apache.flink.table.planner.delegation.PlannerBase;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecSink;
@@ -628,8 +628,7 @@ class DefaultServiceTasks implements ServiceTasks {
             ConnectorOptionsProvider connectorOptions) {
         final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
 
-        final StreamPlanner planner = (StreamPlanner) tableEnv.getPlanner();
-
+        final PlannerBase planner = (PlannerBase) tableEnv.getPlanner();
         final List<FlinkPhysicalRel> physicalGraph = optimize(planner, modifyOperations);
 
         final QuerySummary querySummary = new QuerySummary();
@@ -642,7 +641,6 @@ class DefaultServiceTasks implements ServiceTasks {
                         .filter(r -> r.matches(querySummary))
                         .findFirst()
                         .flatMap(e -> e.execute(serdeContext, physicalGraph));
-
         if (localResults.isPresent()) {
             return CompilationResult.local(querySummary, localResults.get());
         }
@@ -651,11 +649,9 @@ class DefaultServiceTasks implements ServiceTasks {
         // It would be great to base the summary purely on the
         // physical graph but currently this is not possible.
         querySummary.ingestExecNodeGraph(graph);
-
         graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
 
         graph.getRootNodes().forEach(DefaultServiceTasks::checkForUnsupportedExecNodes);
-
         final String compiledPlan;
         try {
             compiledPlan =
@@ -672,7 +668,7 @@ class DefaultServiceTasks implements ServiceTasks {
     /** Runs the optimizer and returns a list of {@link FlinkPhysicalRel}. */
     @SuppressWarnings("unchecked")
     private static List<FlinkPhysicalRel> optimize(
-            StreamPlanner planner, List<ModifyOperation> operations) {
+            PlannerBase planner, List<ModifyOperation> operations) {
         final List<RelNode> logicalNodes =
                 operations.stream().map(planner::translateToRel).collect(Collectors.toList());
         final List<RelNode> optimizedNodes = toJava(planner.optimize(toScala(logicalNodes)));
@@ -682,7 +678,7 @@ class DefaultServiceTasks implements ServiceTasks {
     /** Runs the translation to an {@link ExecNodeGraph}. */
     @SuppressWarnings("unchecked")
     private static ExecNodeGraph translate(
-            StreamPlanner planner, List<FlinkPhysicalRel> physicalGraph) {
+            PlannerBase planner, List<FlinkPhysicalRel> physicalGraph) {
         final List<RelNode> optimizedNodes = (List<RelNode>) (List<?>) physicalGraph;
         return planner.translateToExecNodeGraph(toScala(optimizedNodes), true);
     }
