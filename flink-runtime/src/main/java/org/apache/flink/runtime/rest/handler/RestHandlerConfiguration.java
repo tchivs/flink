@@ -125,13 +125,7 @@ public class RestHandlerConfiguration {
         final Time timeout = Time.milliseconds(configuration.getLong(WebOptions.TIMEOUT));
 
         final String rootDir = "flink-web-ui";
-        final File webUiDir =
-                new File(
-                        configuration.getString(
-                                org.apache.flink.configuration.JobManagerConfluentOptions
-                                        .FORCED_WEB_TMP_UI_DIR,
-                                configuration.getString(WebOptions.TMP_DIR)),
-                        rootDir);
+        final File webUiDir = new File(configuration.getString(WebOptions.TMP_DIR), rootDir);
 
         final boolean webSubmitEnabled = configuration.getBoolean(WebOptions.SUBMIT_ENABLE);
         final boolean webCancelEnabled = configuration.getBoolean(WebOptions.CANCEL_ENABLE);
