@@ -36,6 +36,7 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
     private final MediaType contentType;
     private final String acceptedContentType;
     private final SecretDecrypterProvider secretDecrypterProvider;
+    private final String metricsName;
 
     public AzureMLProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
@@ -63,6 +64,9 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         // Almost all of the Azure AI endpoints seem to use that format.
         if (endpoint.contains("inference.ai.azure.com")) {
             defaultInputFormat = "openai-chat";
+            metricsName = MLFunctionMetrics.AZURE_ML_AI;
+        } else {
+            metricsName = namespace;
         }
         String inputFormat =
                 modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
@@ -106,6 +110,11 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
     @Override
     public String maskSecrets(String message) {
         return message.replaceAll(apiKey, "*****");
+    }
+
+    @Override
+    public String getMetricsName() {
+        return metricsName;
     }
 
     @Override

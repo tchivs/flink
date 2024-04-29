@@ -16,6 +16,7 @@ import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ public class MLPredictFunction extends TableFunction<Object> {
     private final Map<String, String> serializedModelProperties;
     private final String functionName;
     private transient MLModelRuntime mlModelRuntime = null;
+    private transient MLFunctionMetrics metrics;
 
     private static TypeInference getTypeInference(CatalogModel model, DataTypeFactory typeFactory) {
         Preconditions.checkNotNull(model, "Model must not be null.");
@@ -91,6 +93,7 @@ public class MLPredictFunction extends TableFunction<Object> {
     @Override
     public void open(FunctionContext context) throws Exception {
         super.open(context);
+        this.metrics = new MLFunctionMetrics(context.getMetricGroup());
         if (mlModelRuntime != null) {
             mlModelRuntime.close();
         }
@@ -100,7 +103,7 @@ public class MLPredictFunction extends TableFunction<Object> {
             }
             model = deserialize(serializedModelProperties);
         }
-        this.mlModelRuntime = MLModelRuntime.open(model);
+        this.mlModelRuntime = MLModelRuntime.open(model, metrics, Clock.systemUTC());
     }
 
     @Override

@@ -32,6 +32,7 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
     private final String apiKey;
     private final String endpoint;
     private final SecretDecrypterProvider secretDecrypterProvider;
+    private final String metricsName = supportedProvider.getProviderName();
 
     public GoogleAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.secretDecrypterProvider =
@@ -105,5 +106,10 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
     @Override
     public String maskSecrets(String message) {
         return message.replaceAll(apiKey, "*****");
+    }
+
+    @Override
+    public String getMetricsName() {
+        return metricsName;
     }
 }

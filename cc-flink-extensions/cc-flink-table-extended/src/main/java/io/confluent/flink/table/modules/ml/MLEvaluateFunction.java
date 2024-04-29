@@ -25,6 +25,7 @@ import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.table.utils.ModelOptionsUtils;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,6 +42,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
     private final Map<String, String> serializedModelProperties;
     private final String functionName;
     private transient MLModelRuntime mlModelRuntime = null;
+    private transient MLFunctionMetrics metrics = null;
 
     private static TypeInference getTypeInference(CatalogModel model, DataTypeFactory typeFactory) {
         Preconditions.checkNotNull(model, "Model must not be null.");
@@ -453,6 +455,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
     @Override
     public void open(FunctionContext context) throws Exception {
         super.open(context);
+        this.metrics = new MLFunctionMetrics(context.getMetricGroup());
         if (mlModelRuntime != null) {
             mlModelRuntime.close();
         }
@@ -462,7 +465,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
             }
             model = deserialize(serializedModelProperties);
         }
-        this.mlModelRuntime = MLModelRuntime.open(model);
+        this.mlModelRuntime = MLModelRuntime.open(model, metrics, Clock.systemUTC());
     }
 
     @Override

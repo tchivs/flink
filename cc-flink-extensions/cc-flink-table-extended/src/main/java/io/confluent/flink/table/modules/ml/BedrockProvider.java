@@ -39,6 +39,7 @@ import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENDPOIN
 
 /** Implements Model Runtime for AWS Bedrock API. */
 public class BedrockProvider implements MLModelRuntimeProvider {
+    private final MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.BEDROCK;
     private final CatalogModel model;
     private final transient ObjectMapper mapper = new ObjectMapper();
     private final String accessKey;
@@ -55,12 +56,12 @@ public class BedrockProvider implements MLModelRuntimeProvider {
     private final String acceptedContentType;
     private final Map<String, String> headers;
     private final SecretDecrypterProvider secretDecrypterProvider;
+    private final String metricsName = supportedProvider.getProviderName();
 
     public BedrockProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
         this.secretDecrypterProvider =
                 Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
-        MLModelSupportedProviders supportedProvider = MLModelSupportedProviders.BEDROCK;
         String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
         this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
@@ -217,5 +218,10 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         return message.replaceAll(accessKey, "*****")
                 .replaceAll(secretKey, "*****")
                 .replaceAll(sessionToken, "*****");
+    }
+
+    @Override
+    public String getMetricsName() {
+        return metricsName;
     }
 }

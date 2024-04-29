@@ -66,7 +66,8 @@ public class TFServingOutputParser implements OutputParser {
         try {
             jsonNode = mapper.readTree(responseString);
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Error parsing ML Predict response: " + e) {};
+            throw new FlinkRuntimeException(
+                    "Error parsing ML Predict response: response was not valid json") {};
         }
         final JsonNode predictions = jsonNode.at(topLevelNode);
         if (predictions == null || predictions instanceof MissingNode) {

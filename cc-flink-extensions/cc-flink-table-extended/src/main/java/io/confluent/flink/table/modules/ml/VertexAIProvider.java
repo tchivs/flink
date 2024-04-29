@@ -41,6 +41,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
     private final MediaType contentType;
     private final String acceptedContentType;
     private final SecretDecrypterProvider secretDecrypterProvider;
+    private final String metricsName;
 
     public VertexAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
         this.model = model;
@@ -61,6 +62,11 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
                 isPublishedModel
                         ? rawEndpoint.split("/publishers/")[1].split("/")[0].toUpperCase()
                         : "";
+
+        metricsName =
+                isPublishedModel
+                        ? MLFunctionMetrics.VERTEX_PUB
+                        : supportedProvider.getProviderName();
 
         String inputFormat =
                 modelOptionsUtils.getProviderOptionOrDefault(
@@ -204,5 +210,10 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
     public String maskSecrets(String message) {
         // These tokens are short-lived, but we mask it if it hasn't been refreshed.
         return message.replaceAll(getAccessToken(), "*****");
+    }
+
+    @Override
+    public String getMetricsName() {
+        return metricsName;
     }
 }

@@ -35,6 +35,7 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
     private final String endpoint;
     private final MLModelSupportedProviders provider;
     private final SecretDecrypterProvider secretDecrypterProvider;
+    private final String metricsName;
 
     public OpenAIProvider(
             CatalogModel model,
@@ -51,6 +52,7 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
         final String namespace = supportedProvider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
 
+        metricsName = supportedProvider.getProviderName();
         if (supportedProvider == MLModelSupportedProviders.OPENAI) {
             this.endpoint =
                     modelOptionsUtils.getProviderOptionOrDefault(
@@ -129,5 +131,10 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
     @Override
     public String maskSecrets(String message) {
         return message.replaceAll(apiKey, "*****");
+    }
+
+    @Override
+    public String getMetricsName() {
+        return metricsName;
     }
 }
