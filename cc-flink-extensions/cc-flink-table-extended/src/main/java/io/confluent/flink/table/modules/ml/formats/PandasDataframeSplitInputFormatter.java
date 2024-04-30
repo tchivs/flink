@@ -11,7 +11,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;

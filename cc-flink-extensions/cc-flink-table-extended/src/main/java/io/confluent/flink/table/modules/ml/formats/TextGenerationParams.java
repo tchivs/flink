@@ -9,7 +9,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;

@@ -11,7 +11,7 @@ import io.confluent.flink.table.modules.ml.PlainTextDecrypter;
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import io.confluent.flink.table.modules.ml.SecretDecrypter;
 import io.confluent.flink.table.modules.ml.SecretDecrypterProvider;
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.OAEPParameterSpec;

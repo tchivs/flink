@@ -185,8 +185,14 @@ Copyright 2023 Confluent Inc.
             <version>1.12.319</version>
             <scope>compile</scope>
         </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-testing</artifactId>
+      <version>${grpc.version}</version>
+      <scope>test</scope>
+    </dependency>
 
-    </dependencies>
+  </dependencies>
 
 	<dependencyManagement>
 		<dependencies>

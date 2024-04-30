@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.table.catalog.CatalogModel;
 
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 /** Plain text decrypter. */
 public class PlainTextDecrypter implements SecretDecrypter {

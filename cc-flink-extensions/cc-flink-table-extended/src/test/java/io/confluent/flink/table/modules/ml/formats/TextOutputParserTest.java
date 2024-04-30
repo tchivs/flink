@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

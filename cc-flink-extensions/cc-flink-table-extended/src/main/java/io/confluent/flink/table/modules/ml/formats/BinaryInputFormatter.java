@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

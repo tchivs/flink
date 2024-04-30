@@ -12,7 +12,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.Arra
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;

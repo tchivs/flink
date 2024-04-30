@@ -2,7 +2,7 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.utils;
+package io.confluent.flink.table.utils.mlutils;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema.UnresolvedColumn;

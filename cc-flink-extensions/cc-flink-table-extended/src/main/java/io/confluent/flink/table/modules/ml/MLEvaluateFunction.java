@@ -23,7 +23,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import java.time.Clock;
 import java.util.ArrayList;

@@ -1,8 +1,8 @@
 /*
- * Copyright 2023 Confluent Inc.
+ * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.utils;
+package io.confluent.flink.table.utils.mlutils;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
@@ -40,6 +40,13 @@ public class ModelOptionsUtilsTest {
     void testGetDefaultVersion() {
         ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
         assertThat(modelOptionsUtils.getDefaultVersion()).isEqualTo("10");
+    }
+
+    @Test
+    void testGetWithDefault() {
+        ModelOptionsUtils modelOptionsUtils = getModelOptionsUtils();
+        assertThat(modelOptionsUtils.getOptionOrDefault("non_exist", "defaultValue"))
+                .isEqualTo("defaultValue");
     }
 
     @NotNull

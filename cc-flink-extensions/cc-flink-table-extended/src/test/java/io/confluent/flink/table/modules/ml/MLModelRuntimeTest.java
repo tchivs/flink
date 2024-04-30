@@ -19,7 +19,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.google.auth.oauth2.GoogleCredentials;
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 import okhttp3.Response;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

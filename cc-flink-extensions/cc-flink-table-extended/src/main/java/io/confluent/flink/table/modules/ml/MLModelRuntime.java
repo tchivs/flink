@@ -11,7 +11,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;

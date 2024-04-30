@@ -11,3 +11,5 @@ cc-flink-extensions/cc-flink-table-extended/src/main/java/io/confluent/flink/tab
 cc-flink-extensions/cc-flink-table-extended/src/test/java/io/confluent/flink/table/modules/ml/	@confluentinc/matrix
 cc-flink-extensions/cc-flink-managed-table-validation/src/main/java/io/confluent/flink/table/modules/ml/ @confluentinc/matrix
 cc-flink-extensions/cc-flink-managed-table-validation/src/test/java/io/confluent/flink/table/modules/ml/ @confluentinc/matrix
+cc-flink-extensions/cc-flink-table-extended/src/main/java/io/confluent/flink/table/utils/mlutils/ @confluentinc/matrix
+cc-flink-extensions/cc-flink-table-extended/src/test/java/io/confluent/flink/table/utils/mlutils/ @confluentinc/matrix

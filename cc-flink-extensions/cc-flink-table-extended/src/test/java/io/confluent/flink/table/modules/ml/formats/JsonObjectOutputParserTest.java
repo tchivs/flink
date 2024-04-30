@@ -15,7 +15,7 @@ import org.apache.flink.table.data.util.DataFormatConverters;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

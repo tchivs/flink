@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

@@ -14,7 +14,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.MappingIt
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.csv.CsvParser;
 
-import io.confluent.flink.table.utils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
 import okhttp3.Response;
 
 import java.util.List;

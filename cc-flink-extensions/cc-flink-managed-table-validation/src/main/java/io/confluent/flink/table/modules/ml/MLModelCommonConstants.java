@@ -40,6 +40,7 @@ public class MLModelCommonConstants {
     public static final String ENV_ID = "CONFLUENT.MODEL.ENV.ID";
     public static final String DATABASE_ID = "CONFLUENT.MODEL.DATABASE.ID";
     public static final String COMPUTE_POOL_ID = "CONFLUENT.MODEL.COMPUTE_POOL.ID";
+    public static final String COMPUTE_POOL_ENV_ID = "CONFLUENT.MODEL.COMPUTE_POOL.ENV.ID";
     public static final String MODEL_NAME = "CONFLUENT.MODEL.NAME";
     public static final String MODEL_VERSION = "CONFLUENT.MODEL.VERSION";
     public static final String MODEL_KMS_KEY_VERSION_PREFIX = "CONFLUENT.MODEL.SECRET.KEY_VERSION";

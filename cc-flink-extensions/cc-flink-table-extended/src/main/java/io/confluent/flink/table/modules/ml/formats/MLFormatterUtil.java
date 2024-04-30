@@ -9,8 +9,8 @@ import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
-import io.confluent.flink.table.utils.MlUtils;
-import io.confluent.flink.table.utils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import java.util.List;
 import java.util.Map;

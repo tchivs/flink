@@ -1,8 +1,8 @@
 /*
- * Copyright 2023 Confluent Inc.
+ * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.utils;
+package io.confluent.flink.table.utils.mlutils;
 
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.CatalogModel.ModelKind;
@@ -98,5 +98,10 @@ public class ModelOptionsUtils {
 
     public String getOption(final String key) {
         return caseInsensitiveModelOptions.get(key);
+    }
+
+    public String getOptionOrDefault(final String key, final String defaultValue) {
+        String value = caseInsensitiveModelOptions.get(key);
+        return value == null ? defaultValue : value;
     }
 }
