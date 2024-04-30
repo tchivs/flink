@@ -157,7 +157,7 @@ public class MLModelRuntime implements AutoCloseable {
                 if ((response.code() == 429 || response.code() == 503) && retryCount < maxRetries) {
                     response.close();
                     // If the response has a retry-after header, we are polite and use that as the
-                    // wait time and set this as the last retry.
+                    // wait time.
                     long waitTime = retryWait * (1 << retryCount);
                     if (response.header("Retry-After") != null) {
                         try {
@@ -171,11 +171,9 @@ public class MLModelRuntime implements AutoCloseable {
                                                     retryWait),
                                             Duration.ofSeconds(60).toMillis());
                         } catch (NumberFormatException e) {
-                            // If the Retry-After header is not a number, just wait the default and
-                            // do one last retry.
+                            // If the Retry-After header is not a number, just wait the default.
                             // The HTTP spec allows it to be a date, which we don't support.
                         }
-                        retryCount = maxRetries - 1;
                     }
                     try {
                         Thread.sleep(waitTime);
