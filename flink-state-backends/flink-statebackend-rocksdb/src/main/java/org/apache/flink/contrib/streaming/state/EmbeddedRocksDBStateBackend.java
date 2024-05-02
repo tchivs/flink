@@ -47,6 +47,7 @@ import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.DynamicCodeLoadingException;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TernaryBoolean;
 
@@ -520,7 +521,10 @@ public class EmbeddedRocksDBStateBackend extends AbstractManagedMemoryStateBacke
                                 getIncrementalRestoreAsyncCompactAfterRescale())
                         .setUseIngestDbRestoreMode(getUseIngestDbRestoreMode())
                         .setRescalingUseDeleteFilesInRange(isRescalingUseDeleteFilesInRange())
-                        .setIOExecutor(parameters.getEnv().getIOManager().getExecutorService())
+                        .setIOExecutor(
+                                MdcUtils.scopeToJob(
+                                        jobID,
+                                        parameters.getEnv().getIOManager().getExecutorService()))
                         .setManualCompactionConfig(
                                 manualCompactionConfig == null
                                         ? RocksDBManualCompactionConfig.getDefault()
