@@ -96,7 +96,8 @@ class FlinkS3FileSystemTest {
                                         Collections.singletonList(
                                                 new PathsCopyingFileSystem.CopyTask(
                                                         Path.fromLocalFile(new File("")),
-                                                        Path.fromLocalFile(new File("")))),
+                                                        Path.fromLocalFile(new File("")),
+                                                        100L)),
                                         closeableRegistry);
                             } catch (IOException ex) {
                                 actualException.set(ex);

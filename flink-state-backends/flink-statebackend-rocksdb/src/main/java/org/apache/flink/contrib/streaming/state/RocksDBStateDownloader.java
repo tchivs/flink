@@ -152,6 +152,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 if (canCopyPaths(handleAndLocalPath.getHandle())) {
                     org.apache.flink.core.fs.Path remotePath =
                             handleAndLocalPath.getHandle().maybeGetPath().get();
+                    long size = handleAndLocalPath.getHandle().getStateSize();
                     FileSystem.FSKey newFSKey = new FileSystem.FSKey(remotePath.toUri());
                     List<CopyTask> filesToDownload =
                             filesSystemsFilesToDownload.computeIfAbsent(
@@ -159,8 +160,8 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                     filesToDownload.add(
                             new CopyTask(
                                     remotePath,
-                                    new org.apache.flink.core.fs.Path(
-                                            downloadDestination.toUri())));
+                                    new org.apache.flink.core.fs.Path(downloadDestination.toUri()),
+                                    size));
                 } else {
                     runnables.add(
                             createDownloadRunnableUsingStreams(

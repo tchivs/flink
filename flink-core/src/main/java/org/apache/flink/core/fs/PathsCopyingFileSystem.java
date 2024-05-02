@@ -42,10 +42,12 @@ public interface PathsCopyingFileSystem extends IFileSystem {
     class CopyTask {
         private final Path srcPath;
         private final Path destPath;
+        private final long size;
 
-        public CopyTask(Path srcPath, Path destPath) {
+        public CopyTask(Path srcPath, Path destPath, long size) {
             this.srcPath = srcPath;
             this.destPath = destPath;
+            this.size = size;
         }
 
         public Path getSrcPath() {
@@ -54,6 +56,10 @@ public interface PathsCopyingFileSystem extends IFileSystem {
 
         public Path getDestPath() {
             return destPath;
+        }
+
+        public long getSize() {
+            return size;
         }
 
         @Override
