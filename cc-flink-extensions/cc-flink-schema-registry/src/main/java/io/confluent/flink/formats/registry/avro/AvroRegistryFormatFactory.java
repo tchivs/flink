@@ -43,11 +43,13 @@ public class AvroRegistryFormatFactory
             Context context, ReadableConfig formatOptions) {
         FactoryUtil.validateFactoryOptions(this, formatOptions);
 
-        final SchemaRegistryConfig registryConfig = RegistryClientConfigFactory.get(formatOptions);
         return new DecodingFormat<DeserializationSchema<RowData>>() {
             @Override
             public DeserializationSchema<RowData> createRuntimeDecoder(
                     DynamicTableSource.Context context, DataType physicalDataType) {
+                final SchemaRegistryConfig registryConfig =
+                        RegistryClientConfigFactory.get(formatOptions);
+
                 final RowType rowType = (RowType) physicalDataType.getLogicalType();
                 return new AvroRegistryDeserializationSchema(
                         registryConfig, rowType, context.createTypeInformation(physicalDataType));
@@ -65,11 +67,13 @@ public class AvroRegistryFormatFactory
             DynamicTableFactory.Context context, ReadableConfig formatOptions) {
         FactoryUtil.validateFactoryOptions(this, formatOptions);
 
-        final SchemaRegistryConfig registryConfig = RegistryClientConfigFactory.get(formatOptions);
         return new EncodingFormat<SerializationSchema<RowData>>() {
             @Override
             public SerializationSchema<RowData> createRuntimeEncoder(
                     DynamicTableSink.Context context, DataType consumedDataType) {
+                final SchemaRegistryConfig registryConfig =
+                        RegistryClientConfigFactory.get(formatOptions);
+
                 final RowType rowType = (RowType) consumedDataType.getLogicalType();
                 return new AvroRegistrySerializationSchema(registryConfig, rowType);
             }

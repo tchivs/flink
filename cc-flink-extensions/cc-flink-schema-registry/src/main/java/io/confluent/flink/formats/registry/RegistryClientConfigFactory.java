@@ -20,6 +20,7 @@ import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaProvider;
 import javax.annotation.Nullable;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -46,12 +47,7 @@ public class RegistryClientConfigFactory {
 
     /** Should be used in {@link FormatFactory#requiredOptions()}. */
     public static Set<ConfigOption<?>> getRequiredOptions() {
-        Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(RegistryFormatOptions.URL);
-        options.add(RegistryFormatOptions.SCHEMA_ID);
-        options.add(RegistryFormatOptions.LOGICAL_CLUSTER_ID);
-        options.add(RegistryFormatOptions.CREDENTIALS_SOURCE);
-        return options;
+        return Collections.emptySet();
     }
 
     /** Should be used in {@link FormatFactory#optionalOptions()}. */
@@ -59,6 +55,10 @@ public class RegistryClientConfigFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(RegistryFormatOptions.SCHEMA_CACHE_SIZE);
         options.add(RegistryFormatOptions.BASIC_AUTH_USER_INFO);
+        options.add(RegistryFormatOptions.URL);
+        options.add(RegistryFormatOptions.SCHEMA_ID);
+        options.add(RegistryFormatOptions.LOGICAL_CLUSTER_ID);
+        options.add(RegistryFormatOptions.CREDENTIALS_SOURCE);
         return options;
     }
 
