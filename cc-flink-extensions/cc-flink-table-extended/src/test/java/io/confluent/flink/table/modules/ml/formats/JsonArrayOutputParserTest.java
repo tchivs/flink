@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.ml.formats;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link JsonArrayOutputParser}. */
 public class JsonArrayOutputParserTest {
@@ -23,6 +25,16 @@ public class JsonArrayOutputParserTest {
         String response = "[\"output-text\"]";
         assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
+    }
+
+    @Test
+    void testParseResponseNonArray() throws Exception {
+        Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
+        JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
+        String response = "1";
+        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(response)))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("ML prediction response was not a JSON array");
     }
 
     @Test
@@ -37,6 +49,12 @@ public class JsonArrayOutputParserTest {
         row = parser.parse(MlUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
+        final String tooDeep = "[[[1,2,3]]]";
+        // Too deep, should throw an exception
+        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(tooDeep)))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(
+                        "Error deserializing ML Prediction response: ML Predict attempted to deserialize an nested array of depth 1 from a json array of depth 3");
     }
 
     @Test

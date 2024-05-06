@@ -14,6 +14,7 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.util.DataFormatConverters;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link JsonObjectOutputParser}. */
 public class JsonObjectOutputParserTest {
@@ -41,6 +43,23 @@ public class JsonObjectOutputParserTest {
         Row row = parser.parse(MlUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
+        // Array with one extra nesting level should work.
+        response = "{\"output\":[[1,2,3]]}";
+        row = parser.parse(MlUtils.makeResponse(response));
+        assertThat(row.getArity()).isEqualTo(1);
+        assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
+        // Array with two extra nesting levels should throw.
+        final String tooDeep = "{\"output\":[[[1,2,3]]]}";
+        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(tooDeep)))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(
+                        "Error deserializing ML Prediction response field: output: ML Predict attempted to deserialize an nested array of depth 1 from a json array of depth 3");
+        // Non-array should throw.
+        final String nonArray = "{\"output\":1}";
+        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(nonArray)))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(
+                        "Error deserializing ML Prediction response field: output: ML Predict attempted to deserialize an array from a non-array json object");
     }
 
     @Test

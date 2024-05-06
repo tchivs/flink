@@ -204,9 +204,9 @@ public class MLModelRuntime implements AutoCloseable {
                 message = message.replaceAll((String) arg, "*****");
             }
         }
-        // Limit the size of the response string for errors.
-        if (message.length() > 300) {
-            message = message.substring(0, 300) + "...";
+        // Limit the size of the response string for errors to 1 kb.
+        if (message.length() > 1024) {
+            message = message.substring(0, 1024) + "...";
         }
         return message;
     }

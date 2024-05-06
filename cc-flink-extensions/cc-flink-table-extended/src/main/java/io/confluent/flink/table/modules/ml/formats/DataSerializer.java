@@ -7,6 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -1018,9 +1019,44 @@ public class DataSerializer {
     private static OutputDeserializer createArrayDeserializer(ArrayType targetType) {
         final OutputDeserializer elementConverter = createDeserializer(targetType.getElementType());
         final Class<?> elementClass = toExternalConversionClass(targetType.getElementType());
+        int nestingLevel = 1;
+        LogicalType elementType = targetType.getChildren().get(0);
+        while (elementType.getTypeRoot() == LogicalTypeRoot.ARRAY) {
+            nestingLevel++;
+            elementType = elementType.getChildren().get(0);
+        }
+        final int targetNestingLevel = nestingLevel;
         return new OutputDeserializer() {
+            private JsonNode maybeUnnest(JsonNode object) {
+                if (!object.isArray()) {
+                    throw new FlinkRuntimeException(
+                            "ML Predict attempted to deserialize an array from a non-array json object");
+                }
+                // If the nesting level of the target type is one greater than the nesting level
+                // of the target type, we will unnest the json by one level. We allow this because
+                // returned JSON arrays are often wrapped in an outer array.
+                int nesting = 0;
+                JsonNode nest = object;
+                while (nest.isArray() && nest.size() > 0) {
+                    nesting++;
+                    nest = nest.get(0);
+                }
+                if (nesting == targetNestingLevel + 1) {
+                    return object.get(0);
+                } else if (nesting == targetNestingLevel) {
+                    return object;
+                }
+                throw new FlinkRuntimeException(
+                        "ML Predict attempted to deserialize an nested array of depth "
+                                + targetNestingLevel
+                                + " from a json array of depth "
+                                + nesting);
+            }
+
+            /** Strict shape conversion from matching json array shape. */
             @Override
             public Object convert(JsonNode object) throws IOException {
+                object = maybeUnnest(object);
                 final int length = object.size();
                 final Object[] array = (Object[]) Array.newInstance(elementClass, length);
                 for (int i = 0; i < length; ++i) {
@@ -1029,6 +1065,7 @@ public class DataSerializer {
                 return array;
             }
 
+            /** Shape based conversion for converting flat arrays to a known shape. */
             @Override
             public Object convert(JsonNode object, int offset, int length, List<Integer> shape)
                     throws IOException {

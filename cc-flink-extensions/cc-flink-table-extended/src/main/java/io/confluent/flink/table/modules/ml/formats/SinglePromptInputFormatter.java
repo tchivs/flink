@@ -167,6 +167,39 @@ public class SinglePromptInputFormatter implements InputFormatter {
                         textContent.put("text", prompt);
                     }
                 };
+            case "Azure Chat":
+                // Azure's default chat api for LMs that don't have a specific formatter.
+                return new SinglePromptFormatter() {
+                    @Override
+                    public ObjectNode createStaticJson(TextGenerationParams params) {
+                        ObjectNode node = mapper.createObjectNode();
+                        ObjectNode inputData = mapper.createObjectNode();
+                        node.set("input_data", inputData);
+                        ArrayNode inputString = mapper.createArrayNode();
+                        inputData.set("input_string", inputString);
+
+                        ObjectNode message = mapper.createObjectNode();
+                        inputString.add(message);
+                        message.put("role", "user");
+                        message.put("content", "");
+
+                        if (params.hasChatParams()) {
+                            ObjectNode parameters = mapper.createObjectNode();
+                            inputData.set("parameters", parameters);
+                            params.linkTemperature(parameters, "temperature");
+                            params.linkTopP(parameters, "top_p");
+                            params.linkMaxTokens(parameters, "max_new_tokens");
+                        }
+                        return node;
+                    }
+
+                    @Override
+                    public void linkPrompt(ObjectNode node, String prompt) {
+                        ObjectNode message =
+                                (ObjectNode) node.get("input_data").get("input_string").get(0);
+                        message.put("content", prompt);
+                    }
+                };
 
             case "Bedrock Llama":
                 return new SinglePromptFormatter() {
@@ -178,6 +211,31 @@ public class SinglePromptInputFormatter implements InputFormatter {
                         params.linkTopP(node, "top_p");
                         params.linkMaxTokens(node, "max_gen_len");
                         return node;
+                    }
+                };
+
+            case "Cohere Chat":
+                return new SinglePromptFormatter() {
+                    @Override
+                    public ObjectNode createStaticJson(TextGenerationParams params) {
+                        ObjectNode node = mapper.createObjectNode();
+                        params.linkModelVersion(node, "model", null);
+                        params.linkSystemPrompt(node, "preamble");
+
+                        node.put("message", "");
+
+                        params.linkTemperature(node, "temperature");
+                        params.linkTopP(node, "p");
+                        params.linkTopK(node, "k");
+                        params.linkMaxTokens(node, "max_tokens");
+                        params.linkStopSequences(node, "stop_sequences");
+
+                        return node;
+                    }
+
+                    @Override
+                    public void linkPrompt(ObjectNode node, String prompt) {
+                        node.put("message", prompt);
                     }
                 };
 
@@ -210,6 +268,17 @@ public class SinglePromptInputFormatter implements InputFormatter {
                         final ArrayNode parts = content.putArray("parts");
                         final ObjectNode part = parts.addObject();
                         part.put("text", "");
+
+                        if (params.getSystemPrompt() != null) {
+                            // Note: As of 2024-05-02, system_instructions is still only on the
+                            // v1beta API.
+                            final ArrayNode systemInstructions =
+                                    node.putArray("system_instructions");
+                            final ObjectNode systemInstruction = systemInstructions.addObject();
+                            final ArrayNode systemParts = systemInstruction.putArray("parts");
+                            final ObjectNode systemPart = systemParts.addObject();
+                            params.linkSystemPrompt(systemPart, "text");
+                        }
 
                         if (params.hasChatParams()) {
                             ObjectNode textGenerationConfig = mapper.createObjectNode();
@@ -246,6 +315,8 @@ public class SinglePromptInputFormatter implements InputFormatter {
                     }
                 };
 
+            case "Mistral Chat":
+                // Fall through to OpenAI Chat, since they have the same format.
             case "OpenAI Chat":
                 return new SinglePromptFormatter() {
                     @Override

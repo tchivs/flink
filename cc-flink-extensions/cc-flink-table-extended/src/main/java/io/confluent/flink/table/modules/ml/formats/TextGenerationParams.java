@@ -289,6 +289,24 @@ public class TextGenerationParams {
         return "";
     }
 
+    // Link a parameter from the allParams map to a field in the node, returns the name of the
+    // matched parameter.
+    public String linkDefaultParam(
+            ObjectNode node, String fieldName, Object defaultValue, String... paramNames) {
+        // Check paramNames in order until we find a match.
+        for (String paramName : paramNames) {
+            if (allParams.containsKey(paramName)) {
+                Object value = allParams.get(paramName);
+                linkUntypedParam(value, node, fieldName);
+                return paramName.toLowerCase();
+            }
+        }
+        if (defaultValue != null) {
+            linkUntypedParam(defaultValue, node, fieldName);
+        }
+        return "";
+    }
+
     public void linkAllParamsExcept(ObjectNode node, Set<String> excludedParams) {
         // Excluded params should already be lower case, but we'll convert them just in case.
         excludedParams =

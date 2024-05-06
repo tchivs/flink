@@ -25,14 +25,19 @@ public class SinglePromptOutputParser extends JsonObjectOutputParser {
                 return "/completion";
             case "Anthropic Messages":
                 return "/content/0/text";
+            case "Azure Chat":
+                return "/output";
             case "Bedrock Llama":
                 return "/generation";
+            case "Cohere Chat":
+                return "/text";
             case "Cohere Generate":
                 return "/generations/0/text";
             case "Gemini Generate":
                 return "/candidates/0/content/parts/0/text";
             case "Mistral Completions":
                 return "/outputs/0/text";
+            case "Mistral Chat":
             case "OpenAI Chat":
                 return "/choices/0/message/content";
             default:

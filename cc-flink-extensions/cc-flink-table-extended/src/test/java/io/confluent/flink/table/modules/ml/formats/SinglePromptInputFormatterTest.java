@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unittests for all the Bedrock Foundation model formatters. */
-public class BedrockInputFormatterTest {
+public class SinglePromptInputFormatterTest {
     @Test
     void testAI21CompleteInputFormatter() throws Exception {
 
@@ -82,6 +82,22 @@ public class BedrockInputFormatterTest {
     }
 
     @Test
+    void testAzureChatInputFormatter() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        InputFormatter formatter =
+                new SinglePromptInputFormatter(
+                        inputSchema.getColumns(),
+                        "Azure Chat",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.AZUREML);
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"input_data\":{\"input_string\":[{\"role\":\"user\",\"content\":\"input-text-prompt\"}],"
+                                + "\"parameters\":{\"temperature\":0.5,\"top_p\":0.9,\"max_new_tokens\":100}}}");
+    }
+
+    @Test
     void testBedrockLlamaInputFormatter() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
@@ -115,6 +131,40 @@ public class BedrockInputFormatterTest {
     }
 
     @Test
+    void testCohereChatInputFormatter() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        InputFormatter formatter =
+                new SinglePromptInputFormatter(
+                        inputSchema.getColumns(),
+                        "Cohere Chat",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"preamble\":\"System Prompt!\",\"message\":\"input-text-prompt\","
+                                + "\"temperature\":0.5,\"p\":0.9,\"k\":10.0,\"max_tokens\":100,\"stop_sequences\":[\"stop1\",\"stop2\"]}");
+    }
+
+    @Test
+    void testGeminiGenerateInputFormatter() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        InputFormatter formatter =
+                new SinglePromptInputFormatter(
+                        inputSchema.getColumns(),
+                        "Gemini Generate",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.VERTEXAI);
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"contents\":[{\"parts\":[{\"text\":\"input-text-prompt\"}]}],"
+                                + "\"system_instructions\":[{\"parts\":[{\"text\":\"System Prompt!\"}]}],"
+                                + "\"generationConfig\":{\"temperature\":0.5,\"topP\":0.9,\"topK\":10.0,"
+                                + "\"maxOutputTokens\":100,\"stopSequences\":[\"stop1\",\"stop2\"]}}");
+    }
+
+    @Test
     void testMistralCompletionsInputFormatter() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         InputFormatter formatter =
@@ -128,6 +178,23 @@ public class BedrockInputFormatterTest {
                 .isEqualTo(
                         "{\"prompt\":\"input-text-prompt\",\"temperature\":0.5,\"top_p\":0.9,"
                                 + "\"top_k\":10.0,\"max_tokens\":100,\"stop\":[\"stop1\",\"stop2\"]}");
+    }
+
+    @Test
+    void testMistralChatInputFormatter() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        InputFormatter formatter =
+                new SinglePromptInputFormatter(
+                        inputSchema.getColumns(),
+                        "Mistral Chat",
+                        getTextGenerationParams(),
+                        MLModelSupportedProviders.BEDROCK);
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"temperature\":0.5,\"top_p\":0.9,\"max_tokens\":100,\"stop\":[\"stop1\",\"stop2\"],"
+                                + "\"messages\":[{\"role\":\"system\",\"content\":\"System Prompt!\"},"
+                                + "{\"role\":\"user\",\"content\":\"input-text-prompt\"}]}");
     }
 
     private static TextGenerationParams getTextGenerationParams() {

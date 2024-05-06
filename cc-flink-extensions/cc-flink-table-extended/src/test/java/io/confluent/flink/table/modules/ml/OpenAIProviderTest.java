@@ -94,6 +94,26 @@ public class OpenAIProviderTest extends ProviderTestBase {
     }
 
     @Test
+    void testGetRequestEmbedding() throws Exception {
+        CatalogModel model = getEmbeddingModel();
+        OpenAIProvider openAIProvider =
+                new OpenAIProvider(
+                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = openAIProvider.getRequest(args);
+        // Check that the request is created correctly.
+        assertThat(request.url().toString()).isEqualTo("https://api.openai.com/v1/embeddings");
+        assertThat(request.method()).isEqualTo("POST");
+        assertThat(request.header("Authorization")).isEqualTo("Bearer fake-api-key");
+        assertThat(request.body().contentType().toString()).isEqualTo("application/json");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        assertThat(buffer.readUtf8())
+                .isEqualTo(
+                        "{\"input\":[\"input-text-prompt\"],\"model\":\"text-embedding-3-small\"}");
+    }
+
+    @Test
     void testGetRequestAzure() throws Exception {
         CatalogModel model = getCatalogModelAzure();
         OpenAIProvider openAIProvider =
@@ -188,6 +208,15 @@ public class OpenAIProviderTest extends ProviderTestBase {
         Map<String, String> modelOptions = getCommonModelOptions();
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+    }
+
+    @NotNull
+    private static CatalogModel getEmbeddingModel() {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/embeddings");
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<FLOAT>").build();
         return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
     }
 

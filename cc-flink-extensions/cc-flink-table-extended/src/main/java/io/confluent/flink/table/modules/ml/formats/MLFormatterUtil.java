@@ -6,6 +6,8 @@ package io.confluent.flink.table.modules.ml.formats;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
@@ -90,6 +92,12 @@ public class MLFormatterUtil {
                         "Amazon Titan Text",
                         new TextGenerationParams(modelOptions),
                         provider);
+            case "AMAZONTITANEMBED":
+                return new EmbeddingInputFormatter(
+                        inputColumns,
+                        "Amazon Titan Embed",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "ANTHROPICCOMPLETIONS":
                 return new SinglePromptInputFormatter(
                         inputColumns,
@@ -102,10 +110,22 @@ public class MLFormatterUtil {
                         "Anthropic Messages",
                         new TextGenerationParams(modelOptions),
                         provider);
+            case "AZURECHAT":
+                return new SinglePromptInputFormatter(
+                        inputColumns,
+                        "Azure Chat",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             case "BEDROCKLLAMA":
                 return new SinglePromptInputFormatter(
                         inputColumns,
                         "Bedrock Llama",
+                        new TextGenerationParams(modelOptions),
+                        provider);
+            case "COHERECHAT":
+                return new SinglePromptInputFormatter(
+                        inputColumns,
+                        "Cohere Chat",
                         new TextGenerationParams(modelOptions),
                         provider);
             case "COHEREGENERATE":
@@ -114,10 +134,23 @@ public class MLFormatterUtil {
                         "Cohere Generate",
                         new TextGenerationParams(modelOptions),
                         provider);
+            case "COHEREEMBED":
+                return new EmbeddingInputFormatter(
+                        inputColumns,
+                        "Cohere Embed",
+                        new TextGenerationParams(modelOptions),
+                        provider);
+            case "GEMINICHAT":
             case "GEMINIGENERATE":
                 return new SinglePromptInputFormatter(
                         inputColumns,
                         "Gemini Generate",
+                        new TextGenerationParams(modelOptions),
+                        provider);
+            case "MISTRALCHAT":
+                return new SinglePromptInputFormatter(
+                        inputColumns,
+                        "Mistral Chat",
                         new TextGenerationParams(modelOptions),
                         provider);
             case "MISTRALCOMPLETIONS":
@@ -132,6 +165,19 @@ public class MLFormatterUtil {
                         "OpenAI Chat",
                         new TextGenerationParams(modelOptions),
                         provider);
+            case "AZUREEMBED":
+            case "OPENAIEMBED":
+                return new EmbeddingInputFormatter(
+                        inputColumns,
+                        "OpenAI Embed",
+                        new TextGenerationParams(modelOptions),
+                        provider);
+            case "VERTEXEMBED":
+                return new EmbeddingInputFormatter(
+                        inputColumns,
+                        "Vertex Embed",
+                        new TextGenerationParams(modelOptions),
+                        provider);
             default:
                 throw new FlinkRuntimeException("Unsupported ML Model input format: " + format);
         }
@@ -142,12 +188,37 @@ public class MLFormatterUtil {
         // We allow a single input column of type STRING.
         if (inputColumns.size() != 1
                 || (MlUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
-                                != org.apache.flink.table.types.logical.LogicalTypeRoot.VARCHAR
+                                != LogicalTypeRoot.VARCHAR
                         && MlUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
-                                != org.apache.flink.table.types.logical.LogicalTypeRoot.CHAR)) {
+                                != LogicalTypeRoot.CHAR)) {
             throw new FlinkRuntimeException(
                     format
                             + " input format requires a single input column of type STRING, CHAR, or VARCHAR.");
+        }
+    }
+
+    public static void enforceSingleStringOrArrayInput(
+            List<Schema.UnresolvedColumn> inputColumns, String format) {
+        // We allow a single input column of type STRING or ARRAY<STRING>.
+        if (inputColumns.size() != 1) {
+            throw new FlinkRuntimeException(
+                    format
+                            + " input format requires a single input column of type STRING, CHAR, or ARRAY<STRING>.");
+        }
+        LogicalType type = MlUtils.getLogicalType(inputColumns.get(0));
+        if (type.getTypeRoot() != LogicalTypeRoot.VARCHAR
+                && type.getTypeRoot() != LogicalTypeRoot.CHAR
+                && type.getTypeRoot() != LogicalTypeRoot.ARRAY) {
+            throw new FlinkRuntimeException(
+                    format
+                            + " input format requires a single input column of type STRING, CHAR, or ARRAY<STRING>.");
+        }
+        if (type.getTypeRoot() == LogicalTypeRoot.ARRAY
+                && type.getChildren().get(0).getTypeRoot() != LogicalTypeRoot.VARCHAR
+                && type.getChildren().get(0).getTypeRoot() != LogicalTypeRoot.CHAR) {
+            throw new FlinkRuntimeException(
+                    format
+                            + " input format requires a single input column of type STRING, CHAR, or ARRAY<STRING>.");
         }
     }
 
@@ -183,6 +254,9 @@ public class MLFormatterUtil {
                 }
                 return new JsonObjectOutputParser(outputColumns);
             case "JSONARRAY":
+                if (wrapper != null) {
+                    return new JsonArrayOutputParser(outputColumns, wrapper);
+                }
                 return new JsonArrayOutputParser(outputColumns);
             case "TEXT":
             case "TXT":
@@ -202,20 +276,36 @@ public class MLFormatterUtil {
                 return new SinglePromptOutputParser(outputColumns, "AI21 Complete");
             case "AMAZONTITANTEXT":
                 return new SinglePromptOutputParser(outputColumns, "Amazon Titan Text");
+            case "AMAZONTITANEMBED":
+                return new EmbeddingOutputParser(outputColumns, "Amazon Titan Embed");
             case "ANTHROPICCOMPLETIONS":
                 return new SinglePromptOutputParser(outputColumns, "Anthropic Completions");
             case "ANTHROPICMESSAGES":
                 return new SinglePromptOutputParser(outputColumns, "Anthropic Messages");
+            case "AZURECHAT":
+                return new SinglePromptOutputParser(outputColumns, "Azure Chat");
             case "BEDROCKLLAMA":
                 return new SinglePromptOutputParser(outputColumns, "Bedrock Llama");
+            case "COHERECHAT":
+                return new SinglePromptOutputParser(outputColumns, "Cohere Chat");
             case "COHEREGENERATE":
                 return new SinglePromptOutputParser(outputColumns, "Cohere Generate");
+            case "COHEREEMBED":
+                return new EmbeddingOutputParser(outputColumns, "Cohere Embed");
+            case "GEMINICHAT":
             case "GEMINIGENERATE":
                 return new SinglePromptOutputParser(outputColumns, "Gemini Generate");
+            case "MISTRALCHAT":
+                return new SinglePromptOutputParser(outputColumns, "Mistral Chat");
             case "MISTRALCOMPLETIONS":
                 return new SinglePromptOutputParser(outputColumns, "Mistral Completions");
             case "OPENAICHAT":
                 return new SinglePromptOutputParser(outputColumns, "OpenAI Chat");
+            case "AZUREEMBED":
+            case "OPENAIEMBED":
+                return new EmbeddingOutputParser(outputColumns, "OpenAI Embed");
+            case "VERTEXEMBED":
+                return new EmbeddingOutputParser(outputColumns, "Vertex Embed");
             default:
                 throw new FlinkRuntimeException(
                         "Unsupported ML Model output format: " + outputFormat);

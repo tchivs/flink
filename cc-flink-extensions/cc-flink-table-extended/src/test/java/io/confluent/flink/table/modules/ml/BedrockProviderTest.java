@@ -98,6 +98,23 @@ public class BedrockProviderTest extends ProviderTestBase {
     }
 
     @Test
+    void testGetRequestEmbed() throws Exception {
+        CatalogModel model = getEmbedModel("amazon.titan-embed");
+        BedrockProvider bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
+        Object[] args = new Object[] {"input-text-prompt"};
+        Request request = bedrockProvider.getRequest(args);
+        // Check that the request is created correctly.
+        assertThat(request.url().toString())
+                .isEqualTo(
+                        "https://bedrock-runtime.us-west-2.amazonaws.com/model/amazon.titan-embed/invoke/");
+        assertThat(request.method()).isEqualTo("POST");
+        Buffer buffer = new Buffer();
+        request.body().writeTo(buffer);
+        assertThat(buffer.readUtf8()).isEqualTo("{\"inputText\":\"input-text-prompt\"}");
+    }
+
+    @Test
     void testGetRequestAI21() throws Exception {
         CatalogModel model = getEndpointModel("ai21.whatever");
         BedrockProvider bedrockProvider =
@@ -144,6 +161,26 @@ public class BedrockProviderTest extends ProviderTestBase {
         assertThat(buffer.readUtf8())
                 .isEqualTo(
                         "{\"prompt\":\"input-text-prompt\",\"stream\":false,\"num_generations\":1}");
+
+        model = getEmbedModel("cohere.embed");
+        bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
+        request = bedrockProvider.getRequest(args);
+        buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the COHERE-EMBED format.
+        assertThat(buffer.readUtf8())
+                .isEqualTo(
+                        "{\"texts\":[\"input-text-prompt\"],\"input_type\":\"search_document\"}");
+
+        model = getEndpointModel("cohere.command-r");
+        bedrockProvider =
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
+        request = bedrockProvider.getRequest(args);
+        buffer = new Buffer();
+        request.body().writeTo(buffer);
+        // Request should default to the COHERE-CHAT format.
+        assertThat(buffer.readUtf8()).isEqualTo("{\"message\":\"input-text-prompt\"}");
     }
 
     @Test
@@ -214,6 +251,20 @@ public class BedrockProviderTest extends ProviderTestBase {
                         + "/invoke");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+
+        return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+    }
+
+    @NotNull
+    private static CatalogModel getEmbedModel(String endpointModel) {
+        Map<String, String> modelOptions = getCommonModelOptions();
+        modelOptions.put(
+                "BEDROCK.ENDPOINT",
+                "https://bedrock-runtime.us-west-2.amazonaws.com/model/"
+                        + endpointModel
+                        + "/invoke");
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<FLOAT>").build();
 
         return CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
     }

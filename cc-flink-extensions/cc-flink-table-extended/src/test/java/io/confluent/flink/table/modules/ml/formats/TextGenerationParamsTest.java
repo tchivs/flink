@@ -140,8 +140,11 @@ public class TextGenerationParamsTest {
         params.linkModelVersion(node, "model", "gpt-3.5-turbo");
         usedParams.add(params.linkParam(node, "extra", "foo", "extra", "extra2"));
         usedParams.add(params.linkParam(node, "extra3", "extra3"));
-        usedParams.add(params.linkParam(node, "extra4", "extra4"));
+        usedParams.add(params.linkDefaultParam(node, "extra4", "unusedDefault", "extra4"));
         usedParams.add(params.linkParam(node, "duplicate", "duplicate1"));
+        usedParams.add(params.linkDefaultParam(node, "param1", "defaultVal", "unsetparam"));
+
+        assertThat(node.get("param1").asText()).isEqualTo("defaultVal");
 
         assertThat(usedParams)
                 .containsExactlyInAnyOrder(
@@ -152,7 +155,8 @@ public class TextGenerationParamsTest {
                         "extra",
                         "extra3",
                         "extra4",
-                        "duplicate1");
+                        "duplicate1",
+                        "");
 
         ObjectNode node2 = mapper.createObjectNode();
         params.linkAllParamsExcept(node2, usedParams);

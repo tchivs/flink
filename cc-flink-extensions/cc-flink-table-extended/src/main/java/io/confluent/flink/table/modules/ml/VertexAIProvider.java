@@ -116,6 +116,8 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
                     break;
                 case "GOOGLE":
                 default:
+                    // TODO: Figure out if it's an embedding model and set the default format
+                    // accordingly?
                     defaultInputFormat = "GEMINI-GENERATE";
             }
         }

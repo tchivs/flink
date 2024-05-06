@@ -36,6 +36,7 @@ import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -358,6 +359,25 @@ public class DataSerializerTest {
         JsonNode serialized = mapper.readTree("[1, 2, 3]");
         Object deserialized = deserializer.convert(serialized);
         assertThat(deserialized.equals(new int[] {1, 2, 3}));
+
+        // Test nested array
+        serialized = mapper.readTree("[[1, 2, 3]]");
+        deserialized = deserializer.convert(serialized);
+        assertThat(deserialized.equals(new int[] {1, 2, 3}));
+
+        // Array nested too deeply should throw an exception
+        final JsonNode deepArray = mapper.readTree("[[[1, 2, 3]]]");
+        assertThatThrownBy(() -> deserializer.convert(deepArray))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(
+                        "ML Predict attempted to deserialize an nested array of depth 1 from a json array of depth 3");
+
+        // Non-array input should throw an exception
+        final JsonNode nonArray = mapper.readTree("1");
+        assertThatThrownBy(() -> deserializer.convert(nonArray))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(
+                        "ML Predict attempted to deserialize an array from a non-array json object");
     }
 
     @Test

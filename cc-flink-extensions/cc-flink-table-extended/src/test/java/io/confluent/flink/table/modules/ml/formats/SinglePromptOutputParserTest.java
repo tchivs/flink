@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Unit tests for Bedrock foundation model parsers. */
-public class BedrockOutputParserTest {
+/** Unit tests for text/chat foundation model parsers. */
+public class SinglePromptOutputParserTest {
     @Test
     void testParseAI21Complete() throws Exception {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
@@ -54,11 +54,30 @@ public class BedrockOutputParserTest {
     }
 
     @Test
+    void testParseAzureChat() throws Exception {
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        OutputParser parser = new SinglePromptOutputParser(outputSchema.getColumns(), "Azure Chat");
+        String response = "{\"output\":\"output-text\"}";
+        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+                .isEqualTo("+I[output-text]");
+    }
+
+    @Test
     void testParseBedrockLlama() throws Exception {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         OutputParser parser =
                 new SinglePromptOutputParser(outputSchema.getColumns(), "Bedrock Llama");
         String response = "{\"generation\":\"output-text\"}";
+        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+                .isEqualTo("+I[output-text]");
+    }
+
+    @Test
+    void testParseCohereChat() throws Exception {
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        OutputParser parser =
+                new SinglePromptOutputParser(outputSchema.getColumns(), "Cohere Chat");
+        String response = "{\"text\":\"output-text\"}";
         assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
@@ -74,11 +93,32 @@ public class BedrockOutputParserTest {
     }
 
     @Test
+    void testParseGeminiChat() throws Exception {
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        OutputParser parser =
+                new SinglePromptOutputParser(outputSchema.getColumns(), "Gemini Generate");
+        String response =
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"output-text\"}]}}]}";
+        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+                .isEqualTo("+I[output-text]");
+    }
+
+    @Test
     void testMistralCompletions() throws Exception {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         OutputParser parser =
                 new SinglePromptOutputParser(outputSchema.getColumns(), "Mistral Completions");
         String response = "{\"outputs\":[{\"text\":\"output-text\"}]}";
+        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+                .isEqualTo("+I[output-text]");
+    }
+
+    @Test
+    void testMistralChat() throws Exception {
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        OutputParser parser =
+                new SinglePromptOutputParser(outputSchema.getColumns(), "Mistral Chat");
+        String response = "{\"choices\":[{\"message\":{\"content\":\"output-text\"}}]}";
         assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }

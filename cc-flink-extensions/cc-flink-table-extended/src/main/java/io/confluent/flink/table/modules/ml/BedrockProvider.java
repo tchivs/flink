@@ -141,7 +141,11 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         String defaultInputFormat = "AMAZON-TITAN-TEXT";
         switch (provider) {
             case "amazon":
-                defaultInputFormat = "AMAZON-TITAN-TEXT";
+                if (modelId.startsWith("amazon.titan-embed")) {
+                    defaultInputFormat = "AMAZON-TITAN-EMBED";
+                } else {
+                    defaultInputFormat = "AMAZON-TITAN-TEXT";
+                }
                 break;
             case "ai21":
                 defaultInputFormat = "AI21-COMPLETE";
@@ -158,13 +162,22 @@ public class BedrockProvider implements MLModelRuntimeProvider {
                 }
                 break;
             case "cohere":
-                defaultInputFormat = "COHERE-GENERATE";
+                if (modelId.startsWith("cohere.embed")) {
+                    defaultInputFormat = "COHERE-EMBED";
+                } else if (modelId.startsWith("cohere.command-r")) {
+                    defaultInputFormat = "COHERE-CHAT";
+                } else {
+                    defaultInputFormat = "COHERE-GENERATE";
+                }
                 break;
             case "meta":
                 defaultInputFormat = "BEDROCK-LLAMA";
                 break;
             case "mistral":
                 defaultInputFormat = "MISTRAL-COMPLETIONS";
+                break;
+            default:
+                defaultInputFormat = "AMAZON-TITAN-TEXT";
                 break;
         }
         return defaultInputFormat;

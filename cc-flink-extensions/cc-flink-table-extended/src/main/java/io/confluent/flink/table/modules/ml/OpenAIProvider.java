@@ -86,8 +86,12 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException(
                     String.format("%s.API_KEY setting not found", namespace));
         }
+        String defaultInputFormat = "openai-chat";
+        if (endpoint.contains("/embeddings")) {
+            defaultInputFormat = "openai-embed";
+        }
         String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", "openai-chat");
+                modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
