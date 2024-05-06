@@ -48,6 +48,13 @@ public class TaskManagerConfluentOptions {
                     .withDescription(
                             "The environment variable that specifies the host name or address where the TaskManager is exposed.");
 
+    public static final ConfigOption<String> FCP_RUNTIME_VERSION =
+            key("flink.fcp.runtime.version")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The Flink runtime version as propagated from the control plane.");
+
     // ------------------------------------------------------------------------
 
     /** Not intended to be instantiated. */

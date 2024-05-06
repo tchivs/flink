@@ -79,6 +79,7 @@ import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.ExecutorUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.FlinkRuntimeMetricReporter;
 import org.apache.flink.util.Reference;
 import org.apache.flink.util.ShutdownHookUtil;
 import org.apache.flink.util.StringUtils;
@@ -691,6 +692,8 @@ public class TaskManagerRunner implements FatalErrorHandler {
                         externalAddress,
                         resourceID,
                         taskManagerServicesConfiguration.getSystemResourceMetricsProbingInterval());
+        FlinkRuntimeMetricReporter.reportTaskManagerRuntimeVersion(
+                taskManagerMetricGroup.f0, configuration);
 
         final ExecutorService ioExecutor =
                 Executors.newFixedThreadPool(

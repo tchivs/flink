@@ -97,6 +97,7 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.FlinkRuntimeMetricReporter;
 import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.MdcUtils.MdcCloseable;
 import org.apache.flink.util.Preconditions;
@@ -1553,6 +1554,8 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
     }
 
     private void registerDispatcherMetrics(MetricGroup jobManagerMetricGroup) {
+        FlinkRuntimeMetricReporter.reportJobManagerRuntimeVersion(
+                jobManagerMetricGroup, configuration);
         jobManagerMetricGroup.gauge(
                 MetricNames.NUM_RUNNING_JOBS,
                 // metrics can be called from anywhere and therefore, have to run without the main

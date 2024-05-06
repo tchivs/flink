@@ -69,6 +69,13 @@ public class JobManagerConfluentOptions {
                     .withDescription(
                             "Controls how many job submissions may be processed in parallel.");
 
+    public static final ConfigOption<String> FCP_RUNTIME_VERSION =
+            key("flink.fcp.runtime.version")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The Flink runtime version as propagated from the control plane.");
+
     private JobManagerConfluentOptions() {
         throw new IllegalAccessError();
     }
