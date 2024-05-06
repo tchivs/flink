@@ -25,22 +25,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for BedrockProvider. */
-public class BedrockProviderTest {
+public class BedrockProviderTest extends ProviderTestBase {
     @Test
-    void testBadEndpoint() throws Exception {
+    void testBadEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("BEDROCK.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new BedrockProvider(model, new MockSecretDecypterProvider(model)))
+        assertThatThrownBy(
+                        () ->
+                                new BedrockProvider(
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
                         "For BEDROCK endpoint expected to match https://bedrock-runtime(-fips)?\\.[\\w-]+\\.amazonaws\\.com/model/.+/invoke/?, got fake-endpoint");
     }
 
     @Test
-    void testWrongEndpoint() throws Exception {
+    void testWrongEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("BEDROCK.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new BedrockProvider(model, new MockSecretDecypterProvider(model)))
+        assertThatThrownBy(
+                        () ->
+                                new BedrockProvider(
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -49,7 +57,7 @@ public class BedrockProviderTest {
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -62,10 +70,10 @@ public class BedrockProviderTest {
     }
 
     @Test
-    void testBadResponse() throws Exception {
+    void testBadResponse() {
         CatalogModel model = getCatalogModel();
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -76,10 +84,10 @@ public class BedrockProviderTest {
     }
 
     @Test
-    void testErrorResponse() throws Exception {
+    void testErrorResponse() {
         CatalogModel model = getCatalogModel();
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"ErrorCode\":[\"Model not found or something.\"]}";
         assertThatThrownBy(
                         () ->
@@ -93,7 +101,7 @@ public class BedrockProviderTest {
     void testGetRequestAI21() throws Exception {
         CatalogModel model = getEndpointModel("ai21.whatever");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -111,7 +119,7 @@ public class BedrockProviderTest {
     void testGetRequestAnthropic() throws Exception {
         CatalogModel model = getEndpointModel("anthropic.whatever");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         Buffer buffer = new Buffer();
@@ -127,7 +135,7 @@ public class BedrockProviderTest {
     void testGetRequestCohere() throws Exception {
         CatalogModel model = getEndpointModel("cohere.whatever");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         Buffer buffer = new Buffer();
@@ -142,7 +150,7 @@ public class BedrockProviderTest {
     void testGetRequestMeta() throws Exception {
         CatalogModel model = getEndpointModel("meta.whatever");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         Buffer buffer = new Buffer();
@@ -155,7 +163,7 @@ public class BedrockProviderTest {
     void testGetRequestMistral() throws Exception {
         CatalogModel model = getEndpointModel("mistral.whatever");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = bedrockProvider.getRequest(args);
         Buffer buffer = new Buffer();
@@ -165,10 +173,10 @@ public class BedrockProviderTest {
     }
 
     @Test
-    void testParseResponse() throws Exception {
+    void testParseResponse() {
         CatalogModel model = getCatalogModel();
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"results\":[{\"outputText\":\"output-text\"}]}";
         Row row = bedrockProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -178,7 +186,7 @@ public class BedrockProviderTest {
     }
 
     @NotNull
-    private static Request getRequestWithContentOverrides(String inputFormat) {
+    private Request getRequestWithContentOverrides(String inputFormat) {
         Map<String, String> modelOptions = getCommonModelOptions();
         modelOptions.put("BEDROCK.INPUT_FORMAT", inputFormat);
         modelOptions.put("BEDROCK.INPUT_CONTENT_TYPE", "application/x-custom");
@@ -191,7 +199,7 @@ public class BedrockProviderTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
         BedrockProvider bedrockProvider =
-                new BedrockProvider(model, new MockSecretDecypterProvider(model));
+                new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc"};
         return bedrockProvider.getRequest(args);
     }

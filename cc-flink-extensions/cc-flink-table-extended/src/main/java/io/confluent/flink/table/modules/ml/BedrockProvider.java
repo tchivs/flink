@@ -86,7 +86,7 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         String encryptStrategy = modelOptionsUtils.getEncryptStrategy();
         this.accessKey =
                 secretDecrypterProvider
-                        .getDecrypter(encryptStrategy)
+                        .getMeteredDecrypter(encryptStrategy)
                         .decryptFromKey(BedrockRemoteModelOptions.ACCESS_KEY_ID.key());
         this.secretKey =
                 secretDecrypterProvider

@@ -39,30 +39,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for OpenAIProvider. */
-public class OpenAIProviderTest {
+public class OpenAIProviderTest extends ProviderTestBase {
     private final MLModelSupportedProviders provider = MLModelSupportedProviders.OPENAI;
 
     @Test
-    void testBadEndpoint() throws Exception {
+    void testBadEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("OPENAI.ENDPOINT", "fake-endpoint");
         assertThatThrownBy(
                         () ->
                                 new OpenAIProvider(
-                                        model, provider, new MockSecretDecypterProvider(model)))
+                                        model,
+                                        provider,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
                         "For OPENAI endpoint expected to match https://api\\.openai\\.com/.*, got fake-endpoint");
     }
 
     @Test
-    void testWrongEndpoint() throws Exception {
+    void testWrongEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("OPENAI.ENDPOINT", "https://fake-endpoint.com/wrong");
         assertThatThrownBy(
                         () ->
                                 new OpenAIProvider(
-                                        model, provider, new MockSecretDecypterProvider(model)))
+                                        model,
+                                        provider,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -71,7 +75,8 @@ public class OpenAIProviderTest {
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
+                new OpenAIProvider(
+                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -95,7 +100,7 @@ public class OpenAIProviderTest {
                 new OpenAIProvider(
                         model,
                         MLModelSupportedProviders.AZUREOPENAI,
-                        new MockSecretDecypterProvider(model));
+                        new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -116,7 +121,8 @@ public class OpenAIProviderTest {
     void testGetRequestSystemPrompt() throws Exception {
         CatalogModel model = getCatalogModelSystemPrompt();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
+                new OpenAIProvider(
+                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -135,10 +141,11 @@ public class OpenAIProviderTest {
     }
 
     @Test
-    void testBadResponse() throws Exception {
+    void testBadResponse() {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
+                new OpenAIProvider(
+                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () -> openAIProvider.getContentFromResponse(MlUtils.makeResponse(response)))
@@ -148,10 +155,11 @@ public class OpenAIProviderTest {
     }
 
     @Test
-    void testParseResponse() throws Exception {
+    void testParseResponse() {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(model, provider, new MockSecretDecypterProvider(model));
+                new OpenAIProvider(
+                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
         String response =
                 "{\"choices\":[{\"message\":{\"role\":\"user\",\"content\":\"output-text\"}}]}";
         Row row = openAIProvider.getContentFromResponse(MlUtils.makeResponse(response));

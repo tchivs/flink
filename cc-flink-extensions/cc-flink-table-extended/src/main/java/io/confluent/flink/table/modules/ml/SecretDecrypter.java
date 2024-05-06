@@ -16,4 +16,6 @@ public interface SecretDecrypter {
     String decryptFromKey(final String secretKey);
 
     RemoteModelOptions.EncryptionStrategy supportedStrategy();
+
+    MLModelSupportedProviders getProvider();
 }

@@ -73,12 +73,12 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
         if (supportedProvider == MLModelSupportedProviders.OPENAI) {
             this.apiKey =
                     secretDecrypterProvider
-                            .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                            .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
                             .decryptFromKey(OpenAIRemoteModelOptions.API_KEY.key());
         } else {
             this.apiKey =
                     secretDecrypterProvider
-                            .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                            .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
                             .decryptFromKey(AzureOpenAIRemoteModelOptions.API_KEY.key());
         }
 

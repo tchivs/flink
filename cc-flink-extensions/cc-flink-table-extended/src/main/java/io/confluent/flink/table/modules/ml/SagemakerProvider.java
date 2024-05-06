@@ -99,17 +99,17 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
         String encryptStrategy = modelOptionsUtils.getEncryptStrategy();
         this.accessKey =
                 secretDecrypterProvider
-                        .getDecrypter(encryptStrategy)
+                        .getMeteredDecrypter(encryptStrategy)
                         .decryptFromKey(SageMakerRemoteModelOptions.ACCESS_KEY_ID.key());
         this.secretKey =
                 secretDecrypterProvider
-                        .getDecrypter(encryptStrategy)
+                        .getMeteredDecrypter(encryptStrategy)
                         .decryptFromKey(SageMakerRemoteModelOptions.SECRET_KEY.key());
 
         // A session token is optional, but needed for temporary credentials.
         this.sessionToken =
                 secretDecrypterProvider
-                        .getDecrypter(encryptStrategy)
+                        .getMeteredDecrypter(encryptStrategy)
                         .decryptFromKey(SageMakerRemoteModelOptions.SESSION_TOKEN.key());
 
         if (accessKey.isEmpty() || secretKey.isEmpty()) {

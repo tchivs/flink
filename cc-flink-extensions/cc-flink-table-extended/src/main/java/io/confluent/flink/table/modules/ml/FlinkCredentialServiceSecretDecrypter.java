@@ -117,4 +117,9 @@ public class FlinkCredentialServiceSecretDecrypter implements SecretDecrypter {
     public RemoteModelOptions.EncryptionStrategy supportedStrategy() {
         return EncryptionStrategy.KMS;
     }
+
+    @Override
+    public MLModelSupportedProviders getProvider() {
+        return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
+    }
 }

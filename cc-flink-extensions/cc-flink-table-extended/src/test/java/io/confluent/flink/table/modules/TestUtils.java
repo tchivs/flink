@@ -4,9 +4,17 @@
 
 package io.confluent.flink.table.modules;
 
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.SimpleCounter;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.catalog.CatalogModel;
 
 import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
+import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
+import io.confluent.flink.table.modules.ml.MLModelSupportedProviders;
+import io.confluent.flink.table.modules.ml.MeteredSecretDecrypter;
 import io.confluent.flink.table.modules.ml.PlainTextDecrypter;
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import io.confluent.flink.table.modules.ml.SecretDecrypter;
@@ -24,6 +32,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Signature;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Map;
 
 /** Test utilities for encryption and decryption. */
 public class TestUtils {
@@ -76,13 +88,22 @@ public class TestUtils {
      */
     public static class MockFlinkCredentialServiceDecrypter implements SecretDecrypter {
         private final ModelOptionsUtils modelOptionsUtils;
+        private final boolean shouldThrow;
 
         public MockFlinkCredentialServiceDecrypter(CatalogModel model) {
+            this(model, false);
+        }
+
+        public MockFlinkCredentialServiceDecrypter(CatalogModel model, boolean shouldThrow) {
             modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+            this.shouldThrow = shouldThrow;
         }
 
         @Override
         public String decryptFromKey(String secretKey) {
+            if (shouldThrow) {
+                throw new RuntimeException("some error");
+            }
             String secret = modelOptionsUtils.getOption(secretKey);
             if (secret == null || secret.isEmpty()) {
                 return "";
@@ -94,14 +115,24 @@ public class TestUtils {
         public EncryptionStrategy supportedStrategy() {
             return EncryptionStrategy.KMS;
         }
+
+        @Override
+        public MLModelSupportedProviders getProvider() {
+            return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
+        }
     }
 
     /** Mock for {@link io.confluent.flink.table.modules.ml.SecretDecrypterProvider}. */
     public static class MockSecretDecypterProvider implements SecretDecrypterProvider {
         private final CatalogModel model;
+        private final MLFunctionMetrics metrics;
+        private final Clock clock;
 
-        public MockSecretDecypterProvider(CatalogModel model) {
+        public MockSecretDecypterProvider(
+                CatalogModel model, MLFunctionMetrics metrics, Clock clock) {
             this.model = model;
+            this.metrics = metrics;
+            this.clock = clock;
         }
 
         @Override
@@ -113,6 +144,81 @@ public class TestUtils {
                 return new MockFlinkCredentialServiceDecrypter(model);
             }
             throw new IllegalArgumentException("Not supported " + decryptStrategy);
+        }
+
+        @Override
+        public MeteredSecretDecrypter getMeteredDecrypter(String decryptStrategy) {
+            return new MeteredSecretDecrypter(getDecrypter(decryptStrategy), metrics, clock);
+        }
+    }
+
+    /** Mock clock for testing. */
+    public static class IncrementingClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        public IncrementingClock(Instant fixedInstant, ZoneId zone) {
+            this.instant = fixedInstant;
+            this.zone = zone;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new IncrementingClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            instant = instant.plusMillis(1);
+            return instant;
+        }
+    }
+
+    /** Metrics Group to track metrics. */
+    public static class TrackingMetricsGroup extends UnregisteredMetricsGroup {
+        private final Map<String, Counter> counters;
+        private final Map<String, Gauge<?>> gauges;
+        private final String base;
+
+        public TrackingMetricsGroup(
+                String name, Map<String, Counter> counters, Map<String, Gauge<?>> gauges) {
+            this.base = name;
+            this.counters = counters;
+            this.gauges = gauges;
+        }
+
+        @Override
+        public Counter counter(String name) {
+            Counter counter = new SimpleCounter();
+            counters.put(base + "." + name, counter);
+            return counter;
+        }
+
+        @Override
+        public <C extends Counter> C counter(String name, C counter) {
+            counters.put(base + "." + name, counter);
+            return counter;
+        }
+
+        @Override
+        public <T, G extends Gauge<T>> G gauge(String name, G gauge) {
+            gauges.put(base + "." + name, gauge);
+            return gauge;
+        }
+
+        @Override
+        public MetricGroup addGroup(String name) {
+            return new TrackingMetricsGroup(base + "." + name, counters, gauges);
+        }
+
+        @Override
+        public MetricGroup addGroup(String key, String value) {
+            return new TrackingMetricsGroup(base + "." + key + "." + value, counters, gauges);
         }
     }
 }

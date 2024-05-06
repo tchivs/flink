@@ -7,8 +7,6 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.metrics.SimpleCounter;
-import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
@@ -19,6 +17,8 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import io.confluent.flink.table.modules.TestUtils.IncrementingClock;
+import io.confluent.flink.table.modules.TestUtils.TrackingMetricsGroup;
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 import okhttp3.Response;
 import org.assertj.core.api.Assertions;
@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for MLModelRuntime. */
@@ -41,76 +42,6 @@ public class MLModelRuntimeTest {
     MockOkHttpClient mockHttpClient = new MockOkHttpClient();
     Map<String, Gauge<?>> registeredGauges = new HashMap<>();
     Map<String, Counter> registeredCounters = new HashMap<>();
-
-    /** Mock clock for testing. */
-    public class IncrementingClock extends Clock {
-        private Instant instant;
-        private ZoneId zone;
-
-        public IncrementingClock(Instant fixedInstant, ZoneId zone) {
-            this.instant = fixedInstant;
-            this.zone = zone;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return zone;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return new IncrementingClock(instant, zone);
-        }
-
-        @Override
-        public Instant instant() {
-            instant = instant.plusMillis(1);
-            return instant;
-        }
-    }
-
-    /** Metrics Group to track metrics. */
-    private static class TrackingMetricsGroup extends UnregisteredMetricsGroup {
-        private final Map<String, Counter> counters;
-        private final Map<String, Gauge<?>> gauges;
-        private final String base;
-
-        public TrackingMetricsGroup(
-                String name, Map<String, Counter> counters, Map<String, Gauge<?>> gauges) {
-            this.base = name;
-            this.counters = counters;
-            this.gauges = gauges;
-        }
-
-        @Override
-        public Counter counter(String name) {
-            Counter counter = new SimpleCounter();
-            counters.put(base + "." + name, counter);
-            return counter;
-        }
-
-        @Override
-        public <C extends Counter> C counter(String name, C counter) {
-            counters.put(base + "." + name, counter);
-            return counter;
-        }
-
-        @Override
-        public <T, G extends Gauge<T>> G gauge(String name, G gauge) {
-            gauges.put(base + "." + name, gauge);
-            return gauge;
-        }
-
-        @Override
-        public MetricGroup addGroup(String name) {
-            return new TrackingMetricsGroup(base + "." + name, counters, gauges);
-        }
-
-        @Override
-        public MetricGroup addGroup(String key, String value) {
-            return new TrackingMetricsGroup(base + "." + key + "." + value, counters, gauges);
-        }
-    }
 
     /** Mock VertexAIProvider so we can mock out the google credentials. */
     private static class MockVertexAIProvider extends VertexAIProvider {
@@ -180,6 +111,24 @@ public class MLModelRuntimeTest {
                 .isEqualTo(0);
         Assertions.assertThat(registeredCounters.get("m.ConfluentML.prepFailures").getCount())
                 .isEqualTo(0);
+        assertThat(registeredCounters.get("m.ConfluentML.PLAINTEXT.requestSuccesses").getCount())
+                .isEqualTo(1L);
+        assertThat(registeredCounters.get("m.ConfluentML.PLAINTEXT.requestFailures").getCount())
+                .isEqualTo(0L);
+        assertThat(registeredGauges.get("m.ConfluentML.PLAINTEXT.requestMs").getValue())
+                .isEqualTo(1L);
+        assertThat(
+                        registeredCounters
+                                .get("m.ConfluentML.AZUREML.PLAINTEXT.requestSuccesses")
+                                .getCount())
+                .isEqualTo(1L);
+        assertThat(
+                        registeredCounters
+                                .get("m.ConfluentML.AZUREML.PLAINTEXT.requestFailures")
+                                .getCount())
+                .isEqualTo(0L);
+        assertThat(registeredGauges.get("m.ConfluentML.AZUREML.PLAINTEXT.requestMs").getValue())
+                .isEqualTo(1L);
     }
 
     @Test
@@ -248,7 +197,7 @@ public class MLModelRuntimeTest {
     void testRemoteHttpCallVertex() throws Exception {
         CatalogModel model = getVertexAIModel();
         MockVertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model));
+                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model, metrics));
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(vertexAIProvider, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(makeErrorResponse("{\"error\":\"output-text\"}", 100));
@@ -281,7 +230,7 @@ public class MLModelRuntimeTest {
     void testRemoteHttpCallVertexPub() throws Exception {
         CatalogModel model = getVertexAIPubModel();
         MockVertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model));
+                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model, metrics));
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(vertexAIProvider, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(MlUtils.makeResponse("parse-fail"));

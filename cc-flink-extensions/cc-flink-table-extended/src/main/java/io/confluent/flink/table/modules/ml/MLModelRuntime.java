@@ -31,14 +31,14 @@ public class MLModelRuntime implements AutoCloseable {
     private final transient MLFunctionMetrics metrics;
 
     // Clock is used to measure time for metrics. Mockable.
-    private Clock clock;
+    private final Clock clock;
 
     private MLModelRuntime(
             CatalogModel model, OkHttpClient httpClient, MLFunctionMetrics metrics, Clock clock) {
         this.httpClient = httpClient;
-        this.provider = pickProvider(model);
         this.metrics = metrics;
         this.clock = clock;
+        this.provider = pickProvider(model);
         metrics.provision(provider.getMetricsName());
     }
 
@@ -48,8 +48,8 @@ public class MLModelRuntime implements AutoCloseable {
             MLFunctionMetrics metrics,
             Clock clock) {
         this.httpClient = httpClient;
-        this.provider = provider;
         this.metrics = metrics;
+        this.provider = provider;
         this.clock = clock;
         metrics.provision(provider.getMetricsName());
     }
@@ -66,7 +66,7 @@ public class MLModelRuntime implements AutoCloseable {
         }
 
         final SecretDecrypterProvider secretDecrypterProvider =
-                new SecretDecrypterProviderImpl(model);
+                new SecretDecrypterProviderImpl(model, metrics, clock);
 
         if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())) {
             // OpenAI through their own API, not to be confused with the Azure OpenAI API.

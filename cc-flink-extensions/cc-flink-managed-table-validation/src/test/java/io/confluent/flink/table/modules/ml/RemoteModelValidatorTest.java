@@ -23,8 +23,8 @@ import java.util.Set;
 
 import static io.confluent.flink.table.modules.ml.RemoteModelValidator.validateCreateModelOptions;
 import static org.apache.flink.util.CollectionUtil.entry;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 /** Tests for {@link RemoteModelValidator}. */
 public class RemoteModelValidatorTest {

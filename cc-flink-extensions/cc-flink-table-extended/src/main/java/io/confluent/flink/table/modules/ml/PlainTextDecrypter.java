@@ -11,7 +11,7 @@ import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 /** Plain text decrypter. */
 public class PlainTextDecrypter implements SecretDecrypter {
-    private ModelOptionsUtils modelOptionsUtils;
+    private final ModelOptionsUtils modelOptionsUtils;
 
     public PlainTextDecrypter(CatalogModel model) {
         modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
@@ -26,5 +26,10 @@ public class PlainTextDecrypter implements SecretDecrypter {
     @Override
     public EncryptionStrategy supportedStrategy() {
         return EncryptionStrategy.PLAINTEXT;
+    }
+
+    @Override
+    public MLModelSupportedProviders getProvider() {
+        return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
     }
 }

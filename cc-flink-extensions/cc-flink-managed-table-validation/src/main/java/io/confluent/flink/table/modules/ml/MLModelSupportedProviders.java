@@ -8,6 +8,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import java.net.URL;
+import java.util.Locale;
 
 /** enum for supported ML model providers. */
 public enum MLModelSupportedProviders {
@@ -109,6 +110,10 @@ public enum MLModelSupportedProviders {
         if (!endpoint.matches(endpointValidation)) {
             throwEndpointValidationException(runtime, errorMsg);
         }
+    }
+
+    public static MLModelSupportedProviders fromString(String providerName) {
+        return MLModelSupportedProviders.valueOf(providerName.toUpperCase(Locale.ROOT));
     }
 
     private void throwEndpointValidationException(boolean runtime, String msg) {

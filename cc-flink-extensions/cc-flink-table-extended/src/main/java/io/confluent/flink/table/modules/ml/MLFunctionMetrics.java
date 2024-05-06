@@ -8,6 +8,10 @@ import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
+import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,6 +29,7 @@ public class MLFunctionMetrics {
     static final String DEPROVISIONS_NAME = "deprovisions";
     static final String REQUESTS = "requests";
     static final String REQUEST_SUCCESSES = "requestSuccesses";
+    static final String REQUEST_FAILURES = "requestFailures";
     static final String REQUEST_4XX = "request4XX";
     static final String REQUEST_5XX = "request5XX";
     static final String REQUEST_OTHER_HTTP = "requestOtherHttpFailures";
@@ -39,8 +44,34 @@ public class MLFunctionMetrics {
     private final ProviderMetrics totalMetrics;
     private final Map<String, ProviderMetrics> providerMetrics;
 
+    /** Class to hold counters for each decrypter group. */
+    private static class DecrypterMetrics {
+        private final Counter requestSuccess;
+        private final Counter requestFailure;
+        private final Gauge<Long> requestMs;
+        private final AtomicLong lastRequestMs = new AtomicLong(0);
+
+        public DecrypterMetrics(MetricGroup group) {
+            this.requestSuccess = group.counter(REQUEST_SUCCESSES);
+            this.requestFailure = group.counter(REQUEST_FAILURES);
+            this.requestMs = group.gauge(REQUEST_MS, lastRequestMs::get);
+        }
+
+        public void requestMs(long requestMs) {
+            lastRequestMs.set(requestMs);
+        }
+
+        public void requestSuccess() {
+            requestSuccess.inc();
+        }
+
+        public void requestFailure() {
+            requestFailure.inc();
+        }
+    }
+
     /** Class to hold counters for each provider group. */
-    private class ProviderMetrics {
+    private static class ProviderMetrics {
         private final MetricGroup group;
         private final Counter provisions;
         private final Counter deprovisions;
@@ -55,6 +86,7 @@ public class MLFunctionMetrics {
         private final Gauge<Long> totalMs;
         private final Counter bytesSent;
         private final Counter bytesReceived;
+        private final Map<String, DecrypterMetrics> decrypterMetrics;
 
         private final AtomicLong lastRequestMs = new AtomicLong(0);
         private final AtomicLong lastTotalMs = new AtomicLong(0);
@@ -74,6 +106,13 @@ public class MLFunctionMetrics {
             this.totalMs = group.gauge(TOTAL_MS, lastTotalMs::get);
             this.bytesSent = group.counter(BYES_SENT);
             this.bytesReceived = group.counter(BYES_RECEIVED);
+            this.decrypterMetrics =
+                    ImmutableMap.of(
+                            EncryptionStrategy.KMS.name(),
+                            new DecrypterMetrics(group.addGroup(EncryptionStrategy.KMS.name())),
+                            EncryptionStrategy.PLAINTEXT.name(),
+                            new DecrypterMetrics(
+                                    group.addGroup(EncryptionStrategy.PLAINTEXT.name())));
         }
 
         public void provision() {
@@ -127,13 +166,25 @@ public class MLFunctionMetrics {
         public void bytesReceived(long numBytes) {
             bytesReceived.inc(numBytes);
         }
+
+        public void decryptRequestSuccess(String strategy) {
+            decrypterMetrics.get(strategy).requestSuccess();
+        }
+
+        public void decryptRequestFailure(String strategy) {
+            decrypterMetrics.get(strategy).requestFailure();
+        }
+
+        public void decryptRequestMs(String strategy, long ms) {
+            decrypterMetrics.get(strategy).requestMs(ms);
+        }
     }
 
     public MLFunctionMetrics(MetricGroup parentGroup) {
         this.group = parentGroup.addGroup(METRIC_NAME);
         this.totalMetrics = new ProviderMetrics(group);
         // One group per MLModelSupportedProviders
-        this.providerMetrics = new HashMap<String, ProviderMetrics>();
+        providerMetrics = new HashMap<>();
         // Add a group for each provider
         for (MLModelSupportedProviders provider : MLModelSupportedProviders.values()) {
             providerMetrics.put(
@@ -221,5 +272,20 @@ public class MLFunctionMetrics {
     public void bytesReceived(String provider, long numBytes) {
         totalMetrics.bytesReceived(numBytes);
         providerMetrics.get(provider).bytesReceived(numBytes);
+    }
+
+    public void decryptRequestSuccess(String provider, String strategy) {
+        totalMetrics.decryptRequestSuccess(strategy);
+        providerMetrics.get(provider).decryptRequestSuccess(strategy);
+    }
+
+    public void decryptRequestFailure(String provider, String strategy) {
+        totalMetrics.decryptRequestFailure(strategy);
+        providerMetrics.get(provider).decryptRequestFailure(strategy);
+    }
+
+    public void decryptRequestMs(String provider, String strategy, long ms) {
+        totalMetrics.decryptRequestMs(strategy, ms);
+        providerMetrics.get(provider).decryptRequestMs(strategy, ms);
     }
 }

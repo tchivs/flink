@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for VertexAIProvider. */
-public class VertexAIProviderTest {
+public class VertexAIProviderTest extends ProviderTestBase {
 
     /** Mock VertexAIProvider so we can mock out the google credentials. */
     private static class MockVertexAIProvider extends VertexAIProvider {
@@ -62,26 +62,28 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testBadEndpoint() throws Exception {
+    void testBadEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("VERTEXAI.ENDPOINT", "fake-endpoint");
         assertThatThrownBy(
                         () ->
                                 new MockVertexAIProvider(
-                                        model, new MockSecretDecypterProvider(model)))
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
                         "For VERTEXAI endpoint expected to match https://[\\w-]+-aiplatform\\.googleapis\\.com/v1(beta1)?/projects/.+/locations/.+/(endpoints|publishers)/.+(:predict|:rawPredict|:generateContent|:streamGenerateContent|:streamRawPredict)?, got fake-endpoint");
     }
 
     @Test
-    void testWrongEndpoint() throws Exception {
+    void testWrongEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("VERTEXAI.ENDPOINT", "https://fake-endpoint.com/something");
         assertThatThrownBy(
                         () ->
                                 new MockVertexAIProvider(
-                                        model, new MockSecretDecypterProvider(model)))
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -90,7 +92,8 @@ public class VertexAIProviderTest {
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = vertexAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -108,7 +111,8 @@ public class VertexAIProviderTest {
     void testGetRequestGemini() throws Exception {
         CatalogModel model = getGeminiCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = vertexAIProvider.getRequest(args);
         // Check that the request verb was properly changed.
@@ -128,7 +132,8 @@ public class VertexAIProviderTest {
     void testGetRequestAnthropic() throws Exception {
         CatalogModel model = getAnthropicCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = vertexAIProvider.getRequest(args);
         // Check that the request verb was properly changed.
@@ -149,7 +154,8 @@ public class VertexAIProviderTest {
     void testGetRequestMultiInput() throws Exception {
         CatalogModel model = getCatalogModelMultiType();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args =
                 new Object[] {
                     "input-text-prompt",
@@ -187,10 +193,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testBadResponse() throws Exception {
+    void testBadResponse() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -201,10 +208,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testErrorResponse() throws Exception {
+    void testErrorResponse() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"error\":[\"Model not found or something.\"]}";
         assertThatThrownBy(
                         () ->
@@ -215,10 +223,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testParseResponse() throws Exception {
+    void testParseResponse() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[\"output-text\"]}";
         Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -228,10 +237,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testParseResponseWithObject() throws Exception {
+    void testParseResponseWithObject() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\"}]}";
         Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -241,10 +251,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testParseResponseExtraOutput() throws Exception {
+    void testParseResponseExtraOutput() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\",\"score\":0.9}]}";
         Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
@@ -254,10 +265,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testParseResponseMissingOutput() throws Exception {
+    void testParseResponseMissingOutput() {
         CatalogModel model = getCatalogModel();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"not-output\":\"output-text\",\"score\":0.9}]}";
         assertThatThrownBy(
@@ -269,10 +281,11 @@ public class VertexAIProviderTest {
     }
 
     @Test
-    void testParseResponseMultiType() throws Exception {
+    void testParseResponseMultiType() {
         CatalogModel model = getCatalogModelMultiType();
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response =
                 "{\"predictions\":[{\"output\":\"output-text\",\"output2\":3,\"output3\":5.0,"
@@ -330,7 +343,7 @@ public class VertexAIProviderTest {
     }
 
     @NotNull
-    private static Request getRequestBinaryWithFormat(String inputFormat) {
+    private Request getRequestBinaryWithFormat(String inputFormat) {
         Map<String, String> modelOptions = getCommonModelOptions();
         modelOptions.put("VERTEXAI.INPUT_FORMAT", inputFormat);
         Schema inputSchema =
@@ -338,7 +351,8 @@ public class VertexAIProviderTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CatalogModel model = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
         VertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new MockSecretDecypterProvider(model));
+                new MockVertexAIProvider(
+                        model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {new Integer[] {1, 2, 3}, "abc".getBytes()};
         return vertexAIProvider.getRequest(args);
     }

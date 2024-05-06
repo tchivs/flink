@@ -51,7 +51,7 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         // Azure ML can take either an API Key or an expiring token, but we only support API Key.
         this.apiKey =
                 secretDecrypterProvider
-                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
                         .decryptFromKey(AzureMLRemoteModelOptions.API_KEY.key());
 
         // The Azure ML Deployment Name is optional, but allows the user to distinguish between

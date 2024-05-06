@@ -52,7 +52,7 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
         supportedProvider.validateEndpoint(urlBase, true);
         this.apiKey =
                 secretDecrypterProvider
-                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
                         .decryptFromKey(GoogleAIRemoteModelOptions.API_KEY.key());
 
         if (apiKey.isEmpty()) {

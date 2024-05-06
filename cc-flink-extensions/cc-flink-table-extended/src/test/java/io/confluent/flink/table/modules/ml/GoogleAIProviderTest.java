@@ -39,23 +39,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for GoogleAIProvider. */
-public class GoogleAIProviderTest {
+public class GoogleAIProviderTest extends ProviderTestBase {
 
     @Test
-    void testBadEndpoint() throws Exception {
+    void testBadEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("GOOGLEAI.ENDPOINT", "fake-endpoint");
-        assertThatThrownBy(() -> new GoogleAIProvider(model, new MockSecretDecypterProvider(model)))
+        assertThatThrownBy(
+                        () ->
+                                new GoogleAIProvider(
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
                         "For GOOGLEAI endpoint expected to match https://generativelanguage.googleapis.com/.*, got fake-endpoint");
     }
 
     @Test
-    void testWrongEndpoint() throws Exception {
+    void testWrongEndpoint() {
         CatalogModel model = getCatalogModel();
         model.getOptions().put("GOOGLEAI.ENDPOINT", "https://fake-endpoint.com/wrong");
-        assertThatThrownBy(() -> new GoogleAIProvider(model, new MockSecretDecypterProvider(model)))
+        assertThatThrownBy(
+                        () ->
+                                new GoogleAIProvider(
+                                        model,
+                                        new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
     }
@@ -64,7 +72,7 @@ public class GoogleAIProviderTest {
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
         GoogleAIProvider googleAIProvider =
-                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = googleAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -80,10 +88,10 @@ public class GoogleAIProviderTest {
     }
 
     @Test
-    void testBadResponse() throws Exception {
+    void testBadResponse() {
         CatalogModel model = getCatalogModel();
         GoogleAIProvider googleAIProvider =
-                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () ->
@@ -95,10 +103,10 @@ public class GoogleAIProviderTest {
     }
 
     @Test
-    void testParseResponse() throws Exception {
+    void testParseResponse() {
         CatalogModel model = getCatalogModel();
         GoogleAIProvider googleAIProvider =
-                new GoogleAIProvider(model, new MockSecretDecypterProvider(model));
+                new GoogleAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response =
                 "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"output-text\"}]}}]}";

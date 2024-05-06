@@ -4,17 +4,29 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.catalog.CatalogModel;
 
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
+
+import java.time.Clock;
 
 /** Implementation of {@link io.confluent.flink.table.modules.ml.SecretDecrypterProvider}. */
 public class SecretDecrypterProviderImpl implements SecretDecrypterProvider {
 
     private final CatalogModel model;
+    private final MLFunctionMetrics metrics;
+    private final Clock clock;
 
-    public SecretDecrypterProviderImpl(CatalogModel model) {
+    public SecretDecrypterProviderImpl(CatalogModel model, MLFunctionMetrics metrics) {
+        this(model, metrics, Clock.systemUTC());
+    }
+
+    @VisibleForTesting
+    public SecretDecrypterProviderImpl(CatalogModel model, MLFunctionMetrics metrics, Clock clock) {
         this.model = model;
+        this.metrics = metrics;
+        this.clock = clock;
     }
 
     @Override
@@ -26,5 +38,10 @@ public class SecretDecrypterProviderImpl implements SecretDecrypterProvider {
             return new FlinkCredentialServiceSecretDecrypter(model);
         }
         throw new IllegalArgumentException("Unsupported decrypte strategy: " + decryptStrategy);
+    }
+
+    @Override
+    public MeteredSecretDecrypter getMeteredDecrypter(String decryptStrategy) {
+        return new MeteredSecretDecrypter(getDecrypter(decryptStrategy), metrics, clock);
     }
 }

@@ -9,4 +9,6 @@ package io.confluent.flink.table.modules.ml;
  */
 public interface SecretDecrypterProvider {
     SecretDecrypter getDecrypter(final String decryptStrategy);
+
+    MeteredSecretDecrypter getMeteredDecrypter(final String decryptStrategy);
 }

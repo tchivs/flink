@@ -92,7 +92,7 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         // and exchange it for a token.
         String serviceKey =
                 secretDecrypterProvider
-                        .getDecrypter(modelOptionsUtils.getEncryptStrategy())
+                        .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
                         .decryptFromKey(VertexAIRemoteModelOptions.SERVICE_KEY.key());
         if (serviceKey.isEmpty()) {
             throw new FlinkRuntimeException(

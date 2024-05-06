@@ -21,7 +21,7 @@ import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PROVIDE
 /** Utility class to fetch model options with provider namespace. */
 public class ModelOptionsUtils {
     public static final String PROVIDER_OPTION_KEY = PROVIDER;
-    private final String namespace;
+    private final String provider;
     private final Map<String, String> caseInsensitiveModelOptions;
 
     public static String getProvider(Map<String, String> caseSensitiveModelOptions) {
@@ -40,30 +40,30 @@ public class ModelOptionsUtils {
         return FactoryUtil.getModelKind(caseInsensitiveModelOptions);
     }
 
-    public ModelOptionsUtils(CatalogModel model, String namespace) {
-        this.namespace = namespace;
+    public ModelOptionsUtils(CatalogModel model, String provider) {
+        this.provider = provider;
         caseInsensitiveModelOptions = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         caseInsensitiveModelOptions.putAll(model.getOptions());
     }
 
     public ModelOptionsUtils(Map<String, String> modelOptions) {
-        this.namespace = getProvider(modelOptions);
-        caseInsensitiveModelOptions = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
+        this.provider = getProvider(modelOptions);
+        caseInsensitiveModelOptions = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         caseInsensitiveModelOptions.putAll(modelOptions);
     }
 
     public String getProviderOption(String optionName) {
-        return caseInsensitiveModelOptions.get((namespace + "." + optionName).toUpperCase());
+        return caseInsensitiveModelOptions.get((provider + "." + optionName).toUpperCase());
     }
 
     public String getProviderOptionOrDefault(String optionName, String defaultValue) {
         return caseInsensitiveModelOptions.getOrDefault(
-                (namespace + "." + optionName).toUpperCase(), defaultValue);
+                (provider + "." + optionName).toUpperCase(), defaultValue);
     }
 
     public Map<String, String> getCaseInsensitiveProviderOptionsStartingWith(String prefix) {
         Map<String, String> options = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
-        String namespacePrefix = namespace + "." + prefix;
+        String namespacePrefix = provider + "." + prefix;
         caseInsensitiveModelOptions.forEach(
                 (key, value) -> {
                     if (key.toUpperCase().startsWith(namespacePrefix.toUpperCase())) {
@@ -103,5 +103,9 @@ public class ModelOptionsUtils {
     public String getOptionOrDefault(final String key, final String defaultValue) {
         String value = caseInsensitiveModelOptions.get(key);
         return value == null ? defaultValue : value;
+    }
+
+    public String getProvider() {
+        return provider;
     }
 }
