@@ -4,6 +4,7 @@
 
 package io.confluent.flink.formats.converters.avro;
 
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
@@ -43,7 +44,9 @@ public class AvroToFlinkSchemaConverterTest {
                                                 SchemaBuilder.builder()
                                                         .enumeration("color")
                                                         .symbols("red", "blue")),
-                                        new VarCharType(true, VarCharType.MAX_LENGTH))))
+                                        new VarCharType(true, VarCharType.MAX_LENGTH)),
+                                testUnionWithNestedRecordsDuplicateNames(),
+                                testUnionWithNestedRecordsSimpleNames()))
                 .map(Arguments::of);
     }
 
@@ -71,5 +74,145 @@ public class AvroToFlinkSchemaConverterTest {
 
         assertThatThrownBy(() -> AvroToFlinkSchemaConverter.toFlinkSchema(schema))
                 .hasMessage("Cyclic schemas are not supported.");
+    }
+
+    private static TypeMapping testUnionWithNestedRecordsDuplicateNames() {
+        String avroSchemaString =
+                "{\n"
+                        + "  \"type\": \"record\",\n"
+                        + "  \"name\": \"topLevelRecord\",\n"
+                        + "  \"fields\": [\n"
+                        + "    {\n"
+                        + "      \"name\": \"value\",\n"
+                        + "      \"type\": [\n"
+                        + "        {\n"
+                        + "          \"type\": \"record\",\n"
+                        + "          \"name\": \"User\",\n"
+                        + "          \"namespace\": \"io.test1\",\n"
+                        + "          \"fields\": [{\n"
+                        + "            \"name\": \"f0\",\n"
+                        + "            \"type\": \"long\"\n"
+                        + "          }]\n"
+                        + "        },\n"
+                        + "        {\n"
+                        + "          \"type\": \"record\",\n"
+                        + "          \"name\": \"User\",\n"
+                        + "          \"namespace\": \"io.test2\",\n"
+                        + "          \"fields\": [{\n"
+                        + "            \"name\": \"f1\",\n"
+                        + "            \"type\": \"string\"\n"
+                        + "          }]\n"
+                        + "        },\n"
+                        + "        {\n"
+                        + "          \"type\": \"record\",\n"
+                        + "          \"name\": \"Address\",\n"
+                        + "          \"namespace\": \"io.test2\",\n"
+                        + "          \"fields\": [{\n"
+                        + "            \"name\": \"f2\",\n"
+                        + "            \"type\": \"string\"\n"
+                        + "          }]\n"
+                        + "        }\n"
+                        + "      ]\n"
+                        + "    }\n"
+                        + "  ]\n"
+                        + "}";
+        final Schema schema = new Parser().parse(avroSchemaString);
+        return new TypeMapping(
+                schema,
+                DataTypes.ROW(
+                                DataTypes.FIELD(
+                                        "value",
+                                        DataTypes.ROW(
+                                                        DataTypes.FIELD(
+                                                                "io.test1.User",
+                                                                DataTypes.ROW(
+                                                                                DataTypes.FIELD(
+                                                                                        "f0",
+                                                                                        DataTypes
+                                                                                                .BIGINT()
+                                                                                                .notNull()))
+                                                                        .nullable()),
+                                                        DataTypes.FIELD(
+                                                                "io.test2.User",
+                                                                DataTypes.ROW(
+                                                                                DataTypes.FIELD(
+                                                                                        "f1",
+                                                                                        DataTypes
+                                                                                                .STRING()
+                                                                                                .notNull()))
+                                                                        .nullable()),
+                                                        DataTypes.FIELD(
+                                                                "Address",
+                                                                DataTypes.ROW(
+                                                                                DataTypes.FIELD(
+                                                                                        "f2",
+                                                                                        DataTypes
+                                                                                                .STRING()
+                                                                                                .notNull()))
+                                                                        .nullable()))
+                                                .notNull()))
+                        .notNull()
+                        .getLogicalType());
+    }
+
+    private static TypeMapping testUnionWithNestedRecordsSimpleNames() {
+        String avroSchemaString =
+                "{\n"
+                        + "  \"type\": \"record\",\n"
+                        + "  \"name\": \"topLevelRecord\",\n"
+                        + "  \"fields\": [\n"
+                        + "    {\n"
+                        + "      \"name\": \"value\",\n"
+                        + "      \"type\": [\n"
+                        + "        {\n"
+                        + "          \"type\": \"record\",\n"
+                        + "          \"name\": \"User\",\n"
+                        + "          \"namespace\": \"io.test1\",\n"
+                        + "          \"fields\": [{\n"
+                        + "            \"name\": \"f0\",\n"
+                        + "            \"type\": \"long\"\n"
+                        + "          }]\n"
+                        + "        },\n"
+                        + "        {\n"
+                        + "          \"type\": \"record\",\n"
+                        + "          \"name\": \"Address\",\n"
+                        + "          \"namespace\": \"io.test2\",\n"
+                        + "          \"fields\": [{\n"
+                        + "            \"name\": \"f1\",\n"
+                        + "            \"type\": \"string\"\n"
+                        + "          }]\n"
+                        + "        }\n"
+                        + "      ]\n"
+                        + "    }\n"
+                        + "  ]\n"
+                        + "}";
+        final Schema schema = new Parser().parse(avroSchemaString);
+        return new TypeMapping(
+                schema,
+                DataTypes.ROW(
+                                DataTypes.FIELD(
+                                        "value",
+                                        DataTypes.ROW(
+                                                        DataTypes.FIELD(
+                                                                "User",
+                                                                DataTypes.ROW(
+                                                                                DataTypes.FIELD(
+                                                                                        "f0",
+                                                                                        DataTypes
+                                                                                                .BIGINT()
+                                                                                                .notNull()))
+                                                                        .nullable()),
+                                                        DataTypes.FIELD(
+                                                                "Address",
+                                                                DataTypes.ROW(
+                                                                                DataTypes.FIELD(
+                                                                                        "f1",
+                                                                                        DataTypes
+                                                                                                .STRING()
+                                                                                                .notNull()))
+                                                                        .nullable()))
+                                                .notNull()))
+                        .notNull()
+                        .getLogicalType());
     }
 }

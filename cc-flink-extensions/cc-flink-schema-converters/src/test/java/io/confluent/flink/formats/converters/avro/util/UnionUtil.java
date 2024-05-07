@@ -43,8 +43,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter.unionMemberFieldName;
-
 /** Arguments provider for testing union types. */
 public class UnionUtil {
 
@@ -104,8 +102,7 @@ public class UnionUtil {
                             first.getFlinkType().copy(true), second.getFlinkType().copy(true)
                         },
                         new String[] {
-                            unionMemberFieldName(first.getAvroSchema()),
-                            unionMemberFieldName(second.getAvroSchema())
+                            first.getAvroSchema().getName(), second.getAvroSchema().getName()
                         }));
     }
 

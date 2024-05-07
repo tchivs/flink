@@ -5,7 +5,6 @@
 package io.confluent.flink.formats.converters.avro;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
@@ -34,6 +33,7 @@ import org.apache.avro.Schema.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -235,23 +235,43 @@ public class AvroToFlinkSchemaConverter {
                             memberSchemas.get(0), isNullable, cycleContext);
                 }
 
-                Set<String> fieldNames = new HashSet<>();
-                List<RowField> rowFields = new ArrayList<>();
+                List<UnionMember> unionMembers = new ArrayList<>();
                 for (Schema memberSchema : memberSchemas) {
-                    String fieldName = unionMemberFieldName(memberSchema);
-                    if (!fieldNames.add(fieldName)) {
-                        throw new IllegalStateException(
-                                "Multiple union schemas map to the Connect union field name");
-                    }
 
                     LogicalType memberType =
                             toFlinkSchemaWithCycleDetection(memberSchema, true, cycleContext);
 
-                    // make a field with nullable type
-                    rowFields.add(new RowField(fieldName, memberType));
+                    unionMembers.add(
+                            new UnionMember(
+                                    memberSchema.getName(),
+                                    memberSchema.getFullName(),
+                                    memberType));
                 }
 
-                return new RowType(isNullable, rowFields);
+                final Map<String, Long> simpleNameFreq =
+                        unionMembers.stream()
+                                .collect(
+                                        Collectors.groupingBy(
+                                                UnionMember::getSimpleName, Collectors.counting()));
+
+                Set<String> fieldNames = new HashSet<>();
+                List<RowField> unionFields =
+                        unionMembers.stream()
+                                .map(
+                                        member -> {
+                                            final String fieldName =
+                                                    simpleNameFreq.get(member.getSimpleName()) == 1
+                                                            ? member.getSimpleName()
+                                                            : member.getFullName();
+                                            if (!fieldNames.add(fieldName)) {
+                                                throw new ValidationException(
+                                                        "Multiple union schemas map to the same union field name");
+                                            }
+                                            return new RowField(fieldName, member.getLogicalType());
+                                        })
+                                .collect(Collectors.toList());
+
+                return new RowType(isNullable, unionFields);
 
             case NULL:
                 return new NullType();
@@ -280,14 +300,27 @@ public class AvroToFlinkSchemaConverter {
         }
     }
 
-    @VisibleForTesting
-    public static String unionMemberFieldName(org.apache.avro.Schema schema) {
-        if (schema.getType() != Type.RECORD
-                && schema.getType() != Type.FIXED
-                && schema.getType() != Type.ENUM) {
-            return schema.getType().getName();
-        } else {
-            return schema.getFullName();
+    private static final class UnionMember {
+        private final String simpleName;
+        private final String fullName;
+        private final LogicalType logicalType;
+
+        private UnionMember(String simpleName, String fullName, LogicalType logicalType) {
+            this.simpleName = simpleName;
+            this.fullName = fullName;
+            this.logicalType = logicalType;
+        }
+
+        public String getSimpleName() {
+            return simpleName;
+        }
+
+        public String getFullName() {
+            return fullName;
+        }
+
+        public LogicalType getLogicalType() {
+            return logicalType;
         }
     }
 }
