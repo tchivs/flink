@@ -123,10 +123,16 @@ blocks:
             - sudo sysctl -w kernel.core_pattern=core.%p
             - export AWS_ACCESS_KEY_ID=""
             - ./tools/azure-pipelines/uploading_watchdog.sh ./tools/ci/test_controller.sh $module
+      epilogue:
+        always:
+          commands:
             - ./tools/azure-pipelines/cache_docker_images.sh save
-            - tar -czf flink_debug_files_"$module".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
-            - artifact push job flink_debug_files_"$module".tar.gz
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
+        on_fail:
+          commands:
+            - tar -czf flink_debug_files_"$module".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
+            - artifact push job flink_debug_files_"$module".tar.gz --force
+
 
   - name: e2e-tests
     dependencies: []
@@ -168,12 +174,17 @@ blocks:
             - ./tools/azure-pipelines/cache_docker_images.sh load
             - ./tools/ci/compile_ci.sh
             - FLINK_DIR=$(pwd)/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
+      epilogue:
+        always:
+          commands:
             - ./tools/azure-pipelines/cache_docker_images.sh save
-            - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
-            - artifact push job flink_debug_files_"$group".tar.gz
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache $E2E_CACHE_FOLDER
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache $E2E_TARBALL_CACHE
+        on_fail:
+          commands:
+            - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
+            - artifact push job flink_debug_files_"$group".tar.gz --force
 
   - name: docs-check
     dependencies: []
