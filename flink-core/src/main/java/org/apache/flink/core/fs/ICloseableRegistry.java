@@ -81,6 +81,14 @@ public interface ICloseableRegistry extends Closeable {
                 }
 
                 @Override
+                public boolean isClosed() {
+                    return false;
+                }
+
+                @Override
                 public void close() {}
             };
+
+    /** @return true if this registry was closed. */
+    boolean isClosed();
 }

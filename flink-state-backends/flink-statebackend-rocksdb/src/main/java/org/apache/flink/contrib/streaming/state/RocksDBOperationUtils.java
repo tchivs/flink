@@ -20,6 +20,7 @@ package org.apache.flink.contrib.streaming.state;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
 import org.apache.flink.core.fs.ICloseableRegistry;
+import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
@@ -42,7 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -141,18 +141,18 @@ public class RocksDBOperationUtils {
                         columnFamilyOptionsFactory,
                         ttlCompactFiltersManager,
                         writeBufferManagerCapacity);
-        Closeable closeable = columnFamilyDescriptor.getOptions()::close;
 
-        try (Closeable ignored =
-                cancelStreamRegistryForRestore.registerCloseableTemporarily(closeable)) {
+        try {
             ColumnFamilyHandle columnFamilyHandle =
-                    createColumnFamily(columnFamilyDescriptor, db, importFilesMetaData);
+                    createColumnFamily(
+                            columnFamilyDescriptor,
+                            db,
+                            importFilesMetaData,
+                            cancelStreamRegistryForRestore);
             return new RocksDBKeyedStateBackend.RocksDbKvStateInfo(
                     columnFamilyHandle, metaInfoBase);
         } catch (Exception ex) {
-            if (cancelStreamRegistryForRestore.unregisterCloseable(closeable)) {
-                IOUtils.closeQuietly(columnFamilyDescriptor.getOptions());
-            }
+            IOUtils.closeQuietly(columnFamilyDescriptor.getOptions());
             throw new FlinkRuntimeException("Error creating ColumnFamilyHandle.", ex);
         }
     }
@@ -269,12 +269,15 @@ public class RocksDBOperationUtils {
     private static ColumnFamilyHandle createColumnFamily(
             ColumnFamilyDescriptor columnDescriptor,
             RocksDB db,
-            List<ExportImportFilesMetaData> importFilesMetaData)
+            List<ExportImportFilesMetaData> importFilesMetaData,
+            ICloseableRegistry cancelStreamRegistryForRestore)
             throws RocksDBException, InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             // abort recovery if the task thread was already interrupted
             // e.g. because the task was cancelled
             throw new InterruptedException("The thread was interrupted, aborting recovery");
+        } else if (cancelStreamRegistryForRestore.isClosed()) {
+            throw new CancelTaskException("The stream was closed, aborting recovery");
         }
 
         if (importFilesMetaData.isEmpty()) {
