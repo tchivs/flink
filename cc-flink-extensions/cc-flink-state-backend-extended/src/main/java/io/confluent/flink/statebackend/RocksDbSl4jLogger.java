@@ -39,7 +39,11 @@ class RocksDbSl4jLogger extends org.rocksdb.Logger {
                     logger.warn(message);
                     break;
                 case INFO_LEVEL:
-                    logger.info(message);
+                    // temporarily decrease logging
+                    // see https://confluentinc.atlassian.net/browse/NGN-331
+                    // see also https://confluentinc.atlassian.net/browse/FLINKCC-1204
+                    //                    logger.info(message);
+                    logger.debug(message);
                     break;
                 case DEBUG_LEVEL:
                     logger.debug(message);
