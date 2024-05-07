@@ -1,4 +1,4 @@
-*	@confluentinc/flink
+*	@confluentinc/flink-core
 
 cc-flink-extensions/cc-flink-table-extended	@confluentinc/flink-sql
 cc-flink-extensions/cc-flink-managed-table-validation	@confluentinc/flink-sql @confluentinc/flink-storage
