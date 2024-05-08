@@ -126,6 +126,7 @@ blocks:
       epilogue:
         always:
           commands:
+            - source .semaphore/functions.sh && publish_test_results "tests-${module}"
             - ./tools/azure-pipelines/cache_docker_images.sh save
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
         on_fail:
@@ -177,6 +178,7 @@ blocks:
       epilogue:
         always:
           commands:
+            - source .semaphore/functions.sh && publish_test_results "e2e-tests-${group}"
             - ./tools/azure-pipelines/cache_docker_images.sh save
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
             - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache $E2E_CACHE_FOLDER
@@ -211,6 +213,13 @@ blocks:
             - cache restore "$CACHE_PREFIX"-maven-cache
             - make flink-bump-version
             - make flink-deploy
+
+after_pipeline:
+  task:
+    jobs:
+      - name: Generate tests overview
+        commands:
+          - test-results gen-pipeline-report
 
 promotions:
   - name: trigger kdb
