@@ -59,6 +59,12 @@ public class RemoteUdfModule implements Module {
                     .defaultValue("")
                     .withDescription("The version id of the shim jar used for invocation calls.");
 
+    public static final ConfigOption<Boolean> CONFLUENT_REMOTE_UDF_ASYNC_ENABLED =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "async.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether the async version of udfs are enabled");
+
     private final Map<String, FunctionDefinition> normalizedFunctions;
 
     public RemoteUdfModule() {

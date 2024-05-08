@@ -19,6 +19,8 @@ import io.confluent.flink.apiserver.client.ComputeV1Api;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
+import io.confluent.flink.udf.adapter.api.ThreadLocalRemoteUdfSerialization;
+import io.confluent.flink.udf.adapter.api.UdfSerialization;
 import io.confluent.secure.compute.gateway.v1.Error;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionRequest;
 import io.confluent.secure.compute.gateway.v1.InvokeFunctionResponse;
@@ -35,8 +37,10 @@ import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.getUdfTaskFromSpec;
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
+import static org.apache.flink.shaded.guava31.com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 /**
  * This class encapsulates the runtime for interacting with remote UDFs, e.g. to call the remote
@@ -51,7 +55,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
     private static final int POLL_INTERVAL_MS = 500;
 
     private RemoteUdfRuntime(
-            RemoteUdfSerialization remoteUdfSerialization,
+            UdfSerialization udfSerialization,
             RemoteUdfGatewayConnection remoteUdfGatewayConnection,
             String functionInstanceName,
             ApiClient apiClient,
@@ -59,7 +63,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             RemoteUdfMetrics metrics,
             KafkaCredentialsCache credentialsCache,
             JobID jobID) {
-        this.remoteUdfSerialization = remoteUdfSerialization;
+        this.udfSerialization = udfSerialization;
         this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
         this.functionInstanceName = functionInstanceName;
         this.apiClient = apiClient;
@@ -70,7 +74,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
     }
 
     /** Serialization methods. */
-    private final RemoteUdfSerialization remoteUdfSerialization;
+    private final UdfSerialization udfSerialization;
     /** Connection to the UDF remote service gateway. */
     private final RemoteUdfGatewayConnection remoteUdfGatewayConnection;
     /** The id of the function that was created by and is known to this runtime. */
@@ -99,8 +103,13 @@ public class RemoteUdfRuntime implements AutoCloseable {
      * @throws Exception on any error, e.g. from the connection or from the UDF code invocation.
      */
     public Object callRemoteUdf(Object[] args) throws Exception {
-        ByteString serializedArguments = remoteUdfSerialization.serializeArguments(args);
+        ByteString serializedArguments = udfSerialization.serializeArguments(args);
         metrics.bytesToUdf(serializedArguments.size());
+        InvokeFunctionRequest request =
+                InvokeFunctionRequest.newBuilder()
+                        .setFuncInstanceName(functionInstanceName)
+                        .setPayload(serializedArguments)
+                        .build();
         // TRAFFIC-11799: Avoid transient connectivity issues for EA
         InvokeFunctionResponse invokeResponse =
                 remoteUdfGatewayConnection
@@ -116,17 +125,49 @@ public class RemoteUdfRuntime implements AutoCloseable {
                                                 .withCallCredentials(
                                                         new UdfCallCredentials(
                                                                 credentialsCache, jobID))
-                                                .invokeFunction(
-                                                        InvokeFunctionRequest.newBuilder()
-                                                                .setFuncInstanceName(
-                                                                        functionInstanceName)
-                                                                .setPayload(serializedArguments)
-                                                                .build()));
+                                                .invokeFunction(request));
 
         checkAndHandleError(invokeResponse);
         ByteString serializedResult = invokeResponse.getPayload();
         metrics.bytesFromUdf(serializedResult.size());
-        return remoteUdfSerialization.deserializeReturnValue(serializedResult);
+        return udfSerialization.deserializeReturnValue(serializedResult);
+    }
+
+    // Note that unless we get the gateway library to use shaded Guava, we need to reference
+    // the fully qualified name.  Otherwise, style tests will ask us to import only the shaded
+    // version.
+    public com.google.common.util.concurrent.ListenableFuture<Object> callRemoteUdfAsync(
+            Object[] args, Executor executor) throws Exception {
+        ByteString serializedArguments = udfSerialization.serializeArguments(args);
+        metrics.bytesToUdf(serializedArguments.size());
+        InvokeFunctionRequest request =
+                InvokeFunctionRequest.newBuilder()
+                        .setFuncInstanceName(functionInstanceName)
+                        .setPayload(serializedArguments)
+                        .build();
+
+        com.google.common.util.concurrent.ListenableFuture<InvokeFunctionResponse> responseFuture =
+                remoteUdfGatewayConnection
+                        .getAsyncUdfGateway()
+                        .withDeadlineAfter(
+                                remoteUdfGatewayConnection.getDeadlineSeconds(), TimeUnit.SECONDS)
+                        .withCallCredentials(new UdfCallCredentials(credentialsCache, jobID))
+                        .withExecutor(executor)
+                        .invokeFunction(request);
+        return com.google.common.util.concurrent.Futures.transform(
+                responseFuture,
+                invokeResponse -> {
+                    try {
+                        checkAndHandleError(invokeResponse);
+                        ByteString serializedResult = invokeResponse.getPayload();
+                        metrics.bytesFromUdf(serializedResult.size());
+                        return udfSerialization.deserializeReturnValue(serializedResult);
+                    } catch (Throwable t) {
+                        // Wrap anything in a RuntimeException so it can be bubbled up
+                        throw new RuntimeException(t);
+                    }
+                },
+                directExecutor());
     }
 
     /**
@@ -145,15 +186,19 @@ public class RemoteUdfRuntime implements AutoCloseable {
             KafkaCredentialsCache credentialsCache,
             JobID jobID)
             throws Exception {
-        RemoteUdfSerialization remoteUdfSerialization =
-                new RemoteUdfSerialization(
-                        remoteUdfSpec.createReturnTypeSerializer(),
-                        remoteUdfSpec.createArgumentSerializers());
+        UdfSerialization udfSerialization =
+                config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)
+                        ? new ThreadLocalRemoteUdfSerialization(
+                                remoteUdfSpec.createReturnTypeSerializer(),
+                                remoteUdfSpec.createArgumentSerializers())
+                        : new RemoteUdfSerialization(
+                                remoteUdfSpec.createReturnTypeSerializer(),
+                                remoteUdfSpec.createArgumentSerializers());
 
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
             ComputeV1FlinkUdfTask udfTask =
-                    getUdfTaskFromSpec(config, remoteUdfSpec, remoteUdfSerialization);
+                    getUdfTaskFromSpec(config, remoteUdfSpec, udfSerialization);
 
             ApiClient apiClient = getApiClient(config);
             ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
@@ -169,7 +214,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
                 if (udfTask.getStatus().getPhase() == RUNNING) {
                     remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask, config);
                     return new RemoteUdfRuntime(
-                            remoteUdfSerialization,
+                            udfSerialization,
                             remoteUdfGatewayConnection,
                             udfTask.getMetadata().getName(),
                             apiClient,
@@ -210,6 +255,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
     public void close() throws Exception {
         IOUtils.closeQuietly(remoteUdfGatewayConnection);
         deleteUdfTask(apiClient, udfTask);
+        udfSerialization.close();
     }
 
     /** Deletes the UdfTask from the ApiServer. */

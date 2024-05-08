@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Confluent Inc.
+ * Copyright 2024 Confluent Inc.
  */
 
 package io.confluent.flink.table.modules.remoteudf;
@@ -7,21 +7,26 @@ package io.confluent.flink.table.modules.remoteudf;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 import org.apache.flink.table.catalog.DataTypeFactory;
+import org.apache.flink.table.functions.AsyncScalarFunction;
 import org.apache.flink.table.functions.FunctionContext;
-import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.util.Preconditions;
+
+import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 import java.time.Clock;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-/** Proof-of-concept implementation for remote scalar UDF. */
-public class RemoteScalarFunction extends ScalarFunction {
+import static org.apache.flink.shaded.guava31.com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
+/** Async version of {@link RemoteScalarFunction}, which can issue many requests at a time. */
+public class AsyncRemoteScalarFunction extends AsyncScalarFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(RemoteScalarFunction.class);
 
@@ -37,10 +42,14 @@ public class RemoteScalarFunction extends ScalarFunction {
     /** Tracks events which occur with UDFs. */
     private transient RemoteUdfMetrics metrics;
 
+    /** Executor for processing async operations. */
+    private transient ExecutorService executor;
+
     /** Clock used for timing. Can be mocked in testing */
     private Clock clock;
 
-    private RemoteScalarFunction(Configuration config, RemoteUdfSpec remoteUdfSpec, Clock clock) {
+    private AsyncRemoteScalarFunction(
+            Configuration config, RemoteUdfSpec remoteUdfSpec, Clock clock) {
         Preconditions.checkNotNull(config);
         Preconditions.checkNotNull(remoteUdfSpec);
         this.config = config;
@@ -53,30 +62,43 @@ public class RemoteScalarFunction extends ScalarFunction {
      * return value.
      *
      * @param args arguments for the remote function call.
-     * @return the return value of the remote UDF execution.
      */
-    public @Nullable Object eval(Object... args) throws Exception {
+    public void eval(CompletableFuture<Object> completableFuture, Object... args) throws Exception {
         LOG.debug(
-                "Invoking remote scalar function. Plugin: {}, Function: {}, Rtype: {}, Args: {}",
+                "Invoking async remote scalar function. Plugin: {}, Function: {}, Rtype: {}, Args: {}",
                 remoteUdfSpec.getPluginId(),
                 remoteUdfSpec.getFunctionClassName(),
                 remoteUdfSpec.getReturnType(),
                 args);
 
         long startMs = clock.millis();
-        try {
-            metrics.invocation();
-            Object result = remoteUdfRuntime.callRemoteUdf(args);
-            metrics.invocationSuccess();
-            return result;
-        } catch (Throwable t) {
-            LOG.error("Got an error while doing UDF call", t);
-            metrics.invocationFailure();
-            throw t;
-        } finally {
-            long completeMs = clock.millis();
-            metrics.invocationMs(completeMs - startMs);
-        }
+        metrics.invocation();
+        com.google.common.util.concurrent.ListenableFuture<Object> future =
+                remoteUdfRuntime.callRemoteUdfAsync(args, executor);
+        com.google.common.util.concurrent.Futures.addCallback(
+                future,
+                new com.google.common.util.concurrent.FutureCallback<Object>() {
+                    @Override
+                    public void onSuccess(Object result) {
+                        metrics.invocationSuccess();
+                        complete();
+                        completableFuture.complete(result);
+                    }
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        LOG.error("Got an error while doing UDF call", t);
+                        metrics.invocationFailure();
+                        complete();
+                        completableFuture.completeExceptionally(t);
+                    }
+
+                    private void complete() {
+                        long completeMs = clock.millis();
+                        metrics.invocationMs(completeMs - startMs);
+                    }
+                },
+                directExecutor());
     }
 
     @Override
@@ -99,6 +121,13 @@ public class RemoteScalarFunction extends ScalarFunction {
                         metrics,
                         KafkaCredentialsCacheImpl.INSTANCE,
                         context.getJobId());
+        // Shouldn't be any larger than the maximum number of outstanding requests.
+        executor =
+                Executors.newCachedThreadPool(
+                        new ThreadFactoryBuilder()
+                                .setNameFormat(
+                                        String.format("async-rsf-%s", context.getJobId()) + "-%d")
+                                .build());
     }
 
     @Override
@@ -107,6 +136,7 @@ public class RemoteScalarFunction extends ScalarFunction {
             metrics.instanceDeprovision();
             this.remoteUdfRuntime.close();
         }
+        executor.shutdownNow();
         super.close();
     }
 
@@ -116,9 +146,10 @@ public class RemoteScalarFunction extends ScalarFunction {
                 remoteUdfSpec.getArgumentTypes(), remoteUdfSpec.getReturnType());
     }
 
-    public static RemoteScalarFunction create(Configuration config, RemoteUdfSpec remoteUdfSpec) {
-        LOG.info("RemoteScalarFunction config: {}", config);
-        return new RemoteScalarFunction(config, remoteUdfSpec, Clock.systemUTC());
+    public static AsyncRemoteScalarFunction create(
+            Configuration config, RemoteUdfSpec remoteUdfSpec) {
+        LOG.info("AsyncRemoteScalarFunction config: {}", config);
+        return new AsyncRemoteScalarFunction(config, remoteUdfSpec, Clock.systemUTC());
     }
 
     @Override

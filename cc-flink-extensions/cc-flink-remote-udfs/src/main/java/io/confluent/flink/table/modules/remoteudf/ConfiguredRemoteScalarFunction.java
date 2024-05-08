@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.remoteudf;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.functions.FunctionKind;
 import org.apache.flink.table.functions.SpecializedFunction;
@@ -30,6 +31,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+
 /**
  * Class which parses configs to return a list of remote Udfs which can be used for planning. It's
  * also a specialized function which also returns a {@link RemoteScalarFunction} implementation
@@ -39,7 +42,7 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
         implements SpecializedFunction {
     private static final Logger LOG = LoggerFactory.getLogger(ConfiguredRemoteScalarFunction.class);
 
-    private final transient Map<String, String> config;
+    private final transient Configuration config;
     private final transient List<ConfiguredFunctionSpec> configuredFunctionSpecs;
 
     // Is only used for catalog serialization purposes.  Shouldn't be called in practice.
@@ -56,7 +59,7 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     // If used at runtime, must provide a config
     public ConfiguredRemoteScalarFunction(
             Map<String, String> config, List<ConfiguredFunctionSpec> configuredFunctionSpecs) {
-        this.config = config;
+        this.config = Configuration.fromMap(config);
         this.configuredFunctionSpecs = configuredFunctionSpecs;
         LOG.info("ConfiguredRemoteScalarFunction config: {}", config);
     }
@@ -98,7 +101,9 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
 
     @Override
     public FunctionKind getKind() {
-        return FunctionKind.SCALAR;
+        return config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)
+                ? FunctionKind.ASYNC_SCALAR
+                : FunctionKind.SCALAR;
     }
 
     @Override
@@ -129,7 +134,12 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
                             context.getCallContext().getOutputDataType().get(),
                             spec.getReturnType(typeFactory))) {
                 final RemoteUdfSpec remoteUdfSpec = spec.createRemoteUdfSpec(typeFactory);
-                return RemoteScalarFunction.create(config, remoteUdfSpec);
+
+                if (config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)) {
+                    return AsyncRemoteScalarFunction.create(config, remoteUdfSpec);
+                } else {
+                    return RemoteScalarFunction.create(config, remoteUdfSpec);
+                }
             }
         }
         throw new FlinkRuntimeException("Cannot find method signature match");

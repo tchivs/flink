@@ -19,8 +19,8 @@ import io.confluent.flink.apiserver.client.model.ComputeV1Artifact;
 import io.confluent.flink.apiserver.client.model.ComputeV1EntryPoint;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskSpec;
-import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
+import io.confluent.flink.udf.adapter.api.UdfSerialization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -211,9 +211,7 @@ public class UdfUtil {
     }
 
     static ComputeV1FlinkUdfTask getUdfTaskFromSpec(
-            Configuration config,
-            RemoteUdfSpec remoteUdfSpec,
-            RemoteUdfSerialization remoteUdfSerialization)
+            Configuration config, RemoteUdfSpec remoteUdfSpec, UdfSerialization udfSerialization)
             throws IOException {
         String pluginId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID);
         String versionId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID);
@@ -234,7 +232,7 @@ public class UdfUtil {
         ComputeV1EntryPoint udfTaskEntryPoint = new ComputeV1EntryPoint();
         udfTaskEntryPoint.setClassName("io.confluent.flink.udf.adapter.ScalarFunctionHandler");
         udfTaskEntryPoint.setOpenPayload(
-                remoteUdfSerialization
+                udfSerialization
                         .serializeRemoteUdfSpec(remoteUdfSpec)
                         .toByteArray()); // to be removed
         // Unused at the moment -- pass something until platform supports empty payloads

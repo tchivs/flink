@@ -62,8 +62,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYES_FROM_UDF_NAME;
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYES_TO_UDF_NAME;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYTES_FROM_UDF_NAME;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYTES_TO_UDF_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.DEPROVISIONS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_FAILURES_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_NAME;
@@ -71,6 +71,7 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCA
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.METRIC_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfRuntime.AUTH_METADATA;
@@ -189,13 +190,14 @@ public class RemoteUdfIntegrationTest {
                 TimeUnit.MILLISECONDS);
     }
 
-    private void testRemoteUdfGatewayInternal(boolean jss) throws Exception {
+    private void testRemoteUdfGatewayInternal(boolean jss, boolean async) throws Exception {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(
                 CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(),
                 apiServerContainer.getHostAddress());
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
+        confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
         final TableEnvironment tEnv =
                 jss
                         ? TestUtils.getJssTableEnvironment(confMap, testFunctionMeta)
@@ -231,8 +233,8 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals(0, getCounter(metrics, INVOCATION_FAILURES_NAME));
         Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
         Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
-        Assertions.assertEquals(16, getCounter(metrics, BYES_TO_UDF_NAME));
-        Assertions.assertEquals(20, getCounter(metrics, BYES_FROM_UDF_NAME));
+        Assertions.assertEquals(16, getCounter(metrics, BYTES_TO_UDF_NAME));
+        Assertions.assertEquals(20, getCounter(metrics, BYTES_FROM_UDF_NAME));
     }
 
     private void createCredentialsFor(JobID jobID) {
@@ -242,12 +244,22 @@ public class RemoteUdfIntegrationTest {
 
     @Test
     public void testRemoteUdfGateway() throws Exception {
-        testRemoteUdfGatewayInternal(false);
+        testRemoteUdfGatewayInternal(false, false);
     }
 
     @Test
     public void testRemoteUdfGateway_jss() throws Exception {
-        testRemoteUdfGatewayInternal(true);
+        testRemoteUdfGatewayInternal(true, false);
+    }
+
+    @Test
+    public void testRemoteUdfGatewayAsync() throws Exception {
+        testRemoteUdfGatewayInternal(false, true);
+    }
+
+    @Test
+    public void testRemoteUdfGatewayAsync_jss() throws Exception {
+        testRemoteUdfGatewayInternal(true, true);
     }
 
     @Test
@@ -270,12 +282,22 @@ public class RemoteUdfIntegrationTest {
 
     @Test
     public void testRemoteUdfGateway_error() throws Exception {
+        testRemoteUdfGatewayError(false);
+    }
+
+    @Test
+    public void testRemoteUdfGatewayAsync_error() throws Exception {
+        testRemoteUdfGatewayError(true);
+    }
+
+    private void testRemoteUdfGatewayError(boolean async) {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(
                 CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(),
                 apiServerContainer.getHostAddress());
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
+        confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
         final TableEnvironment tEnv =
                 TestUtils.getSqlServiceTableEnvironment(confMap, testFunctionMeta, true, false);
         TableResult result = tEnv.executeSql("SELECT cat1.db1.error(1, 'test', 4);");
@@ -298,8 +320,8 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_FAILURES_NAME));
         Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
         Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
-        Assertions.assertEquals(16, getCounter(metrics, BYES_TO_UDF_NAME));
-        Assertions.assertEquals(0, getCounter(metrics, BYES_FROM_UDF_NAME));
+        Assertions.assertEquals(16, getCounter(metrics, BYTES_TO_UDF_NAME));
+        Assertions.assertEquals(0, getCounter(metrics, BYTES_FROM_UDF_NAME));
     }
 
     private void assertCause(String str, Throwable t) {

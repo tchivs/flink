@@ -7,6 +7,7 @@ package io.confluent.flink.table.modules.remoteudf;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.ThreadSafeSimpleCounter;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,8 +22,8 @@ public class RemoteUdfMetrics {
     static final String INVOCATION_MS_NAME = "invocationsMs";
     static final String PROVISIONS_NAME = "provisions";
     static final String DEPROVISIONS_NAME = "deprovisions";
-    static final String BYES_TO_UDF_NAME = "bytesToUdf";
-    static final String BYES_FROM_UDF_NAME = "bytesFromUdf";
+    static final String BYTES_TO_UDF_NAME = "bytesToUdf";
+    static final String BYTES_FROM_UDF_NAME = "bytesFromUdf";
 
     private final MetricGroup group;
 
@@ -39,14 +40,16 @@ public class RemoteUdfMetrics {
 
     public RemoteUdfMetrics(MetricGroup parentGroup) {
         this.group = parentGroup.addGroup(METRIC_NAME);
-        this.invocations = group.counter(INVOCATION_NAME);
-        this.invocationSuccesses = group.counter(INVOCATION_SUCCESSES_NAME);
-        this.invocationFailures = group.counter(INVOCATION_FAILURES_NAME);
+        this.invocations = group.counter(INVOCATION_NAME, new ThreadSafeSimpleCounter());
+        this.invocationSuccesses =
+                group.counter(INVOCATION_SUCCESSES_NAME, new ThreadSafeSimpleCounter());
+        this.invocationFailures =
+                group.counter(INVOCATION_FAILURES_NAME, new ThreadSafeSimpleCounter());
         this.invocationMs = group.gauge(INVOCATION_MS_NAME, lastInvocationMs::get);
-        this.provisions = group.counter(PROVISIONS_NAME);
-        this.deprovisions = group.counter(DEPROVISIONS_NAME);
-        this.bytesToUdf = group.counter(BYES_TO_UDF_NAME);
-        this.bytesFromUdf = group.counter(BYES_FROM_UDF_NAME);
+        this.provisions = group.counter(PROVISIONS_NAME, new ThreadSafeSimpleCounter());
+        this.deprovisions = group.counter(DEPROVISIONS_NAME, new ThreadSafeSimpleCounter());
+        this.bytesToUdf = group.counter(BYTES_TO_UDF_NAME, new ThreadSafeSimpleCounter());
+        this.bytesFromUdf = group.counter(BYTES_FROM_UDF_NAME, new ThreadSafeSimpleCounter());
     }
 
     public void invocation() {

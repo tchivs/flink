@@ -17,7 +17,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 /** Serialization support for communication between the TM and the remote UDF service. */
-public class RemoteUdfSerialization {
+public class RemoteUdfSerialization implements UdfSerialization {
+
     public RemoteUdfSerialization(
             TypeSerializer<Object> returnTypeSerializer,
             List<TypeSerializer<Object>> argumentSerializers) {
@@ -42,6 +43,7 @@ public class RemoteUdfSerialization {
      * @return the serialized arguments.
      * @throws IOException on serialization error.
      */
+    @Override
     public ByteString serializeArguments(Object[] args) throws IOException {
         Preconditions.checkArgument(argumentSerializers.size() == args.length);
         dataOutput.clear();
@@ -60,6 +62,7 @@ public class RemoteUdfSerialization {
      *     argumentSerializers.size(),
      * @throws IOException on deserialization error.
      */
+    @Override
     public void deserializeArguments(ByteBuffer serialized, Object[] output) throws IOException {
         Preconditions.checkArgument(argumentSerializers.size() == output.length);
         dataInput.setBuffer(serialized);
@@ -75,6 +78,7 @@ public class RemoteUdfSerialization {
      * @return the serialized return value.
      * @throws IOException on serialization error.
      */
+    @Override
     public ByteString serializeReturnValue(Object returnValue) throws IOException {
         dataOutput.clear();
         returnTypeSerializer.serialize(returnValue, dataOutput);
@@ -89,6 +93,7 @@ public class RemoteUdfSerialization {
      * @return the deserialized return value.
      * @throws IOException on deserialization error.
      */
+    @Override
     public Object deserializeReturnValue(ByteString serializedReturnValue) throws IOException {
         // TODO: check if it's worth avoiding this buffer copy for performance
         dataInput.setBuffer(serializedReturnValue.toByteArray());
@@ -103,10 +108,17 @@ public class RemoteUdfSerialization {
      * @return the serialized spec.
      * @throws IOException on serialization error.
      */
+    @Override
     public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec) throws IOException {
         dataOutput.clear();
         spec.serialize(dataOutput);
         return outputToByteString();
+    }
+
+    @Override
+    public void close() {
+        dataOutput.clear();
+        dataInput.setBuffer(new byte[0]);
     }
 
     private ByteString outputToByteString() {

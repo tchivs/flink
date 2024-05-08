@@ -33,6 +33,7 @@ public class RemoteUdfGatewayConnection implements Closeable {
     /** Gateway to invoke remote UDFs. */
     private SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway;
 
+    private final SecureComputeGatewayGrpc.SecureComputeGatewayFutureStub asyncGateway;
     /** Gateway to invoke remote UDFs with retry. */
     private final CallWithRetry callWithRetry;
 
@@ -43,11 +44,13 @@ public class RemoteUdfGatewayConnection implements Closeable {
             String udfGatewayTarget,
             ManagedChannel channel,
             SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub udfGateway,
+            SecureComputeGatewayGrpc.SecureComputeGatewayFutureStub asyncGateway,
             CallWithRetry retryCall,
             int deadlineSeconds) {
         this.udfGatewayTarget = udfGatewayTarget;
         this.channel = channel;
         this.udfGateway = udfGateway;
+        this.asyncGateway = asyncGateway;
         this.callWithRetry = retryCall;
         this.deadlineSeconds = deadlineSeconds;
     }
@@ -85,6 +88,8 @@ public class RemoteUdfGatewayConnection implements Closeable {
 
         SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub gateway =
                 Preconditions.checkNotNull(SecureComputeGatewayGrpc.newBlockingStub(channel));
+        SecureComputeGatewayGrpc.SecureComputeGatewayFutureStub asyncGateway =
+                Preconditions.checkNotNull(SecureComputeGatewayGrpc.newFutureStub(channel));
 
         CallWithRetry retryCall =
                 new CallWithRetry(
@@ -93,7 +98,7 @@ public class RemoteUdfGatewayConnection implements Closeable {
         int deadlineSeconds = config.getInteger(RemoteUdfModule.GATEWAY_SERVICE_DEADLINE_SEC);
 
         return new RemoteUdfGatewayConnection(
-                udfGatewayTarget, channel, gateway, retryCall, deadlineSeconds);
+                udfGatewayTarget, channel, gateway, asyncGateway, retryCall, deadlineSeconds);
     }
 
     /** Closes the connection. */
@@ -104,6 +109,10 @@ public class RemoteUdfGatewayConnection implements Closeable {
 
     public SecureComputeGatewayGrpc.SecureComputeGatewayBlockingStub getUdfGateway() {
         return udfGateway;
+    }
+
+    public SecureComputeGatewayGrpc.SecureComputeGatewayFutureStub getAsyncUdfGateway() {
+        return asyncGateway;
     }
 
     public CallWithRetry getCallWithRetry() {
