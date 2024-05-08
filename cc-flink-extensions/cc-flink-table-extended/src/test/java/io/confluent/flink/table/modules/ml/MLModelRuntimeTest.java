@@ -70,6 +70,31 @@ public class MLModelRuntimeTest {
     }
 
     @Test
+    void ensureProvidersValidated() throws Exception {
+        // Loop through every provider and ensure that validating it doesn't trigger a "Model
+        // provider not supported" exception.
+        for (MLModelSupportedProviders provider : MLModelSupportedProviders.values()) {
+            Map<String, String> modelOptions = new HashMap<>();
+            modelOptions.put("provider", provider.name());
+            CatalogModel model =
+                    CatalogModel.of(
+                            Schema.newBuilder().column("input", "STRING").build(),
+                            Schema.newBuilder().column("output", "STRING").build(),
+                            modelOptions,
+                            "");
+            try {
+                MLModelRuntime.validateSchemas(model);
+            } catch (Exception e) {
+                if (e.getMessage().contains("Model provider not supported")) {
+                    // If you are seeing this, you forgot to add a provider to the list in
+                    // validateSchemas.
+                    throw e;
+                }
+            }
+        }
+    }
+
+    @Test
     void testRemoteHttpCallAzure() throws Exception {
         CatalogModel model = getAzureMLModel();
         MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);

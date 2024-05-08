@@ -154,15 +154,13 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
         this.enableExplanations =
                 modelOptionsUtils.getProviderOptionOrDefault("ENABLE_EXPLANATIONS", "");
 
-        String inputFormat = modelOptionsUtils.getProviderOptionOrDefault("input_format", "csv");
+        String inputFormat = getInputFormat(modelOptionsUtils);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
@@ -170,6 +168,15 @@ public class SagemakerProvider implements MLModelRuntimeProvider {
                         "output_content_type", outputParser.acceptedContentTypes());
         // Precalculate the headers.
         headers = getHeaders();
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        return modelOptionsUtils.getProviderOptionOrDefault("input_format", "csv");
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
     }
 
     private static Object getRowFieldFromJson(

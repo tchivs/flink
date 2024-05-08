@@ -74,6 +74,14 @@ public enum MLModelSupportedProviders {
     }
 
     public void validateEndpoint(String endpoint, boolean runtime) {
+        if (endpoint == null) {
+            final String msg = String.format("For %s, endpoint is required", providerName);
+            if (runtime) {
+                throw new FlinkRuntimeException(msg);
+            } else {
+                throw new ValidationException(msg);
+            }
+        }
         // These should be covered by the regex, but for security reasons we explictly check that
         // the endpoints aren't for localhost, confluent.cloud, or any raw IP, and are https.
         if (endpoint.startsWith("http:")) {

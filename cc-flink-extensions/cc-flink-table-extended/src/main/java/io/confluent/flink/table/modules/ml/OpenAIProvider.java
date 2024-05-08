@@ -37,11 +37,10 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
     private final SecretDecrypterProvider secretDecrypterProvider;
     private final String metricsName;
 
-    public OpenAIProvider(
-            CatalogModel model,
-            MLModelSupportedProviders supportedProvider,
-            SecretDecrypterProvider secretDecrypterProvider) {
-        this.provider = supportedProvider;
+    public OpenAIProvider(CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
+        this.provider =
+                MLModelSupportedProviders.fromString(
+                        ModelOptionsUtils.getProvider(model.getOptions()));
         this.secretDecrypterProvider =
                 Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
         ModelKind modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
@@ -49,15 +48,15 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException(
                     "For OpenAI, ML Predict expected a remote model, got " + modelKind);
         }
-        final String namespace = supportedProvider.getProviderName();
+        final String namespace = provider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
 
-        metricsName = supportedProvider.getProviderName();
-        if (supportedProvider == MLModelSupportedProviders.OPENAI) {
+        metricsName = provider.getProviderName();
+        if (provider == MLModelSupportedProviders.OPENAI) {
             this.endpoint =
                     modelOptionsUtils.getProviderOptionOrDefault(
                             ENDPOINT, MLModelSupportedProviders.OPENAI.getDefaultEndpoint());
-        } else if (supportedProvider == MLModelSupportedProviders.AZUREOPENAI) {
+        } else if (provider == MLModelSupportedProviders.AZUREOPENAI) {
             // Azure OpenAI API doesn't get a default endpoint.
             this.endpoint = modelOptionsUtils.getProviderOption(ENDPOINT);
             if (endpoint == null) {
@@ -65,12 +64,12 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
                         String.format("%s.ENDPOINT setting not found", namespace));
             }
         } else {
-            throw new IllegalArgumentException("Unsupported openai provider: " + supportedProvider);
+            throw new IllegalArgumentException("Unsupported openai provider: " + provider);
         }
 
-        supportedProvider.validateEndpoint(endpoint, true);
+        provider.validateEndpoint(endpoint, true);
 
-        if (supportedProvider == MLModelSupportedProviders.OPENAI) {
+        if (provider == MLModelSupportedProviders.OPENAI) {
             this.apiKey =
                     secretDecrypterProvider
                             .getMeteredDecrypter(modelOptionsUtils.getEncryptStrategy())
@@ -86,25 +85,34 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
             throw new FlinkRuntimeException(
                     String.format("%s.API_KEY setting not found", namespace));
         }
-        String defaultInputFormat = "openai-chat";
-        if (endpoint.contains("/embeddings")) {
-            defaultInputFormat = "openai-embed";
-        }
-        String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
+        String inputFormat = getInputFormat(modelOptionsUtils);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "output_content_type", outputParser.acceptedContentTypes());
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        String defaultInputFormat = "openai-chat";
+        // Note that we aren't bothering to pull the real default endpoint here, because the default
+        // endpoints also use the default input format.
+        String endpoint = modelOptionsUtils.getProviderOptionOrDefault(ENDPOINT, "");
+        if (endpoint.contains("/embeddings")) {
+            defaultInputFormat = "openai-embed";
+        }
+        return modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
     }
 
     @Override

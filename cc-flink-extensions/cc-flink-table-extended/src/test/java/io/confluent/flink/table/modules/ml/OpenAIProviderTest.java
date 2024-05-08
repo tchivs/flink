@@ -50,7 +50,6 @@ public class OpenAIProviderTest extends ProviderTestBase {
                         () ->
                                 new OpenAIProvider(
                                         model,
-                                        provider,
                                         new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
@@ -65,7 +64,6 @@ public class OpenAIProviderTest extends ProviderTestBase {
                         () ->
                                 new OpenAIProvider(
                                         model,
-                                        provider,
                                         new MockSecretDecypterProvider(model, metrics, clock)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("expected to match");
@@ -75,8 +73,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testGetRequest() throws Exception {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -97,8 +94,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testGetRequestEmbedding() throws Exception {
         CatalogModel model = getEmbeddingModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -117,10 +113,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testGetRequestAzure() throws Exception {
         CatalogModel model = getCatalogModelAzure();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model,
-                        MLModelSupportedProviders.AZUREOPENAI,
-                        new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -141,8 +134,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testGetRequestSystemPrompt() throws Exception {
         CatalogModel model = getCatalogModelSystemPrompt();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         Object[] args = new Object[] {"input-text-prompt"};
         Request request = openAIProvider.getRequest(args);
         // Check that the request is created correctly.
@@ -164,8 +156,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testBadResponse() {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
                         () -> openAIProvider.getContentFromResponse(MlUtils.makeResponse(response)))
@@ -178,8 +169,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
     void testParseResponse() {
         CatalogModel model = getCatalogModel();
         OpenAIProvider openAIProvider =
-                new OpenAIProvider(
-                        model, provider, new MockSecretDecypterProvider(model, metrics, clock));
+                new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response =
                 "{\"choices\":[{\"message\":{\"role\":\"user\",\"content\":\"output-text\"}}]}";
         Row row = openAIProvider.getContentFromResponse(MlUtils.makeResponse(response));

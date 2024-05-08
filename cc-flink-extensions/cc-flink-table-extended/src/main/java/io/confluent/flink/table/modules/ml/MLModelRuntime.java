@@ -5,12 +5,14 @@
 package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
+import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
@@ -58,8 +60,6 @@ public class MLModelRuntime implements AutoCloseable {
         if (model == null) {
             return null;
         }
-        // TODO: validate the supported options during model creation time,
-        // and store the valid options including the default options in the model metadata
         String modelProvider = ModelOptionsUtils.getProvider(model.getOptions());
         if (modelProvider.isEmpty()) {
             throw new FlinkRuntimeException("Model PROVIDER option not specified");
@@ -68,10 +68,12 @@ public class MLModelRuntime implements AutoCloseable {
         final SecretDecrypterProvider secretDecrypterProvider =
                 new SecretDecrypterProviderImpl(model, metrics, clock);
 
-        if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())) {
-            // OpenAI through their own API, not to be confused with the Azure OpenAI API.
-            return new OpenAIProvider(
-                    model, MLModelSupportedProviders.OPENAI, secretDecrypterProvider);
+        if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())
+                || modelProvider.equalsIgnoreCase(
+                        MLModelSupportedProviders.AZUREOPENAI.getProviderName())) {
+            // OpenAI through their own API or the Azure OpenAI API,
+            // which is just a special case of Open AI.
+            return new OpenAIProvider(model, secretDecrypterProvider);
         } else if (modelProvider.equalsIgnoreCase(
                 MLModelSupportedProviders.GOOGLEAI.getProviderName())) {
             // Any of the Google AI models through their makersuite or generativeapi endpoints.
@@ -92,14 +94,61 @@ public class MLModelRuntime implements AutoCloseable {
                 MLModelSupportedProviders.AZUREML.getProviderName())) {
             // Azure ML models.
             return new AzureMLProvider(model, secretDecrypterProvider);
+        } else {
+            throw new UnsupportedOperationException("Model provider not supported: " + provider);
+        }
+    }
+
+    public static void validateSchemas(CatalogModel model) {
+        if (model == null) {
+            return;
+        }
+        String modelProvider = ModelOptionsUtils.getProvider(model.getOptions());
+        ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model);
+        String inputFormat;
+        String outputFormat;
+
+        if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())
+                || modelProvider.equalsIgnoreCase(
+                        MLModelSupportedProviders.AZUREOPENAI.getProviderName())) {
+            inputFormat = OpenAIProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = OpenAIProvider.getOutputFormat(modelOptionsUtils, inputFormat);
         } else if (modelProvider.equalsIgnoreCase(
-                MLModelSupportedProviders.AZUREOPENAI.getProviderName())) {
-            // Azure Open AI is just a special case of Open AI.
-            return new OpenAIProvider(
-                    model, MLModelSupportedProviders.AZUREOPENAI, secretDecrypterProvider);
+                MLModelSupportedProviders.GOOGLEAI.getProviderName())) {
+            inputFormat = GoogleAIProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = GoogleAIProvider.getOutputFormat(modelOptionsUtils, inputFormat);
+        } else if (modelProvider.equalsIgnoreCase(
+                MLModelSupportedProviders.VERTEXAI.getProviderName())) {
+            inputFormat = VertexAIProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = VertexAIProvider.getOutputFormat(modelOptionsUtils, inputFormat);
+        } else if (modelProvider.equalsIgnoreCase(
+                MLModelSupportedProviders.SAGEMAKER.getProviderName())) {
+            inputFormat = SagemakerProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = SagemakerProvider.getOutputFormat(modelOptionsUtils, inputFormat);
+        } else if (modelProvider.equalsIgnoreCase(
+                MLModelSupportedProviders.BEDROCK.getProviderName())) {
+            inputFormat = BedrockProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = BedrockProvider.getOutputFormat(modelOptionsUtils, inputFormat);
+        } else if (modelProvider.equalsIgnoreCase(
+                MLModelSupportedProviders.AZUREML.getProviderName())) {
+            inputFormat = AzureMLProvider.getInputFormat(modelOptionsUtils);
+            outputFormat = AzureMLProvider.getOutputFormat(modelOptionsUtils, inputFormat);
         } else {
             throw new UnsupportedOperationException(
                     "Model provider not supported: " + modelProvider);
+        }
+
+        // Get the input and output formatters to validate the schema.
+        // They'll throw an exception if the schema is invalid for them.
+        try {
+            MLFormatterUtil.getInputFormatter(inputFormat, model);
+        } catch (Exception e) {
+            throw new ValidationException("Invalid Schema for model input: " + e.getMessage(), e);
+        }
+        try {
+            MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
+        } catch (Exception e) {
+            throw new ValidationException("Invalid Schema for model output: " + e.getMessage(), e);
         }
     }
 

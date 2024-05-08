@@ -58,28 +58,20 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         supportedProvider.validateEndpoint(rawEndpoint, true);
         Boolean isPublishedModel = rawEndpoint.contains("/publishers/");
         // Pull out the name of the publisher from the endpoint url.
-        String publisher =
-                isPublishedModel
-                        ? rawEndpoint.split("/publishers/")[1].split("/")[0].toUpperCase()
-                        : "";
+        String publisher = getModelPublisher(rawEndpoint);
 
         metricsName =
                 isPublishedModel
                         ? MLFunctionMetrics.VERTEX_PUB
                         : supportedProvider.getProviderName();
 
-        String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "input_format",
-                        pickDefaultFormat(rawEndpoint, isPublishedModel, publisher));
+        String inputFormat = getInputFormat(modelOptionsUtils);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
@@ -106,20 +98,39 @@ public class VertexAIProvider implements MLModelRuntimeProvider {
         }
     }
 
-    private String pickDefaultFormat(
-            String rawEndpoint, Boolean isPublishedModel, String publisher) {
+    private static String getModelPublisher(String endpoint) {
+        Boolean isPublishedModel = endpoint.contains("/publishers/");
+        // Pull out the name of the publisher from the endpoint url.
+        return isPublishedModel
+                ? endpoint.split("/publishers/")[1].split("/")[0].toUpperCase()
+                : "";
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        String endpoint = modelOptionsUtils.getProviderOptionOrDefault(ENDPOINT, "");
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "input_format", pickDefaultFormat(getModelPublisher(endpoint)));
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+    }
+
+    private static String pickDefaultFormat(String publisher) {
         String defaultInputFormat = "tf-serving";
-        if (isPublishedModel) {
-            switch (publisher) {
-                case "ANTHROPIC":
-                    defaultInputFormat = "ANTHROPIC-MESSAGES";
-                    break;
-                case "GOOGLE":
-                default:
-                    // TODO: Figure out if it's an embedding model and set the default format
-                    // accordingly?
-                    defaultInputFormat = "GEMINI-GENERATE";
-            }
+        switch (publisher) {
+            case "ANTHROPIC":
+                defaultInputFormat = "ANTHROPIC-MESSAGES";
+                break;
+            case "GOOGLE":
+                // TODO: Figure out if it's an embedding model and set the default format
+                // accordingly?
+                defaultInputFormat = "GEMINI-GENERATE";
+                break;
+            default:
+                defaultInputFormat = "tf-serving";
+                break;
         }
         return defaultInputFormat;
     }

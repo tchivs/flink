@@ -40,6 +40,10 @@ public class ModelOptionsUtils {
         return FactoryUtil.getModelKind(caseInsensitiveModelOptions);
     }
 
+    public ModelOptionsUtils(CatalogModel model) {
+        this(model.getOptions());
+    }
+
     public ModelOptionsUtils(CatalogModel model, String provider) {
         this.provider = provider;
         caseInsensitiveModelOptions = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);

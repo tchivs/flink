@@ -111,17 +111,13 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         signer.setServiceName("bedrock");
 
         // We pick a default format based on the model id in the endpoint, but users can override.
-        String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "input_format", pickDefaultFormat(endpoint));
+        String inputFormat = getInputFormat(modelOptionsUtils);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
@@ -131,9 +127,14 @@ public class BedrockProvider implements MLModelRuntimeProvider {
         headers = getHeaders();
     }
 
-    private String pickDefaultFormat(String endpoint) {
+    private static String pickDefaultFormat(String endpoint) {
         // Pull the model id from the endpoint.
         // https://bedrock-runtime.REGION.amazonaws.com/model/MODEL-NAME/invoke
+        if (!endpoint.contains("/model/")) {
+            // This shouldn't happen except in testing, as the endpoint will be validated before
+            // getting to this point.
+            throw new FlinkRuntimeException("Invalid Bedrock endpoint: " + endpoint);
+        }
         String modelId = endpoint.split("/model/")[1].split("/")[0];
         // The model id are formatted as PROVIDER.MODEL_NAME, so we can use the provider to pick
         // the default format.
@@ -181,6 +182,17 @@ public class BedrockProvider implements MLModelRuntimeProvider {
                 break;
         }
         return defaultInputFormat;
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        String endpoint = modelOptionsUtils.getProviderOptionOrDefault(ENDPOINT, "");
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "input_format", pickDefaultFormat(endpoint));
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
     }
 
     @Override

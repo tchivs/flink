@@ -57,32 +57,41 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         // The Azure ML Deployment Name is optional, but allows the user to distinguish between
         // two models that are deployed to the same endpoint.
         this.deploymentName = modelOptionsUtils.getProviderOptionOrDefault("deployment_name", "");
-        // By default, we use the Pandas DataFrame Split format for input, with Azure ML's slight
-        // variation of the top level node name.
-        String defaultInputFormat = "azureml-pandas-dataframe";
-        // If the endpoint looks like an Azure AI endpoint, we default to the openai chat format.
-        // Almost all of the Azure AI endpoints seem to use that format.
         if (endpoint.contains("inference.ai.azure.com")) {
-            defaultInputFormat = "openai-chat";
             metricsName = MLFunctionMetrics.AZURE_ML_AI;
         } else {
             metricsName = namespace;
         }
-        String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
+        String inputFormat = getInputFormat(modelOptionsUtils);
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "output_content_type", outputParser.acceptedContentTypes());
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        // By default, we use the Pandas DataFrame Split format for input, with Azure ML's slight
+        // variation of the top level node name.
+        String defaultInputFormat = "azureml-pandas-dataframe";
+        // If the endpoint looks like an Azure AI endpoint, we default to the openai chat format.
+        // Almost all of the Azure AI endpoints seem to use that format.
+        String endpoint = modelOptionsUtils.getProviderOptionOrDefault(ENDPOINT, "");
+        if (endpoint.contains("inference.ai.azure.com")) {
+            defaultInputFormat = "openai-chat";
+        }
+        return modelOptionsUtils.getProviderOptionOrDefault("input_format", defaultInputFormat);
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
     }
 
     @Override

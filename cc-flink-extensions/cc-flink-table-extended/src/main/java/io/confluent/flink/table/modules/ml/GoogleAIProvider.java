@@ -56,7 +56,6 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
                         .decryptFromKey(GoogleAIRemoteModelOptions.API_KEY.key());
 
         if (apiKey.isEmpty()) {
-            // TODO: This exception should fire when the model is created, not when it is run.
             throw new FlinkRuntimeException("Model ML Predict requires an API key");
         }
         // The endpoint is the base URL with the API key added as a query parameter.
@@ -66,21 +65,27 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
                         .addQueryParameter("key", apiKey)
                         .build()
                         .toString();
-        String inputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault("input_format", "gemini-generate");
+        String inputFormat = getInputFormat(modelOptionsUtils);
         inputFormatter = MLFormatterUtil.getInputFormatter(inputFormat, model);
         String inputContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "input_content_type", inputFormatter.contentType());
         contentType = MediaType.parse(inputContentType);
-        String outputFormat =
-                modelOptionsUtils.getProviderOptionOrDefault(
-                        "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
+        String outputFormat = getOutputFormat(modelOptionsUtils, inputFormat);
         outputParser =
                 MLFormatterUtil.getOutputParser(outputFormat, model.getOutputSchema().getColumns());
         acceptedContentType =
                 modelOptionsUtils.getProviderOptionOrDefault(
                         "output_content_type", outputParser.acceptedContentTypes());
+    }
+
+    public static String getInputFormat(ModelOptionsUtils modelOptionsUtils) {
+        return modelOptionsUtils.getProviderOptionOrDefault("input_format", "gemini-generate");
+    }
+
+    public static String getOutputFormat(ModelOptionsUtils modelOptionsUtils, String inputFormat) {
+        return modelOptionsUtils.getProviderOptionOrDefault(
+                "output_format", MLFormatterUtil.defaultOutputFormat(inputFormat));
     }
 
     @Override
