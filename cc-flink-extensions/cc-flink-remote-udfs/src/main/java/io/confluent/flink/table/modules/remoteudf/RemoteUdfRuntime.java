@@ -198,7 +198,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
             ComputeV1FlinkUdfTask udfTask =
-                    getUdfTaskFromSpec(config, remoteUdfSpec, udfSerialization);
+                    getUdfTaskFromSpec(config, remoteUdfSpec, udfSerialization, jobID);
 
             ApiClient apiClient = getApiClient(config);
             ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);

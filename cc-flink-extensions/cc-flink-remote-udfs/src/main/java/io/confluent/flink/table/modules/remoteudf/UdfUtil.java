@@ -5,6 +5,7 @@
 package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
@@ -13,6 +14,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import io.confluent.flink.apiserver.client.model.ApisMetaV1ObjectMeta;
 import io.confluent.flink.apiserver.client.model.ComputeV1Artifact;
@@ -59,6 +61,7 @@ public class UdfUtil {
     public static final String PLUGIN_VERSION_ID_FIELD = "pluginVersionId";
     public static final String FUNCTION_CLASS_NAME_FIELD = "className";
     public static final String FUNCTION_IS_DETERMINISTIC_FIELD = "isDeterministic";
+    static final String LABEL_JOB_ID = "confluent.io/job-id";
 
     private static final List<Field> ALL_FIELDS =
             Collections.unmodifiableList(
@@ -211,7 +214,10 @@ public class UdfUtil {
     }
 
     static ComputeV1FlinkUdfTask getUdfTaskFromSpec(
-            Configuration config, RemoteUdfSpec remoteUdfSpec, UdfSerialization udfSerialization)
+            Configuration config,
+            RemoteUdfSpec remoteUdfSpec,
+            UdfSerialization udfSerialization,
+            JobID jobID)
             throws IOException {
         String pluginId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID);
         String versionId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID);
@@ -227,6 +233,7 @@ public class UdfUtil {
         udfTaskMeta.setName(udfTaskName);
         udfTaskMeta.setOrg(remoteUdfSpec.getOrganization());
         udfTaskMeta.setEnvironment(remoteUdfSpec.getEnvironment());
+        udfTaskMeta.setLabels(ImmutableMap.of(LABEL_JOB_ID, jobID.toHexString()));
 
         // Entrypoint must contain className, open and close Payloads
         ComputeV1EntryPoint udfTaskEntryPoint = new ComputeV1EntryPoint();

@@ -75,6 +75,7 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUE
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfRuntime.AUTH_METADATA;
+import static io.confluent.flink.table.modules.remoteudf.UdfUtil.LABEL_JOB_ID;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -129,6 +130,10 @@ public class RemoteUdfIntegrationTest {
                         ApiServerUtils.listPendingUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
                 if (!udfTasks.isEmpty()) {
                     ComputeV1FlinkUdfTask udfTask = udfTasks.iterator().next();
+                    // Validate the udf task
+                    Map<String, String> labels = udfTask.getMetadata().getLabels();
+                    Assertions.assertFalse(labels.get(LABEL_JOB_ID).isEmpty());
+
                     // Make sure metadata from Payload is properly propagated
                     RemoteUdfSpec udfSpec =
                             RemoteUdfSpec.deserialize(
