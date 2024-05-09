@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link QuerySummary}. */
@@ -249,6 +250,56 @@ public class QuerySummaryTest {
 
         assertThat(querySummary.getUdfCalls()).hasSize(1);
         assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
+    }
+
+    @Test
+    void testSummaryAsyncUdf() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction(
+                "a.b.c",
+                new ConfiguredRemoteScalarFunction(
+                        Collections.singletonMap(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), "true"),
+                        UDF_SPECS));
+
+        env.createTemporaryFunction(
+                "a.b.d",
+                new ConfiguredRemoteScalarFunction(
+                        Collections.singletonMap(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), "false"),
+                        UDF_SPECS2));
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT a.b.c(uid), a.b.d(uid), LOWER(name) "
+                                + "FROM (VALUES (1, 'Bob'), (2, 'Alice'), (3, 'John')) AS T(uid, name)",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getNodeKinds())
+                .containsExactlyInAnyOrder(
+                        NodeKind.VALUES, NodeKind.ASYNC_CALC, NodeKind.CALC, NodeKind.SINK);
+
+        assertThat(querySummary.getExpressionKinds())
+                .containsExactlyInAnyOrder(ExpressionKind.INPUT_REF, ExpressionKind.OTHER);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(2);
+        List<String> names =
+                querySummary.getUdfCalls().stream()
+                        .map(call -> call.getPath())
+                        .collect(Collectors.toList());
+        assertThat(names).containsExactlyInAnyOrder("`a`.`b`.`c`", "`a`.`b`.`d`");
+
+        final NodeSummary sinkSummary = querySummary.getNodes().get(0);
+        assertThat(sinkSummary).extracting(NodeSummary::getKind).isEqualTo(NodeKind.SINK);
+
+        final NodeSummary calcSummary = sinkSummary.getInputs().get(0);
+        assertThat(calcSummary).extracting(NodeSummary::getKind).isEqualTo(NodeKind.CALC);
+        assertThat(calcSummary.getTag(NodeTag.EXPRESSIONS, Set.class)).isNotNull().hasSize(2);
+        final NodeSummary asyncCalcSummary = calcSummary.getInputs().get(0);
+        assertThat(asyncCalcSummary)
+                .extracting(NodeSummary::getKind)
+                .isEqualTo(NodeKind.ASYNC_CALC);
+        assertThat(asyncCalcSummary.getTag(NodeTag.EXPRESSIONS, Set.class)).isNotNull().hasSize(2);
     }
 
     private static void createConfluentCatalogTable(

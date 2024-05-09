@@ -11,6 +11,7 @@ import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
+import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalAsyncCalc;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalCalc;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalSink;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalTableSourceScan;
@@ -77,6 +78,21 @@ public enum NodeTag {
                     tags.put(
                             NodeTag.UDF_CALLS,
                             UdfCall.getUdfCalls(calc.getProgram().getExprList()));
+                });
+
+        addNodeTagExtraction(
+                map,
+                NodeKind.ASYNC_CALC,
+                (rel, tags) -> {
+                    final StreamPhysicalAsyncCalc asyncCalc = (StreamPhysicalAsyncCalc) rel;
+                    final ExpressionKind.Extractor extractor = new ExpressionKind.Extractor();
+                    asyncCalc.getProgram().getExprList().forEach(e -> e.accept(extractor));
+                    tags.put(NodeTag.EXPRESSIONS, extractor.kinds);
+
+                    // Extract UDF metadata
+                    tags.put(
+                            NodeTag.UDF_CALLS,
+                            UdfCall.getUdfCalls(asyncCalc.getProgram().getExprList()));
                 });
 
         addNodeTagExtraction(

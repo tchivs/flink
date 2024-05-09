@@ -6,6 +6,7 @@ package io.confluent.flink.table.service.summary;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
+import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalAsyncCalc;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalCalc;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalChangelogNormalize;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalCorrelate;
@@ -57,6 +58,7 @@ public enum NodeKind {
     UNKNOWN(null),
 
     // StreamPhysicalRel nodes as of Flink 1.18
+    ASYNC_CALC(StreamPhysicalAsyncCalc.class),
     CALC(StreamPhysicalCalc.class),
     CHANGELOG_NORMALIZE(StreamPhysicalChangelogNormalize.class),
     CORRELATE(StreamPhysicalCorrelate.class),
