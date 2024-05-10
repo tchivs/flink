@@ -54,6 +54,8 @@ public class RemoteUdfRuntime implements AutoCloseable {
 
     private static final int POLL_INTERVAL_MS = 500;
 
+    private static final Duration MAX_UDFTASK_PROVISION_DURATION = Duration.ofMinutes(2);
+
     private RemoteUdfRuntime(
             UdfSerialization udfSerialization,
             RemoteUdfGatewayConnection remoteUdfGatewayConnection,
@@ -208,10 +210,13 @@ public class RemoteUdfRuntime implements AutoCloseable {
                     udfTask);
 
             // TODO FRT-353 integrate with Watch API
-            Deadline deadline = Deadline.fromNow(Duration.ofMinutes(2));
+            Deadline deadline = Deadline.fromNow(MAX_UDFTASK_PROVISION_DURATION);
             while (deadline.hasTimeLeft()) {
                 udfTask = getUdfTask(computeV1Api, udfTask);
                 if (udfTask.getStatus().getPhase() == RUNNING) {
+                    metrics.provisionMs(
+                            MAX_UDFTASK_PROVISION_DURATION.toMillis()
+                                    - deadline.timeLeft().toMillis());
                     remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask, config);
                     return new RemoteUdfRuntime(
                             udfSerialization,

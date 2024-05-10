@@ -134,7 +134,9 @@ public class AsyncRemoteScalarFunction extends AsyncScalarFunction {
     public void close() throws Exception {
         if (remoteUdfRuntime != null) {
             metrics.instanceDeprovision();
+            long startMs = clock.millis();
             this.remoteUdfRuntime.close();
+            metrics.deprovisionMs(clock.millis() - startMs);
         }
         executor.shutdownNow();
         super.close();

@@ -10,6 +10,7 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
@@ -64,11 +65,14 @@ import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYTES_FROM_UDF_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.BYTES_TO_UDF_NAME;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.DEPROVISIONS_MS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.DEPROVISIONS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_FAILURES_NAME;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_MS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCATION_SUCCESSES_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.METRIC_NAME;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_MS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
@@ -234,10 +238,16 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertTrue(group.isPresent());
         Map<String, Metric> metrics = REPORTER.getMetricsByGroup(group.get());
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
+        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
         Assertions.assertEquals(0, getCounter(metrics, INVOCATION_FAILURES_NAME));
         Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(16, getCounter(metrics, BYTES_TO_UDF_NAME));
         Assertions.assertEquals(20, getCounter(metrics, BYTES_FROM_UDF_NAME));
     }
@@ -321,10 +331,16 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertTrue(group.isPresent());
         Map<String, Metric> metrics = REPORTER.getMetricsByGroup(group.get());
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
+        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(0, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_FAILURES_NAME));
         Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
         Assertions.assertEquals(16, getCounter(metrics, BYTES_TO_UDF_NAME));
         Assertions.assertEquals(0, getCounter(metrics, BYTES_FROM_UDF_NAME));
     }
@@ -347,6 +363,14 @@ public class RemoteUdfIntegrationTest {
 
     private long getCounter(Map<String, Metric> metrics, String name) {
         return ((Counter) metrics.get(name)).getCount();
+    }
+
+    private <T> Optional<Gauge<T>> getGauge(Map<String, Metric> metrics, String name) {
+        if (!metrics.containsKey(name)) {
+            return Optional.empty();
+        } else {
+            return Optional.of((Gauge<T>) metrics.get(name));
+        }
     }
 
     /** Verifies that we're passing the auth headers. */
