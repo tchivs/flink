@@ -13,6 +13,7 @@ import org.apache.flink.traces.reporter.TraceReporter;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.TracerProvider;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
@@ -89,17 +90,35 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
 
     @Override
     public void notifyOfAddedSpan(Span span) {
+        notifyOfAddedSpanInternal(span, null);
+    }
+
+    private void notifyOfAddedSpanInternal(Span span, io.opentelemetry.api.trace.Span parent) {
         Tracer tracer = tracerProvider.get(span.getScope());
         SpanBuilder spanBuilder = tracer.spanBuilder(span.getName());
 
         span.getAttributes().forEach(setAttribute(spanBuilder));
         additionalScope.forEach(setAttribute(spanBuilder));
 
-        spanBuilder
-                .setStartTimestamp(span.getStartTsMillis(), TimeUnit.MILLISECONDS)
-                .setNoParent()
-                .startSpan()
-                .end(span.getEndTsMillis(), TimeUnit.MILLISECONDS);
+        if (parent == null) {
+            // root span case
+            spanBuilder.setNoParent();
+        } else {
+            // child / nested span case
+            spanBuilder.setParent(Context.current().with(parent));
+        }
+
+        io.opentelemetry.api.trace.Span currentOtelSpan =
+                spanBuilder
+                        .setStartTimestamp(span.getStartTsMillis(), TimeUnit.MILLISECONDS)
+                        .startSpan();
+
+        // Recursively add child spans to this parent
+        for (Span childSpan : span.getChildren()) {
+            notifyOfAddedSpanInternal(childSpan, currentOtelSpan);
+        }
+
+        currentOtelSpan.end(span.getEndTsMillis(), TimeUnit.MILLISECONDS);
     }
 
     private static BiConsumer<String, Object> setAttribute(SpanBuilder spanBuilder) {

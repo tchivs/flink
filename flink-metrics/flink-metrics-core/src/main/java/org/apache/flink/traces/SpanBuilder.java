@@ -20,12 +20,15 @@ package org.apache.flink.traces;
 
 import org.apache.flink.annotation.Experimental;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /** Builder used to construct {@link Span}. See {@link Span#builder(Class, String)}. */
 @Experimental
 public class SpanBuilder {
     private final HashMap<String, Object> attributes = new HashMap<>();
+    private final List<Span> children = new ArrayList<>();
     private final Class<?> classScope;
     private final String name;
     private long startTsMillis;
@@ -57,7 +60,8 @@ public class SpanBuilder {
                 name,
                 startTsMillisToBuild,
                 endTsMillisToBuild,
-                attributes);
+                attributes,
+                children);
     }
 
     /**
@@ -93,6 +97,18 @@ public class SpanBuilder {
     /** Additional attribute to be attached to this {@link Span}. */
     public SpanBuilder setAttribute(String key, double value) {
         attributes.put(key, value);
+        return this;
+    }
+
+    /** Adds child spans (= nested). */
+    public SpanBuilder addChildren(List<Span> children) {
+        this.children.addAll(children);
+        return this;
+    }
+
+    /** Adds child span (= nested). */
+    public SpanBuilder addChild(Span child) {
+        this.children.add(child);
         return this;
     }
 }

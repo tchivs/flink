@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -86,6 +87,136 @@ public class OpenTelemetryTraceReporterTest {
         expectedAttributes.put(scopeKey2, scopeValue2);
         expectedAttributes.put(attribute1Key, attribute1Value);
         assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+    }
+
+    @Test
+    public void testReportNestedSpan() {
+        MetricConfig metricConfig = new MetricConfig();
+        String scopeKey1 = "scopeKey1";
+        String scopeKey2 = "scopeKey2";
+        String scopeValue1 = "scopeValue1";
+        String scopeValue2 = "scopeValue2";
+        String scope = this.getClass().getCanonicalName();
+
+        String attribute1KeyRoot = "foo";
+        String attribute1ValueRoot = "bar";
+
+        String attribute1KeyL1N1 = "foo_1_1";
+        String attribute1ValueL1N1 = "bar_1_1";
+
+        String attribute1KeyL1N2 = "foo_1_2";
+        String attribute1ValueL1N2 = "bar_1_2";
+
+        String attribute1KeyL2N1 = "foo_2_1";
+        String attribute1ValueL2N1 = "bar_2_1";
+
+        metricConfig.setProperty(
+                ARG_SCOPE_VARIABLES_ADDITIONAL,
+                String.format("%s: %s , %s : %s", scopeKey1, scopeValue1, scopeKey2, scopeValue2));
+        metricConfig.setProperty(ARG_EXPORTER_FACTORY_CLASS, ExporterFactory.class.getName());
+        TestSpanExporterFactory spanExporterFactory = new TestSpanExporterFactory();
+        reporter.open(metricConfig, spanExporterFactory);
+        try {
+            Span childLeveL2N1 =
+                    Span.builder(this.getClass(), "2_1")
+                            .setAttribute(attribute1KeyL2N1, attribute1ValueL2N1)
+                            .setStartTsMillis(44)
+                            .setEndTsMillis(46)
+                            .build();
+
+            Span childL1N1 =
+                    Span.builder(this.getClass(), "1_1")
+                            .setAttribute(attribute1KeyL1N1, attribute1ValueL1N1)
+                            .setStartTsMillis(43)
+                            .setEndTsMillis(48)
+                            .addChild(childLeveL2N1)
+                            .build();
+
+            Span childL1N2 =
+                    Span.builder(this.getClass(), "1_2")
+                            .setAttribute(attribute1KeyL1N2, attribute1ValueL1N2)
+                            .setStartTsMillis(44)
+                            .setEndTsMillis(46)
+                            .build();
+
+            Span rootSpan =
+                    Span.builder(this.getClass(), "root")
+                            .setAttribute(attribute1KeyRoot, attribute1ValueRoot)
+                            .setStartTsMillis(42)
+                            .setEndTsMillis(64)
+                            .addChildren(Arrays.asList(childL1N1, childL1N2))
+                            .build();
+
+            reporter.notifyOfAddedSpan(rootSpan);
+        } finally {
+            reporter.close();
+        }
+
+        assertThat(spanExporterFactory.getSpans()).hasSize(4);
+
+        SpanData spanDataRoot = spanExporterFactory.getSpans().get(3);
+        assertThat(spanDataRoot.getName()).isEqualTo("root");
+        assertThat(spanDataRoot.getInstrumentationScopeInfo().getName()).isEqualTo(scope);
+        Map<String, String> attributes = new HashMap<>();
+        spanDataRoot
+                .getAttributes()
+                .asMap()
+                .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
+
+        Map<String, String> expectedAttributes = new HashMap<>();
+        expectedAttributes.put(scopeKey1, scopeValue1);
+        expectedAttributes.put(scopeKey2, scopeValue2);
+        expectedAttributes.put(attribute1KeyRoot, attribute1ValueRoot);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+        assertThat(spanDataRoot.getParentSpanId()).isEqualTo("0000000000000000");
+
+        SpanData spanDataL1N2 = spanExporterFactory.getSpans().get(2);
+        assertThat(spanDataL1N2.getName()).isEqualTo("1_2");
+        assertThat(spanDataL1N2.getInstrumentationScopeInfo().getName()).isEqualTo(scope);
+        attributes.clear();
+        spanDataL1N2
+                .getAttributes()
+                .asMap()
+                .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
+
+        expectedAttributes.clear();
+        expectedAttributes.put(scopeKey1, scopeValue1);
+        expectedAttributes.put(scopeKey2, scopeValue2);
+        expectedAttributes.put(attribute1KeyL1N2, attribute1ValueL1N2);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+        assertThat(spanDataL1N2.getParentSpanId()).isEqualTo(spanDataRoot.getSpanId());
+
+        SpanData spanDataL1N1 = spanExporterFactory.getSpans().get(1);
+        assertThat(spanDataL1N1.getName()).isEqualTo("1_1");
+        assertThat(spanDataL1N1.getInstrumentationScopeInfo().getName()).isEqualTo(scope);
+        attributes.clear();
+        spanDataL1N1
+                .getAttributes()
+                .asMap()
+                .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
+
+        expectedAttributes.clear();
+        expectedAttributes.put(scopeKey1, scopeValue1);
+        expectedAttributes.put(scopeKey2, scopeValue2);
+        expectedAttributes.put(attribute1KeyL1N1, attribute1ValueL1N1);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+        assertThat(spanDataL1N1.getParentSpanId()).isEqualTo(spanDataRoot.getSpanId());
+
+        SpanData spanDataL2N1 = spanExporterFactory.getSpans().get(0);
+        assertThat(spanDataL2N1.getName()).isEqualTo("2_1");
+        assertThat(spanDataL2N1.getInstrumentationScopeInfo().getName()).isEqualTo(scope);
+        attributes.clear();
+        spanDataL2N1
+                .getAttributes()
+                .asMap()
+                .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
+
+        expectedAttributes.clear();
+        expectedAttributes.put(scopeKey1, scopeValue1);
+        expectedAttributes.put(scopeKey2, scopeValue2);
+        expectedAttributes.put(attribute1KeyL2N1, attribute1ValueL2N1);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+        assertThat(spanDataL2N1.getParentSpanId()).isEqualTo(spanDataL1N1.getSpanId());
     }
 
     static class TestSpanExporterFactory implements SpanExporterFactory {
