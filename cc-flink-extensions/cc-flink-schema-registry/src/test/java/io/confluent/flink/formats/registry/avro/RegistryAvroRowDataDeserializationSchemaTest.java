@@ -5,9 +5,6 @@
 package io.confluent.flink.formats.registry.avro;
 
 import org.apache.flink.api.common.serialization.DeserializationSchema;
-import org.apache.flink.api.common.serialization.SerializationSchema;
-import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
@@ -19,11 +16,10 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
-import org.apache.flink.util.SimpleUserCodeClassLoader;
 import org.apache.flink.util.TestLoggerExtension;
-import org.apache.flink.util.UserCodeClassLoader;
 
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
+import io.confluent.flink.formats.registry.utils.MockInitializationContext;
 import io.confluent.flink.formats.registry.utils.TestSchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.avro.AvroSchema;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
@@ -267,20 +263,5 @@ class RegistryAvroRowDataDeserializationSchemaTest {
         stream.write(schemaId >>> 16);
         stream.write(schemaId >>> 8);
         stream.write(schemaId);
-    }
-
-    private static class MockInitializationContext
-            implements DeserializationSchema.InitializationContext,
-                    SerializationSchema.InitializationContext {
-
-        @Override
-        public MetricGroup getMetricGroup() {
-            return new UnregisteredMetricsGroup();
-        }
-
-        @Override
-        public UserCodeClassLoader getUserCodeClassLoader() {
-            return SimpleUserCodeClassLoader.create(getClass().getClassLoader());
-        }
     }
 }
