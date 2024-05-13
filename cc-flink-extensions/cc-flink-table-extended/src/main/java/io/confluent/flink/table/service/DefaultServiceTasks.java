@@ -88,9 +88,17 @@ import java.util.stream.StreamSupport;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_PREFIX;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_RETRY_DELAY;
+import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_TIMEOUT;
 import static org.apache.flink.configuration.ConfigurationUtils.canBePrefixMap;
 import static org.apache.flink.configuration.ConfigurationUtils.filterPrefixMapKey;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.IDLE_STATE_RETENTION;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_MAX_ATTEMPTS;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_TIMEOUT;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SINK_ROWTIME_INSERTER;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SOURCE_IDLE_TIMEOUT;
 import static org.apache.flink.table.api.config.OptimizerConfigOptions.TABLE_OPTIMIZER_NONDETERMINISTIC_UPDATE_STRATEGY;
@@ -249,6 +257,20 @@ class DefaultServiceTasks implements ServiceTasks {
         // forbidden.
         tableEnvironment.unloadModule("core");
         tableEnvironment.loadModule("core", CoreProxyModule.INSTANCE);
+
+        // Set these whether remote UDFs are enabled or not, since these configs are used by
+        // all async scalar functions.  Note: Currently only UDFs use async scalar functions.
+        config.set(
+                TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY,
+                privateConfig.get(CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY));
+        config.set(
+                TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY,
+                privateConfig.get(CONFLUENT_REMOTE_UDF_RETRY_DELAY));
+        config.set(
+                TABLE_EXEC_ASYNC_SCALAR_TIMEOUT, privateConfig.get(CONFLUENT_REMOTE_UDF_TIMEOUT));
+        config.set(
+                TABLE_EXEC_ASYNC_SCALAR_MAX_ATTEMPTS,
+                privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
 
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {

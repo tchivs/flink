@@ -150,6 +150,34 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent remote UDFs.");
 
+    public static final ConfigOption<Integer> CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.async.buffer-capacity")
+                    .intType()
+                    .defaultValue(10)
+                    .withDescription(
+                            "The max number of async i/o operation that the async lookup join can trigger.");
+
+    public static final ConfigOption<Duration> CONFLUENT_REMOTE_UDF_TIMEOUT =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.async.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(10))
+                    .withDescription(
+                            "The async timeout for the asynchronous operation to complete.");
+
+    public static final ConfigOption<Duration> CONFLUENT_REMOTE_UDF_RETRY_DELAY =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.async.retry-delay")
+                    .durationType()
+                    .defaultValue(Duration.ofMillis(3000))
+                    .withDescription("The delay to wait before trying again.");
+
+    public static final ConfigOption<Integer> CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS =
+            ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.async.max-attempts")
+                    .intType()
+                    .defaultValue(200)
+                    .withDescription(
+                            "The max number of async retry attempts to make before task "
+                                    + "execution is failed.");
+
     public static final ConfigOption<Boolean> CONFLUENT_OTLP_FUNCTIONS_ENABLED =
             ConfigOptions.key(PRIVATE_PREFIX + "otlp.enabled")
                     .booleanType()
