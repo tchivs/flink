@@ -35,6 +35,7 @@ public enum SqlStatementKind {
     SHOW_FUNCTIONS(Category.DQL),
     SHOW_JOBS(Category.DQL),
     // -------------- DML --------------
+    CREATE_TABLE_AS(Category.DDL_DML),
     INSERT_INTO(Category.DML),
     EXECUTE_STATEMENT_SET(Category.DML);
 
@@ -52,6 +53,7 @@ public enum SqlStatementKind {
     public enum Category {
         DDL,
         DQL,
-        DML
+        DML,
+        DDL_DML
     }
 }
