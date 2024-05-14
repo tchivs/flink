@@ -38,7 +38,7 @@ global_job_config:
       - export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64/"
       # hugo
       - sudo mkdir -p /usr/share/hugo
-      - curl -fsSL -o /tmp/hugo.tar.gz https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/hugo_extended_0.98.0_Linux-64bit.tar.gz
+      - curl -fsSL -o /tmp/hugo.tar.gz https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/hugo_extended_0.98.0_Linux-64bit.tar.gz
       - sudo tar -xzf /tmp/hugo.tar.gz -C /usr/share/hugo
       - rm -f /tmp/hugo.tar.gz
       - sudo ln -s /usr/share/hugo/hugo /usr/bin/hugo
@@ -108,7 +108,7 @@ blocks:
             - echo $module
             - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY
             # openssl requirements
-            - curl -O https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - curl -O https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - sudo apt-get install -y libapr1
             - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
@@ -156,10 +156,10 @@ blocks:
             - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY
             # Set coredump pattern, it should be removed after [FLINK-30787]
             - sudo sysctl kernel.dmesg_restrict=0
-            - curl -LO https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/minikube-linux-amd64-1-28-0
+            - curl -LO https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/minikube-linux-amd64-1-28-0
             - sudo install minikube-linux-amd64-1-28-0 /usr/local/bin/minikube
             # openssl requirements
-            - curl -O https://confluent-packaging-tools.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - curl -O https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - sudo apt-get install -y libapr1
             - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
             - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
