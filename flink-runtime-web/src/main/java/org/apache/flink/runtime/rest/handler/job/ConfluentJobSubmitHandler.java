@@ -23,6 +23,7 @@ import org.apache.flink.runtime.rest.messages.ErrorResponseBody;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitHeaders;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitRequestBody;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
+import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.TemporaryClassLoaderContext;
 import org.apache.flink.util.concurrent.FutureUtils;
 
@@ -152,17 +153,25 @@ public final class ConfluentJobSubmitHandler
         if (restHandlerException.isPresent()) {
             return FutureUtils.completedExceptionally(restHandlerException.get());
         }
-        log.info("Validated job submission request: {}.", requestBody.jobId);
 
-        final JobGraph jobGraph = processJobSubmission(requestBody);
-        log.info("Generated job graph: {}.", requestBody.jobId);
+        final Map<String, String> context =
+                Collections.singletonMap(MdcUtils.JOB_ID, requestBody.jobId);
+        try (MdcUtils.MdcCloseable ignored = MdcUtils.withContext(context)) {
+            log.info("Validated job submission request.");
 
-        return gateway.submitJob(jobGraph, timeout)
-                .thenApply(
-                        i -> {
-                            log.info("Submitted job: {}.", requestBody.jobId);
-                            return EmptyResponseBody.getInstance();
-                        });
+            final JobGraph jobGraph = processJobSubmission(requestBody);
+            log.info("Generated job graph.");
+
+            return gateway.submitJob(jobGraph, timeout)
+                    .thenApply(
+                            i -> {
+                                try (MdcUtils.MdcCloseable ignored2 =
+                                        MdcUtils.withContext(context)) {
+                                    log.info("Submitted job.");
+                                }
+                                return EmptyResponseBody.getInstance();
+                            });
+        }
     }
 
     private static Optional<RestHandlerException> validateInput(

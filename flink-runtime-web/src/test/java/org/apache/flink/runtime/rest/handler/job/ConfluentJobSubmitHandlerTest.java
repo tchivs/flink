@@ -22,12 +22,15 @@ import org.apache.flink.runtime.rest.messages.EmptyResponseBody;
 import org.apache.flink.runtime.rest.messages.job.ConfluentJobSubmitRequestBody;
 import org.apache.flink.runtime.webmonitor.TestingDispatcherGateway;
 import org.apache.flink.testutils.executor.TestExecutorExtension;
+import org.apache.flink.testutils.logging.LoggerAuditingExtension;
+import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.concurrent.FutureUtils;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.slf4j.event.Level;
 
 import javax.annotation.Nullable;
 
@@ -61,6 +64,10 @@ class ConfluentJobSubmitHandlerTest {
     @RegisterExtension
     static final TestExecutorExtension<ExecutorService> EXECUTOR_EXTENSION =
             new TestExecutorExtension<>(Executors::newSingleThreadExecutor);
+
+    @RegisterExtension
+    final LoggerAuditingExtension loggerExtension =
+            new LoggerAuditingExtension(ConfluentJobSubmitHandler.class, Level.INFO);
 
     /**
      * Verifies that the generated job graph uses a default parallelism of 1.
@@ -178,6 +185,42 @@ class ConfluentJobSubmitHandlerTest {
     }
 
     @Test
+    void testLoggingOnSuccessfulSubmission() throws Exception {
+        final String jobId = JobID.generate().toHexString();
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        jobId,
+                        null,
+                        Collections.singleton(loadCompiledPlan()),
+                        Collections.emptyMap());
+
+        submitAndRetrieveJobGraph(request);
+
+        assertThat(loggerExtension.getEvents())
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .contains("Validated");
+                            assertThat(event.getContextData().toMap())
+                                    .containsEntry(MdcUtils.JOB_ID, jobId);
+                        })
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .contains("Generated");
+                            assertThat(event.getContextData().toMap())
+                                    .containsEntry(MdcUtils.JOB_ID, jobId);
+                        })
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .contains("Submitted");
+                            assertThat(event.getContextData().toMap())
+                                    .containsEntry(MdcUtils.JOB_ID, jobId);
+                        });
+    }
+
+    @Test
     void testRateLimiting() throws Exception {
         final BlockerSync blockerSync = new BlockerSync();
 
@@ -220,6 +263,14 @@ class ConfluentJobSubmitHandlerTest {
             // new job submissions should go through
             submitRandomRequest(handler, dispatcherGateway).join();
         }
+
+        assertThat(loggerExtension.getEvents())
+                .noneSatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .contains("Too many job submissions");
+                            assertThat(event.getContextData().toMap()).containsKey(MdcUtils.JOB_ID);
+                        });
     }
 
     private static CompletableFuture<EmptyResponseBody> submitRandomRequest(
@@ -258,6 +309,12 @@ class ConfluentJobSubmitHandlerTest {
                         Collections.emptyMap()),
                 HttpResponseStatus.BAD_REQUEST,
                 "generatorArguments must not be empty");
+
+        assertThat(loggerExtension.getEvents())
+                .noneSatisfy(
+                        event ->
+                                assertThat(event.getContextData().toMap())
+                                        .containsKey(MdcUtils.JOB_ID));
     }
 
     @Test
@@ -265,22 +322,30 @@ class ConfluentJobSubmitHandlerTest {
         final String compiledPlan = "foo bar baz";
 
         final Exception generationFailure = new RuntimeException("generation failure");
+        final String jobId = JobID.generate().toHexString();
 
         testErrorHandling(
                 createHandler(
                         (i1, i2, i3) -> {
+                            ConfluentJobSubmitHandler.LOG.error("generation error");
                             throw generationFailure;
                         },
                         e ->
                                 new RestHandlerException(
                                         e.getMessage(), HttpResponseStatus.BAD_REQUEST)),
                 createRequest(
-                        JobID.generate().toHexString(),
-                        null,
-                        Collections.singleton(compiledPlan),
-                        Collections.emptyMap()),
+                        jobId, null, Collections.singleton(compiledPlan), Collections.emptyMap()),
                 HttpResponseStatus.BAD_REQUEST,
                 generationFailure.getMessage());
+
+        assertThat(loggerExtension.getEvents())
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .isEqualTo("generation error");
+                            assertThat(event.getContextData().toMap())
+                                    .containsEntry(MdcUtils.JOB_ID, jobId);
+                        });
     }
 
     @Test
@@ -290,6 +355,7 @@ class ConfluentJobSubmitHandlerTest {
         final Exception generationFailure = new RuntimeException("generation failure");
         final RuntimeException classificationFailure =
                 new RuntimeException("classification failure");
+        final String jobId = JobID.generate().toHexString();
 
         testErrorHandling(
                 createHandler(
@@ -300,12 +366,19 @@ class ConfluentJobSubmitHandlerTest {
                             throw classificationFailure;
                         }),
                 createRequest(
-                        JobID.generate().toHexString(),
-                        null,
-                        Collections.singleton(compiledPlan),
-                        Collections.emptyMap()),
+                        jobId, null, Collections.singleton(compiledPlan), Collections.emptyMap()),
                 HttpResponseStatus.INTERNAL_SERVER_ERROR,
                 "Internal error occurred");
+
+        assertThat(loggerExtension.getEvents())
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getMessage().getFormattedMessage())
+                                    .isEqualTo(
+                                            "Internal error occurred while handling job graph generation error.");
+                            assertThat(event.getContextData().toMap())
+                                    .containsEntry(MdcUtils.JOB_ID, jobId);
+                        });
     }
 
     private static void testErrorHandling(
