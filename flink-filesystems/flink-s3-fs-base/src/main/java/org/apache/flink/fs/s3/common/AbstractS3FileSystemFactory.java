@@ -81,7 +81,7 @@ public abstract class AbstractS3FileSystemFactory implements FileSystemFactory {
     public static final ConfigOption<MemorySize> S5CMD_BATCH_MAX_STATE_SIZE =
             ConfigOptions.key("s3.s5cmd.batch.max-state")
                     .memoryType()
-                    .defaultValue(MemorySize.ofMebiBytes(50))
+                    .defaultValue(MemorySize.ofMebiBytes(1024))
                     .withDescription("Maximum size of files to download per one call to s5cmd.");
 
     public static final ConfigOption<Integer> S5CMD_BATCH_MAX_FILES =
