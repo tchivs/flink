@@ -27,11 +27,13 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus;
+import io.confluent.flink.apiserver.client.model.FlinkV1Job;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedFunctionWithTypes;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedUdfGateway;
 import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContainer;
-import io.confluent.flink.table.modules.remoteudf.util.ApiServerUtils;
+import io.confluent.flink.table.modules.remoteudf.util.ApiServerContainerUtils;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
+import io.confluent.flink.table.modules.remoteudf.utils.NamesGenerator;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.grpc.Metadata;
 import io.grpc.Server;
@@ -74,12 +76,13 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.INVOCA
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.METRIC_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_MS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_NAME;
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfRuntime.AUTH_METADATA;
-import static io.confluent.flink.table.modules.remoteudf.UdfUtil.LABEL_JOB_ID;
+import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.LABEL_JOB_ID;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -97,8 +100,13 @@ public class RemoteUdfIntegrationTest {
                             .setConfiguration(REPORTER.addToConfiguration(new Configuration()))
                             .build());
 
-    private static final String TEST_ORG = "test-org";
-    private static final String TEST_ENV = "test-env";
+    private static final String CELL = String.format("cell-%s", NamesGenerator.nextRandomName());
+    private static final String TEST_ORG = String.format("org-%s", NamesGenerator.nextRandomName());
+    private static final String TEST_ENV = String.format("env-%s", NamesGenerator.nextRandomName());
+    private static final String TEST_CP =
+            String.format("compute-pool-%s", NamesGenerator.nextRandomName());
+    private static final String TEST_JOB_NAME =
+            String.format("job-%s", NamesGenerator.nextRandomName());
     private static final String GW_HOST = "localhost";
     private static final int GW_PORT = 51000;
     private Server gatewayServer;
@@ -131,12 +139,21 @@ public class RemoteUdfIntegrationTest {
         public void run() {
             try {
                 Collection<ComputeV1FlinkUdfTask> udfTasks =
-                        ApiServerUtils.listPendingUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
+                        ApiServerContainerUtils.listUdfTasksWithStatus(
+                                apiServerContainer, TEST_ORG, TEST_ENV, "Pending");
                 if (!udfTasks.isEmpty()) {
                     ComputeV1FlinkUdfTask udfTask = udfTasks.iterator().next();
                     // Validate the udf task
                     Map<String, String> labels = udfTask.getMetadata().getLabels();
                     Assertions.assertFalse(labels.get(LABEL_JOB_ID).isEmpty());
+                    // Validate Job Owner Reference
+                    FlinkV1Job job =
+                            ApiServerContainerUtils.getJob(
+                                    apiServerContainer, TEST_ORG, TEST_ENV, TEST_JOB_NAME);
+                    Assertions.assertFalse(job.getMetadata().getOwnerReferences().isEmpty());
+                    Assertions.assertEquals(
+                            job.getMetadata().getOwnerReferences().get(0).getName(),
+                            udfTask.getMetadata().getName());
 
                     // Make sure metadata from Payload is properly propagated
                     RemoteUdfSpec udfSpec =
@@ -188,7 +205,15 @@ public class RemoteUdfIntegrationTest {
         apiServerContainer = new ApiServerContainer();
         apiServerContainer.start();
 
-        ApiServerUtils.createTestEnvAndOrg(apiServerContainer, TEST_ORG, TEST_ENV);
+        ApiServerContainerUtils.createTestEnvAndOrg(apiServerContainer, TEST_ORG, TEST_ENV);
+        ApiServerContainerUtils.createComputePool(
+                apiServerContainer, CELL, TEST_ORG, TEST_ENV, TEST_CP);
+        ApiServerContainerUtils.createJob(
+                apiServerContainer, CELL, TEST_ORG, TEST_ENV, TEST_CP, TEST_JOB_NAME);
+        Assertions.assertNotNull(
+                ApiServerContainerUtils.getJob(
+                        apiServerContainer, TEST_ORG, TEST_ENV, TEST_JOB_NAME));
+
         // Periodic service that marks UdfTask ready with metadata
         executorService = Executors.newSingleThreadScheduledExecutor();
         // Shutdown on completion
@@ -201,17 +226,17 @@ public class RemoteUdfIntegrationTest {
 
     private void testRemoteUdfGatewayInternal(boolean jss, boolean async) throws Exception {
         Map<String, String> confMap = new HashMap<>();
-        confMap.put(
-                CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(),
-                apiServerContainer.getHostAddress());
+        confMap.put(JOB_NAME.key(), TEST_JOB_NAME);
+        confMap.put(CONFLUENT_REMOTE_UDF_APISERVER.key(), apiServerContainer.getHostAddress());
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
         final TableEnvironment tEnv =
                 jss
-                        ? TestUtils.getJssTableEnvironment(confMap, testFunctionMeta)
+                        ? TestUtils.getJssTableEnvironment(
+                                TEST_ORG, TEST_ENV, confMap, testFunctionMeta)
                         : TestUtils.getSqlServiceTableEnvironment(
-                                confMap, testFunctionMeta, true, false);
+                                TEST_ORG, TEST_ENV, confMap, testFunctionMeta, true, false);
         TableResult result = tEnv.executeSql("SELECT cat1.db1.remote1(1, 'test', 4);");
         JobID jobID = result.getJobClient().get().getJobID();
         createCredentialsFor(jobID);
@@ -224,7 +249,8 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals("str:[1, test, 4]", row.getField(0));
 
         Collection<ComputeV1FlinkUdfTask> udfTasks =
-                ApiServerUtils.listRunningUdfTasks(apiServerContainer, TEST_ORG, TEST_ENV);
+                ApiServerContainerUtils.listUdfTasksWithStatus(
+                        apiServerContainer, TEST_ORG, TEST_ENV, "Running");
         Assertions.assertEquals(0, udfTasks.size());
 
         Optional<MetricGroup> group =
@@ -283,7 +309,8 @@ public class RemoteUdfIntegrationTest {
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         final TableEnvironment tableEnv =
-                TestUtils.getSqlServiceTableEnvironment(confMap, testFunctionMeta, true, false);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, confMap, testFunctionMeta, true, false);
         assertThatThrownBy(
                         () -> {
                             TableResult result =
@@ -307,14 +334,14 @@ public class RemoteUdfIntegrationTest {
 
     private void testRemoteUdfGatewayError(boolean async) {
         Map<String, String> confMap = new HashMap<>();
-        confMap.put(
-                CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(),
-                apiServerContainer.getHostAddress());
+        confMap.put(JOB_NAME.key(), TEST_JOB_NAME);
+        confMap.put(CONFLUENT_REMOTE_UDF_APISERVER.key(), apiServerContainer.getHostAddress());
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
         final TableEnvironment tEnv =
-                TestUtils.getSqlServiceTableEnvironment(confMap, testFunctionMeta, true, false);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, confMap, testFunctionMeta, true, false);
         TableResult result = tEnv.executeSql("SELECT cat1.db1.error(1, 'test', 4);");
         JobID jobID = result.getJobClient().get().getJobID();
         createCredentialsFor(jobID);

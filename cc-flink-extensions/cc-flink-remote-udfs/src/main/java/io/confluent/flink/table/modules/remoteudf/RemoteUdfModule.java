@@ -19,6 +19,12 @@ import java.util.Set;
 /** Module for Remote UFDs. */
 public class RemoteUdfModule implements Module {
 
+    public static final ConfigOption<String> JOB_NAME =
+            ConfigOptions.key("job.name")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The name of the job as defined by the FCP");
+
     public static final String CONFLUENT_REMOTE_UDF_PREFIX = "confluent.remote-udf.";
 
     public static final ConfigOption<Integer> GATEWAY_SERVICE_DEADLINE_SEC =
@@ -41,11 +47,25 @@ public class RemoteUdfModule implements Module {
                     .defaultValue(5)
                     .withDescription(
                             "The total number of attempts to use when retry invoking the secure gateway");
-    public static final ConfigOption<String> CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER =
+    public static final ConfigOption<String> CONFLUENT_REMOTE_UDF_APISERVER =
             ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "apiserver")
                     .stringType()
                     .defaultValue("")
                     .withDescription("The target for the ApiServer endpoint.");
+
+    public static final ConfigOption<Long> CONFLUENT_REMOTE_UDF_APISERVER_RETRY_BACKOFF_MS =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "apiserver.retry.backoff.ms")
+                    .longType()
+                    .defaultValue(Duration.ofSeconds(1).toMillis())
+                    .withDescription(
+                            "The base amount of time to backoff after a ApiServer endpoint failure");
+
+    public static final ConfigOption<Integer> CONFLUENT_REMOTE_UDF_APISERVER_RETRY_MAX_ATTEMPTS =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "apiserver.retry.max.attempts")
+                    .intType()
+                    .defaultValue(5)
+                    .withDescription(
+                            "The total number of attempts to use when retry invoking the ApiServer endpoint");
 
     public static final ConfigOption<String> CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID =
             ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "pluginid")

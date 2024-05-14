@@ -14,19 +14,22 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.remoteudf.mock.MockedFunctionWithTypes;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
+import io.confluent.flink.table.modules.remoteudf.utils.NamesGenerator;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ServiceTasks;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Basic Unit tests for remote UDF. */
 @Confluent
 public class RemoteUdfTest extends AbstractTestBase {
+
+    private static final String TEST_ORG = String.format("org-%s", NamesGenerator.nextRandomName());
+    private static final String TEST_ENV = String.format("env-%s", NamesGenerator.nextRandomName());
     private static MockedFunctionWithTypes[] testFunctionTriple =
             new MockedFunctionWithTypes[] {
                 new MockedFunctionWithTypes(
@@ -44,7 +47,8 @@ public class RemoteUdfTest extends AbstractTestBase {
         assertThat(remoteUdfModule.listFunctions().size()).isEqualTo(1);
         assertThat(remoteUdfModule.getFunctionDefinition("IS_SMALLER")).isPresent();
 
-        final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
+        final TableEnvironment tableEnv =
+                TestUtils.getJssTableEnvironment(TEST_ORG, TEST_ENV, testFunctionTriple);
         final ForegroundJobResultPlan plan =
                 foregroundJobCustomConfig(tableEnv, "SELECT IS_SMALLER('Small', 'Large')");
         assertThat(plan.getCompiledPlan()).contains(ForegroundResultTableFactory.IDENTIFIER);
@@ -53,7 +57,8 @@ public class RemoteUdfTest extends AbstractTestBase {
     @Test
     public void testJssRemoteUdfsEnabled() throws Exception {
         // should be enabled by default for JSS service
-        final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
+        final TableEnvironment tableEnv =
+                TestUtils.getJssTableEnvironment(TEST_ORG, TEST_ENV, testFunctionTriple);
 
         final ForegroundJobResultPlan plan =
                 foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote2('payload')");
@@ -63,7 +68,8 @@ public class RemoteUdfTest extends AbstractTestBase {
     @Test
     public void testJssRemoteUdfsNoExpressionReducer() throws Exception {
         // should be enabled by default for JSS service
-        final TableEnvironment tableEnv = TestUtils.getJssTableEnvironment(testFunctionTriple);
+        final TableEnvironment tableEnv =
+                TestUtils.getJssTableEnvironment(TEST_ORG, TEST_ENV, testFunctionTriple);
 
         final ForegroundJobResultPlan plan =
                 foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote1(1)");
@@ -77,7 +83,8 @@ public class RemoteUdfTest extends AbstractTestBase {
     public void testRemoteUdfsEnabled() throws Exception {
         // SQL service controls remote UDFs using config params
         final TableEnvironment tableEnv =
-                TestUtils.getSqlServiceTableEnvironment(testFunctionTriple, true, false);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, testFunctionTriple, true, false);
 
         final ForegroundJobResultPlan plan =
                 foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.remote2('payload')");
@@ -93,7 +100,8 @@ public class RemoteUdfTest extends AbstractTestBase {
                 };
         // SQL service controls remote UDFs using config params
         final TableEnvironment tableEnv =
-                TestUtils.getSqlServiceTableEnvironment(testFunctionWithHyphen, true, false);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, testFunctionWithHyphen, true, false);
 
         final ForegroundJobResultPlan plan =
                 foregroundJobCustomConfig(tableEnv, "SELECT cat1.db1.`remote-4`(1)");
@@ -104,7 +112,8 @@ public class RemoteUdfTest extends AbstractTestBase {
     public void testRemoteUdfsEnabled_useCatalogDb() throws Exception {
         // SQL service controls remote UDFs using config params
         final TableEnvironment tableEnv =
-                TestUtils.getSqlServiceTableEnvironment(testFunctionTriple, true, true);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, testFunctionTriple, true, true);
         tableEnv.executeSql("USE CATALOG cat1");
         tableEnv.executeSql("USE db1");
         final ForegroundJobResultPlan plan =
@@ -115,7 +124,8 @@ public class RemoteUdfTest extends AbstractTestBase {
     @Test
     public void testRemoteUdfsDisabled() {
         final TableEnvironment tableEnv =
-                TestUtils.getSqlServiceTableEnvironment(testFunctionTriple, false, false);
+                TestUtils.getSqlServiceTableEnvironment(
+                        TEST_ORG, TEST_ENV, testFunctionTriple, false, false);
         assertThatThrownBy(() -> tableEnv.executeSql("SELECT remote2('payload')"))
                 .message()
                 .contains("No match found for function signature remote2");

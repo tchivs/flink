@@ -41,7 +41,6 @@ public class RemoteUdfMetrics {
     private final Counter bytesFromUdf;
 
     private final AtomicLong lastInvocationMs = new AtomicLong(0);
-
     private final AtomicLong lastProvisionMs = new AtomicLong(0);
     private final AtomicLong lastDeprovisionMs = new AtomicLong(0);
 

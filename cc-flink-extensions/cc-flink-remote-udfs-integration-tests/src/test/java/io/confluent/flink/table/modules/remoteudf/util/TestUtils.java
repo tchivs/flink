@@ -39,7 +39,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_ARGUMENT_TYPES_FIELD;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTION_CATALOG_FIELD;
@@ -57,7 +57,6 @@ import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REM
 
 /** Test utility class with common functionality for Remote UDF testing. */
 public class TestUtils {
-    static final String GW_SERVER_TARGET = "localhost:50051";
     static final String APISERVER_TARGET = "http://localhost:8080";
     public static final int EXPECTED_INT_RETURN_VALUE = 424242;
 
@@ -114,17 +113,23 @@ public class TestUtils {
 
     public static Map<String, String> getBaseConfigMap(String apiserverTarget) {
         Map<String, String> confMap = new HashMap<>();
-        confMap.put(CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER.key(), apiserverTarget);
+        confMap.put(CONFLUENT_REMOTE_UDF_APISERVER.key(), apiserverTarget);
         return confMap;
     }
 
     public static TableEnvironment getSqlServiceTableEnvironment(
-            MockedFunctionWithTypes[] testFunctions, boolean udfsEnabled, boolean createCatalog) {
+            String org,
+            String env,
+            MockedFunctionWithTypes[] testFunctions,
+            boolean udfsEnabled,
+            boolean createCatalog) {
         return getSqlServiceTableEnvironment(
-                getBaseConfigMap(), testFunctions, udfsEnabled, createCatalog);
+                org, env, getBaseConfigMap(), testFunctions, udfsEnabled, createCatalog);
     }
 
     public static TableEnvironment getSqlServiceTableEnvironment(
+            String org,
+            String env,
             Map<String, String> confMap,
             MockedFunctionWithTypes[] testFunctions,
             boolean udfsEnabled,
@@ -135,7 +140,7 @@ public class TestUtils {
             createCatalog(tableEnv);
         }
         if (udfsEnabled) {
-            TestUtils.populateServiceTaskConfFromMockedFunctions(confMap, testFunctions);
+            TestUtils.populateServiceTaskConfFromMockedFunctions(org, env, confMap, testFunctions);
             confMap.put(CONFLUENT_REMOTE_UDF_ENABLED.key(), String.valueOf(true));
         }
         INSTANCE.configureEnvironment(
@@ -143,16 +148,20 @@ public class TestUtils {
         return tableEnv;
     }
 
-    public static TableEnvironment getJssTableEnvironment(MockedFunctionWithTypes[] testFunctions) {
-        return getJssTableEnvironment(getBaseConfigMap(), testFunctions);
+    public static TableEnvironment getJssTableEnvironment(
+            String org, String env, MockedFunctionWithTypes[] testFunctions) {
+        return getJssTableEnvironment(org, env, getBaseConfigMap(), testFunctions);
     }
 
     public static TableEnvironment getJssTableEnvironment(
-            Map<String, String> confMap, MockedFunctionWithTypes[] testFunctions) {
+            String org,
+            String env,
+            Map<String, String> confMap,
+            MockedFunctionWithTypes[] testFunctions) {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        TestUtils.populateServiceTaskConfFromMockedFunctions(confMap, testFunctions);
+        TestUtils.populateServiceTaskConfFromMockedFunctions(org, env, confMap, testFunctions);
         INSTANCE.configureEnvironment(
                 tableEnv,
                 Collections.emptyMap(),
@@ -174,11 +183,11 @@ public class TestUtils {
      * ConfiguredRemoteScalarFunctions.
      */
     public static void populateServiceTaskConfFromMockedFunctions(
-            Map<String, String> udfConf, MockedFunctionWithTypes[] funcs) {
+            String org, String env, Map<String, String> udfConf, MockedFunctionWithTypes[] funcs) {
         for (MockedFunctionWithTypes func : funcs) {
             Preconditions.checkState(func.getArgTypes().size() == func.getReturnType().size());
-            udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_ORG_FIELD, "test-org");
-            udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_ENV_FIELD, "test-env");
+            udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_ORG_FIELD, org);
+            udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_ENV_FIELD, env);
             udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_CATALOG_FIELD, "cat1");
             udfConf.put(FUNCTIONS_PREFIX + func.getName() + "." + FUNCTION_DATABASE_FIELD, "db1");
             udfConf.put(

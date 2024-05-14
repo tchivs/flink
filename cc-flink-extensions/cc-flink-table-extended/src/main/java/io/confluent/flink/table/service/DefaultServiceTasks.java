@@ -87,6 +87,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_PREFIX;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY;
 import static io.confluent.flink.table.service.ServiceTasksOptions.CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS;
@@ -303,7 +304,8 @@ class DefaultServiceTasks implements ServiceTasks {
                     .toMap()
                     .forEach(
                             (k, v) -> {
-                                if (k.startsWith(FUNCTIONS_PREFIX)
+                                if (k.equals(JOB_NAME.key())
+                                        || k.startsWith(FUNCTIONS_PREFIX)
                                         || k.startsWith(CONFLUENT_REMOTE_UDF_PREFIX)) {
                                     remoteUdfConfig.put(k, v);
                                 }

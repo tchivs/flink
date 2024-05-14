@@ -37,34 +37,29 @@ public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGate
         InvokeFunctionResponse.Builder builder = InvokeFunctionResponse.newBuilder();
 
         try {
-
-            if (testUdfSpec != null) {
-                List<TypeSerializer<Object>> argumentSerializers =
-                        testUdfSpec.createArgumentSerializers();
-                RemoteUdfSerialization serialization =
-                        new RemoteUdfSerialization(
-                                testUdfSpec.createReturnTypeSerializer(), argumentSerializers);
-                Object[] args = new Object[argumentSerializers.size()];
-                serialization.deserializeArguments(
-                        request.getPayload().asReadOnlyByteBuffer(), args);
-                if (testUdfSpec
-                        .getReturnType()
-                        .getLogicalType()
-                        .is(DataTypes.STRING().getLogicalType().getTypeRoot())) {
-                    builder.setPayload(
-                            serialization.serializeReturnValue(
-                                    BinaryStringData.fromString("str:" + Arrays.asList(args))));
-                } else if (testUdfSpec
-                        .getReturnType()
-                        .getLogicalType()
-                        .is(DataTypes.INT().getLogicalType().getTypeRoot())) {
-                    builder.setPayload(
-                            serialization.serializeReturnValue(
-                                    TestUtils.EXPECTED_INT_RETURN_VALUE));
-                } else {
-                    throw new Exception(
-                            "Unknown return type " + testUdfSpec.getReturnType().getLogicalType());
-                }
+            List<TypeSerializer<Object>> argumentSerializers =
+                    testUdfSpec.createArgumentSerializers();
+            RemoteUdfSerialization serialization =
+                    new RemoteUdfSerialization(
+                            testUdfSpec.createReturnTypeSerializer(), argumentSerializers);
+            Object[] args = new Object[argumentSerializers.size()];
+            serialization.deserializeArguments(request.getPayload().asReadOnlyByteBuffer(), args);
+            if (testUdfSpec
+                    .getReturnType()
+                    .getLogicalType()
+                    .is(DataTypes.STRING().getLogicalType().getTypeRoot())) {
+                builder.setPayload(
+                        serialization.serializeReturnValue(
+                                BinaryStringData.fromString("str:" + Arrays.asList(args))));
+            } else if (testUdfSpec
+                    .getReturnType()
+                    .getLogicalType()
+                    .is(DataTypes.INT().getLogicalType().getTypeRoot())) {
+                builder.setPayload(
+                        serialization.serializeReturnValue(TestUtils.EXPECTED_INT_RETURN_VALUE));
+            } else {
+                throw new Exception(
+                        "Unknown return type " + testUdfSpec.getReturnType().getLogicalType());
             }
         } catch (Exception ex) {
             builder.setError(Error.newBuilder().setCode(1).setMessage(ex.getMessage()).build());

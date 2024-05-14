@@ -10,13 +10,11 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
 import org.apache.flink.util.IOUtils;
-import org.apache.flink.util.Preconditions;
 
 import com.google.protobuf.ByteString;
 import io.confluent.flink.apiserver.client.ApiClient;
-import io.confluent.flink.apiserver.client.ApiException;
-import io.confluent.flink.apiserver.client.ComputeV1Api;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
+import io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.flink.udf.adapter.api.ThreadLocalRemoteUdfSerialization;
@@ -36,9 +34,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
-import static io.confluent.flink.table.modules.remoteudf.UdfUtil.getUdfTaskFromSpec;
+import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.createApiServerUdfTask;
+import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.generateUdfTaskFromSpec;
+import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.updateApiServerJobWithUdfTaskOwnerRef;
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 import static org.apache.flink.shaded.guava31.com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
@@ -49,31 +48,8 @@ import static org.apache.flink.shaded.guava31.com.google.common.util.concurrent.
 public class RemoteUdfRuntime implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(RemoteUdfRuntime.class);
 
-    public static final Metadata.Key<String> AUTH_METADATA =
-            Metadata.Key.of("Authorization", ASCII_STRING_MARSHALLER);
-
-    private static final int POLL_INTERVAL_MS = 500;
-
-    private static final Duration MAX_UDFTASK_PROVISION_DURATION = Duration.ofMinutes(2);
-
-    private RemoteUdfRuntime(
-            UdfSerialization udfSerialization,
-            RemoteUdfGatewayConnection remoteUdfGatewayConnection,
-            String functionInstanceName,
-            ApiClient apiClient,
-            ComputeV1FlinkUdfTask udfTask,
-            RemoteUdfMetrics metrics,
-            KafkaCredentialsCache credentialsCache,
-            JobID jobID) {
-        this.udfSerialization = udfSerialization;
-        this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
-        this.functionInstanceName = functionInstanceName;
-        this.apiClient = apiClient;
-        this.udfTask = udfTask;
-        this.metrics = metrics;
-        this.credentialsCache = credentialsCache;
-        this.jobID = jobID;
-    }
+    /** Configuration for the runtime. */
+    private final Configuration config;
 
     /** Serialization methods. */
     private final UdfSerialization udfSerialization;
@@ -94,8 +70,39 @@ public class RemoteUdfRuntime implements AutoCloseable {
     /** Where we store tokens used to access the compute platform. */
     private final KafkaCredentialsCache credentialsCache;
 
+    /** Metadata key for the authorization token. */
+    public static final Metadata.Key<String> AUTH_METADATA =
+            Metadata.Key.of("Authorization", ASCII_STRING_MARSHALLER);
+
+    /** The interval in milliseconds to poll for the UDF task status. */
+    private static final int POLL_INTERVAL_MS = 500;
+
+    /** The maximum duration to wait for the UDF task to be provisioned. */
+    private static final Duration MAX_UDFTASK_PROVISION_DURATION = Duration.ofMinutes(2);
+
     /** The job id of the current job running this UDF. */
     private final JobID jobID;
+
+    private RemoteUdfRuntime(
+            Configuration config,
+            UdfSerialization udfSerialization,
+            RemoteUdfGatewayConnection remoteUdfGatewayConnection,
+            String functionInstanceName,
+            ApiClient apiClient,
+            ComputeV1FlinkUdfTask udfTask,
+            RemoteUdfMetrics metrics,
+            KafkaCredentialsCache credentialsCache,
+            JobID jobID) {
+        this.config = config;
+        this.udfSerialization = udfSerialization;
+        this.remoteUdfGatewayConnection = remoteUdfGatewayConnection;
+        this.functionInstanceName = functionInstanceName;
+        this.apiClient = apiClient;
+        this.udfTask = udfTask;
+        this.metrics = metrics;
+        this.credentialsCache = credentialsCache;
+        this.jobID = jobID;
+    }
 
     /**
      * Calls the remote UDF.
@@ -188,7 +195,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             KafkaCredentialsCache credentialsCache,
             JobID jobID)
             throws Exception {
-        UdfSerialization udfSerialization =
+        final UdfSerialization udfSerialization =
                 config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)
                         ? new ThreadLocalRemoteUdfSerialization(
                                 remoteUdfSpec.createReturnTypeSerializer(),
@@ -199,31 +206,33 @@ public class RemoteUdfRuntime implements AutoCloseable {
 
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
-            ComputeV1FlinkUdfTask udfTask =
-                    getUdfTaskFromSpec(config, remoteUdfSpec, udfSerialization, jobID);
-
-            ApiClient apiClient = getApiClient(config);
-            ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
-            computeV1Api.createComputeV1FlinkUdfTask(
-                    udfTask.getMetadata().getEnvironment(),
-                    udfTask.getMetadata().getOrg(),
-                    udfTask);
+            final ApiClient apiClient = ApiServerUtils.getApiClient(config);
+            final ComputeV1FlinkUdfTask udfTask =
+                    createApiServerUdfTask(
+                            config,
+                            apiClient,
+                            generateUdfTaskFromSpec(
+                                    config, remoteUdfSpec, udfSerialization, jobID));
+            updateApiServerJobWithUdfTaskOwnerRef(config, apiClient, udfTask);
 
             // TODO FRT-353 integrate with Watch API
             Deadline deadline = Deadline.fromNow(MAX_UDFTASK_PROVISION_DURATION);
             while (deadline.hasTimeLeft()) {
-                udfTask = getUdfTask(computeV1Api, udfTask);
-                if (udfTask.getStatus().getPhase() == RUNNING) {
+                final ComputeV1FlinkUdfTask currentUdfTask =
+                        ApiServerUtils.getUdfTask(config, apiClient, udfTask);
+                if (currentUdfTask.getStatus().getPhase() == RUNNING) {
                     metrics.provisionMs(
                             MAX_UDFTASK_PROVISION_DURATION.toMillis()
                                     - deadline.timeLeft().toMillis());
-                    remoteUdfGatewayConnection = RemoteUdfGatewayConnection.open(udfTask, config);
+                    remoteUdfGatewayConnection =
+                            RemoteUdfGatewayConnection.open(currentUdfTask, config);
                     return new RemoteUdfRuntime(
+                            config,
                             udfSerialization,
                             remoteUdfGatewayConnection,
-                            udfTask.getMetadata().getName(),
+                            currentUdfTask.getMetadata().getName(),
                             apiClient,
-                            udfTask,
+                            currentUdfTask,
                             metrics,
                             credentialsCache,
                             jobID);
@@ -241,15 +250,6 @@ public class RemoteUdfRuntime implements AutoCloseable {
         }
     }
 
-    private static ComputeV1FlinkUdfTask getUdfTask(
-            ComputeV1Api computeV1Api, ComputeV1FlinkUdfTask udfTask) throws ApiException {
-        return computeV1Api.readComputeV1FlinkUdfTask(
-                udfTask.getMetadata().getEnvironment(),
-                udfTask.getMetadata().getName(),
-                udfTask.getMetadata().getOrg(),
-                null);
-    }
-
     /**
      * Cleans up the runtime, including closing gateway connection and deleting UdfTask from the
      * ApiServer.
@@ -259,29 +259,8 @@ public class RemoteUdfRuntime implements AutoCloseable {
     @Override
     public void close() throws Exception {
         IOUtils.closeQuietly(remoteUdfGatewayConnection);
-        deleteUdfTask(apiClient, udfTask);
+        ApiServerUtils.deleteUdfTask(config, apiClient, udfTask);
         udfSerialization.close();
-    }
-
-    /** Deletes the UdfTask from the ApiServer. */
-    private static void deleteUdfTask(ApiClient apiClient, ComputeV1FlinkUdfTask udfTask)
-            throws ApiException {
-        ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
-        computeV1Api.deleteComputeV1FlinkUdfTask(
-                udfTask.getMetadata().getEnvironment(),
-                udfTask.getMetadata().getName(),
-                udfTask.getMetadata().getOrg());
-    }
-
-    /** Returns the ApiClient for the given configuration. */
-    private static ApiClient getApiClient(Configuration config) {
-        String apiServerEndpoint = config.getString(CONFLUENT_CONFLUENT_REMOTE_UDF_APISERVER);
-        Preconditions.checkArgument(
-                !apiServerEndpoint.isEmpty(), "ApiServer target not configured!");
-        ApiClient apiClient = new ApiClient().setBasePath(apiServerEndpoint);
-        // set the client just in case we use the default ctors somewhere
-        io.confluent.flink.apiserver.client.Configuration.setDefaultApiClient(apiClient);
-        return apiClient;
     }
 
     /** Checks the response for an error and throws an exception if there is one. */
