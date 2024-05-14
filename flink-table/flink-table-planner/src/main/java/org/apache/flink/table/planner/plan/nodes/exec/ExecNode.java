@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.plan.nodes.exec;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.plan.nodes.exec.visitor.ExecNodeVisitor;
@@ -123,4 +124,8 @@ public interface ExecNode<T> extends ExecNodeTranslator<T>, FusionCodegenExecNod
      * properties might be impacted by this (e.g. UID generation for transformations).
      */
     void setCompiled(boolean isCompiled);
+
+    @Confluent
+    @JsonIgnore
+    boolean isCompiled();
 }

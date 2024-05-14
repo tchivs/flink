@@ -125,6 +125,16 @@ public class QuerySummaryTest {
     }
 
     @Test
+    void testChangelogModeForPointInTime() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inBatchMode());
+
+        createTable(env, "bounded1", Boundedness.BOUNDED);
+
+        assertProperties(env, "SELECT * FROM bounded1", QueryProperty.APPEND_ONLY);
+        assertProperties(env, "SELECT COUNT(*) FROM bounded1", QueryProperty.APPEND_ONLY);
+    }
+
+    @Test
     void testSourceAndSinkIdentifierTags() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 

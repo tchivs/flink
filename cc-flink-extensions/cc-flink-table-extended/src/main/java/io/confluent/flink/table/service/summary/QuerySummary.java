@@ -6,6 +6,7 @@ package io.confluent.flink.table.service.summary;
 
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph;
+import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecSink;
 import org.apache.flink.table.planner.plan.nodes.exec.stream.StreamExecSink;
 import org.apache.flink.table.planner.plan.nodes.physical.FlinkPhysicalRel;
 import org.apache.flink.types.RowKind;
@@ -115,6 +116,13 @@ public class QuerySummary {
     }
 
     public void ingestExecNodeGraph(ExecNodeGraph execNodeGraph) {
+        boolean pointInTime =
+                execNodeGraph.getRootNodes().stream().anyMatch(n -> n instanceof BatchExecSink);
+        if (pointInTime) {
+            queryProperties.add(QueryProperty.APPEND_ONLY);
+            return;
+        }
+
         // Append-only / updating sink inputs
         final boolean isAppendOnly =
                 execNodeGraph.getRootNodes().stream()

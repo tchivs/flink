@@ -17,19 +17,24 @@
  */
 package org.apache.flink.table.planner.delegation
 
+import org.apache.flink.annotation.Confluent
 import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.configuration.ExecutionOptions
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectReader
 import org.apache.flink.table.api.{ExplainDetail, ExplainFormat, PlanReference, TableConfig, TableException}
+import org.apache.flink.table.api.PlanReference.{ContentPlanReference, FilePlanReference, ResourcePlanReference}
 import org.apache.flink.table.api.config.OptimizerConfigOptions
 import org.apache.flink.table.catalog.{CatalogManager, FunctionCatalog}
 import org.apache.flink.table.delegation.{Executor, InternalPlan}
 import org.apache.flink.table.module.ModuleManager
 import org.apache.flink.table.operations.{ModifyOperation, Operation}
 import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistributionTraitDef
+import org.apache.flink.table.planner.plan.ExecNodeGraphInternalPlan
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph
 import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecNode
 import org.apache.flink.table.planner.plan.nodes.exec.processor.{DeadlockBreakupProcessor, DynamicFilteringDependencyProcessor, ExecNodeGraphProcessor, ForwardHashExchangeProcessor, MultipleInputNodeCreationProcessor}
+import org.apache.flink.table.planner.plan.nodes.exec.serde.JsonSerdeUtil
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodePlanDumper
 import org.apache.flink.table.planner.plan.optimize.{BatchCommonSubGraphBasedOptimizer, Optimizer}
 import org.apache.flink.table.planner.plan.utils.FlinkRelOptUtil
@@ -39,6 +44,7 @@ import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
 import org.apache.calcite.rel.RelCollationTraitDef
 import org.apache.calcite.sql.SqlExplainLevel
 
+import java.io.{File, IOException}
 import java.util
 
 import scala.collection.JavaConversions._
@@ -84,6 +90,7 @@ class BatchPlanner(
     processors
   }
 
+  @Confluent
   override protected def translateToPlan(execGraph: ExecNodeGraph): util.List[Transformation[_]] = {
     beforeTranslation()
     val planner = createDummyPlanner()
@@ -162,19 +169,6 @@ class BatchPlanner(
       catalogManager,
       classLoader)
   }
-
-  override def loadPlan(planReference: PlanReference): InternalPlan = {
-    throw new UnsupportedOperationException(
-      "The compiled plan feature is not supported in batch mode.")
-  }
-
-  override def compilePlan(modifyOperations: util.List[ModifyOperation]): InternalPlan =
-    throw new UnsupportedOperationException(
-      "The compiled plan feature is not supported in batch mode.")
-
-  override def translatePlan(plan: InternalPlan): util.List[Transformation[_]] =
-    throw new UnsupportedOperationException(
-      "The compiled plan feature is not supported in batch mode.")
 
   override def explainPlan(plan: InternalPlan, extraDetails: ExplainDetail*): String =
     throw new UnsupportedOperationException(
