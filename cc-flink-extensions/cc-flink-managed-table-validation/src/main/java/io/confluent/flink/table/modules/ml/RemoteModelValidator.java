@@ -79,6 +79,12 @@ public class RemoteModelValidator {
 
     public static Map<String, String> validateCreateModelOptions(
             String modelIdentifier, Map<String, String> options) {
+        return validateCreateModelOptions(
+                modelIdentifier, options, MLModelCommonConstants.DEFAULT_PARAM_SIZE_LIMIT);
+    }
+
+    public static Map<String, String> validateCreateModelOptions(
+            String modelIdentifier, Map<String, String> options, int paramSizeLimit) {
         Map<String, String> uppercaseOptions = uppercaseOptions(options);
         final String provider = uppercaseOptions.get(PROVIDER);
         if (provider == null) {
@@ -86,7 +92,8 @@ public class RemoteModelValidator {
         }
         final PublicRemoteModelFactory factory =
                 new PublicRemoteModelFactory(modelIdentifier, provider);
-        final RemoteModelHelper helper = new RemoteModelHelper(factory, uppercaseOptions);
+        final RemoteModelHelper helper =
+                new RemoteModelHelper(factory, uppercaseOptions, paramSizeLimit);
         helper.validate();
         final Configuration validatedOptions = helper.getOptions();
         return validatedOptions.toMap();
@@ -224,8 +231,12 @@ public class RemoteModelValidator {
 
     private static class RemoteModelHelper
             extends FactoryUtil.FactoryHelper<PublicRemoteModelFactory> {
-        public RemoteModelHelper(PublicRemoteModelFactory factory, Map<String, String> options) {
+        private final int paramSizeLimit;
+
+        public RemoteModelHelper(
+                PublicRemoteModelFactory factory, Map<String, String> options, int paramSizeLimit) {
             super(factory, options);
+            this.paramSizeLimit = paramSizeLimit;
         }
 
         @Override
@@ -244,6 +255,7 @@ public class RemoteModelValidator {
                     deprecatedOptionKeys,
                     factory.paramsPrefix());
             validateEndpoint();
+            validateParamSizeLimit();
         }
 
         /** Validate unconsumed options keys with skipping allowed prefix. */
@@ -271,6 +283,23 @@ public class RemoteModelValidator {
 
         private void validateEndpoint() {
             factory.getModelOptions().validateEndpoint(allOptions, false);
+        }
+
+        private void validateParamSizeLimit() {
+            String paramPrefix = factory.paramsPrefix().toLowerCase(Locale.ROOT);
+            long paramCount =
+                    allOptions.keySet().stream()
+                            .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(paramPrefix))
+                            .count();
+            if (paramCount > paramSizeLimit) {
+                throw new ValidationException(
+                        "Number of param options starting with '"
+                                + paramPrefix
+                                + "' exceeds limit: "
+                                + paramSizeLimit
+                                + ". Current size: "
+                                + paramCount);
+            }
         }
     }
 }

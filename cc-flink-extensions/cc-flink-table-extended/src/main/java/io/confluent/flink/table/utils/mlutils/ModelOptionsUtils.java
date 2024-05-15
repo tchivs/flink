@@ -9,10 +9,11 @@ import org.apache.flink.table.catalog.CatalogModel.ModelKind;
 import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
+
 import java.util.Map;
 import java.util.TreeMap;
 
-import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_HOST;
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.DEFAULT_VERSION;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT_STRATEGY;
@@ -87,12 +88,13 @@ public class ModelOptionsUtils {
     }
 
     public String getCredentialServiceHost() {
-        return caseInsensitiveModelOptions.get(CREDENTIAL_SERVICE_HOST.key());
+        return caseInsensitiveModelOptions.get(MLModelCommonConstants.CREDENTIAL_SERVICE_HOST);
     }
 
     public int getCredentialServicePort() {
         try {
-            String port = caseInsensitiveModelOptions.get(CREDENTIAL_SERVICE_PORT.key());
+            String port =
+                    caseInsensitiveModelOptions.get(MLModelCommonConstants.CREDENTIAL_SERVICE_PORT);
             return Integer.parseInt(port);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(

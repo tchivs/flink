@@ -328,6 +328,60 @@ public class RemoteModelValidatorTest {
     }
 
     @Test
+    void testParamLimit() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider",
+                        "sagemaker",
+                        "task",
+                        "text_generation",
+                        "sagemaker.aws_access_key_id",
+                        "key_id",
+                        "sagemaker.aws_secret_access_key",
+                        "secret_key",
+                        "sagemaker.endpoint",
+                        "https://runtime.sagemaker.us-west-2.amazonaws.com/endpoints/matrix/invocations",
+                        "sagemaker.params.p1",
+                        "param1",
+                        "sagemaker.params.p2",
+                        "param2",
+                        "sagemaker.params.p3",
+                        "param3",
+                        "sagemaker.target_container_host_name",
+                        "secondContainer");
+        validateCreateModelOptions("m1", options, 3);
+    }
+
+    @Test
+    void testParamLimitViolation() {
+        Map<String, String> options =
+                ImmutableMap.of(
+                        "provider",
+                        "sagemaker",
+                        "task",
+                        "text_generation",
+                        "sagemaker.aws_access_key_id",
+                        "key_id",
+                        "sagemaker.aws_secret_access_key",
+                        "secret_key",
+                        "sagemaker.endpoint",
+                        "https://runtime.sagemaker.us-west-2.amazonaws.com/endpoints/matrix/invocations",
+                        "sagemaker.params.p1",
+                        "param1",
+                        "SagemAker.Params.P2",
+                        "param2",
+                        "sagemaker.params.p3",
+                        "param3",
+                        "sagemaker.target_container_host_name",
+                        "secondContainer");
+        assertThatThrownBy(() -> validateCreateModelOptions("m1", options, 2))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage(
+                        "Number of param options starting with 'sagemaker.params.' exceeds "
+                                + "limit: 2. Current size: 3");
+    }
+
+    @Test
     void testGetPublicOptions() {
         Map<String, String> options =
                 ImmutableMap.of(
@@ -410,7 +464,7 @@ public class RemoteModelValidatorTest {
     }
 
     @Test
-    void testCaseInsentiveOptions() {
+    void testCaseInsensitiveOptions() {
         Map<String, String> options =
                 ImmutableMap.of(
                         "pRoVidEr", "sagemaker",

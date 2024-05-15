@@ -43,7 +43,8 @@ public class MLModelCommonConstants {
     public static final String COMPUTE_POOL_ENV_ID = "CONFLUENT.MODEL.COMPUTE_POOL.ENV.ID";
     public static final String MODEL_NAME = "CONFLUENT.MODEL.NAME";
     public static final String MODEL_VERSION = "CONFLUENT.MODEL.VERSION";
-    public static final String MODEL_KMS_KEY_VERSION_PREFIX = "CONFLUENT.MODEL.SECRET.KEY_VERSION";
     public static final String CREDENTIAL_SERVICE_HOST = "CONFLUENT.CREDENTIAL.SERVICE.HOST";
     public static final String CREDENTIAL_SERVICE_PORT = "CONFLUENT.CREDENTIAL.SERVICE.PORT";
+
+    public static final int DEFAULT_PARAM_SIZE_LIMIT = 32;
 }
