@@ -150,10 +150,10 @@ public class RemoteUdfIntegrationTest {
                     FlinkV1Job job =
                             ApiServerContainerUtils.getJob(
                                     apiServerContainer, TEST_ORG, TEST_ENV, TEST_JOB_NAME);
-                    Assertions.assertFalse(job.getMetadata().getOwnerReferences().isEmpty());
+                    Assertions.assertFalse(udfTask.getMetadata().getOwnerReferences().isEmpty());
                     Assertions.assertEquals(
-                            job.getMetadata().getOwnerReferences().get(0).getName(),
-                            udfTask.getMetadata().getName());
+                            udfTask.getMetadata().getOwnerReferences().get(0).getName(),
+                            job.getMetadata().getName());
 
                     // Make sure metadata from Payload is properly propagated
                     RemoteUdfSpec udfSpec =

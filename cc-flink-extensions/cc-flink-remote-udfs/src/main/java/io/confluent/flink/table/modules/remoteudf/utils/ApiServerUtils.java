@@ -223,6 +223,7 @@ public class ApiServerUtils {
     public static void updateApiServerJobWithUdfTaskOwnerRef(
             Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask) {
         final FlinkV1Api flinkV1Api = new FlinkV1Api(apiClient);
+        final ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
         final String jobName = config.getString(JOB_NAME);
         Preconditions.checkArgument(!jobName.isEmpty(), "Job Name must be set");
         final CallWithRetry apiserverRetryCall =
@@ -239,20 +240,19 @@ public class ApiServerUtils {
                                         udfTask.getMetadata().getOrg(),
                                         null);
 
-                        flinkV1Job
-                                .getMetadata()
+                        udfTask.getMetadata()
                                 .addOwnerReferencesItem(
                                         new ApisMetaV1OwnerReference()
-                                                .apiVersion(udfTask.getApiVersion())
-                                                .kind(udfTask.getKind())
-                                                .name(udfTask.getMetadata().getName())
-                                                .uid(udfTask.getMetadata().getUid()));
+                                                .apiVersion(flinkV1Job.getApiVersion())
+                                                .kind(flinkV1Job.getKind())
+                                                .name(flinkV1Job.getMetadata().getName())
+                                                .uid(flinkV1Job.getMetadata().getUid()));
 
-                        return flinkV1Api.updateFlinkV1Job(
+                        return computeV1Api.updateComputeV1FlinkUdfTask(
                                 udfTask.getMetadata().getEnvironment(),
-                                jobName,
+                                udfTask.getMetadata().getName(),
                                 udfTask.getMetadata().getOrg(),
-                                flinkV1Job);
+                                udfTask);
                     } catch (ApiException e) {
                         throw new RuntimeException(e);
                     }
