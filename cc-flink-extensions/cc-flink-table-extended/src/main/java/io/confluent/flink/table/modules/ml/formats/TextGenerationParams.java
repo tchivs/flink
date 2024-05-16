@@ -249,6 +249,32 @@ public class TextGenerationParams {
     }
 
     private void linkUntypedParam(Object value, ObjectNode node, String fieldName) {
+        // If the field name has a period, we treat it as a nested field.
+        String[] parts = fieldName.split("\\.", -1); // -1 to keep trailing empty strings.
+        if (parts.length > 1) {
+            // Do a first pass to fix escaped periods.
+            for (int i = 1; i < parts.length - 1; i++) {
+                if (parts[i].isEmpty()) {
+                    parts[i + 1] = parts[i - 1] + "." + parts[i + 1];
+                    parts[i - 1] = "";
+                }
+            }
+            int lastNonEmpty =
+                    parts[parts.length - 1].isEmpty() ? parts.length - 2 : parts.length - 1;
+            // Create the intermediate nodes.
+            ObjectNode current = node;
+            for (int i = 0; i < lastNonEmpty; i++) {
+                if (parts[i].isEmpty()) {
+                    continue;
+                }
+                if (!current.has(parts[i])) {
+                    current.putObject(parts[i]);
+                }
+                current = (ObjectNode) current.get(parts[i]);
+            }
+            fieldName = parts[lastNonEmpty];
+            node = current;
+        }
         if (value instanceof Double) {
             node.put(fieldName, (Double) value);
         } else if (value instanceof Long) {
@@ -272,7 +298,7 @@ public class TextGenerationParams {
             linkUntypedParam(ref.value, node, fieldName);
             return ref.name;
         }
-        return "";
+        return null;
     }
 
     // Link a parameter from the allParams map to a field in the node, returns the name of the
@@ -286,7 +312,7 @@ public class TextGenerationParams {
                 return paramName.toLowerCase();
             }
         }
-        return "";
+        return null;
     }
 
     // Link a parameter from the allParams map to a field in the node, returns the name of the
@@ -304,10 +330,12 @@ public class TextGenerationParams {
         if (defaultValue != null) {
             linkUntypedParam(defaultValue, node, fieldName);
         }
-        return "";
+        return null;
     }
 
     public void linkAllParamsExcept(ObjectNode node, Set<String> excludedParams) {
+        // Remove any null values from the set.
+        excludedParams.remove(null);
         // Excluded params should already be lower case, but we'll convert them just in case.
         excludedParams =
                 excludedParams.stream().map(String::toLowerCase).collect(Collectors.toSet());

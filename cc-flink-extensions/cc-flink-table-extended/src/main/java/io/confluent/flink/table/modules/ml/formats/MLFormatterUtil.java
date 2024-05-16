@@ -40,9 +40,11 @@ public class MLFormatterUtil {
             case "JSON":
             case "JSONOBJECT":
                 if (wrapper != null) {
-                    return new JsonObjectInputFormatter(inputColumns, wrapper);
+                    return new JsonObjectInputFormatter(
+                            inputColumns, new TextGenerationParams(modelOptions), wrapper);
                 }
-                return new JsonObjectInputFormatter(inputColumns);
+                return new JsonObjectInputFormatter(
+                        inputColumns, new TextGenerationParams(modelOptions));
             case "JSONARRAY":
                 return new JsonArrayInputFormatter(inputColumns);
             case "PANDASDATAFRAME":
@@ -76,10 +78,12 @@ public class MLFormatterUtil {
             case "TFSERVINGCOLUMN":
             case "MLFLOWTENSOR":
                 // Alias for JSON:inputs
-                return new JsonObjectInputFormatter(inputColumns, "inputs");
+                return new JsonObjectInputFormatter(
+                        inputColumns, new TextGenerationParams(modelOptions), "inputs");
             case "AZUREMLTENSOR":
                 // Alias for JSON:input_data
-                return new JsonObjectInputFormatter(inputColumns, "input_data");
+                return new JsonObjectInputFormatter(
+                        inputColumns, new TextGenerationParams(modelOptions), "input_data");
             case "AI21COMPLETE":
                 return new SinglePromptInputFormatter(
                         inputColumns,

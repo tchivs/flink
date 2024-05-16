@@ -87,7 +87,7 @@ public class TextGenerationParamsTest {
         TextGenerationParams params = getTextGenerationParams();
 
         String usedParam = params.linkParam(node, "extra", "these", "don't", "exist");
-        assertThat(usedParam).isEqualTo("");
+        assertThat(usedParam).isEqualTo(null);
         // The field shouldn't have been created.
         assertThat(node.has("extra")).isFalse();
 
@@ -156,16 +156,35 @@ public class TextGenerationParamsTest {
                         "extra3",
                         "extra4",
                         "duplicate1",
-                        "");
+                        null);
 
         ObjectNode node2 = mapper.createObjectNode();
         params.linkAllParamsExcept(node2, usedParams);
         // node2 should have all the params we didn't previously link.
-        assertThat(node2.size()).isEqualTo(6);
+        assertThat(node2.size()).isEqualTo(12);
         assertThat(node2.get("SYSTEM_PROMPT").asText()).isEqualTo("ignored");
         assertThat(node2.get("TOP_k").asInt()).isEqualTo(10);
         assertThat(node2.get("max_k").asInt()).isEqualTo(11);
         assertThat(node2.get("EXTRA2").isArray()).isTrue();
+        assertThat(node2.get("parameter").isObject()).isTrue();
+        assertThat(node2.get("parameter").get("one").asInt()).isEqualTo(1);
+        assertThat(node2.get("parameter").get("two").isObject()).isTrue();
+        assertThat(node2.get("parameter").get("two").get("three").asInt()).isEqualTo(2);
+        assertThat(node2.get("parameter.two").asInt()).isEqualTo(3);
+        assertThat(node2.get("parameter").get("two.").get("three").asInt()).isEqualTo(4);
+        assertThat(node2.get("parameter").get("two..three").asInt()).isEqualTo(5);
+        assertThat(node2.get("parameter").get("two.").get("four").get("five").asInt()).isEqualTo(6);
+        assertThat(node2.get("parameter").get("two..four").get("five").asInt()).isEqualTo(7);
+        assertThat(node2.get("parameter").get("six").asInt()).isEqualTo(8);
+        assertThat(node2.get(".parameter").get("seven").asInt()).isEqualTo(9);
+        assertThat(node2.get(".parameter").get("eight").asInt()).isEqualTo(10);
+        assertThat(node2.get(".parameter").get("eight.").asInt()).isEqualTo(11);
+        assertThat(node2.get(".parameter").get("nine.").asInt()).isEqualTo(12);
+        assertThat(node2.get(".parameter").get("nine..").asInt()).isEqualTo(14);
+        assertThat(node2.get("...").asInt()).isEqualTo(15);
+        assertThat(node2.get(".parameter").get("nine....nine").asInt()).isEqualTo(16);
+        assertThat(node2.get("....").asInt()).isEqualTo(17);
+        assertThat(node2.get("").asInt()).isEqualTo(13);
         ArrayNode extraSequences = (ArrayNode) node2.get("EXTRA2");
         assertThat(extraSequences.size()).isEqualTo(3);
         assertThat(extraSequences.get(0).asText()).isEqualTo("extra");
@@ -194,6 +213,23 @@ public class TextGenerationParamsTest {
         modelOptions.put("BEDROCK.params.DUPLICATE1", "hello");
         modelOptions.put("BEDROCK.params.Duplicate1", "hello again");
         modelOptions.put("BEDROCK.params.DUPLICATE1.INT", "123");
+        modelOptions.put("BEDROCK.params.parameter.one.INT", "1");
+        modelOptions.put("BEDROCK.params.parameter.two.three", "2");
+        modelOptions.put("BEDROCK.params.parameter..two", "3");
+        modelOptions.put("BEDROCK.params.parameter.two...three", "4");
+        modelOptions.put("BEDROCK.params.parameter.two....three", "5");
+        modelOptions.put("BEDROCK.params.parameter.two...four.five", "6");
+        modelOptions.put("BEDROCK.params.parameter.two....four.five", "7");
+        modelOptions.put("BEDROCK.params..parameter.six", "8");
+        modelOptions.put("BEDROCK.params...parameter.seven", "9");
+        modelOptions.put("BEDROCK.params...parameter.eight.", "10");
+        modelOptions.put("BEDROCK.params...parameter.eight..", "11");
+        modelOptions.put("BEDROCK.params...parameter.nine...", "12");
+        modelOptions.put("BEDROCK.params...parameter.nine....", "14");
+        modelOptions.put("BEDROCK.params.......", "15");
+        modelOptions.put("BEDROCK.params...parameter.nine........nine", "16");
+        modelOptions.put("BEDROCK.params..........", "17");
+        modelOptions.put("BEDROCK.params.", "13");
         modelOptions.put("BEDROCK.params.SYSTEM_PROMPT", "ignored");
         modelOptions.put("BEDROCK.SYSTEM_prompt", "System Prompt!");
         modelOptions.put("BEDROCK.model_VERSION", "model-123");

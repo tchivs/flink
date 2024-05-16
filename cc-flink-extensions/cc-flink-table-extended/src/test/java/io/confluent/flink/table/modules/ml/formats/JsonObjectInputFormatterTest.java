@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,25 +21,86 @@ public class JsonObjectInputFormatterTest {
     @Test
     void testGetRequest() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
-        JsonObjectInputFormatter formatter = new JsonObjectInputFormatter(inputSchema.getColumns());
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getEmptyParams());
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo("{\"input\":\"input-text-prompt\"}");
     }
 
+    @Test
     void testGetRequestWithWrapper() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         JsonObjectInputFormatter formatter =
-                new JsonObjectInputFormatter(inputSchema.getColumns(), "wrapper");
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getEmptyParams(), "wrapper");
         Object[] args = new Object[] {"input-text-prompt"};
-        assertThat(formatter.format(args))
+        assertThat(new String(formatter.format(args)))
                 .isEqualTo("{\"wrapper\":{\"input\":\"input-text-prompt\"}}");
+    }
+
+    @Test
+    void testGetRequestWithParams() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getTextGenerationParams());
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"Duplicate1\":123,\"EXTRA\":1,\"parameter.two\":3,\"parameter\":{\"one\":1,\"two\":{\"three\":2}},\"TemperaturE\":0.5,\"input\":\"input-text-prompt\"}");
+    }
+
+    @Test
+    void testGetRequestWithWrapperAndParams() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(
+                        inputSchema.getColumns(), getTextGenerationParams(), "wrapper");
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"wrapper\":{\"input\":\"input-text-prompt\"},\"Duplicate1\":123,\"EXTRA\":1,\"parameter.two\":3,\"parameter\":{\"one\":1,\"two\":{\"three\":2}},\"TemperaturE\":0.5}");
+    }
+
+    @Test
+    void testGetRequestWithWrapperParamsConflict() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(
+                        inputSchema.getColumns(), getTextGenerationParams(), "parameter");
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"parameter\":{\"one\":1,\"two\":{\"three\":2},\"input\":\"input-text-prompt\"},\"Duplicate1\":123,\"EXTRA\":1,\"parameter.two\":3,\"TemperaturE\":0.5}");
+    }
+
+    @Test
+    void testGetRequestWithParamsOverwrite() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("parameter.two", "STRING").build();
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getTextGenerationParams());
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"Duplicate1\":123,\"EXTRA\":1,\"parameter.two\":\"input-text-prompt\",\"parameter\":{\"one\":1,\"two\":{\"three\":2}},\"TemperaturE\":0.5}");
+    }
+
+    @Test
+    void testGetRequestWithWrapperParamsOverwrite() throws Exception {
+        Schema inputSchema = Schema.newBuilder().column("one", "STRING").build();
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(
+                        inputSchema.getColumns(), getTextGenerationParams(), "parameter");
+        Object[] args = new Object[] {"input-text-prompt"};
+        assertThat(new String(formatter.format(args)))
+                .isEqualTo(
+                        "{\"parameter\":{\"one\":\"input-text-prompt\",\"two\":{\"three\":2}},\"Duplicate1\":123,\"EXTRA\":1,\"parameter.two\":3,\"TemperaturE\":0.5}");
     }
 
     @Test
     void testGetRequestArray() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "ARRAY<INT>").build();
-        JsonObjectInputFormatter formatter = new JsonObjectInputFormatter(inputSchema.getColumns());
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getEmptyParams());
         Object[] args = new Object[] {new Integer[] {1, 2, 3}};
         assertThat(new String(formatter.format(args))).isEqualTo("{\"input\":[1,2,3]}");
     }
@@ -45,7 +108,8 @@ public class JsonObjectInputFormatterTest {
     @Test
     void testGetRequestMultiArray() throws Exception {
         Schema inputSchema = Schema.newBuilder().column("input", "ARRAY<ARRAY<INT>>").build();
-        JsonObjectInputFormatter formatter = new JsonObjectInputFormatter(inputSchema.getColumns());
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getEmptyParams());
         Object[] args = new Object[] {new Integer[][] {{1, 2, 3}, {4, 5, 6}}};
         assertThat(new String(formatter.format(args))).isEqualTo("{\"input\":[[1,2,3],[4,5,6]]}");
     }
@@ -71,7 +135,8 @@ public class JsonObjectInputFormatterTest {
                         .column("input16", "ARRAY<ARRAY<INT>>")
                         .column("input17", "ROW(field1 INT, field2 BOOLEAN)")
                         .build();
-        JsonObjectInputFormatter formatter = new JsonObjectInputFormatter(inputSchema.getColumns());
+        JsonObjectInputFormatter formatter =
+                new JsonObjectInputFormatter(inputSchema.getColumns(), getEmptyParams());
         Object[] args =
                 new Object[] {
                     "input-text-prompt",
@@ -104,5 +169,28 @@ public class JsonObjectInputFormatterTest {
                                 + "\"input12\":\"Yw==\",\"input13\":\"ZA==\",\"input14\":7.1,"
                                 + "\"input15\":[\"a\",\"b\"],\"input16\":[[1,2,3],[4,5,6]],"
                                 + "\"input17\":{\"field1\":12,\"field2\":true}}");
+    }
+
+    private static TextGenerationParams getEmptyParams() {
+        Map<String, String> modelOptions = new HashMap<>();
+        modelOptions.put("PROVIDER", "BEDROCK");
+        modelOptions.put("BEDROCK.SYSTEM_prompt", "System Prompt!");
+        modelOptions.put("BEDROCK.model_VERSION", "model-123");
+        return new TextGenerationParams(modelOptions);
+    }
+
+    private static TextGenerationParams getTextGenerationParams() {
+        Map<String, String> modelOptions = new HashMap<>();
+        modelOptions.put("PROVIDER", "BEDROCK");
+        modelOptions.put("BEDROCK.PARAMS.TemperaturE", "0.5");
+        modelOptions.put("BEDROCK.params.EXTRA", "1");
+        modelOptions.put("BEDROCK.params.Duplicate1", "hello again");
+        modelOptions.put("BEDROCK.params.DUPLICATE1.INT", "123");
+        modelOptions.put("BEDROCK.params.parameter.one.INT", "1");
+        modelOptions.put("BEDROCK.params.parameter.two.three", "2");
+        modelOptions.put("BEDROCK.params.parameter..two", "3");
+        modelOptions.put("BEDROCK.SYSTEM_prompt", "System Prompt!");
+        modelOptions.put("BEDROCK.model_VERSION", "model-123");
+        return new TextGenerationParams(modelOptions);
     }
 }
