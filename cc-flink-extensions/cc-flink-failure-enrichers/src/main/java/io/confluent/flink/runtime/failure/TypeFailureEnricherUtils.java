@@ -62,7 +62,8 @@ final class TypeFailureEnricherUtils {
      * @param searchType the type of exception to search for in the chain.
      * @return Optional throwable of the requested type if available, otherwise empty
      */
-    public static Optional<Throwable> findThrowableByName(Throwable throwable, Class searchType) {
+    public static Optional<Throwable> findThrowableByName(
+            Throwable throwable, Class<?> searchType) {
         if (throwable == null || searchType == null) {
             return Optional.empty();
         }
@@ -72,7 +73,7 @@ final class TypeFailureEnricherUtils {
         while (t != null) {
             // SQL-1836: Check for contains name instead of exact match to support shaded deps
             if (t.getClass().getName().contains(searchName)) {
-                return Optional.of(throwable);
+                return Optional.of(t);
             } else {
                 t = t.getCause();
             }

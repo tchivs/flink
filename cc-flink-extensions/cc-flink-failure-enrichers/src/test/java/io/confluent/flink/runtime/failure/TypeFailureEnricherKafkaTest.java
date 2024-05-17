@@ -5,6 +5,7 @@
 package io.confluent.flink.runtime.failure;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.junit.jupiter.api.Test;
@@ -41,5 +42,19 @@ public class TypeFailureEnricherKafkaTest {
                 "USER",
                 "USER_ERROR_MSG",
                 "test. logicalCluster: CLUSTER_NOT_FOUND!");
+
+        // Check that we also match nested exceptions
+        assertFailureEnricherLabels(
+                configuration,
+                new FlinkRuntimeException(
+                        "test root",
+                        new SaslAuthenticationException(
+                                "test. " + "logicalCluster: CLUSTER_NOT_FOUND" + "!")),
+                "ERROR_CLASS_CODE",
+                "18",
+                "TYPE",
+                "USER",
+                "USER_ERROR_MSG",
+                "test root\nCaused by: test. logicalCluster: CLUSTER_NOT_FOUND!");
     }
 }

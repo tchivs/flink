@@ -10,6 +10,7 @@ import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.FlinkUserCodeClassLoaders;
 import org.apache.flink.util.MutableURLClassLoader;
 import org.apache.flink.util.SerializedThrowable;
@@ -42,6 +43,7 @@ import java.util.jar.JarOutputStream;
 
 import static io.confluent.flink.runtime.failure.TypeFailureEnricherTableITCase.assertFailureEnricherLabels;
 import static org.apache.flink.util.FlinkUserCodeClassLoader.NOOP_EXCEPTION_HANDLER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -254,6 +256,30 @@ class TypeFailureEnricherTest {
                 "USER",
                 "USER_ERROR_MSG",
                 "Some other error message");
+    }
+
+    @Test
+    void testFindExceptionByName() {
+        ArithmeticException grandGrandChild = new ArithmeticException("grandGrandchild");
+        IllegalStateException grandChild = new IllegalStateException("grandchild", grandGrandChild);
+        IllegalStateException child = new IllegalStateException("child", grandChild);
+        FlinkRuntimeException root = new FlinkRuntimeException("root", child);
+
+        assertThat(
+                        TypeFailureEnricherUtils.findThrowableByName(
+                                        root, FlinkRuntimeException.class)
+                                .orElse(null))
+                .isSameAs(root);
+        assertThat(
+                        TypeFailureEnricherUtils.findThrowableByName(
+                                        root, IllegalStateException.class)
+                                .orElse(null))
+                .isSameAs(child);
+        assertThat(
+                        TypeFailureEnricherUtils.findThrowableByName(
+                                        root, ArithmeticException.class)
+                                .orElse(null))
+                .isSameAs(grandGrandChild);
     }
 
     @Test
