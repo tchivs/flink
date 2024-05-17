@@ -126,18 +126,6 @@ public final class ServiceTasksOptions {
 
     public static final String PRIVATE_PREFIX = "confluent.";
 
-    public static final ConfigOption<Boolean> CONFLUENT_AI_FUNCTIONS_ENABLED =
-            ConfigOptions.key(PRIVATE_PREFIX + "ai-functions.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("A flag to enable or disable Confluent AI functions.");
-
-    public static final ConfigOption<Duration> CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT =
-            ConfigOptions.key(PRIVATE_PREFIX + "ai-functions.call-timeout")
-                    .durationType()
-                    .defaultValue(Duration.ofSeconds(30))
-                    .withDescription("A timeout for Confluent AI function calls.");
-
     public static final ConfigOption<Boolean> CONFLUENT_ML_FUNCTIONS_ENABLED =
             ConfigOptions.key(PRIVATE_PREFIX + "ml-functions.enabled")
                     .booleanType()

@@ -53,7 +53,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.connectors.ForegroundResultTableSink;
-import io.confluent.flink.table.modules.ai.AIFunctionsModule;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.ml.MLEvaluateAllFunction;
 import io.confluent.flink.table.modules.ml.MLEvaluateFunction;
@@ -274,16 +273,6 @@ class DefaultServiceTasks implements ServiceTasks {
                 privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
 
         if (service == Service.JOB_SUBMISSION_SERVICE
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
-            Configuration aiFunctionsConfig = new Configuration();
-            aiFunctionsConfig.set(
-                    ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT,
-                    privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_CALL_TIMEOUT));
-            tableEnvironment.loadModule(
-                    "openai", new AIFunctionsModule(aiFunctionsConfig, sqlSecretsConf));
-        }
-
-        if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("ml", new MLFunctionsModule());
         }
@@ -294,9 +283,7 @@ class DefaultServiceTasks implements ServiceTasks {
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)
-                // TODO: remove this demo hack...
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_AI_FUNCTIONS_ENABLED)) {
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_REMOTE_UDF_ENABLED)) {
             tableEnvironment.loadModule("remote-udf", new RemoteUdfModule());
             // Forward the target address of the remote gateway (or proxy) to the udf.
             Map<String, String> remoteUdfConfig = new HashMap<>();

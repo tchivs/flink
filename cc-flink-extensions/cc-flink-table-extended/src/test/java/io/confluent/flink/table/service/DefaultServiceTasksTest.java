@@ -76,7 +76,7 @@ public class DefaultServiceTasksTest {
                         .column("amount", DataTypes.INT())
                         .column("ts", DataTypes.TIMESTAMP_LTZ(3))
                         .build(),
-                Map.of("connector", "datagen", "number-of-rows", "10"),
+                ImmutableMap.of("connector", "datagen", "number-of-rows", "10"),
                 Collections.emptyMap());
 
         final ForegroundJobResultPlan plan =
@@ -184,20 +184,6 @@ public class DefaultServiceTasksTest {
                 tableEnv, Collections.emptyMap(), Collections.emptyMap(), Service.SQL_SERVICE);
 
         assertThat(tableEnv.listFunctions()).hasSameElementsAs(CoreProxyModule.PUBLIC_LIST);
-    }
-
-    @Test
-    void testConfigurationAiFunctionsModule() {
-        final TableEnvironment tableEnv =
-                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        INSTANCE.configureEnvironment(
-                tableEnv,
-                Collections.emptyMap(),
-                Collections.singletonMap("confluent.ai-functions.enabled", "true"),
-                Service.SQL_SERVICE);
-
-        assertThat(tableEnv.listFunctions().length)
-                .isGreaterThan(CoreProxyModule.PUBLIC_LIST.size());
     }
 
     @Test

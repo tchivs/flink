@@ -10,12 +10,10 @@ import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkException;
-import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.FlinkUserCodeClassLoaders;
 import org.apache.flink.util.MutableURLClassLoader;
 import org.apache.flink.util.SerializedThrowable;
 
-import io.confluent.flink.table.modules.ai.AISecret;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
 import org.junit.jupiter.api.BeforeAll;
@@ -256,22 +254,6 @@ class TypeFailureEnricherTest {
                 "USER",
                 "USER_ERROR_MSG",
                 "Some other error message");
-    }
-
-    @Test
-    void testUserSecretExceptionClassification() throws ExecutionException, InterruptedException {
-        Exception toValidate =
-                new FlinkRuntimeException(String.format(AISecret.ERROR_MESSAGE, "name"));
-        assertFailureEnricherLabels(
-                toValidate,
-                "ERROR_CLASS_CODE",
-                "14",
-                "JOB_CANNOT_RESTART",
-                "",
-                "TYPE",
-                "USER",
-                "USER_ERROR_MSG",
-                "SECRET is null. Please SET 'name' and resubmit job.");
     }
 
     @Test
