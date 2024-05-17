@@ -294,6 +294,7 @@ public class FlinkS3FileSystem extends HadoopFileSystem
                         artefacts.toArray(new String[0]));
                 runningSizeFiles = 0;
                 runningSizeBytes = 0;
+                batch.clear();
             }
         }
     }
