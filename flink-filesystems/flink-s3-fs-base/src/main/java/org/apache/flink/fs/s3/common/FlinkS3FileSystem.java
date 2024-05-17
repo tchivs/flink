@@ -334,7 +334,14 @@ public class FlinkS3FileSystem extends HadoopFileSystem
             File outScrolls = new File(tmpWorkingDir, "s5cmd_output");
             Preconditions.checkState(outScrolls.createNewFile());
 
-            FileUtils.writeFileUtf8(inScrolls, String.join(System.lineSeparator(), spells));
+            FileUtils.writeFileUtf8(
+                    inScrolls,
+                    String.join(System.lineSeparator(), spells)
+                            // a line separator after the last string is necessary
+                            // because the file content serves as input to a process
+                            // and similar to input from a terminal it needs a newline to take
+                            // effect
+                            + System.lineSeparator());
 
             final Process wizard =
                     hogwart.redirectErrorStream(true)
