@@ -95,7 +95,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                                                             runnable, executorService))
                                     .collect(Collectors.toList()));
             Exception interruptedException = null;
-            while (!downloadFuture.isDone()) {
+            while (!downloadFuture.isDone() || downloadFuture.isCompletedExceptionally()) {
                 try {
                     downloadFuture.get();
                 } catch (InterruptedException e) {
