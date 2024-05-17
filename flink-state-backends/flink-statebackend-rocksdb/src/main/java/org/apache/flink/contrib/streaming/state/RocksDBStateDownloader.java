@@ -38,6 +38,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -103,6 +104,27 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                     interruptedException = interruptedException == null ? e : interruptedException;
                 }
             }
+
+            for (StateHandleDownloadSpec spec : downloadRequests) {
+                RocksDBStateDownloader.getAllHandles(spec)
+                        .forEach(
+                                handleAndLocalPath -> {
+                                    File local = getDestination(spec, handleAndLocalPath).toFile();
+                                    checkState(
+                                            local.exists(),
+                                            "Local file %s is missing after download",
+                                            local);
+                                    checkState(
+                                            handleAndLocalPath.getStateSize() == 0
+                                                    || local.length()
+                                                            == handleAndLocalPath.getStateSize(),
+                                            "Local file %s has wrong size after download (expected %s but was %s)",
+                                            local,
+                                            handleAndLocalPath.getStateSize(),
+                                            local.length());
+                                });
+            }
+
             if (interruptedException != null) {
                 Thread.currentThread().interrupt();
                 throw interruptedException;
@@ -145,10 +167,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
         for (StateHandleDownloadSpec downloadSpec : downloadRequests) {
             for (HandleAndLocalPath handleAndLocalPath : getAllHandles(downloadSpec)) {
-                Path downloadDestination =
-                        downloadSpec
-                                .getDownloadDestination()
-                                .resolve(handleAndLocalPath.getLocalPath());
+                Path downloadDestination = getDestination(downloadSpec, handleAndLocalPath);
                 if (canCopyPaths(handleAndLocalPath.getHandle())) {
                     org.apache.flink.core.fs.Path remotePath =
                             handleAndLocalPath.getHandle().maybeGetPath().get();
@@ -186,6 +205,11 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         return runnables;
     }
 
+    private static Path getDestination(
+            StateHandleDownloadSpec spec, HandleAndLocalPath handleAndLocalPath) {
+        return spec.getDownloadDestination().resolve(handleAndLocalPath.getLocalPath());
+    }
+
     private boolean canCopyPaths(StreamStateHandle handle) throws IOException {
         Optional<org.apache.flink.core.fs.Path> remotePath = handle.maybeGetPath();
         if (!remotePath.isPresent()) {
@@ -194,7 +218,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         return FileSystem.canCopyPaths(remotePath.get().toUri());
     }
 
-    private Iterable<? extends HandleAndLocalPath> getAllHandles(
+    private static Iterable<? extends HandleAndLocalPath> getAllHandles(
             StateHandleDownloadSpec downloadSpec) {
         return Streams.concat(
                         downloadSpec.getStateHandle().getSharedState().stream(),
