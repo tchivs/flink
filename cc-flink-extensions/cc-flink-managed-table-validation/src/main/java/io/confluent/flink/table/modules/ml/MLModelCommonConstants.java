@@ -18,6 +18,7 @@ public class MLModelCommonConstants {
     public static final String AWS_SECRET_ACCESS_KEY = "AWS_SECRET_ACCESS_KEY";
     public static final String AWS_SESSION_TOKEN = "AWS_SESSION_TOKEN";
     public static final String SYSTEM_PROMPT = "SYSTEM_PROMPT";
+    public static final String PROVIDER_MODEL_VERSION = "MODEL_VERSION";
     public static final String INPUT_FORMAT = "INPUT_FORMAT";
     public static final String OUTPUT_FORMAT = "OUTPUT_FORMAT";
     public static final String INPUT_CONTENT_TYPE = "INPUT_CONTENT_TYPE";

@@ -211,7 +211,8 @@ public class RemoteModelValidatorTest {
                         "task", "text_generation",
                         "openai.api_key", "key",
                         "openai.endpoint", "https://api.openai.com/",
-                        "openai.system_prompt", "count prime numbers");
+                        "openai.system_prompt", "count prime numbers",
+                        "openai.model_version", "chatgpt-4o");
         validateCreateModelOptions("m1", options);
     }
 
@@ -323,7 +324,7 @@ public class RemoteModelValidatorTest {
                         "sagemaker.inference_id", "inference_id",
                         "sagemaker.target_variant", "variant1",
                         "sagemaker.target_model", "model.tar.gz",
-                        "sagemaker.target_container_host_name", "secondContainer");
+                        "sagemaker.model_version", "chatgpt-4o");
         validateCreateModelOptions("m1", options);
     }
 
@@ -439,14 +440,16 @@ public class RemoteModelValidatorTest {
                         "sagemaker.custom_attributes", "custom_attributes",
                         "sagemaker.inference_id", "inference_id",
                         "sagemaker.target_variant", "target_variant",
-                        "sagemaker.target_model", "target_model");
+                        "sagemaker.target_model", "target_model",
+                        "sagemaker.model_version", "chatgpt-4o");
         Map<String, String> publicOptions = RemoteModelValidator.getPublicOptions(options);
         assertThat(publicOptions)
                 .contains(
                         entry("sagemaker.custom_attributes", "custom_attributes"),
                         entry("sagemaker.inference_id", "inference_id"),
                         entry("sagemaker.target_variant", "target_variant"),
-                        entry("sagemaker.target_model", "target_model"));
+                        entry("sagemaker.target_model", "target_model"),
+                        entry("sagemaker.model_version", "chatgpt-4o"));
     }
 
     @Test

@@ -60,11 +60,18 @@ public class VertexAIRemoteModelOptions extends RemoteModelOptions {
                     .noDefaultValue()
                     .withDescription("The output content type for the remote ML model.");
 
+    public static final ConfigOption<String> MODEL_VERSION =
+            ConfigOptions.key(NAMESPACE + "." + MLModelCommonConstants.PROVIDER_MODEL_VERSION)
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The version of the remote ML model.");
+
     private final Set<ConfigOption<?>> requiredProviderLevelOptions =
             ImmutableSet.of(SERVICE_KEY, ENDPOINT);
     private final Set<ConfigOption<?>> optionalProviderLevelOptions =
             ImmutableSet.of(
                     SYSTEM_PROMPT,
+                    MODEL_VERSION,
                     INPUT_FORMAT,
                     INPUT_CONTENT_TYPE,
                     OUTPUT_FORMAT,
