@@ -124,7 +124,7 @@ public class AvroToFlinkSchemaConverterTest {
                                         "value",
                                         DataTypes.ROW(
                                                         DataTypes.FIELD(
-                                                                "io.test1.User",
+                                                                "io_test1_User",
                                                                 DataTypes.ROW(
                                                                                 DataTypes.FIELD(
                                                                                         "f0",
@@ -133,7 +133,7 @@ public class AvroToFlinkSchemaConverterTest {
                                                                                                 .notNull()))
                                                                         .nullable()),
                                                         DataTypes.FIELD(
-                                                                "io.test2.User",
+                                                                "io_test2_User",
                                                                 DataTypes.ROW(
                                                                                 DataTypes.FIELD(
                                                                                         "f1",

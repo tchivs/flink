@@ -307,7 +307,7 @@ public class AvroToFlinkSchemaConverter {
 
         private UnionMember(String simpleName, String fullName, LogicalType logicalType) {
             this.simpleName = simpleName;
-            this.fullName = fullName;
+            this.fullName = fullName.replace('.', '_');
             this.logicalType = logicalType;
         }
 

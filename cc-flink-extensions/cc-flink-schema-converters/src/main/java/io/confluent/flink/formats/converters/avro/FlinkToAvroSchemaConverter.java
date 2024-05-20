@@ -20,6 +20,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
+import org.apache.flink.util.StringUtils;
 
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -105,6 +106,9 @@ public class FlinkToAvroSchemaConverter {
                         SchemaBuilder.builder().record(rowName).fields();
                 for (int i = 0; i < rowType.getFieldCount(); i++) {
                     String fieldName = fieldNames.get(i);
+                    if (!validateName(fieldName)) {
+                        throw getInvalidFieldNameException(fieldName);
+                    }
                     LogicalType fieldType = rowType.getTypeAt(i);
                     SchemaBuilder.GenericDefault<Schema> fieldBuilder =
                             builder.name(fieldName)
@@ -138,6 +142,15 @@ public class FlinkToAvroSchemaConverter {
                 throw new ValidationException(
                         "Unsupported to derive an Avro Schema for type: " + logicalType);
         }
+    }
+
+    private static ValidationException getInvalidFieldNameException(String fieldName) {
+        return new ValidationException(
+                String.format(
+                        "Illegal field name for AVRO format: "
+                                + "`%s`. AVRO expects field"
+                                + " names to start with [A-Za-z_] subsequently contain only [A-Za-z0-9_].",
+                        fieldName));
     }
 
     private static Schema convertMap(MapType logicalType, String rowName) {
@@ -250,5 +263,23 @@ public class FlinkToAvroSchemaConverter {
         return schema.isNullable()
                 ? schema
                 : Schema.createUnion(SchemaBuilder.builder().nullType(), schema);
+    }
+
+    // Extracted from org.apache.avro.Schema.validateName
+    private static boolean validateName(String name) {
+        if (StringUtils.isNullOrWhitespaceOnly(name)) {
+            return false;
+        }
+        char first = name.charAt(0);
+        if (!(Character.isLetter(first) || first == '_')) {
+            return false;
+        }
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!(Character.isLetterOrDigit(c) || c == '_')) {
+                return false;
+            }
+        }
+        return true;
     }
 }
