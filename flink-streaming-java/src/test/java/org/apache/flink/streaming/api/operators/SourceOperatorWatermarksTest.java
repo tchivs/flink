@@ -64,10 +64,10 @@ class SourceOperatorWatermarksTest {
     }
 
     @Test
-    void testPerPartitionWatermarksAfterRecovery() throws Exception {
+    void testWatermark() throws Exception {
         List<MockSourceSplit> initialSplits = new ArrayList<>();
-        initialSplits.add(new MockSourceSplit(0).addRecord(1042).addRecord(1044));
-        initialSplits.add(new MockSourceSplit(1).addRecord(42).addRecord(44));
+        initialSplits.add(new MockSourceSplit(0, 1000).addRecord(1042).addRecord(1044));
+        initialSplits.add(new MockSourceSplit(1, 1000).addRecord(42).addRecord(44));
         operator.initializeState(context.createStateContext(initialSplits));
         operator.open();
 
