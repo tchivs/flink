@@ -303,7 +303,14 @@ public class ClassifiedExceptionTest {
                 // ---
                 TestSpec.test("expression reducer exception using division by zero")
                         .executeSql("SELECT 1/0")
-                        .expectExactUserError("Division by zero."));
+                        .expectExactUserError("Division by zero."),
+                // ---
+                TestSpec.test("unsupported time travel")
+                        .executeSql("CREATE TABLE t (i INT) WITH ('connector' = 'datagen')")
+                        .executeSql(
+                                "SELECT * FROM t FOR SYSTEM_TIME AS OF TIMESTAMP '2023-01-01 01:00:00'")
+                        .expectUserError(
+                                "The Time Travel query feature is currently not supported."));
     }
 
     @ParameterizedTest(name = "{index}: {0}")

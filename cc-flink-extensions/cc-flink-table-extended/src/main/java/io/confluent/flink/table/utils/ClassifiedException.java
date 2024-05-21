@@ -11,6 +11,7 @@ import org.apache.flink.table.api.ModelException;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.TableNotExistException;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
@@ -562,6 +563,14 @@ public final class ClassifiedException {
                                     ExceptionKind.USER,
                                     "The requested operation is not supported."));
                 });
+
+        // Time travel not supported
+        putClassifiedException(
+                CodeLocation.inMethod(
+                        Catalog.class, "getTable", UnsupportedOperationException.class),
+                Handler.rewriteMessage(
+                        ExceptionKind.USER,
+                        "The Time Travel query feature is currently not supported."));
     }
 
     private static void putClassifiedException(CodeLocation codeLocation, Handler handler) {
