@@ -5,7 +5,6 @@
 package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
@@ -25,14 +24,15 @@ public class MLEvaluationMetricsAccumulator {
             throw new IllegalArgumentException("Model must not be null.");
         }
 
-        ModelTask modelTask = ModelOptionsUtils.getModelTask(model.getOptions());
-        if (modelTask == CatalogModel.ModelTask.CLASSIFICATION) {
+        MLModelCommonConstants.ModelTask modelTask =
+                ModelOptionsUtils.getModelTask(model.getOptions());
+        if (modelTask.equals(MLModelCommonConstants.ModelTask.CLASSIFICATION)) {
             this.classificationMetricsAccumulator = new ClassificationMetricsAccumulator();
-        } else if (modelTask == CatalogModel.ModelTask.REGRESSION) {
+        } else if (modelTask.equals(MLModelCommonConstants.ModelTask.REGRESSION)) {
             this.regressionMetricsAccumulator = new RegressionMetricsAccumulator();
-        } else if (modelTask == CatalogModel.ModelTask.CLUSTERING) {
+        } else if (modelTask.equals(MLModelCommonConstants.ModelTask.CLUSTERING)) {
             this.clusteringMetricsAccumulator = new ClusteringMetricsAccumulator();
-        } else if (modelTask == CatalogModel.ModelTask.TEXT_GENERATION) {
+        } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
             this.textGenerationMetricsAccumulator = new TextGenerationMetricsAccumulator();
         } else {
             throw new IllegalArgumentException("Model task not supported.");

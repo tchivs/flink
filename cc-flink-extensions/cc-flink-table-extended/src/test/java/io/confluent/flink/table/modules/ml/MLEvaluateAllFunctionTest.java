@@ -17,7 +17,6 @@ import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
@@ -84,11 +83,7 @@ public class MLEvaluateAllFunctionTest {
                                         .column("f2", "STRING")
                                         .build(),
                                 Schema.newBuilder().column("categorical_label", "STRING").build(),
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         inputSchema,
                         classificationOutputSchema);
@@ -100,11 +95,7 @@ public class MLEvaluateAllFunctionTest {
                                         .column("f2", "STRING")
                                         .build(),
                                 Schema.newBuilder().column("categorical_label", "STRING").build(),
-                                ImmutableMap.of(
-                                        "provider",
-                                        "vertexai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "vertexai", "task", "CLASSIFICATION"),
                                 ""),
                         inputSchema,
                         classificationOutputSchema);
@@ -116,8 +107,7 @@ public class MLEvaluateAllFunctionTest {
                                         .column("f2", "STRING")
                                         .build(),
                                 Schema.newBuilder().column("numerical_label", "DOUBLE").build(),
-                                ImmutableMap.of(
-                                        "provider", "openai", "task", ModelTask.REGRESSION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "REGRESSION"),
                                 ""),
                         inputSchema,
                         regressionOutputSchema);
@@ -129,11 +119,7 @@ public class MLEvaluateAllFunctionTest {
                                         .column("f2", "STRING")
                                         .build(),
                                 Schema.newBuilder().column("numerical_label", "DOUBLE").build(),
-                                ImmutableMap.of(
-                                        "provider",
-                                        "vertexai",
-                                        "task",
-                                        ModelTask.REGRESSION.name()),
+                                ImmutableMap.of("provider", "vertexai", "task", "REGRESSION"),
                                 ""),
                         inputSchema,
                         regressionOutputSchema);

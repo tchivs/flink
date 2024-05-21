@@ -20,7 +20,6 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -439,7 +438,7 @@ public class VertexAIProviderTest extends ProviderTestBase {
                 "https://region-aiplatform.googleapis.com/v1/projects/1234/locations/us-central1/endpoints/1234");
         modelOptions.put("VERTEXAI.SERVICE_KEY", "fake-service-key");
         modelOptions.put("PROVIDER", "VERTEXAI");
-        modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("TASK", "CLASSIFICATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }

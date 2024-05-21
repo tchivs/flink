@@ -4,8 +4,8 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelKind;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -43,10 +43,17 @@ public class OpenAIProvider implements MLModelRuntimeProvider {
                         ModelOptionsUtils.getProvider(model.getOptions()));
         this.secretDecrypterProvider =
                 Objects.requireNonNull(secretDecrypterProvider, "secreteDecrypterProvider");
-        ModelKind modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
-        if (!modelKind.equals(CatalogModel.ModelKind.REMOTE)) {
+        MLModelCommonConstants.ModelKind modelKind;
+        try {
+            modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
+        } catch (ValidationException e) {
             throw new FlinkRuntimeException(
-                    "For OpenAI, ML Predict expected a remote model, got " + modelKind);
+                    "Failed to get model kind from model options: " + e.getMessage(), e);
+        }
+
+        if (!modelKind.equals(MLModelCommonConstants.ModelKind.REMOTE)) {
+            throw new FlinkRuntimeException(
+                    "For OpenAI, ML Predict expected a remote model, got " + modelKind.name());
         }
         final String namespace = provider.getProviderName();
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);

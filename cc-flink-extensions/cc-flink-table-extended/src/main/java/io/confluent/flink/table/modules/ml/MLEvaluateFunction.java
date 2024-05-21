@@ -6,8 +6,8 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.functions.AggregateFunction;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetricsAccumulator> {
     public static final String NAME = "ML_EVALUATE";
     private transient CatalogModel model;
-    private transient ModelTask modelTask;
+    private transient MLModelCommonConstants.ModelTask modelTask;
     private final Map<String, String> serializedModelProperties;
     private final String functionName;
     private transient MLModelRuntime mlModelRuntime = null;
@@ -46,7 +46,13 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
 
     private static TypeInference getTypeInference(CatalogModel model, DataTypeFactory typeFactory) {
         Preconditions.checkNotNull(model, "Model must not be null.");
-        ModelTask modelTask = ModelOptionsUtils.getModelTask(model.getOptions());
+        MLModelCommonConstants.ModelTask modelTask;
+        try {
+            modelTask = ModelOptionsUtils.getModelTask(model.getOptions());
+        } catch (ValidationException e) {
+            throw new FlinkRuntimeException(
+                    "Failed to get model task from model options: " + e.getMessage(), e);
+        }
         return TypeInference.newBuilder()
                 .inputTypeStrategy(
                         new InputTypeStrategy() {
@@ -101,7 +107,8 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                                                                 .getDataType()))
                                                 .collect(Collectors.toList()));
                                 // Model expected output columns.
-                                if (modelTask != CatalogModel.ModelTask.CLUSTERING) {
+                                if (!modelTask.equals(
+                                        MLModelCommonConstants.ModelTask.CLUSTERING)) {
                                     DataType expectedOutputType =
                                             typeFactory.createDataType(
                                                     ((Schema.UnresolvedPhysicalColumn)
@@ -132,7 +139,8 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                             Signature.Argument.of("input" + i);
                                     arguments.add(argument);
                                 }
-                                if (modelTask != CatalogModel.ModelTask.CLUSTERING) {
+                                if (!modelTask.equals(
+                                        MLModelCommonConstants.ModelTask.CLUSTERING)) {
                                     final Signature.Argument argument =
                                             Signature.Argument.of("expectedOutput");
                                     arguments.add(argument);
@@ -142,14 +150,15 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                         })
                 .outputTypeStrategy(
                         callContext -> {
-                            if (modelTask == CatalogModel.ModelTask.CLASSIFICATION) {
+                            if (modelTask.equals(MLModelCommonConstants.ModelTask.CLASSIFICATION)) {
                                 return Optional.of(
                                         DataTypes.ROW(
                                                 DataTypes.FIELD("ACCURACY", DataTypes.DOUBLE()),
                                                 DataTypes.FIELD("PRECISION", DataTypes.DOUBLE()),
                                                 DataTypes.FIELD("RECALL", DataTypes.DOUBLE()),
                                                 DataTypes.FIELD("F1", DataTypes.DOUBLE())));
-                            } else if (modelTask == CatalogModel.ModelTask.REGRESSION) {
+                            } else if (modelTask.equals(
+                                    MLModelCommonConstants.ModelTask.REGRESSION)) {
                                 return Optional.of(
                                         DataTypes.ROW(
                                                 DataTypes.FIELD(
@@ -157,13 +166,15 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                                 DataTypes.FIELD(
                                                         "ROOT_MEAN_SQUARED_ERROR",
                                                         DataTypes.DOUBLE())));
-                            } else if (modelTask == CatalogModel.ModelTask.CLUSTERING) {
+                            } else if (modelTask.equals(
+                                    MLModelCommonConstants.ModelTask.CLUSTERING)) {
                                 return Optional.of(
                                         DataTypes.ROW(
                                                 DataTypes.FIELD(
                                                         "SILHOUETTE_COEFFICIENT",
                                                         DataTypes.DOUBLE())));
-                            } else if (modelTask == CatalogModel.ModelTask.TEXT_GENERATION) {
+                            } else if (modelTask.equals(
+                                    MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
                                 return Optional.of(
                                         DataTypes.ROW(
                                                 DataTypes.FIELD(
@@ -202,7 +213,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
             try {
                 String predictColumnName = model.getOutputSchema().getColumns().get(0).getName();
                 Object predictedValue = predictResult.getField(predictColumnName);
-                if (modelTask == CatalogModel.ModelTask.CLASSIFICATION) {
+                if (modelTask.equals(MLModelCommonConstants.ModelTask.CLASSIFICATION)) {
                     if (predictedValue == null) {
                         throw new FlinkRuntimeException("The predicted value is null");
                     }
@@ -232,7 +243,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                                     .get(actual)
                                                     .get(predicted)
                                             + 1);
-                } else if (modelTask == CatalogModel.ModelTask.REGRESSION) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.REGRESSION)) {
                     if (predictedValue == null) {
                         throw new FlinkRuntimeException("The predicted value is null");
                     }
@@ -243,10 +254,10 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                             Math.abs(actual - predicted);
                     acc.regressionMetricsAccumulator.totalSquaredError +=
                             Math.pow(actual - predicted, 2);
-                } else if (modelTask == CatalogModel.ModelTask.CLUSTERING) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.CLUSTERING)) {
                     acc.count++;
                     // TODO: Matrix to implement clustering evaluation metrics.
-                } else if (modelTask == CatalogModel.ModelTask.TEXT_GENERATION) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
                     acc.count++;
                     // TODO: Matrix to implement text generation evaluation metrics.
                 } else {
@@ -267,7 +278,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
             try {
                 String predictColumnName = model.getOutputSchema().getColumns().get(0).getName();
                 Object predictedValue = predictResult.getField(predictColumnName);
-                if (modelTask == CatalogModel.ModelTask.CLASSIFICATION) {
+                if (modelTask.equals(MLModelCommonConstants.ModelTask.CLASSIFICATION)) {
                     if (predictedValue == null) {
                         throw new FlinkRuntimeException("The predicted value is null");
                     }
@@ -293,7 +304,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                                         .get(predicted)
                                                 - 1);
                     }
-                } else if (modelTask == CatalogModel.ModelTask.REGRESSION) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.REGRESSION)) {
                     if (predictedValue == null) {
                         throw new FlinkRuntimeException("The predicted value is null");
                     }
@@ -304,10 +315,10 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                             Math.abs(actual - predicted);
                     acc.regressionMetricsAccumulator.totalSquaredError -=
                             Math.pow(actual - predicted, 2);
-                } else if (modelTask == CatalogModel.ModelTask.CLUSTERING) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.CLUSTERING)) {
                     acc.count--;
                     // TODO: Matrix to implement clustering evaluation metrics.
-                } else if (modelTask == CatalogModel.ModelTask.TEXT_GENERATION) {
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
                     acc.count--;
                     // TODO: Matrix to implement text generation evaluation metrics.
                 } else {

@@ -30,9 +30,6 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
-import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelKind;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -59,13 +56,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -108,20 +103,6 @@ public final class FactoryUtil {
                     .withDescription(
                             "Defines the format identifier for encoding data. "
                                     + "The identifier is used to discover a suitable format factory.");
-
-    public static final ConfigOption<String> MODEL_PROVIDER =
-            ConfigOptions.key("provider")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Defines the model provider for remote models");
-
-    public static final ConfigOption<CatalogModel.ModelTask> MODEL_TASK =
-            ConfigOptions.key("task")
-                    .enumType(CatalogModel.ModelTask.class)
-                    .noDefaultValue()
-                    .withDescription(
-                            "Defines the model provider for remote models. Supported tasks are "
-                                    + "REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION");
 
     public static final ConfigOption<Integer> SINK_PARALLELISM =
             ConfigOptions.key("sink.parallelism")
@@ -765,30 +746,6 @@ public final class FactoryUtil {
                             + formatOptionKey
                             + "'.");
         }
-    }
-
-    public static ModelKind getModelKind(final Map<String, String> modelOptions) {
-        final TreeMap<String, String> caseInSensitiveModelOptions =
-                new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        caseInSensitiveModelOptions.putAll(modelOptions);
-        if (caseInSensitiveModelOptions.containsKey(MODEL_PROVIDER.key())) {
-            return ModelKind.REMOTE;
-        }
-        throw new ValidationException("'provider' must be specified for model.");
-    }
-
-    public static ModelTask getModelTask(final Map<String, String> modelOptions) {
-        String value =
-                modelOptions.getOrDefault(
-                        MODEL_TASK.key(),
-                        modelOptions.get(MODEL_TASK.key().toUpperCase(Locale.ROOT)));
-        if (value == null) {
-            throw new ValidationException("'task' must be specified for model.");
-        }
-
-        Configuration configuration =
-                Configuration.fromMap(Collections.singletonMap(MODEL_TASK.key(), value));
-        return configuration.get(MODEL_TASK);
     }
 
     /** Returns the {@link DynamicTableFactory} via {@link Catalog}. */

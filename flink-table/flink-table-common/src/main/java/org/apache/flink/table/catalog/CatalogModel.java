@@ -28,25 +28,6 @@ import java.util.Map;
 /** Interface for a model in a catalog. */
 @PublicEvolving
 public interface CatalogModel {
-    /** The kind of {@link CatalogModel}. */
-    @PublicEvolving
-    enum ModelKind {
-        IMPORT,
-        NATIVE,
-        REMOTE,
-        UNKNOWN
-    }
-
-    /** The task of {@link CatalogModel}. */
-    @PublicEvolving
-    enum ModelTask {
-        REGRESSION,
-        CLASSIFICATION,
-        CLUSTERING,
-        TEXT_GENERATION,
-        UNKNOWN
-    }
-
     /** Returns a map of string-based model options. */
     Map<String, String> getOptions();
 

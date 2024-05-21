@@ -13,7 +13,6 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
@@ -221,11 +220,7 @@ public class DefaultServiceTasksTest {
                         CatalogModel.of(
                                 inputSchema,
                                 outputSchema,
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         resolvedInputSchema,
                         resovledOutputSchema);
@@ -274,11 +269,7 @@ public class DefaultServiceTasksTest {
                         CatalogModel.of(
                                 inputSchema,
                                 outputSchema,
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         resolvedInputSchema,
                         resovledOutputSchema);
@@ -327,11 +318,7 @@ public class DefaultServiceTasksTest {
                         CatalogModel.of(
                                 inputSchema,
                                 outputSchema,
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         resolvedInputSchema,
                         resovledOutputSchema);
@@ -381,11 +368,7 @@ public class DefaultServiceTasksTest {
                         CatalogModel.of(
                                 inputSchema,
                                 outputSchema,
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         resolvedInputSchema,
                         resovledOutputSchema);

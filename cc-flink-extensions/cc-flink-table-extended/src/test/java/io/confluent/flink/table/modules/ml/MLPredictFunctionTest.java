@@ -16,7 +16,6 @@ import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
@@ -78,11 +77,7 @@ public class MLPredictFunctionTest {
                                         .column("f2", "STRING")
                                         .build(),
                                 Schema.newBuilder().column("label", "STRING").build(),
-                                ImmutableMap.of(
-                                        "provider",
-                                        "openai",
-                                        "task",
-                                        ModelTask.CLASSIFICATION.name()),
+                                ImmutableMap.of("provider", "openai", "task", "CLASSIFICATION"),
                                 ""),
                         inputSchema,
                         outputSchema);

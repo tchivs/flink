@@ -81,7 +81,7 @@ public class AzureMLProvider implements MLModelRuntimeProvider {
         // variation of the top level node name.
         String defaultInputFormat = "azureml-pandas-dataframe";
         // If the endpoint looks like an Azure AI endpoint, we default to the openai chat format.
-        // Almost all of the Azure AI endpoints seem to use that format.
+        // Almost all the Azure AI endpoints seem to use that format.
         String endpoint = modelOptionsUtils.getProviderOptionOrDefault(ENDPOINT, "");
         if (endpoint.contains("inference.ai.azure.com")) {
             defaultInputFormat = "openai-chat";

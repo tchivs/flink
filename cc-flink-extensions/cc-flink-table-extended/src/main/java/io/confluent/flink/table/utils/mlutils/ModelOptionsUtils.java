@@ -4,41 +4,65 @@
 
 package io.confluent.flink.table.utils.mlutils;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelKind;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
-import org.apache.flink.table.factories.FactoryUtil;
 
 import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
 import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.DEFAULT_VERSION;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT_STRATEGY;
-import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.PROVIDER;
 
 /** Utility class to fetch model options with provider namespace. */
 public class ModelOptionsUtils {
-    public static final String PROVIDER_OPTION_KEY = PROVIDER;
     private final String provider;
     private final Map<String, String> caseInsensitiveModelOptions;
 
     public static String getProvider(Map<String, String> caseSensitiveModelOptions) {
         return caseSensitiveModelOptions.entrySet().stream()
-                .filter(entry -> entry.getKey().equalsIgnoreCase(PROVIDER_OPTION_KEY))
+                .filter(entry -> entry.getKey().equalsIgnoreCase(MLModelCommonConstants.PROVIDER))
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse("");
     }
 
-    public static ModelTask getModelTask(Map<String, String> caseInsensitiveModelOptions) {
-        return FactoryUtil.getModelTask(caseInsensitiveModelOptions);
+    public static MLModelCommonConstants.ModelKind getModelKind(Map<String, String> modelOptions) {
+        final TreeMap<String, String> caseInSensitiveModelOptions =
+                new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        caseInSensitiveModelOptions.putAll(modelOptions);
+        if (caseInSensitiveModelOptions.containsKey(MLModelCommonConstants.PROVIDER)) {
+            return MLModelCommonConstants.ModelKind.REMOTE;
+        }
+        throw new ValidationException("'provider' must be specified for model.");
     }
 
-    public static ModelKind getModelKind(Map<String, String> caseInsensitiveModelOptions) {
-        return FactoryUtil.getModelKind(caseInsensitiveModelOptions);
+    public static MLModelCommonConstants.ModelTask getModelTask(Map<String, String> modelOptions) {
+        final TreeMap<String, String> caseInSensitiveModelOptions =
+                new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        caseInSensitiveModelOptions.putAll(modelOptions);
+        if (!caseInSensitiveModelOptions.containsKey(MLModelCommonConstants.TASK)) {
+            throw new ValidationException("'task' must be specified for model.");
+        }
+        final String taskStringValue =
+                caseInSensitiveModelOptions.get(MLModelCommonConstants.TASK).toUpperCase();
+        MLModelCommonConstants.ModelTask taskValue;
+        try {
+            taskValue = MLModelCommonConstants.ModelTask.valueOf(taskStringValue);
+        } catch (IllegalArgumentException e) {
+            taskValue = null;
+        }
+        if (taskValue == null) {
+            throw new ValidationException(
+                    "Task value '"
+                            + taskStringValue
+                            + "' is not supported. Supported values are: "
+                            + Arrays.toString(MLModelCommonConstants.ModelTask.values()));
+        }
+        return taskValue;
     }
 
     public ModelOptionsUtils(CatalogModel model) {
@@ -67,7 +91,7 @@ public class ModelOptionsUtils {
     }
 
     public Map<String, String> getCaseInsensitiveProviderOptionsStartingWith(String prefix) {
-        Map<String, String> options = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
+        Map<String, String> options = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         String namespacePrefix = provider + "." + prefix;
         caseInsensitiveModelOptions.forEach(
                 (key, value) -> {

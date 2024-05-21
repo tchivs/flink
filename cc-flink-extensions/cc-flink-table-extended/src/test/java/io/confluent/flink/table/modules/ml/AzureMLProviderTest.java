@@ -21,7 +21,6 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.types.UnresolvedDataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
@@ -462,7 +461,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
                 "AZUREML.ENDPOINT", "https://fake-endpoint.region.inference.ml.azure.com/score");
         modelOptions.put("AZUREML.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "AZUREML");
-        modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("TASK", "CLASSIFICATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }

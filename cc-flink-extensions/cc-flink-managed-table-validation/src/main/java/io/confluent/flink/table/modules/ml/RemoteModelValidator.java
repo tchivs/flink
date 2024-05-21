@@ -37,8 +37,8 @@ public class RemoteModelValidator {
     private static final List<String> PRIVATE_PREFIXES = ImmutableList.of(CONFLUENT_PRIVATE_PREFIX);
 
     /**
-     * Upper case options keys. ValidationExeption if options contains both uppercase and lowercase
-     * for same key.
+     * Upper case options keys. Validation exception if options contains both uppercase and
+     * lowercase for same key.
      *
      * @param options Options to uppercase
      * @return Map with uppercase key
@@ -48,8 +48,8 @@ public class RemoteModelValidator {
     }
 
     /**
-     * Lower case options keys. ValidationExeption if options contains both uppercase and lowercase
-     * for same key.
+     * Lower case options keys. Validation exception if options contains both uppercase and
+     * lowercase for same key.
      *
      * @param options Options to uppercase
      * @return Map with lowercase key

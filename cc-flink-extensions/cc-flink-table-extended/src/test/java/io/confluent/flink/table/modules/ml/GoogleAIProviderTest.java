@@ -20,7 +20,6 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -124,7 +123,7 @@ public class GoogleAIProviderTest extends ProviderTestBase {
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro");
         modelOptions.put("GOOGLEAI.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "GOOGLEAI");
-        modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("TASK", "CLASSIFICATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();

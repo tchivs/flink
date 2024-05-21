@@ -4,7 +4,7 @@
 
 package io.confluent.flink.table.modules.ml;
 
-/** Collention of some normal model properties. */
+/** Collection of some normal model properties. */
 public class MLModelCommonConstants {
     // Common Provider level config constants
     public static final String API_KEY = "API_KEY";
@@ -24,7 +24,7 @@ public class MLModelCommonConstants {
     public static final String INPUT_CONTENT_TYPE = "INPUT_CONTENT_TYPE";
     public static final String OUTPUT_CONTENT_TYPE = "OUTPUT_CONTENT_TYPE";
 
-    // AWS Sagamaker specific constants
+    // AWS Sagemaker specific constants
     public static final String CUSTOM_ATTRIBUTES = "CUSTOM_ATTRIBUTES";
     public static final String INFERENCE_ID = "INFERENCE_ID";
     public static final String TARGET_VARIANT = "TARGET_VARIANT";
@@ -48,4 +48,19 @@ public class MLModelCommonConstants {
     public static final String CREDENTIAL_SERVICE_PORT = "CONFLUENT.CREDENTIAL.SERVICE.PORT";
 
     public static final int DEFAULT_PARAM_SIZE_LIMIT = 32;
+
+    /** Supported Model Kind: REMOTE, IMPORT, NATIVE. */
+    public enum ModelKind {
+        REMOTE,
+        IMPORT,
+        NATIVE
+    }
+
+    /** Supported Model Task: REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION. */
+    public enum ModelTask {
+        REGRESSION,
+        CLASSIFICATION,
+        CLUSTERING,
+        TEXT_GENERATION
+    }
 }

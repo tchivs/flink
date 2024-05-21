@@ -4,8 +4,8 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelKind;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -38,10 +38,17 @@ public class GoogleAIProvider implements MLModelRuntimeProvider {
         this.secretDecrypterProvider =
                 Objects.requireNonNull(secretDecrypterProvider, "SecretDecrypterProvider");
         final String namespace = supportedProvider.getProviderName();
-        final ModelKind modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
-        if (!modelKind.equals(CatalogModel.ModelKind.REMOTE)) {
+        MLModelCommonConstants.ModelKind modelKind;
+        try {
+            modelKind = ModelOptionsUtils.getModelKind(model.getOptions());
+        } catch (ValidationException e) {
             throw new FlinkRuntimeException(
-                    "For GoogleAI, ML Predict expected a remote model, got " + modelKind);
+                    "Failed to get model kind from model options: " + e.getMessage(), e);
+        }
+
+        if (!modelKind.equals(MLModelCommonConstants.ModelKind.REMOTE)) {
+            throw new FlinkRuntimeException(
+                    "For GoogleAI, ML Predict expected a remote model, got " + modelKind.name());
         }
         ModelOptionsUtils modelOptionsUtils = new ModelOptionsUtils(model, namespace);
         // Pull relevant headers from the model, or use defaults.

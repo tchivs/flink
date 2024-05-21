@@ -18,7 +18,6 @@
 
 package org.apache.flink.table.catalog;
 
-import org.apache.flink.table.catalog.CatalogModel.ModelKind;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -36,7 +35,6 @@ import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
-import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.functions.FunctionIdentifier;
 import org.apache.flink.util.StringUtils;
 
@@ -417,21 +415,6 @@ public class GenericInMemoryCatalog extends AbstractCatalog {
                 return;
             }
             throw new ModelNotExistException(getName(), modelPath);
-        }
-
-        ModelKind existModelKind = FactoryUtil.getModelKind(existingModel.getOptions());
-        ModelKind newModelKind = null;
-        try {
-            newModelKind = FactoryUtil.getModelKind(modelChange.getOptions());
-        } catch (Exception e) {
-            // ModelKind not changed. Do nothing.
-        }
-
-        if (newModelKind != null && existModelKind != newModelKind) {
-            throw new CatalogException(
-                    String.format(
-                            "Model types don't match. Existing model is '%s' and new model is '%s'.",
-                            existModelKind, newModelKind));
         }
 
         Map<String, String> newOptions = new HashMap<>(existingModel.getOptions());

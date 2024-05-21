@@ -6,7 +6,6 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -286,7 +285,7 @@ public class BedrockProviderTest extends ProviderTestBase {
         modelOptions.put("BEDROCK.AWS_ACCESS_KEY_ID", "fake-id");
         modelOptions.put("BEDROCK.AWS_SECRET_ACCESS_KEY", "fake-secret-key");
         modelOptions.put("PROVIDER", "BEDROCK");
-        modelOptions.put("TASK", ModelTask.CLASSIFICATION.name());
+        modelOptions.put("TASK", "CLASSIFICATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }

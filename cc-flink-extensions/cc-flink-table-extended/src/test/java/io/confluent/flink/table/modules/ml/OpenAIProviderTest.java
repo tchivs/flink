@@ -20,7 +20,6 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -186,7 +185,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
                 "https://resource.openai.azure.com/openai/deployments/deploymentname/chat/completions");
         modelOptions.put("AZUREOPENAI.API_KEY", "fake-api-key");
         modelOptions.put("PROVIDER", "AZUREOPENAI");
-        modelOptions.put("TASK", ModelTask.TEXT_GENERATION.name());
+        modelOptions.put("TASK", "TEXT_GENERATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         Schema inputSchema = Schema.newBuilder().column("input", "STRING").build();
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
@@ -225,7 +224,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
         modelOptions.put("PROVIDER", "OPENAI");
         modelOptions.put("OPENAI.ENDPOINT", "https://api.openai.com/v1/chat/completions");
         modelOptions.put("OPENAI.API_KEY", "fake-api-key");
-        modelOptions.put("TASK", ModelTask.TEXT_GENERATION.name());
+        modelOptions.put("TASK", "TEXT_GENERATION");
         modelOptions.put("CONFLUENT.MODEL.SECRET.ENCRYPT_STRATEGY", "plaintext");
         return modelOptions;
     }

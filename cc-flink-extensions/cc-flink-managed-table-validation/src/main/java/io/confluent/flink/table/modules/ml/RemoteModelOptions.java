@@ -7,7 +7,6 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
@@ -22,9 +21,9 @@ public abstract class RemoteModelOptions {
     // PUBLIC - TOP LEVEL CONFIG
     // --------------------------------------------------------------------------------------------
 
-    public static final ConfigOption<ModelTask> TASK =
+    public static final ConfigOption<MLModelCommonConstants.ModelTask> TASK =
             ConfigOptions.key(MLModelCommonConstants.TASK)
-                    .enumType(ModelTask.class)
+                    .enumType(MLModelCommonConstants.ModelTask.class)
                     .noDefaultValue()
                     .withDescription("The task type of the remote ML model.");
 
