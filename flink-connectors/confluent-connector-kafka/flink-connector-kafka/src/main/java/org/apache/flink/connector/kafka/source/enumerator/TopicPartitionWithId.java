@@ -19,6 +19,9 @@ import java.util.UUID;
 @Confluent
 @PublicEvolving
 public class TopicPartitionWithId implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     private final TopicPartition topicPartition;
     @Nullable private final UUID topicId;
 
