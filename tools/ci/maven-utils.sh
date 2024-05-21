@@ -65,9 +65,10 @@ MAVEN_WRAPPER="${CI_DIR}/../../mvnw"
 
 export MAVEN_WRAPPER
 
-MAVEN_MIRROR_CONFIG_FILE=""
+# set_mirror_config disabled and use default maven  settings - see https://confluentinc.atlassian.net/browse/SQL-1099 for details
+MAVEN_MIRROR_CONFIG_FILE="${HOME}/.m2/settings.xml"
 NPM_PROXY_PROFILE_ACTIVATION=""
-set_mirror_config
+#set_mirror_config
 
 export MVN_GLOBAL_OPTIONS_WITHOUT_MIRROR="$MAVEN_ARGS "
 # see https://developercommunity.visualstudio.com/content/problem/851041/microsoft-hosted-agents-run-into-maven-central-tim.html

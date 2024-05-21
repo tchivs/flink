@@ -41,6 +41,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.runtime.checkpoint.SavepointType;
 import org.apache.flink.runtime.checkpoint.SnapshotType;
+import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetricsBuilder;
 import org.apache.flink.runtime.checkpoint.SubtaskState;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
@@ -1778,6 +1779,23 @@ public class StreamTaskTest {
     }
 
     @Test
+    void testSubTaskInitializationMetrics() throws Exception {
+        StreamTaskMailboxTestHarnessBuilder<Integer> builder =
+                new StreamTaskMailboxTestHarnessBuilder<>(
+                                OneInputStreamTask::new, BasicTypeInfo.INT_TYPE_INFO)
+                        .addInput(BasicTypeInfo.INT_TYPE_INFO)
+                        .setupOutputForSingletonOperatorChain(
+                                new TestBoundedOneInputStreamOperator());
+
+        try (StreamTaskMailboxTestHarness<Integer> harness = builder.buildUnrestored()) {
+            harness.streamTask.restore();
+
+            assertThat(harness.getTaskStateManager().getReportedInitializationMetrics())
+                    .isPresent();
+        }
+    }
+
+    @Test
     void testMailboxMetricsMeasurement() throws Exception {
         final int numMails = 10, sleepTime = 5;
         StreamTaskMailboxTestHarnessBuilder<Integer> builder =
@@ -2290,9 +2308,10 @@ public class StreamTaskTest {
         protected void cleanUpInternal() throws Exception {}
 
         @Override
-        public StreamTaskStateInitializer createStreamTaskStateInitializer() {
+        public StreamTaskStateInitializer createStreamTaskStateInitializer(
+                SubTaskInitializationMetricsBuilder initializationMetrics) {
             final StreamTaskStateInitializer streamTaskStateManager =
-                    super.createStreamTaskStateInitializer();
+                    super.createStreamTaskStateInitializer(initializationMetrics);
             return (operatorID,
                     operatorClassName,
                     processingTimeService,

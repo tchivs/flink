@@ -18,10 +18,13 @@
 
 package org.apache.flink.runtime.resourcemanager;
 
+import org.apache.flink.annotation.Confluent;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.blocklist.BlocklistListener;
@@ -68,11 +71,28 @@ public interface ResourceManagerGateway
      * @param timeout Timeout for the future to complete
      * @return Future registration response
      */
+    @VisibleForTesting
+    default CompletableFuture<RegistrationResponse> registerJobMaster(
+            JobMasterId jobMasterId,
+            ResourceID jobMasterResourceId,
+            String jobMasterAddress,
+            JobID jobId,
+            @RpcTimeout Time timeout) {
+        return registerJobMaster(
+                jobMasterId,
+                jobMasterResourceId,
+                jobMasterAddress,
+                jobId,
+                new Configuration(),
+                timeout);
+    }
+
     CompletableFuture<RegistrationResponse> registerJobMaster(
             JobMasterId jobMasterId,
             ResourceID jobMasterResourceId,
             String jobMasterAddress,
             JobID jobId,
+            Configuration jobConfiguration,
             @RpcTimeout Time timeout);
 
     /**
@@ -209,6 +229,10 @@ public interface ResourceManagerGateway
      */
     CompletableFuture<Collection<Tuple2<ResourceID, String>>>
             requestTaskManagerMetricQueryServiceAddresses(@RpcTimeout Time timeout);
+
+    @Confluent
+    CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(@RpcTimeout Time timeout, JobID jobId);
 
     /**
      * Request the file upload from the given {@link TaskExecutor} to the cluster's {@link

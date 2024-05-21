@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.blocklist.BlockedNode;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
@@ -127,6 +128,10 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
     private volatile Function<Collection<BlockedNode>, CompletableFuture<Acknowledge>>
             notifyNewBlockedNodesFunction =
                     ignored -> CompletableFuture.completedFuture(Acknowledge.get());
+
+    private volatile Function<JobID, CompletableFuture<Collection<Tuple2<ResourceID, String>>>>
+            requestTaskManagerMetricQueryServiceAddressesFunction =
+                    ignored -> CompletableFuture.completedFuture(Collections.emptyList());
 
     public TestingResourceManagerGateway() {
         this(
@@ -249,12 +254,20 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
         this.notifyNewBlockedNodesFunction = notifyNewBlockedNodesFunction;
     }
 
+    public void setRequestTaskManagerMetricQueryServiceAddressesFunction(
+            Function<JobID, CompletableFuture<Collection<Tuple2<ResourceID, String>>>>
+                    requestTaskManagerMetricQueryServiceAddressesFunction) {
+        this.requestTaskManagerMetricQueryServiceAddressesFunction =
+                requestTaskManagerMetricQueryServiceAddressesFunction;
+    }
+
     @Override
     public CompletableFuture<RegistrationResponse> registerJobMaster(
             JobMasterId jobMasterId,
             ResourceID jobMasterResourceId,
             String jobMasterAddress,
             JobID jobId,
+            Configuration jobConfiguration,
             Time timeout) {
         final QuadFunction<
                         JobMasterId,
@@ -413,6 +426,12 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
     public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
             requestTaskManagerMetricQueryServiceAddresses(Time timeout) {
         return CompletableFuture.completedFuture(Collections.emptyList());
+    }
+
+    @Override
+    public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(Time timeout, JobID jobId) {
+        return requestTaskManagerMetricQueryServiceAddressesFunction.apply(jobId);
     }
 
     @Override

@@ -30,7 +30,8 @@ public class FailureResultUtil {
                     sweg.getExecutionGraphHandler(),
                     sweg.getOperatorCoordinatorHandler(),
                     failureResult.getBackoffTime(),
-                    sweg.getFailures());
+                    sweg.getFailures(),
+                    StateTransitions.ToRestarting.Cause.ERROR);
         } else {
             sweg.getLogger().info("Failing job.", failureResult.getFailureCause());
             context.goToFailing(

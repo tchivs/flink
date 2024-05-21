@@ -21,6 +21,7 @@ package org.apache.flink.runtime.checkpoint;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CompositeStateHandle;
 import org.apache.flink.runtime.state.SharedStateRegistry;
+import org.apache.flink.runtime.state.StateObject;
 import org.apache.flink.runtime.state.memory.ByteStreamStateHandle;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.Preconditions;
@@ -31,6 +32,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -189,16 +191,17 @@ public class OperatorState implements CompositeStateHandle {
 
     @Override
     public long getStateSize() {
-        long result = coordinatorState == null ? 0L : coordinatorState.getStateSize();
+        return streamAllSubHandles().mapToLong(StateObject::getStateSize).sum();
+    }
 
-        for (int i = 0; i < parallelism; i++) {
-            OperatorSubtaskState operatorSubtaskState = operatorSubtaskStates.get(i);
-            if (operatorSubtaskState != null) {
-                result += operatorSubtaskState.getStateSize();
-            }
-        }
+    @Override
+    public void collectSizeStats(StateObjectSizeStatsCollector collector) {
+        streamAllSubHandles().forEach(handle -> handle.collectSizeStats(collector));
+    }
 
-        return result;
+    private Stream<StateObject> streamAllSubHandles() {
+        return Stream.concat(Stream.of(coordinatorState), operatorSubtaskStates.values().stream())
+                .filter(Objects::nonNull);
     }
 
     @Override

@@ -90,6 +90,13 @@ public class CheckpointConfigFromConfigurationTest {
                         .viaSetter(CheckpointConfig::enableUnalignedCheckpoints)
                         .getterVia(CheckpointConfig::isUnalignedCheckpointsEnabled)
                         .nonDefaultValue(true),
+                TestSpec.testValue(true)
+                        .whenSetFromFile(
+                                "execution.checkpointing.unaligned.splittable-timers.enabled",
+                                "true")
+                        .viaSetter(CheckpointConfig::enableUnalignedCheckpointsSplittableTimers)
+                        .getterVia(CheckpointConfig::isUnalignedCheckpointsSplittableTimersEnabled)
+                        .nonDefaultValue(true),
                 TestSpec.testValue(
                                 (CheckpointStorage)
                                         new FileSystemCheckpointStorage(

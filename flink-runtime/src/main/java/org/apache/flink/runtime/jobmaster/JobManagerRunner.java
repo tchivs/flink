@@ -29,7 +29,7 @@ import org.apache.flink.util.AutoCloseableAsync;
 import java.util.concurrent.CompletableFuture;
 
 /** Interface for a runner which executes a {@link JobMaster}. */
-public interface JobManagerRunner extends AutoCloseableAsync {
+public interface JobManagerRunner extends AutoCloseableAsync, ConfluentJobManagerRunner {
 
     /**
      * Start the execution of the {@link JobMaster}.

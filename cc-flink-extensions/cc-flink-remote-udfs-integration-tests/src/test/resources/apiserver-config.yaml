@@ -1,0 +1,20 @@
+################################################################################
+#  Copyright 2024 Confluent Inc.
+################################################################################
+# Persistence for resources.
+storage:
+  # For development purposes. Change this to `dynamodb` if needed.
+  kind: inmemory
+
+uploads:
+  # Maximum file size to be uploaded in a single request.
+  maxBytes: 1073741824
+  # For debugging, uploads can happen to local filesystem instead of s3.
+  forceLocal: true
+
+listing:
+  # Default number of elements per page when listing resources. Helps in reducing traffic.
+  defaultLimit: 500
+  # Maximum number of elements per page when listing resources. Helps in preventing unlimited listing.
+  maxLimit: 10000
+

@@ -1,0 +1,41 @@
+/*
+ * Copyright 2023 Confluent Inc.
+ */
+
+package io.confluent.flink.compute.credentials;
+
+import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.util.FlinkRuntimeException;
+
+import io.confluent.flink.credentials.AbstractCredentialDecrypterImpl;
+
+import java.io.Serializable;
+import java.util.Optional;
+
+/**
+ * Reads a secret which is cached in memory on the TM from the JM, and uses that to decrypt the API
+ * key from the FCP Credential Service. It can also sign data using the private key.
+ */
+@Confluent
+public class InMemoryCredentialDecrypterImpl extends AbstractCredentialDecrypterImpl
+        implements Serializable {
+
+    public static final InMemoryCredentialDecrypterImpl INSTANCE =
+            new InMemoryCredentialDecrypterImpl();
+
+    @Override
+    public void init(Configuration configuration) {
+        // Nothing to do
+    }
+
+    @Override
+    protected byte[] readPrivateKey() {
+        // Get the private key from memory
+        Optional<byte[]> computePoolKey = ComputePoolKeyCacheImpl.INSTANCE.getPrivateKey();
+        if (!computePoolKey.isPresent()) {
+            throw new FlinkRuntimeException("Couldn't read private key");
+        }
+        return computePoolKey.get();
+    }
+}

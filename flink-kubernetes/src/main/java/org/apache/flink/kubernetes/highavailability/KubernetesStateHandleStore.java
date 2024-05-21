@@ -45,6 +45,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -137,6 +138,11 @@ public class KubernetesStateHandleStore<T extends Serializable>
             return inner.getStateSize();
         }
 
+        @Override
+        public void collectSizeStats(StateObjectSizeStatsCollector collector) {
+            inner.collectSizeStats(collector);
+        }
+
         RetrievableStateHandle<T> getInner() {
             return inner;
         }
@@ -217,7 +223,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
                     !updateConfigMap(
                                     cm -> {
                                         try {
-                                            return addEntry(cm, key, serializedStoreHandle);
+                                            return addEntry(state, cm, key, serializedStoreHandle);
                                         } catch (Exception e) {
                                             throw new CompletionException(e);
                                         }
@@ -468,6 +474,11 @@ public class KubernetesStateHandleStore<T extends Serializable>
      */
     @Override
     public boolean releaseAndTryRemove(String key) throws Exception {
+        return releaseAndTryRemove(true, key);
+    }
+
+    @Override
+    public boolean releaseAndTryRemove(boolean deleteCheckpointPath, String key) throws Exception {
         checkNotNull(key, "Key in ConfigMap.");
         final AtomicReference<RetrievableStateHandle<T>> stateHandleRefer = new AtomicReference<>();
         final AtomicBoolean stateHandleDoesNotExist = new AtomicBoolean(false);
@@ -494,6 +505,9 @@ public class KubernetesStateHandleStore<T extends Serializable>
                                     // Remove entry from the config map as we can't recover from
                                     // this (the serialization would fail on the retry as well).
                                     Objects.requireNonNull(configMap.getData().remove(key));
+                                    if (deleteCheckpointPath) {
+                                        onDelete(key, configMap.getData());
+                                    }
                                 }
                                 return Optional.of(configMap);
                             } else {
@@ -512,6 +526,9 @@ public class KubernetesStateHandleStore<T extends Serializable>
                                                 // transaction" by removing the entry from the
                                                 // ConfigMap.
                                                 configMap.getData().remove(key);
+                                                if (deleteCheckpointPath) {
+                                                    onDelete(key, configMap.getData());
+                                                }
                                                 return Optional.of(configMap);
                                             });
                                 } catch (Exception e) {
@@ -576,7 +593,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
      * to finish the removal before the actual update.
      */
     private Optional<KubernetesConfigMap> addEntry(
-            KubernetesConfigMap configMap, String key, byte[] serializedStateHandle)
+            T state, KubernetesConfigMap configMap, String key, byte[] serializedStateHandle)
             throws Exception {
         final String oldBase64Content = configMap.getData().get(key);
         final String newBase64Content = toBase64(serializedStateHandle);
@@ -607,6 +624,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
             }
         }
         configMap.getData().put(key, newBase64Content);
+        onAdd(state, configMap.getData());
         return Optional.of(configMap);
     }
 
@@ -674,4 +692,8 @@ public class KubernetesStateHandleStore<T extends Serializable>
                 configMapName,
                 e);
     }
+
+    protected void onAdd(T state, Map<String, String> data) {}
+
+    protected void onDelete(String key, Map<String, String> data) {}
 }

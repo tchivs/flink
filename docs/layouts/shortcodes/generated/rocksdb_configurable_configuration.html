@@ -69,10 +69,22 @@
             <td>The maximum number of open files (per stateful operator) that can be used by the DB, '-1' means no limit. The default value is '-1'.</td>
         </tr>
         <tr>
+            <td><h5>state.backend.rocksdb.incremental-restore-async-compact-after-rescale</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>If true, an async compaction of RocksDB is started after every restore after which we detect keys (including tombstones) in the database that are outside the key-groups range of the backend.</td>
+        </tr>
+        <tr>
+            <td><h5>state.backend.rocksdb.log.bridging</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Whether to use the same logging for RocksDB as for Flink (i.e. sl4j frontend). Overrides <code class="highlighter-rouge">state.backend.rocksdb.log.dir</code> but preserves <code class="highlighter-rouge">state.backend.rocksdb.log.level</code>.</td>
+        </tr>
+        <tr>
             <td><h5>state.backend.rocksdb.log.dir</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>
-            <td>The directory for RocksDB's information logging files. If empty (Flink default setting), log files will be in the same directory as the Flink log. If non-empty, this directory will be used and the data directory's absolute path will be used as the prefix of the log file name. If setting this option as a non-existing location, e.g '/dev/null', RocksDB will then create the log under its own database folder as before.</td>
+            <td>The directory for RocksDB's information logging files. If empty (Flink default setting), log files will be in the same directory as the Flink log. If non-empty, this directory will be used and the data directory's absolute path will be used as the prefix of the log file name. The directory must exist</td>
         </tr>
         <tr>
             <td><h5>state.backend.rocksdb.log.file-num</h5></td>
@@ -93,6 +105,12 @@
             <td>The maximum size of RocksDB's file used for information logging. If the log files becomes larger than this, a new file will be created. If 0, all logs will be written to one log file. The default maximum file size is '25MB'. </td>
         </tr>
         <tr>
+            <td><h5>state.backend.rocksdb.rescaling.use-delete-files-in-range</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>If true, during rescaling, the deleteFilesInRange API will be invoked to clean up the useless files so that local disk space can be reclaimed more promptly.</td>
+        </tr>
+        <tr>
             <td><h5>state.backend.rocksdb.restore-overlap-fraction-threshold</h5></td>
             <td style="word-wrap: break-word;">0.0</td>
             <td>Double</td>
@@ -109,6 +127,12 @@
             <td style="word-wrap: break-word;">false</td>
             <td>Boolean</td>
             <td>If true, every newly created SST file will contain a Bloom filter. It is disabled by default.</td>
+        </tr>
+        <tr>
+            <td><h5>state.backend.rocksdb.use-ingest-db-restore-mode</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>A recovery mode that directly clips and ingests multiple DBs during state recovery if the keys in the SST files does not exceed the declared key-group range.</td>
         </tr>
         <tr>
             <td><h5>state.backend.rocksdb.write-batch-size</h5></td>

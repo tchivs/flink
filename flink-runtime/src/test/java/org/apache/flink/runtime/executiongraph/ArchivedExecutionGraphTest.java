@@ -211,6 +211,7 @@ public class ArchivedExecutionGraphTest {
                         "TestJob",
                         JobStatus.INITIALIZING,
                         null,
+                        "{}",
                         null,
                         System.currentTimeMillis(),
                         Arrays.asList(jobVertex),

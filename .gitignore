@@ -65,3 +65,8 @@ tools/japicmp-output
 /docs/go.mod
 /docs/go.sum
 /docs/.hugo_build.lock
+
+
+# CFLT specific
+/mk-include
+/.mk-include-timestamp

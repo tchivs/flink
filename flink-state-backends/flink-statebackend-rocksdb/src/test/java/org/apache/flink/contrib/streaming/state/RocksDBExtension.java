@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.IOUtils;
 
@@ -92,7 +93,9 @@ public class RocksDBExtension implements BeforeEachCallback, AfterEachCallback {
 
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         // close it before reuse the reference.
                         try {
                             currentOptions.close();
@@ -179,7 +182,8 @@ public class RocksDBExtension implements BeforeEachCallback, AfterEachCallback {
                                         .setUseFsync(false)
                                         .setInfoLogLevel(InfoLogLevel.HEADER_LEVEL)
                                         .setStatsDumpPeriodSec(0),
-                                handlesToClose)
+                                handlesToClose,
+                                new JobID())
                         .setCreateIfMissing(true);
         if (enableStatistics) {
             Statistics statistics = new Statistics();

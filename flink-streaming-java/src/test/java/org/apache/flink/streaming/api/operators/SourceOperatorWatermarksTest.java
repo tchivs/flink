@@ -73,8 +73,8 @@ class SourceOperatorWatermarksTest {
 
         CollectingDataOutput<Integer> actualOutput = new CollectingDataOutput<>();
 
-        // after emitting first element from first split, there can not be watermark emitted, as
-        // watermark from the other split is still unknown.
+        // after emitting the first element from the first split, there can not be watermark
+        // emitted, as a watermark from the other split is still unknown.
         assertThat(operator.emitNext(actualOutput)).isEqualTo(DataInputStatus.MORE_AVAILABLE);
         assertNoWatermarks(actualOutput);
 

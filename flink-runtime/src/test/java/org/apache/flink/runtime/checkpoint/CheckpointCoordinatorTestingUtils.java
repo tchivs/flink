@@ -844,6 +844,7 @@ public class CheckpointCoordinatorTestingUtils {
                     checkpointPlanCalculator,
                     SystemClock.getInstance(),
                     checkpointStatsTracker,
+                    false,
                     vertexFinishedStateCheckerFactory);
         }
     }

@@ -53,6 +53,7 @@ import org.apache.flink.runtime.rest.handler.job.JobConfigHandler;
 import org.apache.flink.runtime.rest.handler.job.JobDetailsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobExceptionsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobExecutionResultHandler;
+import org.apache.flink.runtime.rest.handler.job.JobFailHandler;
 import org.apache.flink.runtime.rest.handler.job.JobIdsHandler;
 import org.apache.flink.runtime.rest.handler.job.JobManagerJobConfigurationHandler;
 import org.apache.flink.runtime.rest.handler.job.JobManagerJobEnvironmentHandler;
@@ -81,6 +82,7 @@ import org.apache.flink.runtime.rest.handler.job.coordination.ClientCoordination
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingJobsMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingSubtasksMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.AggregatingTaskManagersMetricsHandler;
+import org.apache.flink.runtime.rest.handler.job.metrics.AutopilotMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobManagerMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.JobVertexMetricsHandler;
@@ -88,12 +90,14 @@ import org.apache.flink.runtime.rest.handler.job.metrics.JobVertexWatermarksHand
 import org.apache.flink.runtime.rest.handler.job.metrics.SubtaskMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.metrics.TaskManagerMetricsHandler;
 import org.apache.flink.runtime.rest.handler.job.rescaling.RescalingHandlers;
+import org.apache.flink.runtime.rest.handler.job.results.ForegroundResultHandler;
 import org.apache.flink.runtime.rest.handler.job.savepoints.SavepointDisposalHandlers;
 import org.apache.flink.runtime.rest.handler.job.savepoints.SavepointHandlers;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
 import org.apache.flink.runtime.rest.handler.legacy.files.StaticFileServerHandler;
 import org.apache.flink.runtime.rest.handler.legacy.files.WebContentHandlerSpecification;
 import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
+import org.apache.flink.runtime.rest.handler.taskmanager.StandbyTaskManagerActivationHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerCustomLogHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerDetailsHandler;
 import org.apache.flink.runtime.rest.handler.taskmanager.TaskManagerLogFileHandler;
@@ -142,6 +146,7 @@ import org.apache.flink.runtime.rest.messages.job.SubtaskCurrentAttemptDetailsHe
 import org.apache.flink.runtime.rest.messages.job.SubtaskExecutionAttemptAccumulatorsHeaders;
 import org.apache.flink.runtime.rest.messages.job.SubtaskExecutionAttemptDetailsHeaders;
 import org.apache.flink.runtime.rest.messages.job.coordination.ClientCoordinationHeaders;
+import org.apache.flink.runtime.rest.messages.job.results.ForegroundResultHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerCustomLogHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerDetailsHeaders;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerLogFileHeaders;
@@ -503,6 +508,15 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         final JobMetricsHandler jobMetricsHandler =
                 new JobMetricsHandler(leaderRetriever, timeout, responseHeaders, metricFetcher);
 
+        final AutopilotMetricsHandler autopilotMetricsHandler =
+                new AutopilotMetricsHandler(
+                        leaderRetriever,
+                        timeout,
+                        responseHeaders,
+                        resourceManagerRetriever,
+                        metricFetcher.getMetricQueryServiceRetriever(),
+                        executor);
+
         final SubtaskMetricsHandler subtaskMetricsHandler =
                 new SubtaskMetricsHandler(leaderRetriever, timeout, responseHeaders, metricFetcher);
 
@@ -698,6 +712,13 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         responseHeaders,
                         ClientCoordinationHeaders.getInstance());
 
+        final ForegroundResultHandler foregroundResultHandler =
+                new ForegroundResultHandler(
+                        leaderRetriever,
+                        timeout,
+                        responseHeaders,
+                        ForegroundResultHeaders.getInstance());
+
         final ShutdownHandler shutdownHandler =
                 new ShutdownHandler(
                         leaderRetriever, timeout, responseHeaders, ShutdownHeaders.getInstance());
@@ -709,6 +730,11 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         responseHeaders,
                         JobClientHeartbeatHeaders.getInstance());
 
+        final StandbyTaskManagerActivationHandler standbyTaskManagerActivationHandler =
+                new StandbyTaskManagerActivationHandler(leaderRetriever, timeout, responseHeaders);
+
+        final JobFailHandler jobFailHandler =
+                new JobFailHandler(leaderRetriever, timeout, responseHeaders);
         final File webUiDir = restConfiguration.getWebUiDir();
 
         Optional<StaticFileServerHandler<T>> optWebContent;
@@ -776,6 +802,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         jobVertexWatermarksHandler.getMessageHeaders(),
                         jobVertexWatermarksHandler));
         handlers.add(Tuple2.of(jobMetricsHandler.getMessageHeaders(), jobMetricsHandler));
+        handlers.add(
+                Tuple2.of(autopilotMetricsHandler.getMessageHeaders(), autopilotMetricsHandler));
         handlers.add(Tuple2.of(subtaskMetricsHandler.getMessageHeaders(), subtaskMetricsHandler));
         handlers.add(
                 Tuple2.of(
@@ -884,6 +912,10 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         handlers.add(
                 Tuple2.of(
                         clientCoordinationHandler.getMessageHeaders(), clientCoordinationHandler));
+        handlers.add(
+                Tuple2.of(foregroundResultHandler.getMessageHeaders(), foregroundResultHandler));
+
+        handlers.add(Tuple2.of(jobFailHandler.getMessageHeaders(), jobFailHandler));
 
         // TODO: Remove once the Yarn proxy can forward all REST verbs
         handlers.add(
@@ -898,6 +930,11 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         handlers.add(
                 Tuple2.of(
                         jobClientHeartbeatHandler.getMessageHeaders(), jobClientHeartbeatHandler));
+
+        handlers.add(
+                Tuple2.of(
+                        standbyTaskManagerActivationHandler.getMessageHeaders(),
+                        standbyTaskManagerActivationHandler));
 
         optWebContent.ifPresent(
                 webContent -> {

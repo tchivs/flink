@@ -20,6 +20,7 @@ package org.apache.flink.streaming.api.operators;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.state.CheckpointableKeyedStateBackend;
 import org.apache.flink.runtime.state.KeyGroupStatePartitionStreamProvider;
 import org.apache.flink.runtime.state.KeyedStateCheckpointOutputStream;
@@ -38,6 +39,15 @@ import java.io.Serializable;
  */
 @Internal
 public interface InternalTimeServiceManager<K> {
+
+    /** Signals whether the watermark should continue advancing. */
+    @Internal
+    @FunctionalInterface
+    interface ShouldStopAdvancingFn {
+
+        boolean shouldStopAdvancing();
+    }
+
     /**
      * Creates an {@link InternalTimerService} for handling a group of timers identified by the
      * given {@code name}. The timers are scoped to a key and namespace.
@@ -57,6 +67,15 @@ public interface InternalTimeServiceManager<K> {
     void advanceWatermark(Watermark watermark) throws Exception;
 
     /**
+     * Try to {@link #advanceWatermark(Watermark)}, but if {@link ShouldStopAdvancingFn} returns
+     * {@code true}, stop the advancement and return as soon as possible.
+     *
+     * @return true if {@link Watermark} has been fully processed, false otherwise.
+     */
+    boolean tryAdvanceWatermark(Watermark watermark, ShouldStopAdvancingFn shouldStopAdvancingFn)
+            throws Exception;
+
+    /**
      * Snapshots the timers to raw keyed state.
      *
      * <p><b>TODO:</b> This can be removed once heap-based timers are integrated with RocksDB
@@ -73,6 +92,7 @@ public interface InternalTimeServiceManager<K> {
     @FunctionalInterface
     interface Provider extends Serializable {
         <K> InternalTimeServiceManager<K> create(
+                TaskIOMetricGroup taskIOMetricGroup,
                 CheckpointableKeyedStateBackend<K> keyedStatedBackend,
                 ClassLoader userClassloader,
                 KeyContext keyContext,

@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.operations;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.internal.TableResultInternal;
 import org.apache.flink.table.functions.FunctionIdentifier;
 import org.apache.flink.table.functions.SqlLikeUtils;
@@ -48,6 +49,7 @@ public class ShowFunctionsOperation implements ShowOperation {
 
     private final FunctionScope functionScope;
     private final String preposition;
+
     private final String catalogName;
     private final String databaseName;
     // different like type such as like, ilike
@@ -143,6 +145,11 @@ public class ShowFunctionsOperation implements ShowOperation {
         return notLike;
     }
 
+    @Confluent
+    public String getLikePattern() {
+        return likePattern;
+    }
+
     @Override
     public TableResultInternal execute(Context ctx) {
         final String[] functionNames;
@@ -203,5 +210,13 @@ public class ShowFunctionsOperation implements ShowOperation {
         }
 
         return buildStringArrayResult("function name", rows);
+    }
+
+    public String getCatalogName() {
+        return catalogName;
+    }
+
+    public String getDatabaseName() {
+        return databaseName;
     }
 }

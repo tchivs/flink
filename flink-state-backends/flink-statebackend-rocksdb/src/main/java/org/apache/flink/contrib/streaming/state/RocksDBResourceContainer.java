@@ -19,6 +19,7 @@
 package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
@@ -93,17 +94,26 @@ public final class RocksDBResourceContainer implements AutoCloseable {
     /** The handles to be closed when the container is closed. */
     private final ArrayList<AutoCloseable> handlesToClose;
 
+    private final JobID jobID;
+
     @Nullable private Path relocatedDbLogBaseDir;
 
     @VisibleForTesting
     public RocksDBResourceContainer() {
-        this(new Configuration(), PredefinedOptions.DEFAULT, null, null, null, false);
+        this(new Configuration(), PredefinedOptions.DEFAULT, null, null, null, false, new JobID());
     }
 
     @VisibleForTesting
     public RocksDBResourceContainer(
             PredefinedOptions predefinedOptions, @Nullable RocksDBOptionsFactory optionsFactory) {
-        this(new Configuration(), predefinedOptions, optionsFactory, null, null, false);
+        this(
+                new Configuration(),
+                predefinedOptions,
+                optionsFactory,
+                null,
+                null,
+                false,
+                new JobID());
     }
 
     @VisibleForTesting
@@ -111,7 +121,14 @@ public final class RocksDBResourceContainer implements AutoCloseable {
             PredefinedOptions predefinedOptions,
             @Nullable RocksDBOptionsFactory optionsFactory,
             @Nullable OpaqueMemoryResource<RocksDBSharedResources> sharedResources) {
-        this(new Configuration(), predefinedOptions, optionsFactory, sharedResources, null, false);
+        this(
+                new Configuration(),
+                predefinedOptions,
+                optionsFactory,
+                sharedResources,
+                null,
+                false,
+                new JobID());
     }
 
     public RocksDBResourceContainer(
@@ -120,8 +137,10 @@ public final class RocksDBResourceContainer implements AutoCloseable {
             @Nullable RocksDBOptionsFactory optionsFactory,
             @Nullable OpaqueMemoryResource<RocksDBSharedResources> sharedResources,
             @Nullable File instanceBasePath,
-            boolean enableStatistics) {
+            boolean enableStatistics,
+            JobID jobID) {
 
+        this.jobID = jobID;
         this.configuration = configuration;
         this.predefinedOptions = checkNotNull(predefinedOptions);
         this.optionsFactory = optionsFactory;
@@ -147,7 +166,7 @@ public final class RocksDBResourceContainer implements AutoCloseable {
 
         // add user-defined options factory, if specified
         if (optionsFactory != null) {
-            opt = optionsFactory.createDBOptions(opt, handlesToClose);
+            opt = optionsFactory.createDBOptions(opt, handlesToClose, jobID);
         }
 
         // add necessary default options

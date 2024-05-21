@@ -20,6 +20,7 @@ package org.apache.flink.runtime.security.token;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.SecurityOptions;
 import org.apache.flink.core.plugin.PluginManager;
@@ -305,17 +306,17 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
     @VisibleForTesting
     void startTokensUpdate() {
         try {
-            LOG.info("Starting tokens update task");
+            LOG.debug("Starting tokens update task");
             DelegationTokenContainer container = new DelegationTokenContainer();
             Optional<Long> nextRenewal = obtainDelegationTokensAndGetNextRenewal(container);
 
             if (container.hasTokens()) {
                 delegationTokenReceiverRepository.onNewTokensObtained(container);
 
-                LOG.info("Notifying listener about new tokens");
+                LOG.debug("Notifying listener about new tokens");
                 checkNotNull(listener, "Listener must not be null");
                 listener.onNewTokensObtained(InstantiationUtil.serializeObject(container));
-                LOG.info("Listener notified successfully");
+                LOG.debug("Listener notified successfully");
             } else {
                 LOG.warn("No tokens obtained so skipping notifications");
             }
@@ -330,7 +331,7 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
                                     renewalDelay,
                                     TimeUnit.MILLISECONDS);
                 }
-                LOG.info("Tokens update task started with {} ms delay", renewalDelay);
+                LOG.debug("Tokens update task started with {} ms delay", renewalDelay);
             } else {
                 LOG.warn(
                         "Tokens update task not started because either no tokens obtained or none of the tokens specified its renewal date");
@@ -383,6 +384,52 @@ public class DefaultDelegationTokenManager implements DelegationTokenManager {
 
         stopTokensUpdate();
 
+        for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+            try {
+                provider.stop();
+            } catch (Throwable t) {
+                LOG.error("Failed to stop delegation token provider {}", provider.serviceName(), t);
+            }
+        }
+
         LOG.info("Stopped credential renewal");
+    }
+
+    @Override
+    public void registerJob(JobID jobId, Configuration jobConfiguration) throws Exception {
+        try {
+            boolean obtainNewToken = false;
+            for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+                if (provider.registerJob(jobId, jobConfiguration)) {
+                    obtainNewToken = true;
+                }
+            }
+            if (obtainNewToken) {
+                synchronized (tokensUpdateFutureLock) {
+                    stopTokensUpdate();
+                    tokensUpdateFuture =
+                            scheduledExecutor.schedule(
+                                    () -> ioExecutor.execute(this::startTokensUpdate),
+                                    0,
+                                    TimeUnit.MILLISECONDS);
+                }
+            }
+        } catch (Exception e) {
+            // If any of the providers fail to register, then unregister the job from them all.
+            unregisterJob(jobId);
+            LOG.error("Failed to register job {}", jobId.toHexString(), e);
+            throw e;
+        }
+    }
+
+    @Override
+    public void unregisterJob(JobID jobId) throws Exception {
+        for (DelegationTokenProvider provider : delegationTokenProviders.values()) {
+            try {
+                provider.unregisterJob(jobId);
+            } catch (Exception e) {
+                LOG.error("Failed to unregister job  for provider {}", provider.serviceName(), e);
+            }
+        }
     }
 }

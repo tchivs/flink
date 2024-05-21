@@ -206,7 +206,13 @@ public class KubernetesLeaderElectionHaServices extends AbstractHaServices {
 
     @Override
     public void internalCleanupJobData(JobID jobID) throws Exception {
-        kubeClient.deleteConfigMap(getJobSpecificConfigMap(jobID)).get();
+        final boolean retainOnTermination =
+                configuration.get(
+                        org.apache.flink.configuration.JobManagerConfluentOptions
+                                .RETAIN_JOB_HA_CP_STORE_ON_TERMINATION);
+        if (!retainOnTermination) {
+            kubeClient.deleteConfigMap(getJobSpecificConfigMap(jobID)).get();
+        }
         // need to delete job specific leader address from leader config map
     }
 

@@ -18,6 +18,10 @@
 
 package org.apache.flink.runtime.rest.handler.legacy.metrics;
 
+import org.apache.flink.annotation.Confluent;
+import org.apache.flink.runtime.webmonitor.retriever.MetricQueryServiceRetriever;
+import org.apache.flink.util.concurrent.FutureUtils;
+
 /**
  * The MetricFetcher can be used to fetch metrics from the JobManager and all registered
  * TaskManagers.
@@ -39,4 +43,12 @@ public interface MetricFetcher {
 
     /** @return timestamp of the last update. */
     long getLastUpdateTime();
+
+    @Confluent
+    default MetricQueryServiceRetriever getMetricQueryServiceRetriever() {
+        return rpcServiceAddress ->
+                FutureUtils.completedExceptionally(
+                        new UnsupportedOperationException(
+                                "This retriever is not able to lookup anything."));
+    }
 }

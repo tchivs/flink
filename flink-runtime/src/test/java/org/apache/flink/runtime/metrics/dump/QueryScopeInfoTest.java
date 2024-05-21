@@ -126,7 +126,8 @@ class QueryScopeInfoTest {
     @Test
     void testOperatorQueryScopeInfo() {
         QueryScopeInfo.OperatorQueryScopeInfo info =
-                new QueryScopeInfo.OperatorQueryScopeInfo("jobid", "taskid", 2, 0, "opname");
+                new QueryScopeInfo.OperatorQueryScopeInfo(
+                        "jobid", "taskid", 2, 0, "opname", "opid");
         assertThat(info.getCategory()).isEqualTo(QueryScopeInfo.INFO_CATEGORY_OPERATOR);
         assertThat(info.scope).isEmpty();
         assertThat(info.jobID).isEqualTo("jobid");
@@ -144,7 +145,7 @@ class QueryScopeInfoTest {
 
         info =
                 new QueryScopeInfo.OperatorQueryScopeInfo(
-                        "jobid", "taskid", 2, 0, "opname", "hello");
+                        "jobid", "taskid", 2, 0, "opname", "opid", "hello");
         assertThat(info.getCategory()).isEqualTo(QueryScopeInfo.INFO_CATEGORY_OPERATOR);
         assertThat(info.scope).isEqualTo("hello");
         assertThat(info.jobID).isEqualTo("jobid");

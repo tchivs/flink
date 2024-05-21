@@ -22,21 +22,28 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.listener.AlterDatabaseEvent;
+import org.apache.flink.table.catalog.listener.AlterModelEvent;
 import org.apache.flink.table.catalog.listener.AlterTableEvent;
 import org.apache.flink.table.catalog.listener.CatalogModificationEvent;
 import org.apache.flink.table.catalog.listener.CatalogModificationListener;
 import org.apache.flink.table.catalog.listener.CreateDatabaseEvent;
+import org.apache.flink.table.catalog.listener.CreateModelEvent;
 import org.apache.flink.table.catalog.listener.CreateTableEvent;
 import org.apache.flink.table.catalog.listener.DropDatabaseEvent;
+import org.apache.flink.table.catalog.listener.DropModelEvent;
 import org.apache.flink.table.catalog.listener.DropTableEvent;
 import org.apache.flink.table.utils.CatalogManagerMocks;
 import org.apache.flink.table.utils.ExpressionResolverMocks;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -250,6 +257,79 @@ class CatalogManagerTest {
         assertThat(dropTemporaryEvent.identifier().getObjectName()).isEqualTo("table2");
     }
 
+    @Test
+    void testModelModificationListener() throws Exception {
+        CompletableFuture<CreateModelEvent> createFuture = new CompletableFuture<>();
+        CompletableFuture<AlterModelEvent> alterFuture = new CompletableFuture<>();
+        CompletableFuture<DropModelEvent> dropFuture = new CompletableFuture<>();
+        CatalogManager catalogManager =
+                CatalogManager.newBuilder()
+                        .defaultCatalog("default", new GenericInMemoryCatalog("default"))
+                        .classLoader(CatalogManagerTest.class.getClassLoader())
+                        .config(new Configuration())
+                        .catalogModificationListeners(
+                                Collections.singletonList(
+                                        new TestingModelModificationListener(
+                                                createFuture, alterFuture, dropFuture)))
+                        .catalogStoreHolder(
+                                CatalogStoreHolder.newBuilder()
+                                        .classloader(CatalogManagerTest.class.getClassLoader())
+                                        .catalogStore(new GenericInMemoryCatalogStore())
+                                        .config(new Configuration())
+                                        .build())
+                        .build();
+
+        catalogManager.initSchemaResolver(true, ExpressionResolverMocks.dummyResolver());
+
+        // Create a model
+        catalogManager.createModel(
+                CatalogModel.of(
+                        Schema.derived(),
+                        Schema.derived(),
+                        ImmutableMap.of("provider", "openai", "task", "TEXT_GENERATION"),
+                        null),
+                ObjectIdentifier.of(
+                        catalogManager.getCurrentCatalog(),
+                        catalogManager.getCurrentDatabase(),
+                        "model1"),
+                true);
+        CreateModelEvent createModelEvent = createFuture.get(10, TimeUnit.SECONDS);
+        assertThat(createModelEvent.identifier().getObjectName()).isEqualTo("model1");
+        assertThat(createModelEvent.ignoreIfExists()).isTrue();
+
+        // Alter a model
+        catalogManager.alterModel(
+                CatalogModel.of(
+                        Schema.derived(),
+                        Schema.derived(),
+                        ImmutableMap.of("provider", "azure", "endpoint", "some-endpoint"),
+                        "model1 comment"),
+                ObjectIdentifier.of(
+                        catalogManager.getCurrentCatalog(),
+                        catalogManager.getCurrentDatabase(),
+                        "model1"),
+                false);
+        Map<String, String> expectedOptions = new HashMap<>();
+        expectedOptions.put("provider", "azure");
+        expectedOptions.put("endpoint", "some-endpoint");
+        AlterModelEvent alterEvent = alterFuture.get(10, TimeUnit.SECONDS);
+        assertThat(alterEvent.identifier().getObjectName()).isEqualTo("model1");
+        assertThat(alterEvent.newModel().getComment()).isEqualTo("model1 comment");
+        assertThat(alterEvent.newModel().getOptions()).isEqualTo(expectedOptions);
+        assertThat(alterEvent.ignoreIfNotExists()).isFalse();
+
+        // Drop a model
+        catalogManager.dropModel(
+                ObjectIdentifier.of(
+                        catalogManager.getCurrentCatalog(),
+                        catalogManager.getCurrentDatabase(),
+                        "model1"),
+                true);
+        DropModelEvent dropEvent = dropFuture.get(10, TimeUnit.SECONDS);
+        assertThat(dropEvent.ignoreIfNotExists()).isTrue();
+        assertThat(dropEvent.identifier().getObjectName()).isEqualTo("model1");
+    }
+
     private CatalogManager createCatalogManager(CatalogModificationListener listener) {
         return CatalogManager.newBuilder()
                 .classLoader(CatalogManagerTest.class.getClassLoader())
@@ -337,6 +417,35 @@ class CatalogManagerTest {
         }
     }
 
+    /** Testing model modification listener. */
+    static class TestingModelModificationListener implements CatalogModificationListener {
+        private final CompletableFuture<CreateModelEvent> createFuture;
+        private final CompletableFuture<AlterModelEvent> alterFuture;
+        private final CompletableFuture<DropModelEvent> dropFuture;
+
+        TestingModelModificationListener(
+                CompletableFuture<CreateModelEvent> createFuture,
+                CompletableFuture<AlterModelEvent> alterFuture,
+                CompletableFuture<DropModelEvent> dropFuture) {
+            this.createFuture = createFuture;
+            this.alterFuture = alterFuture;
+            this.dropFuture = dropFuture;
+        }
+
+        @Override
+        public void onEvent(CatalogModificationEvent event) {
+            if (event instanceof CreateModelEvent) {
+                createFuture.complete((CreateModelEvent) event);
+            } else if (event instanceof AlterModelEvent) {
+                alterFuture.complete((AlterModelEvent) event);
+            } else if (event instanceof DropModelEvent) {
+                dropFuture.complete((DropModelEvent) event);
+            } else {
+                throw new UnsupportedOperationException();
+            }
+        }
+    }
+
     @Test
     void testCatalogStore() throws Exception {
         CatalogStore catalogStore = new GenericInMemoryCatalogStore();
@@ -395,10 +504,16 @@ class CatalogManagerTest {
                         Collections.emptyMap()),
                 ObjectIdentifier.of("exist_cat", "cat_db", "test_table"),
                 false);
+        catalogManager.createModel(
+                CatalogModel.of(Schema.derived(), Schema.derived(), Collections.emptyMap(), null),
+                ObjectIdentifier.of("exist_cat", "cat_db", "test_model"),
+                false);
         assertThat(catalogManager.listSchemas("exist_cat"))
                 .isEqualTo(new HashSet<>(Arrays.asList("default", "cat_db")));
         assertThat(catalogManager.listTables("exist_cat", "cat_db"))
                 .isEqualTo(Collections.singleton("test_table"));
+        assertThat(catalogManager.listModels("exist_cat", "cat_db"))
+                .isEqualTo(Collections.singleton("test_model"));
         catalogManager.setCurrentCatalog("exist_cat");
         assertThat(catalogManager.listSchemas())
                 .isEqualTo(

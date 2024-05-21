@@ -17,6 +17,7 @@
 
 package org.apache.flink.streaming.api.operators.collect;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.common.typeutils.base.LongSerializer;
@@ -71,6 +72,11 @@ public class CollectCoordinationResponse implements CoordinationResponse {
 
     public long getLastCheckpointedOffset() {
         return lastCheckpointedOffset;
+    }
+
+    @Confluent
+    public List<byte[]> getSerializedResults() {
+        return serializedResults;
     }
 
     // TODO the following two methods might be not so efficient

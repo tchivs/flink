@@ -21,6 +21,7 @@ package org.apache.flink.table.planner.operations;
 import org.apache.flink.sql.parser.ddl.SqlAddJar;
 import org.apache.flink.sql.parser.ddl.SqlAlterDatabase;
 import org.apache.flink.sql.parser.ddl.SqlAlterFunction;
+import org.apache.flink.sql.parser.ddl.SqlAlterModel;
 import org.apache.flink.sql.parser.ddl.SqlAlterTable;
 import org.apache.flink.sql.parser.ddl.SqlAlterTableCompact;
 import org.apache.flink.sql.parser.ddl.SqlAlterTableDropColumn;
@@ -36,11 +37,13 @@ import org.apache.flink.sql.parser.ddl.SqlAnalyzeTable;
 import org.apache.flink.sql.parser.ddl.SqlCompilePlan;
 import org.apache.flink.sql.parser.ddl.SqlCreateDatabase;
 import org.apache.flink.sql.parser.ddl.SqlCreateFunction;
+import org.apache.flink.sql.parser.ddl.SqlCreateModel;
 import org.apache.flink.sql.parser.ddl.SqlCreateTable;
 import org.apache.flink.sql.parser.ddl.SqlCreateTableAs;
 import org.apache.flink.sql.parser.ddl.SqlDropCatalog;
 import org.apache.flink.sql.parser.ddl.SqlDropDatabase;
 import org.apache.flink.sql.parser.ddl.SqlDropFunction;
+import org.apache.flink.sql.parser.ddl.SqlDropModel;
 import org.apache.flink.sql.parser.ddl.SqlDropTable;
 import org.apache.flink.sql.parser.ddl.SqlDropView;
 import org.apache.flink.sql.parser.ddl.SqlRemoveJar;
@@ -61,6 +64,7 @@ import org.apache.flink.sql.parser.dml.SqlExecute;
 import org.apache.flink.sql.parser.dml.SqlExecutePlan;
 import org.apache.flink.sql.parser.dml.SqlStatementSet;
 import org.apache.flink.sql.parser.dql.SqlLoadModule;
+import org.apache.flink.sql.parser.dql.SqlRichDescribeModel;
 import org.apache.flink.sql.parser.dql.SqlRichDescribeTable;
 import org.apache.flink.sql.parser.dql.SqlRichExplain;
 import org.apache.flink.sql.parser.dql.SqlShowCatalogs;
@@ -72,6 +76,7 @@ import org.apache.flink.sql.parser.dql.SqlShowCurrentDatabase;
 import org.apache.flink.sql.parser.dql.SqlShowDatabases;
 import org.apache.flink.sql.parser.dql.SqlShowJars;
 import org.apache.flink.sql.parser.dql.SqlShowJobs;
+import org.apache.flink.sql.parser.dql.SqlShowModels;
 import org.apache.flink.sql.parser.dql.SqlShowModules;
 import org.apache.flink.sql.parser.dql.SqlShowTables;
 import org.apache.flink.sql.parser.dql.SqlShowViews;
@@ -117,6 +122,7 @@ import org.apache.flink.table.functions.FunctionIdentifier;
 import org.apache.flink.table.operations.BeginStatementSetOperation;
 import org.apache.flink.table.operations.CompileAndExecutePlanOperation;
 import org.apache.flink.table.operations.DeleteFromFilterOperation;
+import org.apache.flink.table.operations.DescribeModelOperation;
 import org.apache.flink.table.operations.DescribeTableOperation;
 import org.apache.flink.table.operations.EndStatementSetOperation;
 import org.apache.flink.table.operations.ExplainOperation;
@@ -132,6 +138,7 @@ import org.apache.flink.table.operations.ShowCreateViewOperation;
 import org.apache.flink.table.operations.ShowCurrentCatalogOperation;
 import org.apache.flink.table.operations.ShowCurrentDatabaseOperation;
 import org.apache.flink.table.operations.ShowDatabasesOperation;
+import org.apache.flink.table.operations.ShowModelsOperation;
 import org.apache.flink.table.operations.ShowModulesOperation;
 import org.apache.flink.table.operations.ShowTablesOperation;
 import org.apache.flink.table.operations.ShowViewsOperation;
@@ -163,6 +170,7 @@ import org.apache.flink.table.operations.ddl.CreateTempSystemFunctionOperation;
 import org.apache.flink.table.operations.ddl.DropCatalogFunctionOperation;
 import org.apache.flink.table.operations.ddl.DropCatalogOperation;
 import org.apache.flink.table.operations.ddl.DropDatabaseOperation;
+import org.apache.flink.table.operations.ddl.DropModelOperation;
 import org.apache.flink.table.operations.ddl.DropTableOperation;
 import org.apache.flink.table.operations.ddl.DropTempSystemFunctionOperation;
 import org.apache.flink.table.operations.ddl.DropViewOperation;
@@ -226,6 +234,8 @@ public class SqlNodeToOperationConversion {
     private final FlinkPlannerImpl flinkPlanner;
     private final CatalogManager catalogManager;
     private final SqlCreateTableConverter createTableConverter;
+    private final SqlCreateModelConverter createModelConverter;
+    private final SqlAlterModelConverter alterModelConverter;
     private final AlterSchemaConverter alterSchemaConverter;
 
     // ~ Constructors -----------------------------------------------------------
@@ -244,11 +254,14 @@ public class SqlNodeToOperationConversion {
                         flinkPlanner.getOrCreateSqlValidator(),
                         this::getQuotedSqlString,
                         catalogManager);
+        this.createModelConverter =
+                new SqlCreateModelConverter(flinkPlanner.getOrCreateSqlValidator(), catalogManager);
+        this.alterModelConverter = new SqlAlterModelConverter(catalogManager);
     }
 
     /**
      * This is the main entrance for executing all kinds of DDL/DML {@code SqlNode}s, different
-     * SqlNode will have it's implementation in the #convert(type) method whose 'type' argument is
+     * SqlNode will have its implementation in the #convert(type) method whose 'type' argument is
      * subclass of {@code SqlNode}.
      *
      * @param flinkPlanner FlinkPlannerImpl to convertCreateTable sql node to rel node
@@ -315,6 +328,9 @@ public class SqlNodeToOperationConversion {
             }
             return Optional.of(
                     converter.createTableConverter.convertCreateTable((SqlCreateTable) validated));
+        } else if (validated instanceof SqlCreateModel) {
+            return Optional.of(
+                    converter.createModelConverter.convertCreateModel((SqlCreateModel) validated));
         } else if (validated instanceof SqlDropTable) {
             return Optional.of(converter.convertDropTable((SqlDropTable) validated));
         } else if (validated instanceof SqlAlterTable) {
@@ -339,6 +355,8 @@ public class SqlNodeToOperationConversion {
             return Optional.of(converter.convertShowCreateView((SqlShowCreateView) validated));
         } else if (validated instanceof SqlRichExplain) {
             return Optional.of(converter.convertRichExplain((SqlRichExplain) validated));
+        } else if (validated instanceof SqlRichDescribeModel) {
+            return Optional.of(converter.convertDescribeModel((SqlRichDescribeModel) validated));
         } else if (validated instanceof SqlRichDescribeTable) {
             return Optional.of(converter.convertDescribeTable((SqlRichDescribeTable) validated));
         } else if (validated instanceof SqlAddJar) {
@@ -380,6 +398,13 @@ public class SqlNodeToOperationConversion {
             return Optional.of(converter.convertDelete((SqlDelete) validated));
         } else if (validated instanceof SqlUpdate) {
             return Optional.of(converter.convertUpdate((SqlUpdate) validated));
+        } else if (validated instanceof SqlAlterModel) {
+            return Optional.of(
+                    converter.alterModelConverter.convertAlterModel((SqlAlterModel) validated));
+        } else if (validated instanceof SqlDropModel) {
+            return Optional.of(converter.convertDropModel((SqlDropModel) validated));
+        } else if (validated instanceof SqlShowModels) {
+            return Optional.of(converter.convertShowModels((SqlShowModels) validated));
         } else {
             return Optional.empty();
         }
@@ -997,6 +1022,15 @@ public class SqlNodeToOperationConversion {
         return new ExplainOperation(operation, sqlExplain.getExplainDetails());
     }
 
+    /** Convert DESCRIBE MODEL [EXTENDED] [[catalogName.] dataBasesName].sqlIdentifier. */
+    private Operation convertDescribeModel(SqlRichDescribeModel sqlRichDescribeModel) {
+        UnresolvedIdentifier unresolvedIdentifier =
+                UnresolvedIdentifier.of(sqlRichDescribeModel.fullModelName());
+        ObjectIdentifier identifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
+
+        return new DescribeModelOperation(identifier, sqlRichDescribeModel.isExtended());
+    }
+
     /** Convert DESCRIBE [EXTENDED] [[catalogName.] dataBasesName].sqlIdentifier. */
     private Operation convertDescribeTable(SqlRichDescribeTable sqlRichDescribeTable) {
         UnresolvedIdentifier unresolvedIdentifier =
@@ -1380,5 +1414,44 @@ public class SqlNodeToOperationConversion {
         // transform to a relational tree
         RelRoot relational = planner.rel(validated);
         return new PlannerQueryOperation(relational.project());
+    }
+
+    /** convert DROP MODEL statement. */
+    private Operation convertDropModel(SqlDropModel sqlDropModel) {
+        UnresolvedIdentifier unresolvedIdentifier =
+                UnresolvedIdentifier.of(sqlDropModel.fullModelName());
+        ObjectIdentifier identifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
+
+        return new DropModelOperation(identifier, sqlDropModel.getIfExists());
+    }
+
+    /** convert SHOW MODELS statement. */
+    private Operation convertShowModels(SqlShowModels sqlShowModels) {
+        if (sqlShowModels.getPreposition() == null) {
+            return new ShowModelsOperation(
+                    sqlShowModels.getLikeSqlPattern(),
+                    sqlShowModels.isWithLike(),
+                    sqlShowModels.isNotLike());
+        }
+        String[] fullDatabaseName = sqlShowModels.fullDatabaseName();
+        if (fullDatabaseName.length > 2) {
+            throw new ValidationException(
+                    String.format(
+                            "show models from/in identifier [ %s ] format error",
+                            String.join(".", fullDatabaseName)));
+        }
+        String catalogName =
+                (fullDatabaseName.length == 1)
+                        ? catalogManager.getCurrentCatalog()
+                        : fullDatabaseName[0];
+        String databaseName =
+                (fullDatabaseName.length == 1) ? fullDatabaseName[0] : fullDatabaseName[1];
+        return new ShowModelsOperation(
+                catalogName,
+                databaseName,
+                sqlShowModels.getLikeSqlPattern(),
+                sqlShowModels.isWithLike(),
+                sqlShowModels.isNotLike(),
+                sqlShowModels.getPreposition());
     }
 }

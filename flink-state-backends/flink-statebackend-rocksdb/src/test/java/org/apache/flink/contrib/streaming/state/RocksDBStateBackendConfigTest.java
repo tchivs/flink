@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.configuration.ConfigOption;
@@ -29,14 +30,17 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.operators.testutils.MockEnvironment;
 import org.apache.flink.runtime.operators.testutils.MockEnvironmentBuilder;
 import org.apache.flink.runtime.query.KvStateRegistry;
-import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
+import org.apache.flink.runtime.query.TaskKvStateRegistry;
+import org.apache.flink.runtime.state.CheckpointableKeyedStateBackend;
 import org.apache.flink.runtime.state.KeyGroupRange;
+import org.apache.flink.runtime.state.KeyedStateBackendParametersImpl;
 import org.apache.flink.runtime.state.StateBackend;
 import org.apache.flink.runtime.state.filesystem.FsStateBackend;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSetFactory;
@@ -408,20 +412,25 @@ public class RocksDBStateBackendConfigTest {
         assertNull(rocksDbBackend.getDbStoragePaths());
 
         final MockEnvironment env = getMockEnvironment(dir1);
+        JobID jobID = env.getJobID();
+        KeyGroupRange keyGroupRange = new KeyGroupRange(0, 0);
+        TaskKvStateRegistry kvStateRegistry = env.getTaskKvStateRegistry();
+        CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
         RocksDBKeyedStateBackend<Integer> keyedBackend =
                 (RocksDBKeyedStateBackend<Integer>)
                         rocksDbBackend.createKeyedStateBackend(
-                                env,
-                                env.getJobID(),
-                                "test_op",
-                                IntSerializer.INSTANCE,
-                                1,
-                                new KeyGroupRange(0, 0),
-                                env.getTaskKvStateRegistry(),
-                                TtlTimeProvider.DEFAULT,
-                                new UnregisteredMetricsGroup(),
-                                Collections.emptyList(),
-                                new CloseableRegistry());
+                                new KeyedStateBackendParametersImpl<>(
+                                        (Environment) env,
+                                        jobID,
+                                        "test_op",
+                                        IntSerializer.INSTANCE,
+                                        1,
+                                        keyGroupRange,
+                                        kvStateRegistry,
+                                        TtlTimeProvider.DEFAULT,
+                                        (MetricGroup) new UnregisteredMetricsGroup(),
+                                        Collections.emptyList(),
+                                        cancelStreamRegistry));
 
         try {
             File instanceBasePath = keyedBackend.getInstanceBasePath();
@@ -452,18 +461,24 @@ public class RocksDBStateBackendConfigTest {
 
             boolean hasFailure = false;
             try {
+                JobID jobID = env.getJobID();
+                KeyGroupRange keyGroupRange = new KeyGroupRange(0, 0);
+                TaskKvStateRegistry kvStateRegistry =
+                        new KvStateRegistry().createTaskRegistry(env.getJobID(), new JobVertexID());
+                CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
                 rocksDbBackend.createKeyedStateBackend(
-                        env,
-                        env.getJobID(),
-                        "foobar",
-                        IntSerializer.INSTANCE,
-                        1,
-                        new KeyGroupRange(0, 0),
-                        new KvStateRegistry().createTaskRegistry(env.getJobID(), new JobVertexID()),
-                        TtlTimeProvider.DEFAULT,
-                        new UnregisteredMetricsGroup(),
-                        Collections.emptyList(),
-                        new CloseableRegistry());
+                        new KeyedStateBackendParametersImpl<>(
+                                (Environment) env,
+                                jobID,
+                                "foobar",
+                                IntSerializer.INSTANCE,
+                                1,
+                                keyGroupRange,
+                                kvStateRegistry,
+                                TtlTimeProvider.DEFAULT,
+                                (MetricGroup) new UnregisteredMetricsGroup(),
+                                Collections.emptyList(),
+                                cancelStreamRegistry));
             } catch (Exception e) {
                 assertTrue(e.getMessage().contains("No local storage directories available"));
                 assertTrue(e.getMessage().contains(targetDir.getAbsolutePath()));
@@ -492,20 +507,25 @@ public class RocksDBStateBackendConfigTest {
                     targetDir1.getAbsolutePath(), targetDir2.getAbsolutePath());
 
             try {
-                AbstractKeyedStateBackend<Integer> keyedStateBackend =
+                JobID jobID = env.getJobID();
+                KeyGroupRange keyGroupRange = new KeyGroupRange(0, 0);
+                TaskKvStateRegistry kvStateRegistry =
+                        new KvStateRegistry().createTaskRegistry(env.getJobID(), new JobVertexID());
+                CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
+                CheckpointableKeyedStateBackend<Integer> keyedStateBackend =
                         rocksDbBackend.createKeyedStateBackend(
-                                env,
-                                env.getJobID(),
-                                "foobar",
-                                IntSerializer.INSTANCE,
-                                1,
-                                new KeyGroupRange(0, 0),
-                                new KvStateRegistry()
-                                        .createTaskRegistry(env.getJobID(), new JobVertexID()),
-                                TtlTimeProvider.DEFAULT,
-                                new UnregisteredMetricsGroup(),
-                                Collections.emptyList(),
-                                new CloseableRegistry());
+                                new KeyedStateBackendParametersImpl<>(
+                                        (Environment) env,
+                                        jobID,
+                                        "foobar",
+                                        IntSerializer.INSTANCE,
+                                        1,
+                                        keyGroupRange,
+                                        kvStateRegistry,
+                                        TtlTimeProvider.DEFAULT,
+                                        (MetricGroup) new UnregisteredMetricsGroup(),
+                                        Collections.emptyList(),
+                                        cancelStreamRegistry));
 
                 IOUtils.closeQuietly(keyedStateBackend);
                 keyedStateBackend.dispose();
@@ -604,7 +624,13 @@ public class RocksDBStateBackendConfigTest {
 
             try (RocksDBResourceContainer optionsContainer =
                     new RocksDBResourceContainer(
-                            configuration, PredefinedOptions.DEFAULT, null, null, null, false)) {
+                            configuration,
+                            PredefinedOptions.DEFAULT,
+                            null,
+                            null,
+                            null,
+                            false,
+                            new JobID())) {
 
                 DBOptions dbOptions = optionsContainer.getDbOptions();
                 assertEquals(-1, dbOptions.maxOpenFiles());
@@ -658,7 +684,9 @@ public class RocksDBStateBackendConfigTest {
                 new RocksDBOptionsFactory() {
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 
@@ -688,7 +716,8 @@ public class RocksDBStateBackendConfigTest {
                         null,
                         null,
                         null,
-                        false)) {
+                        false,
+                        new JobID())) {
 
             final ColumnFamilyOptions columnFamilyOptions = optionsContainer.getColumnOptions();
             assertNotNull(columnFamilyOptions);
@@ -702,7 +731,8 @@ public class RocksDBStateBackendConfigTest {
                         null,
                         null,
                         null,
-                        false)) {
+                        false,
+                        new JobID())) {
 
             final ColumnFamilyOptions columnFamilyOptions = optionsContainer.getColumnOptions();
             assertNotNull(columnFamilyOptions);
@@ -716,7 +746,9 @@ public class RocksDBStateBackendConfigTest {
                 new RocksDBOptionsFactory() {
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 
@@ -869,6 +901,74 @@ public class RocksDBStateBackendConfigTest {
         assertTrue(0.3 == rocksDBStateBackend.getOverlapFractionThreshold());
     }
 
+    @Test
+    public void testDefaultUseIngestDB() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        assertEquals(
+                RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE.defaultValue(),
+                rocksDBStateBackend.getUseIngestDbRestoreMode());
+    }
+
+    @Test
+    public void testConfigureUseIngestDB() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        Configuration configuration = new Configuration();
+        configuration.set(RocksDBConfigurableOptions.USE_INGEST_DB_RESTORE_MODE, true);
+        rocksDBStateBackend =
+                rocksDBStateBackend.configure(configuration, getClass().getClassLoader());
+        assertTrue(rocksDBStateBackend.getUseIngestDbRestoreMode());
+    }
+
+    @Test
+    public void testDefaultUseDeleteFilesInRange() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        assertEquals(
+                RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING
+                        .defaultValue(),
+                rocksDBStateBackend.isRescalingUseDeleteFilesInRange());
+    }
+
+    @Test
+    public void testConfigureUseFilesInRange() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        Configuration configuration = new Configuration();
+        configuration.set(
+                RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING,
+                !RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING
+                        .defaultValue());
+        rocksDBStateBackend =
+                rocksDBStateBackend.configure(configuration, getClass().getClassLoader());
+        assertEquals(
+                !RocksDBConfigurableOptions.USE_DELETE_FILES_IN_RANGE_DURING_RESCALING
+                        .defaultValue(),
+                rocksDBStateBackend.isRescalingUseDeleteFilesInRange());
+    }
+
+    @Test
+    public void testDefaultIncrementalRestoreInstanceBufferSize() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        assertEquals(
+                RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE
+                        .defaultValue(),
+                rocksDBStateBackend.getIncrementalRestoreAsyncCompactAfterRescale());
+    }
+
+    @Test
+    public void testConfigureIncrementalRestoreInstanceBufferSize() {
+        EmbeddedRocksDBStateBackend rocksDBStateBackend = new EmbeddedRocksDBStateBackend(true);
+        Configuration configuration = new Configuration();
+        boolean notDefault =
+                !RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE
+                        .defaultValue();
+        configuration.set(
+                RocksDBConfigurableOptions.INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE,
+                notDefault);
+        rocksDBStateBackend =
+                rocksDBStateBackend.configure(configuration, getClass().getClassLoader());
+        assertEquals(
+                notDefault, rocksDBStateBackend.getIncrementalRestoreAsyncCompactAfterRescale());
+    }
+
     private void verifySetParameter(Runnable setter) {
         try {
             setter.run();
@@ -923,7 +1023,7 @@ public class RocksDBStateBackendConfigTest {
 
         @Override
         public DBOptions createDBOptions(
-                DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                DBOptions currentOptions, Collection<AutoCloseable> handlesToClose, JobID jobID) {
             return currentOptions.setMaxBackgroundJobs(backgroundJobs);
         }
 

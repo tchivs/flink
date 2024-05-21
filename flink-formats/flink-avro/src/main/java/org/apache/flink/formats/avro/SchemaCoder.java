@@ -18,6 +18,8 @@
 
 package org.apache.flink.formats.avro;
 
+import org.apache.flink.annotation.Confluent;
+
 import org.apache.avro.Schema;
 
 import java.io.IOException;
@@ -47,5 +49,10 @@ public interface SchemaCoder {
          * @return new instance {@link SchemaCoder}
          */
         SchemaCoder get();
+
+        @Confluent
+        default SchemaCoder get(SchemaCoderProviderContext context) {
+            return get();
+        }
     }
 }

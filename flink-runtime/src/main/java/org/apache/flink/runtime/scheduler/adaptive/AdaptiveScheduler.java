@@ -25,6 +25,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.configuration.SchedulerExecutionMode;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.configuration.WebOptions;
 import org.apache.flink.core.execution.CheckpointType;
 import org.apache.flink.core.execution.SavepointFormatType;
@@ -43,6 +44,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointStatsSnapshot;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
+import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetrics;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
@@ -71,6 +73,7 @@ import org.apache.flink.runtime.jobgraph.JobType;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
 import org.apache.flink.runtime.jobmanager.PartitionProducerDisposedException;
 import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableException;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
@@ -215,6 +218,8 @@ public class AdaptiveScheduler
     private boolean isTransitioningState = false;
 
     private int numRestarts = 0;
+    private int numRestartsDueToRescales = 0;
+    private int numRestartsDueToErrors = 0;
 
     private final MutableVertexAttemptNumberStore vertexAttemptNumberStore =
             new DefaultVertexAttemptNumberStore();
@@ -232,6 +237,9 @@ public class AdaptiveScheduler
     private final JobManagerJobMetricGroup jobManagerJobMetricGroup;
 
     private final Duration slotIdleTimeout;
+
+    private final JobFailureMetricReporter jobFailureMetricReporter;
+    private final boolean reportEventsAsSpans;
 
     public AdaptiveScheduler(
             JobGraph jobGraph,
@@ -319,6 +327,12 @@ public class AdaptiveScheduler
                 tmpJobStatusListeners::add,
                 initializationTimestamp,
                 jobStatusMetricsSettings);
+        jobManagerJobMetricGroup.gauge(
+                org.apache.flink.runtime.metrics.MetricNames.NUM_RESCALE_RESTARTS,
+                () -> numRestartsDueToRescales);
+        jobManagerJobMetricGroup.gauge(
+                org.apache.flink.runtime.metrics.MetricNames.NUM_ERROR_RESTARTS,
+                () -> numRestartsDueToErrors);
 
         jobStatusListeners = Collections.unmodifiableCollection(tmpJobStatusListeners);
         this.failureEnrichers = failureEnrichers;
@@ -328,6 +342,9 @@ public class AdaptiveScheduler
         this.jobManagerJobMetricGroup = jobManagerJobMetricGroup;
         this.slotIdleTimeout =
                 Duration.ofMillis(configuration.get(JobManagerOptions.SLOT_IDLE_TIMEOUT));
+
+        this.jobFailureMetricReporter = new JobFailureMetricReporter(jobManagerJobMetricGroup);
+        this.reportEventsAsSpans = configuration.get(TraceOptions.REPORT_EVENTS_AS_SPANS);
     }
 
     private static void assertPreconditions(JobGraph jobGraph) throws RuntimeException {
@@ -754,6 +771,16 @@ public class AdaptiveScheduler
     }
 
     @Override
+    public void reportInitializationMetrics(
+            JobID jobId, SubTaskInitializationMetrics initializationMetrics) {
+        state.tryRun(
+                StateWithExecutionGraph.class,
+                stateWithExecutionGraph ->
+                        stateWithExecutionGraph.reportInitializationMetrics(initializationMetrics),
+                "reportCheckpointMetrics");
+    }
+
+    @Override
     public CompletableFuture<String> stopWithSavepoint(
             @Nullable String targetDirectory, boolean terminate, SavepointFormatType formatType) {
         return state.tryCall(
@@ -889,6 +916,7 @@ public class AdaptiveScheduler
                 jobInformation.getName(),
                 jobStatus,
                 cause,
+                JsonPlanGenerator.generatePlan(jobGraph),
                 jobInformation.getCheckpointingSettings(),
                 initializationTimestamp,
                 jobGraph.getVertices(),
@@ -903,7 +931,9 @@ public class AdaptiveScheduler
                 new WaitingForResources.Factory(
                         this,
                         LOG,
-                        this.initialResourceAllocationTimeout,
+                        previousExecutionGraph == null
+                                ? this.initialResourceAllocationTimeout
+                                : Duration.ofMillis(-1L),
                         this.resourceStabilizationTimeout,
                         previousExecutionGraph));
     }
@@ -962,7 +992,8 @@ public class AdaptiveScheduler
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler,
             Duration backoffTime,
-            List<ExceptionHistoryEntry> failureCollection) {
+            List<ExceptionHistoryEntry> failureCollection,
+            Cause cause) {
 
         for (ExecutionVertex executionVertex : executionGraph.getAllExecutionVertices()) {
             final int attemptNumber =
@@ -985,6 +1016,14 @@ public class AdaptiveScheduler
                         userCodeClassLoader,
                         failureCollection));
         numRestarts++;
+        switch (cause) {
+            case RESCALE:
+                numRestartsDueToRescales++;
+                break;
+            case ERROR:
+                numRestartsDueToErrors++;
+                break;
+        }
     }
 
     @Override
@@ -1201,8 +1240,22 @@ public class AdaptiveScheduler
     }
 
     @Override
-    public FailureResult howToHandleFailure(Throwable failure) {
-        if (ExecutionFailureHandler.isUnrecoverableError(failure)) {
+    public FailureResult howToHandleFailure(
+            Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+        FailureResult failureResult = determineFailureResult(failure, failureLabels);
+        if (reportEventsAsSpans) {
+            // TODO: replace with reporting as event once events are supported.
+            // Add reporting as callback for when the failure labeling is completed.
+            failureLabels.thenAcceptAsync(
+                    (labels) -> jobFailureMetricReporter.reportJobFailure(failureResult, labels),
+                    componentMainThreadExecutor);
+        }
+        return failureResult;
+    }
+
+    private FailureResult determineFailureResult(
+            Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
+        if (ExecutionFailureHandler.isUnrecoverableError(failure, failureLabels)) {
             return FailureResult.canNotRestart(
                     new JobException("The failure is not recoverable", failure));
         }

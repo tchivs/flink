@@ -27,6 +27,7 @@ import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
+import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetrics;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.AccessExecution;
@@ -236,6 +237,10 @@ abstract class StateWithExecutionGraph implements State {
                 executionAttemptID, checkpointId, checkpointMetrics);
     }
 
+    void reportInitializationMetrics(SubTaskInitializationMetrics initializationMetrics) {
+        executionGraphHandler.reportInitializationMetrics(initializationMetrics);
+    }
+
     void updateAccumulators(AccumulatorSnapshot accumulatorSnapshot) {
         executionGraph.updateAccumulators(accumulatorSnapshot);
     }
@@ -356,7 +361,7 @@ abstract class StateWithExecutionGraph implements State {
     }
 
     /** Transition to different state when failure occurs. Stays in the same state by default. */
-    abstract void onFailure(Throwable cause);
+    abstract void onFailure(Throwable cause, CompletableFuture<Map<String, String>> failureLabels);
 
     /**
      * Transition to different state when the execution graph reaches a globally terminal state.
@@ -369,7 +374,7 @@ abstract class StateWithExecutionGraph implements State {
     public void handleGlobalFailure(
             Throwable cause, CompletableFuture<Map<String, String>> failureLabels) {
         failureCollection.add(ExceptionHistoryEntry.createGlobal(cause, failureLabels));
-        onFailure(cause);
+        onFailure(cause, failureLabels);
     }
 
     /**
@@ -401,7 +406,8 @@ abstract class StateWithExecutionGraph implements State {
                         ExceptionHistoryEntry.create(execution, taskName, failureLabels));
                 onFailure(
                         ErrorInfo.handleMissingThrowable(
-                                taskExecutionStateTransition.getError(userCodeClassLoader)));
+                                taskExecutionStateTransition.getError(userCodeClassLoader)),
+                        failureLabels);
             }
         }
         return successfulUpdate;

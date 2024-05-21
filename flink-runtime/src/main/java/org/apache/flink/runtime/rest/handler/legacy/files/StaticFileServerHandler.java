@@ -36,6 +36,7 @@ import org.apache.flink.runtime.rest.handler.util.MimeTypes;
 import org.apache.flink.runtime.rest.messages.ErrorResponseBody;
 import org.apache.flink.runtime.webmonitor.RestfulGateway;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
+import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFutureListener;
@@ -65,7 +66,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.text.ParseException;
+import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collections;
@@ -73,6 +74,10 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpHeaderNames.CACHE_CONTROL;
 import static org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
@@ -113,6 +118,10 @@ public class StaticFileServerHandler<T extends RestfulGateway> extends LeaderRet
 
     /** The path in which the static documents are. */
     private final File rootPath;
+
+    /** Active processes of loading classpath resources to local temporary files. */
+    private final ConcurrentMap<File, CompletableFuture<File>> activeLoadings =
+            new ConcurrentHashMap<>();
 
     public StaticFileServerHandler(
             GatewayRetriever<? extends T> retriever, Time timeout, File rootPath)
@@ -155,49 +164,45 @@ public class StaticFileServerHandler<T extends RestfulGateway> extends LeaderRet
 
     /** Response when running with leading JobManager. */
     private void respondToRequest(
-            ChannelHandlerContext ctx, HttpRequest request, String requestPath)
-            throws IOException, ParseException, URISyntaxException, RestHandlerException {
+            ChannelHandlerContext ctx, HttpRequest request, String requestPath) throws Exception {
 
         // convert to absolute path
         final File file = new File(rootPath, requestPath);
 
         if (!file.exists()) {
-            // file does not exist. Try to load it with the classloader
-            ClassLoader cl = StaticFileServerHandler.class.getClassLoader();
-
-            try (InputStream resourceStream = cl.getResourceAsStream("web" + requestPath)) {
-                boolean success = false;
+            CompletableFuture<File> ownFuture = new CompletableFuture<>();
+            CompletableFuture<File> resultFuture =
+                    activeLoadings.computeIfAbsent(file, ign -> ownFuture);
+            if (resultFuture == ownFuture) {
+                logger.debug("Resource not loaded, loading: {}", file);
+                File fileTmp = Files.createTempFile("flink-resource-", null).toFile();
                 try {
-                    if (resourceStream != null) {
-                        URL root = cl.getResource("web");
-                        URL requested = cl.getResource("web" + requestPath);
-
-                        if (root != null && requested != null) {
-                            URI rootURI = new URI(root.getPath()).normalize();
-                            URI requestedURI = new URI(requested.getPath()).normalize();
-
-                            // Check that we don't load anything from outside of the
-                            // expected scope.
-                            if (!rootURI.relativize(requestedURI).equals(requestedURI)) {
-                                logger.debug(
-                                        "Loading missing file from classloader: {}", requestPath);
-                                // ensure that directory to file exists.
-                                file.getParentFile().mkdirs();
-                                Files.copy(resourceStream, file.toPath());
-
-                                success = true;
-                            }
-                        }
-                    }
-                } catch (Throwable t) {
-                    logger.error("error while responding", t);
+                    loadResource(requestPath, fileTmp);
+                    file.getParentFile().mkdirs();
+                    Files.move(fileTmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE);
+                    resultFuture.complete(file);
+                } catch (Throwable e) {
+                    resultFuture.completeExceptionally(e);
+                    logger.error("error while responding", e);
+                    ExceptionUtils.rethrowException(e);
                 } finally {
-                    if (!success) {
-                        logger.debug(
-                                "Unable to load requested file {} from classloader", requestPath);
-                        throw new NotFoundException(
-                                String.format("Unable to load requested file %s.", requestPath));
+                    activeLoadings.remove(file, resultFuture);
+                    try {
+                        fileTmp.delete();
+                    } catch (Exception e) {
+                        logger.warn("error while deleting temporary file: {}", fileTmp, e);
                     }
+                }
+            } else {
+                logger.debug("Resource is being loaded, waiting: {}", file);
+                try {
+                    resultFuture.get();
+                } catch (InterruptedException e) {
+                    logger.error("error while responding", e);
+                    throw e;
+                } catch (ExecutionException e) {
+                    logger.error("error while responding", e);
+                    ExceptionUtils.rethrowException(e.getCause());
                 }
             }
         }
@@ -279,6 +284,39 @@ public class StaticFileServerHandler<T extends RestfulGateway> extends LeaderRet
             logger.error("Failed to serve file.", e);
             throw new RestHandlerException("Internal server error.", INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private File loadResource(String requestPath, File target)
+            throws IOException, NotFoundException, URISyntaxException {
+        // file does not exist. Try to load it with the classloader
+        ClassLoader cl = StaticFileServerHandler.class.getClassLoader();
+
+        try (InputStream resourceStream = cl.getResourceAsStream("web" + requestPath)) {
+            if (resourceStream != null) {
+                URL root = cl.getResource("web");
+                URL requested = cl.getResource("web" + requestPath);
+
+                if (root != null && requested != null) {
+                    URI rootURI = new URI(root.getPath()).normalize();
+                    URI requestedURI = new URI(requested.getPath()).normalize();
+
+                    // Check that we don't load anything from outside of the
+                    // expected scope.
+                    if (!rootURI.relativize(requestedURI).equals(requestedURI)) {
+                        logger.debug("Loading missing file from classloader: {}", requestPath);
+                        Files.copy(
+                                resourceStream,
+                                target.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+
+                        return target;
+                    }
+                }
+            }
+        }
+        logger.debug("Unable to load requested file {} from classloader", requestPath);
+        throw new NotFoundException(
+                String.format("Unable to load requested file %s.", requestPath));
     }
 
     @Override

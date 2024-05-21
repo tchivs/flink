@@ -57,7 +57,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>Gateways which implement this method run a REST endpoint which is reachable under the returned
  * address.
  */
-public interface RestfulGateway extends RpcGateway {
+public interface RestfulGateway extends RpcGateway, ConfluentRestfulGateway {
 
     /**
      * Cancel the given job.
@@ -313,5 +313,10 @@ public interface RestfulGateway extends RpcGateway {
     default CompletableFuture<Acknowledge> updateJobResourceRequirements(
             JobID jobId, JobResourceRequirements jobResourceRequirements) {
         throw new UnsupportedOperationException("Operation is not yet implemented.");
+    }
+
+    /** Activate the standby TaskManager on given address. */
+    default CompletableFuture<Void> activateStandbyTaskManager(String rpcHost, String rpcPort) {
+        return FutureUtils.completedVoidFuture();
     }
 }

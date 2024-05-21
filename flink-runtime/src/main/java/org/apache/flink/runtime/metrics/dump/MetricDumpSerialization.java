@@ -37,6 +37,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +83,9 @@ public class MetricDumpSerialization {
         public final int numGauges;
         public final int numMeters;
         public final int numHistograms;
+
+        // should the TS be created before serialization (== evaluation of metrics)?
+        public final Instant timestamp = Clock.systemUTC().instant();
 
         public MetricSerializationResult(
                 byte[] serializedCounters,
@@ -251,6 +256,7 @@ public class MetricDumpSerialization {
                 out.writeInt(operatorInfo.subtaskIndex);
                 out.writeInt(operatorInfo.attemptNumber);
                 out.writeUTF(operatorInfo.operatorName);
+                out.writeUTF(operatorInfo.operatorId);
                 break;
             case INFO_CATEGORY_JM_OPERATOR:
                 QueryScopeInfo.JobManagerOperatorQueryScopeInfo jmOperatorInfo =
@@ -473,8 +479,15 @@ public class MetricDumpSerialization {
                 subtaskIndex = dis.readInt();
                 attemptNumber = dis.readInt();
                 operatorName = dis.readUTF();
+                final String operatorId = dis.readUTF();
                 return new QueryScopeInfo.OperatorQueryScopeInfo(
-                        jobID, vertexID, subtaskIndex, attemptNumber, operatorName, scope);
+                        jobID,
+                        vertexID,
+                        subtaskIndex,
+                        attemptNumber,
+                        operatorName,
+                        operatorId,
+                        scope);
             case INFO_CATEGORY_JM_OPERATOR:
                 jobID = dis.readUTF();
                 vertexID = dis.readUTF();

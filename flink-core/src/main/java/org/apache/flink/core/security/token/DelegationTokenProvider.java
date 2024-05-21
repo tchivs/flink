@@ -19,6 +19,7 @@
 package org.apache.flink.core.security.token;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.Optional;
@@ -30,7 +31,7 @@ import java.util.Optional;
  * DelegationTokenReceiver} instances both on JobManager and TaskManager side.
  */
 @Experimental
-public interface DelegationTokenProvider {
+public interface DelegationTokenProvider extends DelegationTokenProviderConfluent {
 
     /** Config prefix of providers. */
     String CONFIG_PREFIX = "security.delegation.token.provider";
@@ -88,4 +89,28 @@ public interface DelegationTokenProvider {
      * @return the obtained delegation tokens.
      */
     ObtainedDelegationTokens obtainDelegationTokens() throws Exception;
+
+    /**
+     * Registers a new job that started with the provider, which may need to do job specific
+     * fetching for the token. If so, the method can return true and trigger another refresh.
+     *
+     * <p>This call must not fail since it could leave things in an inconsistent state.
+     *
+     * @param jobId The job id of the job
+     * @param jobConfiguration The job configuration
+     * @return If the newly registered job should trigger an immediate call to {@code
+     *     obtainDelegationTokens} or not.
+     */
+    default boolean registerJob(JobID jobId, Configuration jobConfiguration) {
+        return false;
+    }
+
+    /**
+     * Called when the job has ended and should be unregistered.
+     *
+     * <p>This call must not fail since it could leave things in an inconsistent state.
+     *
+     * @param jobId The job id of the job
+     */
+    default void unregisterJob(JobID jobId) {}
 }

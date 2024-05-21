@@ -65,7 +65,8 @@ public interface JobMasterGateway
                 KvStateLocationOracle,
                 KvStateRegistryGateway,
                 JobMasterOperatorEventGateway,
-                BlocklistListener {
+                BlocklistListener,
+                ConfluentJobMasterGateway {
 
     /**
      * Cancels the currently executed job.

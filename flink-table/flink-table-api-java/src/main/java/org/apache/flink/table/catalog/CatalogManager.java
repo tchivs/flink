@@ -24,6 +24,7 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.CatalogNotExistException;
 import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.ModelException;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
@@ -32,16 +33,20 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
 import org.apache.flink.table.catalog.exceptions.PartitionNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.listener.AlterDatabaseEvent;
+import org.apache.flink.table.catalog.listener.AlterModelEvent;
 import org.apache.flink.table.catalog.listener.AlterTableEvent;
 import org.apache.flink.table.catalog.listener.CatalogContext;
 import org.apache.flink.table.catalog.listener.CatalogModificationListener;
 import org.apache.flink.table.catalog.listener.CreateDatabaseEvent;
+import org.apache.flink.table.catalog.listener.CreateModelEvent;
 import org.apache.flink.table.catalog.listener.CreateTableEvent;
 import org.apache.flink.table.catalog.listener.DropDatabaseEvent;
+import org.apache.flink.table.catalog.listener.DropModelEvent;
 import org.apache.flink.table.catalog.listener.DropTableEvent;
 import org.apache.flink.table.delegation.Planner;
 import org.apache.flink.table.expressions.resolver.ExpressionResolver.ExpressionResolverBuilder;
@@ -57,11 +62,13 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -201,17 +208,15 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
             checkNotNull(config, "Config cannot be null");
             checkNotNull(catalogStoreHolder, "CatalogStoreHolder cannot be null");
             catalogStoreHolder.open();
-            CatalogManager catalogManager =
-                    new CatalogManager(
-                            defaultCatalogName,
-                            defaultCatalog,
-                            dataTypeFactory != null
-                                    ? dataTypeFactory
-                                    : new DataTypeFactoryImpl(classLoader, config, executionConfig),
-                            new ManagedTableListener(classLoader, config),
-                            catalogModificationListeners,
-                            catalogStoreHolder);
-            return catalogManager;
+            return new CatalogManager(
+                    defaultCatalogName,
+                    defaultCatalog,
+                    dataTypeFactory != null
+                            ? dataTypeFactory
+                            : new DataTypeFactoryImpl(classLoader, config, executionConfig),
+                    new ManagedTableListener(classLoader, config),
+                    catalogModificationListeners,
+                    catalogStoreHolder);
         }
     }
 
@@ -820,7 +825,7 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
      *
      * <p><b>NOTE:</b>It is primarily used for interacting with Calcite's schema.
      *
-     * @return list of schemas in the root of catalog manager
+     * @return set of schemas in the root of catalog manager
      */
     public Set<String> listSchemas() {
         return Stream.concat(
@@ -837,7 +842,7 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
      * <p><b>NOTE:</b>It is primarily used for interacting with Calcite's schema.
      *
      * @param catalogName filter for the catalog part of the schema
-     * @return list of schemas with the given prefix
+     * @return set of schemas with the given prefix
      */
     public Set<String> listSchemas(String catalogName) {
         return Stream.concat(
@@ -856,7 +861,7 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
      * <p><b>NOTE:</b>It is primarily used for interacting with Calcite's schema.
      *
      * @param catalogName filter for the catalog part of the schema
-     * @return true if a subschema exists
+     * @return true if a sub-schema exists
      */
     public boolean schemaExists(String catalogName) {
         return getCatalog(catalogName).isPresent()
@@ -1271,6 +1276,195 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
     }
 
     /**
+     * Retrieves a fully qualified model. If the path is not yet fully qualified use {@link
+     * #qualifyIdentifier(UnresolvedIdentifier)} first.
+     *
+     * @param objectIdentifier full path of the model to retrieve
+     * @return model that the path points to.
+     */
+    public Optional<ResolvedCatalogModel> getModel(ObjectIdentifier objectIdentifier) {
+        Optional<Catalog> catalogOptional = getCatalog(objectIdentifier.getCatalogName());
+        ObjectPath objectPath = objectIdentifier.toObjectPath();
+        if (catalogOptional.isPresent()) {
+            Catalog currentCatalog = catalogOptional.get();
+            try {
+                final CatalogModel model = currentCatalog.getModel(objectPath);
+                if (model != null) {
+                    final ResolvedCatalogModel resolvedModel = resolveCatalogModel(model);
+                    return Optional.of(resolvedModel);
+                }
+            } catch (ModelNotExistException e) {
+                // Ignore.
+            } catch (UnsupportedOperationException e) {
+                // Ignore for catalogs that don't support models.
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Like {@link #getModel(ObjectIdentifier)}, but throws an error when the model is not available
+     * in any of the catalogs.
+     */
+    public ResolvedCatalogModel getModelOrError(ObjectIdentifier objectIdentifier) {
+        return getModel(objectIdentifier)
+                .orElseThrow(
+                        () ->
+                                new ModelException(
+                                        String.format(
+                                                "Cannot find model '%s' in any of the catalogs %s.",
+                                                objectIdentifier, listCatalogs())));
+    }
+
+    /**
+     * Returns an array of names of all models registered in the namespace of the current catalog
+     * and database.
+     *
+     * @return names of all registered models
+     */
+    public Set<String> listModels() {
+        return listModels(getCurrentCatalog(), getCurrentDatabase());
+    }
+
+    /**
+     * Returns an array of names of all models registered in the namespace of the given catalog and
+     * database.
+     *
+     * @return names of all registered models
+     */
+    public Set<String> listModels(String catalogName, String databaseName) {
+        Catalog catalog = getCatalogOrThrowException(catalogName);
+        if (catalog == null) {
+            throw new ValidationException(String.format("Catalog %s does not exist", catalogName));
+        }
+        try {
+            return new HashSet<>(catalog.listModels(databaseName));
+        } catch (DatabaseNotExistException e) {
+            throw new ValidationException(
+                    String.format("Database %s does not exist", databaseName), e);
+        }
+    }
+
+    /**
+     * Creates a model in a given fully qualified path.
+     *
+     * @param model The resolved model to put in the given path.
+     * @param objectIdentifier The fully qualified path where to put the model.
+     * @param ignoreIfExists If false exception will be thrown if a model exists in the given path.
+     */
+    public void createModel(
+            CatalogModel model, ObjectIdentifier objectIdentifier, boolean ignoreIfExists) {
+        execute(
+                (catalog, path) -> {
+                    final ResolvedCatalogModel resolvedModel = resolveCatalogModel(model);
+                    catalog.createModel(path, resolvedModel, ignoreIfExists);
+                    catalogModificationListeners.forEach(
+                            listener ->
+                                    listener.onEvent(
+                                            CreateModelEvent.createEvent(
+                                                    CatalogContext.createContext(
+                                                            objectIdentifier.getCatalogName(),
+                                                            catalog),
+                                                    objectIdentifier,
+                                                    resolvedModel,
+                                                    ignoreIfExists)));
+                },
+                objectIdentifier,
+                false,
+                "CreateModel");
+    }
+
+    /**
+     * Alters a model in a given fully qualified path.
+     *
+     * @param modelChange The model containing only changes
+     * @param objectIdentifier The fully qualified path where to alter the model.
+     * @param ignoreIfNotExists If false exception will be thrown if the model to be altered does
+     *     not exist.
+     */
+    public void alterModel(
+            CatalogModel modelChange,
+            ObjectIdentifier objectIdentifier,
+            boolean ignoreIfNotExists) {
+        execute(
+                (catalog, path) -> {
+                    ResolvedCatalogModel resolvedModel = resolveCatalogModel(modelChange);
+                    catalog.alterModel(path, resolvedModel, ignoreIfNotExists);
+                    catalogModificationListeners.forEach(
+                            listener ->
+                                    listener.onEvent(
+                                            AlterModelEvent.createEvent(
+                                                    CatalogContext.createContext(
+                                                            objectIdentifier.getCatalogName(),
+                                                            catalog),
+                                                    objectIdentifier,
+                                                    resolvedModel,
+                                                    ignoreIfNotExists)));
+                },
+                objectIdentifier,
+                ignoreIfNotExists,
+                "AlterModel");
+    }
+
+    /**
+     * Drops a model in a given fully qualified path.
+     *
+     * @param objectIdentifier The fully qualified path of the model to drop.
+     * @param ignoreIfNotExists If false exception will be thrown if the model to drop does not
+     *     exist.
+     */
+    public void dropModel(ObjectIdentifier objectIdentifier, boolean ignoreIfNotExists) {
+        final Optional<ResolvedCatalogModel> resultOpt = getModel(objectIdentifier);
+        if (resultOpt.isPresent()) {
+            execute(
+                    (catalog, path) -> {
+                        ResolvedCatalogModel resolvedModel = resultOpt.get();
+                        catalog.dropModel(path, ignoreIfNotExists);
+                        catalogModificationListeners.forEach(
+                                listener ->
+                                        listener.onEvent(
+                                                DropModelEvent.createEvent(
+                                                        CatalogContext.createContext(
+                                                                objectIdentifier.getCatalogName(),
+                                                                catalog),
+                                                        objectIdentifier,
+                                                        resolvedModel,
+                                                        ignoreIfNotExists)));
+                    },
+                    objectIdentifier,
+                    ignoreIfNotExists,
+                    "DropModel");
+        } else if (!ignoreIfNotExists) {
+            throw new ValidationException(
+                    String.format(
+                            "Model with identifier '%s' does not exist.",
+                            objectIdentifier.asSummaryString()));
+        }
+    }
+
+    public ResolvedCatalogModel resolveCatalogModel(CatalogModel model) {
+        Preconditions.checkNotNull(schemaResolver, "Schema resolver is not initialized.");
+        if (model instanceof ResolvedCatalogModel) {
+            return (ResolvedCatalogModel) model;
+        }
+        // If input schema / output schema does not exist, get the schema from select as statement.
+        final ResolvedSchema resolvedInputSchema;
+        if (model.getInputSchema() == null) {
+            resolvedInputSchema = null;
+        } else {
+            resolvedInputSchema = model.getInputSchema().resolve(schemaResolver);
+        }
+
+        final ResolvedSchema resolvedOutputSchema;
+        if (model.getOutputSchema() == null) {
+            resolvedOutputSchema = null;
+        } else {
+            resolvedOutputSchema = model.getOutputSchema().resolve(schemaResolver);
+        }
+        return ResolvedCatalogModel.of(model, resolvedInputSchema, resolvedOutputSchema);
+    }
+
+    /**
      * A command that modifies given {@link Catalog} in an {@link ObjectPath}. This unifies error
      * handling across different commands.
      */
@@ -1290,10 +1484,15 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
                 command.execute(catalog.get(), objectIdentifier.toObjectPath());
             } catch (TableAlreadyExistException
                     | TableNotExistException
+                    | ModelNotExistException
                     | DatabaseNotExistException e) {
                 throw new ValidationException(getErrorMessage(objectIdentifier, commandName), e);
             } catch (Exception e) {
-                throw new TableException(getErrorMessage(objectIdentifier, commandName), e);
+                if (commandName.contains("Model")) {
+                    throw new ModelException(getErrorMessage(objectIdentifier, commandName), e);
+                } else {
+                    throw new TableException(getErrorMessage(objectIdentifier, commandName), e);
+                }
             }
         } else if (!ignoreNoCatalog) {
             throw new ValidationException(
@@ -1326,12 +1525,45 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
 
         final ResolvedSchema resolvedSchema = table.getUnresolvedSchema().resolve(schemaResolver);
 
-        // Validate partition keys are included in physical columns
+        // Validate distribution keys are included in physical columns
         final List<String> physicalColumns =
                 resolvedSchema.getColumns().stream()
                         .filter(Column::isPhysical)
                         .map(Column::getName)
                         .collect(Collectors.toList());
+
+        final Consumer<TableDistribution> distributionValidation =
+                distribution -> {
+                    distribution
+                            .getBucketKeys()
+                            .forEach(
+                                    bucketKey -> {
+                                        if (!physicalColumns.contains(bucketKey)) {
+                                            throw new ValidationException(
+                                                    String.format(
+                                                            "Invalid bucket key '%s'. A bucket key for a distribution must "
+                                                                    + "reference a physical column in the schema. "
+                                                                    + "Available columns are: %s",
+                                                            bucketKey, physicalColumns));
+                                        }
+                                    });
+
+                    distribution
+                            .getBucketCount()
+                            .ifPresent(
+                                    c -> {
+                                        if (c <= 0) {
+                                            throw new ValidationException(
+                                                    String.format(
+                                                            "Invalid bucket count '%s'. The number of "
+                                                                    + "buckets for a distributed table must be at least 1.",
+                                                            c));
+                                        }
+                                    });
+                };
+
+        table.getDistribution().ifPresent(distributionValidation);
+
         table.getPartitionKeys()
                 .forEach(
                         partitionKey -> {

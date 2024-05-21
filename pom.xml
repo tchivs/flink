@@ -102,6 +102,7 @@ under the License.
 		<module>flink-kubernetes</module>
 		<module>flink-external-resources</module>
 		<module>tools/ci/flink-ci-tools</module>
+		<module>cc-flink-extensions</module>
 	</modules>
 
 	<properties>
@@ -156,11 +157,14 @@ under the License.
 		<assertj.version>3.23.1</assertj.version>
 		<py4j.version>0.10.9.7</py4j.version>
 		<beam.version>2.43.0</beam.version>
-		<protoc.version>3.21.7</protoc.version>
+		<protoc.version>3.22.5</protoc.version>
+		<error_prone.version>2.14.0</error_prone.version>
 		<okhttp.version>3.14.9</okhttp.version>
 		<testcontainers.version>1.18.3</testcontainers.version>
 		<lz4.version>1.8.0</lz4.version>
 		<commons.io.version>2.15.1</commons.io.version>
+		<grpc.version>1.53.0</grpc.version>
+		<annotation-api.version>1.2</annotation-api.version>
 		<japicmp.skip>false</japicmp.skip>
 		<flink.convergence.phase>validate</flink.convergence.phase>
 		<!--
@@ -210,6 +214,10 @@ under the License.
 		<!-- Can be set to any value to reproduce a specific build. -->
 		<test.randomization.seed/>
 		<test.unit.pattern>**/*Test.*</test.unit.pattern>
+		<animal-sniffer-annotations.version>1.18</animal-sniffer-annotations.version>
+
+		<!-- Align versions of Kafka dependency across the repository -->
+		<kafka.version>7.2.7-3-ce</kafka.version>
 	</properties>
 
 	<dependencies>
@@ -751,6 +759,13 @@ under the License.
 				<groupId>org.joda</groupId>
 				<artifactId>joda-convert</artifactId>
 				<version>1.7</version>
+			</dependency>
+
+			<dependency>
+				<!-- for security reasons -->
+				<groupId>net.minidev</groupId>
+				<artifactId>json-smart</artifactId>
+				<version>2.4.10</version>
 			</dependency>
 
 			<!-- kryo used in different versions by Flink an chill -->
@@ -1418,7 +1433,7 @@ under the License.
 											<version>[3.8.6]</version>
 										</requireMavenVersion>
 										<requireJavaVersion>
-											<version>[1.8.0,1.8.1)</version>
+											<version>[11.0.0,11.1.0)</version>
 										</requireJavaVersion>
 									</rules>
 								</configuration>
@@ -1537,10 +1552,26 @@ under the License.
 								<pattern>Licensed to the Apache Software Foundation (ASF) under one</pattern>
 							</patterns>
 						</license>
+						<!-- Enforce this license:
+							Copyright 2023 Confluent Inc.
+						-->
+						<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+							<licenseFamilyCategory>CFLT</licenseFamilyCategory>
+							<licenseFamilyName>Confluent Copyright</licenseFamilyName>
+							<notes />
+							<patterns>
+								<pattern>Copyright 2022 Confluent Inc.</pattern>
+								<pattern>Copyright 2023 Confluent Inc.</pattern>
+								<pattern>Copyright 2024 Confluent Inc.</pattern>
+							</patterns>
+						</license>
 					</licenses>
 					<licenseFamilies>
 						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
 							<familyName>Apache License 2.0</familyName>
+						</licenseFamily>
+						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+							<familyName>Confluent Copyright</familyName>
 						</licenseFamily>
 					</licenseFamilies>
 					<excludes>
@@ -1617,6 +1648,8 @@ under the License.
 						<exclude>flink-end-to-end-tests/flink-tpcds-test/tpcds-tool/answer_set/*</exclude>
 						<exclude>flink-end-to-end-tests/flink-tpcds-test/tpcds-tool/query/*</exclude>
 						<exclude>flink-table/flink-table-code-splitter/src/test/resources/**</exclude>
+						<exclude>flink-connectors/confluent-connector-kafka/flink-connector-kafka/src/test/resources/**</exclude>
+						<exclude>flink-connectors/confluent-connector-kafka/tools/japicmp-output/**</exclude>
 
 						<!-- ArchUnit violation stores  -->
 						<exclude>**/archunit-violations/**</exclude>
@@ -1687,6 +1720,18 @@ under the License.
 
 						<!-- The most recently published version configuration file -->
 						<exclude>flink-test-utils-parent/flink-migration-test-utils/src/main/resources/most_recently_published_version</exclude>
+
+						<!-- CFLT specific excludes -->
+						<exclude>mk-include/**</exclude>
+						<exclude>.semaphore/**</exclude>
+						<exclude>Makefile</exclude>
+						<exclude>service.yml</exclude>
+						<exclude>tools/ci/confluent/**</exclude>
+
+						<!-- confluent-specific json files -->
+						<exclude>cc-flink-extensions/**/*.json</exclude>
+						<exclude>flink-runtime-web/src/main/resources/preload_plan.json</exclude>
+						<exclude>flink-runtime-web/src/test/resources/compiled_plan.json</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
@@ -2341,6 +2386,31 @@ under the License.
 							<exclude>*flink-yarn-tests*</exclude>
 						</excludes>
 					</configuration>
+				</plugin>
+
+				<plugin>
+					<!-- https://confluentinc.atlassian.net/browse/TIF-432 -->
+					<artifactId>maven-antrun-plugin</artifactId>
+					<version>3.1.0</version>
+					<executions>
+						<execution>
+							<phase>initialize</phase>
+							<configuration>
+								<target>
+									<copy file="${project.basedir}/git-hooks/pre-push"
+										  tofile="${project.basedir}/.git/hooks/pre-push"/>
+									<chmod file=".git/hooks/pre-push" perm="755"/>
+									<exec executable="/usr/bin/env">
+										<arg line="git config --local core.hooksPath ${project.basedir}/.git/hooks"/>
+									</exec>
+								</target>
+							</configuration>
+							<goals>
+								<goal>run</goal>
+							</goals>
+							<inherited>false</inherited>
+						</execution>
+					</executions>
 				</plugin>
 			</plugins>
 		</pluginManagement>

@@ -33,6 +33,7 @@ import org.apache.flink.configuration.HeartbeatManagerOptions;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.core.execution.SavepointFormatType;
+import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.core.io.InputSplitAssigner;
 import org.apache.flink.core.io.InputSplitSource;
@@ -837,6 +838,16 @@ class JobMasterTest {
             assertThat(savepointCheckpoint).isNotNull();
 
             assertThat(savepointCheckpoint.getCheckpointID()).isEqualTo(savepointId);
+            assertThat(savepointCheckpoint.getExternalPointer())
+                    .isEqualTo(
+                            new org.apache.flink.core.fs.Path(
+                                            savepointRestoreSettings.getRestorePath())
+                                    // add scheme
+                                    .makeQualified(FileSystem.getLocalFileSystem())
+                                    // we're pointing to a file, which is interpreted as a metadata
+                                    // file, so the savepoint is the containing directory
+                                    .getParent()
+                                    .toString());
         }
     }
 

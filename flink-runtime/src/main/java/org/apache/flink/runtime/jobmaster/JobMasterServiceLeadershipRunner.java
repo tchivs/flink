@@ -538,4 +538,19 @@ public class JobMasterServiceLeadershipRunner implements JobManagerRunner, Leade
         STOPPED,
         JOB_COMPLETED,
     }
+
+    @Override
+    public CompletableFuture<Void> fail(Exception error, Time timeout) {
+        synchronized (lock) {
+            return getJobMasterGateway()
+                    .thenCompose(jobMasterGateway -> jobMasterGateway.fail(error, timeout))
+                    .exceptionally(
+                            e -> {
+                                throw new CompletionException(
+                                        new FlinkException(
+                                                "Failing failed.",
+                                                ExceptionUtils.stripCompletionException(e)));
+                            });
+        }
+    }
 }

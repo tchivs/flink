@@ -73,6 +73,45 @@
       }
     }
   }, {
+    "url" : "/confluent/submit/compiled-plan",
+    "method" : "POST",
+    "status-code" : "202 Accepted",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:ConfluentJobSubmitRequestBody",
+      "properties" : {
+        "jobId" : {
+          "type" : "string"
+        },
+        "savepointPath" : {
+          "type" : "string"
+        },
+        "generatorArguments" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "configuration" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:EmptyResponseBody"
+    }
+  }, {
     "url" : "/datasets",
     "method" : "GET",
     "status-code" : "200 OK",
@@ -1054,6 +1093,83 @@
           "type" : "object",
           "additionalProperties" : {
             "type" : "any"
+          }
+        }
+      }
+    }
+  }, {
+    "url" : "/jobs/:jobid/autopilot-metrics",
+    "method" : "POST",
+    "status-code" : "200 OK",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ {
+        "key" : "jobid"
+      } ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:metrics:AutopilotMetricsRequestBody",
+      "properties" : {
+        "taskManagerMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "taskMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "operatorMetrics" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:metrics:AutopilotMetricsResponseBody",
+      "properties" : {
+        "taskManagerTimestamps" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "taskManagerMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
+          }
+        },
+        "taskMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
+          }
+        },
+        "operatorMetrics" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
           }
         }
       }
@@ -2095,6 +2211,80 @@
         },
         "job-execution-result" : {
           "type" : "any"
+        }
+      }
+    }
+  }, {
+    "url" : "/jobs/:jobid/fail",
+    "method" : "PATCH",
+    "status-code" : "202 Accepted",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ {
+        "key" : "jobid"
+      } ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:JobFailRequestBody",
+      "properties" : {
+        "failReason" : {
+          "type" : "string"
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:EmptyResponseBody"
+    }
+  }, {
+    "url" : "/jobs/:jobid/foreground-result/:operatorid",
+    "method" : "POST",
+    "status-code" : "200 OK",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ {
+        "key" : "jobid"
+      }, {
+        "key" : "operatorid"
+      } ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:results:ForegroundResultRequestBody",
+      "properties" : {
+        "version" : {
+          "type" : "string"
+        },
+        "offset" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:job:results:ForegroundResultResponseBody",
+      "properties" : {
+        "version" : {
+          "type" : "string"
+        },
+        "lastCheckpointedOffset" : {
+          "type" : "integer"
+        },
+        "data" : {
+          "type" : "string"
+        },
+        "rowCount" : {
+          "type" : "integer"
+        },
+        "isFinished" : {
+          "type" : "boolean"
         }
       }
     }
@@ -3791,6 +3981,33 @@
     },
     "response" : {
       "type" : "any"
+    }
+  }, {
+    "url" : "/taskmanagers/standby-activation",
+    "method" : "POST",
+    "status-code" : "202 Accepted",
+    "file-upload" : false,
+    "path-parameters" : {
+      "pathParameters" : [ ]
+    },
+    "query-parameters" : {
+      "queryParameters" : [ ]
+    },
+    "request" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:taskmanager:StandbyTaskManagerActivationRequestBody",
+      "properties" : {
+        "rpcHost" : {
+          "type" : "string"
+        },
+        "rpcPort" : {
+          "type" : "string"
+        }
+      }
+    },
+    "response" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:org:apache:flink:runtime:rest:messages:EmptyResponseBody"
     }
   }, {
     "url" : "/taskmanagers/:taskmanagerid",

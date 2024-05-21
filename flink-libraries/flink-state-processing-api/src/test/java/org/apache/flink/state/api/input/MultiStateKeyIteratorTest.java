@@ -24,10 +24,13 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.core.fs.CloseableRegistry;
+import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
 import org.apache.flink.runtime.state.KeyGroupRange;
+import org.apache.flink.runtime.state.KeyedStateBackendParametersImpl;
 import org.apache.flink.runtime.state.VoidNamespace;
 import org.apache.flink.runtime.state.VoidNamespaceSerializer;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
@@ -54,18 +57,24 @@ public class MultiStateKeyIteratorTest {
     private static AbstractKeyedStateBackend<Integer> createKeyedStateBackend() {
         MockStateBackend backend = new MockStateBackend();
 
+        Environment env = new DummyEnvironment();
+        JobID jobID = new JobID();
+        KeyGroupRange keyGroupRange = KeyGroupRange.of(0, 128);
+        MetricGroup metricGroup = UnregisteredMetricGroups.createUnregisteredTaskMetricGroup();
+        CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
         return backend.createKeyedStateBackend(
-                new DummyEnvironment(),
-                new JobID(),
-                "mock-backend",
-                IntSerializer.INSTANCE,
-                129,
-                KeyGroupRange.of(0, 128),
-                null,
-                TtlTimeProvider.DEFAULT,
-                UnregisteredMetricGroups.createUnregisteredTaskMetricGroup(),
-                Collections.emptyList(),
-                new CloseableRegistry());
+                new KeyedStateBackendParametersImpl<>(
+                        env,
+                        jobID,
+                        "mock-backend",
+                        IntSerializer.INSTANCE,
+                        129,
+                        keyGroupRange,
+                        null,
+                        TtlTimeProvider.DEFAULT,
+                        metricGroup,
+                        Collections.emptyList(),
+                        cancelStreamRegistry));
     }
 
     private static void setKey(

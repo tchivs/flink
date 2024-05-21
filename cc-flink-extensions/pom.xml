@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2023 Confluent Inc.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.apache.flink</groupId>
+		<artifactId>flink-parent</artifactId>
+		<version>1.18-SNAPSHOT</version>
+	</parent>
+
+	<groupId>io.confluent.flink</groupId>
+	<artifactId>cc-flink-extensions</artifactId>
+	<name>Confluent Flink :</name>
+
+	<packaging>pom</packaging>
+
+	<properties>
+		<bouncycastle.version>1.73</bouncycastle.version>
+		<schema.registry.version>7.5.0-22</schema.registry.version>
+		<opentelemetry.version>1.30.1</opentelemetry.version>
+		<opentelemetry.proto.version>1.0.0-alpha</opentelemetry.proto.version>
+		<apiserver.version>0.2345.0</apiserver.version>
+		<okhttp.version>4.10.0</okhttp.version>
+		<secure-gateway-api.version>0.140.0</secure-gateway-api.version>
+	</properties>
+
+	<modules>
+		<module>cc-flink-table-extended</module>
+		<module>cc-flink-managed-table-validation</module>
+		<module>cc-flink-schema-registry</module>
+		<module>cc-flink-schema-converters</module>
+		<module>cc-flink-credentials</module>
+		<module>cc-flink-compute-credentials</module>
+		<module>cc-flink-failure-enrichers</module>
+		<module>cc-flink-common-metrics</module>
+		<module>cc-flink-state-backend-extended</module>
+		<module>cc-flink-kubernetes-extended</module>
+		<module>cc-flink-runtime-extensions</module>
+		<module>cc-flink-remote-udfs</module>
+		<module>cc-flink-remote-udfs-integration-tests</module>
+		<module>cc-flink-udf-adapter</module>
+		<module>cc-flink-udf-adapter-api</module>
+	</modules>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>io.opentelemetry</groupId>
+				<artifactId>opentelemetry-bom</artifactId>
+				<version>${opentelemetry.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>io.opentelemetry.proto</groupId>
+				<artifactId>opentelemetry-proto</artifactId>
+				<version>${opentelemetry.proto.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>logging-interceptor</artifactId>
+				<version>${okhttp.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.jetbrains.kotlin</groupId>
+						<artifactId>kotlin-stdlib-jdk8</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>okhttp</artifactId>
+				<version>${okhttp.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.jetbrains.kotlin</groupId>
+						<artifactId>kotlin-stdlib-jdk8</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.jetbrains.kotlin</groupId>
+						<artifactId>kotlin-stdlib-common</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>mockwebserver</artifactId>
+				<version>${okhttp.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+</project>

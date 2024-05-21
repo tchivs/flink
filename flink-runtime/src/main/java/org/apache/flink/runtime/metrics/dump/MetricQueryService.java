@@ -30,6 +30,7 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.metrics.groups.AbstractMetricGroup;
 import org.apache.flink.runtime.rpc.RpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.JobMetricsFilter;
 import org.apache.flink.runtime.webmonitor.retriever.MetricQueryServiceGateway;
 import org.apache.flink.util.TimeUtils;
 
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.metrics.dump.MetricDumpSerialization.MetricDumpSerializer;
 
@@ -267,5 +269,55 @@ public class MetricQueryService extends RpcEndpoint implements MetricQueryServic
                         : METRIC_QUERY_SERVICE_NAME + "_" + resourceID.getResourceIdString();
 
         return new MetricQueryService(rpcService, endpointId, maximumFrameSize);
+    }
+
+    @Override
+    public CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryJobMetrics(
+            Time timeout, JobMetricsFilter filter) {
+        return callAsync(
+                () ->
+                        enforceSizeLimit(
+                                serializer.serialize(
+                                        filterMetrics(counters, filter),
+                                        filterMetrics(gauges, filter),
+                                        filterMetrics(histograms, filter),
+                                        filterMetrics(meters, filter))),
+                TimeUtils.toDuration(timeout));
+    }
+
+    private static <T extends Metric> Map<T, Tuple2<QueryScopeInfo, String>> filterMetrics(
+            Map<T, Tuple2<QueryScopeInfo, String>> metrics, JobMetricsFilter filter) {
+        return metrics.entrySet().stream()
+                .filter(e -> filterMetric(e.getKey(), e.getValue().f0, e.getValue().f1, filter))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static <T extends Metric> boolean filterMetric(
+            T ignored, QueryScopeInfo info, String metricName, JobMetricsFilter filter) {
+        final String fullName = info.scope.isEmpty() ? metricName : info.scope + "." + metricName;
+        switch (info.getCategory()) {
+            case QueryScopeInfo.INFO_CATEGORY_TM:
+                {
+                    return filter.getTaskManagerMetrics().contains(fullName);
+                }
+            case QueryScopeInfo.INFO_CATEGORY_TASK:
+                {
+                    final QueryScopeInfo.TaskQueryScopeInfo cast =
+                            (QueryScopeInfo.TaskQueryScopeInfo) info;
+                    return cast.jobID.equals(filter.getJobId())
+                            && filter.getTaskMetrics().contains(fullName);
+                }
+            case QueryScopeInfo.INFO_CATEGORY_OPERATOR:
+                {
+                    final QueryScopeInfo.OperatorQueryScopeInfo cast =
+                            (QueryScopeInfo.OperatorQueryScopeInfo) info;
+                    return cast.jobID.equals(filter.getJobId())
+                            && filter.getOperatorMetrics().contains(fullName);
+                }
+            default:
+                {
+                    return false;
+                }
+        }
     }
 }

@@ -40,6 +40,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.checkpoint.StateObjectCollection;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.operators.testutils.MockEnvironment;
+import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.runtime.testutils.statemigration.TestType;
 import org.apache.flink.util.ExceptionUtils;
@@ -1412,20 +1413,24 @@ public abstract class StateBackendMigrationTestBase<B extends StateBackend> exte
             KeyGroupRange keyGroupRange,
             Environment env)
             throws Exception {
+        StateBackend stateBackend = getStateBackend();
+        JobID jobID = new JobID();
+        TaskKvStateRegistry kvStateRegistry = env.getTaskKvStateRegistry();
+        CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
         CheckpointableKeyedStateBackend<K> backend =
-                getStateBackend()
-                        .createKeyedStateBackend(
+                stateBackend.createKeyedStateBackend(
+                        new KeyedStateBackendParametersImpl<>(
                                 env,
-                                new JobID(),
+                                jobID,
                                 "test_op",
                                 keySerializer,
                                 numberOfKeyGroups,
                                 keyGroupRange,
-                                env.getTaskKvStateRegistry(),
+                                kvStateRegistry,
                                 TtlTimeProvider.DEFAULT,
                                 new UnregisteredMetricsGroup(),
                                 Collections.emptyList(),
-                                new CloseableRegistry());
+                                cancelStreamRegistry));
         return backend;
     }
 
@@ -1448,20 +1453,24 @@ public abstract class StateBackendMigrationTestBase<B extends StateBackend> exte
             List<KeyedStateHandle> state,
             Environment env)
             throws Exception {
+        StateBackend stateBackend = getStateBackend();
+        JobID jobID = new JobID();
+        TaskKvStateRegistry kvStateRegistry = env.getTaskKvStateRegistry();
+        CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
         CheckpointableKeyedStateBackend<K> backend =
-                getStateBackend()
-                        .createKeyedStateBackend(
+                stateBackend.createKeyedStateBackend(
+                        new KeyedStateBackendParametersImpl<>(
                                 env,
-                                new JobID(),
+                                jobID,
                                 "test_op",
                                 keySerializer,
                                 numberOfKeyGroups,
                                 keyGroupRange,
-                                env.getTaskKvStateRegistry(),
+                                kvStateRegistry,
                                 TtlTimeProvider.DEFAULT,
                                 new UnregisteredMetricsGroup(),
                                 state,
-                                new CloseableRegistry());
+                                cancelStreamRegistry));
         return backend;
     }
 
@@ -1489,13 +1498,16 @@ public abstract class StateBackendMigrationTestBase<B extends StateBackend> exte
     private OperatorStateBackend createOperatorStateBackend() throws Exception {
         return getStateBackend()
                 .createOperatorStateBackend(
-                        env, "test_op", Collections.emptyList(), new CloseableRegistry());
+                        new OperatorStateBackendParametersImpl(
+                                env, "test_op", Collections.emptyList(), new CloseableRegistry()));
     }
 
     private OperatorStateBackend createOperatorStateBackend(Collection<OperatorStateHandle> state)
             throws Exception {
         return getStateBackend()
-                .createOperatorStateBackend(env, "test_op", state, new CloseableRegistry());
+                .createOperatorStateBackend(
+                        new OperatorStateBackendParametersImpl(
+                                env, "test_op", state, new CloseableRegistry()));
     }
 
     private OperatorStateBackend restoreOperatorStateBackend(OperatorStateHandle state)

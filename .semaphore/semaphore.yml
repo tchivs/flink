@@ -1,0 +1,228 @@
+version: v1.0
+name: build-test-release
+agent:
+  machine:
+    type: s1-prod-ubuntu20-04-amd64-2
+execution_time_limit:
+  minutes: 90
+
+auto_cancel:
+  running:
+    when: "branch !~ '^release-[0-9]+\\.[0-9]+-confluent$'"
+
+global_job_config:
+  env_vars:
+    - name: FLINK_ARTIFACT_DIR
+      value: "/home/semaphore/flink_artifact"
+    - name: MAVEN_LOCAL_CACHE
+      value: "/home/semaphore/.m2/repository"
+    - name: MAVEN_ARGS
+      value: '-Dmaven.repo.local=/home/semaphore/.m2/repository'
+    - name: DOCKER_IMAGES_CACHE_FOLDER
+      value: "/home/semaphore/.docker_cache"
+    - name: E2E_CACHE_FOLDER
+      value: "/home/semaphore/e2e_cache"
+    - name: E2E_TARBALL_CACHE
+      value: "/home/semaphore/e2e_artifact_cache"
+    - name: DEBUG_FILES_OUTPUT_DIR
+      value: "/tmp/debug_files"
+    - name: MVN_RUN_VERBOSE
+      value: "true"
+    # cache prefix used across all runs (branches and PRs)
+    - name: SHARED_CACHE_PREFIX
+      value: "shared-cache"
+  prologue:
+    commands:
+      - sem-version java 11
+      # workaround for failing e2e tests - see https://confluent.slack.com/archives/C065732SFHV/p1704882814371079?thread_ts=1704831317.971149&cid=C065732SFHV
+      - export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64/"
+      # hugo
+      - sudo mkdir -p /usr/share/hugo
+      - curl -fsSL -o /tmp/hugo.tar.gz https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/hugo_extended_0.98.0_Linux-64bit.tar.gz
+      - sudo tar -xzf /tmp/hugo.tar.gz -C /usr/share/hugo
+      - rm -f /tmp/hugo.tar.gz
+      - sudo ln -s /usr/share/hugo/hugo /usr/bin/hugo
+      # UTF8
+      - sudo bash -c 'echo "en_US.UTF-8 UTF-8" > /etc/locale.gen'
+      - sudo locale-gen
+      - sudo update-locale en_US.UTF-8
+      # use branch name as cache prefix (target branch for PRs)
+      - export CACHE_PREFIX="$SEMAPHORE_GIT_BRANCH"
+      - checkout
+      - . vault-setup
+      - . vault-sem-get-secret ci-reporting
+      - export PROFILE="-Pjdk11 -Dflink.forkCountUnitTest=8 -Dflink.forkCountITCase=4"
+blocks:
+  - name: pre-compile-checks
+    dependencies: []
+    task:
+      jobs:
+        - name: pre-compile-checks
+          commands:
+            # Cache restore maven
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - source tools/ci/maven-utils.sh
+            - run_mvn org.apache.rat:apache-rat-plugin:check -N
+            - run_mvn checkstyle:check spotless:check -T1C
+  - name: packaging-licensing-checks
+    dependencies: []
+    task:
+      jobs:
+        - name: packaging-licensing-checks
+          commands:
+            # Cache restore maven
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            # skip checks from pre-compile-checks
+            - export PROFILE="${PROFILE} -Drat.skip -Dcheckstyle.skip -Dspotless.check.skip"
+            - ./tools/ci/compile_ci.sh || exit $?
+            - if [ -n "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CACHE_PREFIX"-maven-cache ${MAVEN_LOCAL_CACHE}; fi
+  - name: compile_ci
+    dependencies: []
+    task:
+      jobs:
+        - name: compile_ci
+          commands:
+            - make install-protoc install-protoc-gen-go generate-udf-protos
+            # Cache restore maven
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - source tools/ci/maven-utils.sh
+            - run_mvn test-compile -Dflink.markBundledAsOptional=false -Dfast
+            - ./tools/azure-pipelines/create_build_artifact.sh
+            - tar -czf FlinkCompileArtifact.tar.gz -C $FLINK_ARTIFACT_DIR .
+            - artifact push workflow FlinkCompileArtifact.tar.gz --force
+
+  - name: tests
+    dependencies: [compile_ci]
+    task:
+      jobs:
+        - name: tests
+          matrix:
+            - env_var: module
+              values: ["core", "table", "connect", "tests", "misc"]
+            - env_var: SYSTEM_JOBTIMEOUT
+              values: ["240"]
+          commands:
+            - export AGENT_TEMPDIRECTORY="/tmp/"
+            - export TF_BUILD="true" # simulate run on Azure
+            - export CURRENT_SHARED_CACHE_PREFIX="${SHARED_CACHE_PREFIX}-${module}"
+            - echo $module
+            - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY
+            # openssl requirements
+            - curl -O https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - sudo apt-get install -y libapr1
+            - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - artifact pull workflow FlinkCompileArtifact.tar.gz
+            - mkdir -p $FLINK_ARTIFACT_DIR
+            - tar -xzf FlinkCompileArtifact.tar.gz -C $FLINK_ARTIFACT_DIR
+            - ./tools/azure-pipelines/unpack_build_artifact.sh
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache
+            - ./tools/azure-pipelines/cache_docker_images.sh load
+            # Set coredump pattern, it should be removed after [FLINK-30787]
+            - sudo sysctl -w kernel.core_pattern=core.%p
+            - export AWS_ACCESS_KEY_ID=""
+            - ./tools/azure-pipelines/uploading_watchdog.sh ./tools/ci/test_controller.sh $module
+      epilogue:
+        always:
+          commands:
+            - source .semaphore/functions.sh && publish_test_results "tests-${module}"
+            - ./tools/azure-pipelines/cache_docker_images.sh save
+            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
+        on_fail:
+          commands:
+            - tar -czf flink_debug_files_"$module".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
+            - artifact push job flink_debug_files_"$module".tar.gz --force
+
+
+  - name: e2e-tests
+    dependencies: []
+    run:
+      # Skip e2e test execution if this is a documentation only pull request (master / release builds will still be checked regularly)
+      when: "change_in('/', {exclude: [ '/docs/' ] })"
+    task:
+      jobs:
+        - name: e2e-tests
+          matrix:
+            - env_var: group
+              values: ["1", "2", "3", "4"]
+            - env_var: SYSTEM_JOBTIMEOUT
+              values: ["310"]
+          commands:
+            - export AGENT_TEMPDIRECTORY="/tmp/"
+            - export TF_BUILD="true" # simulate run on Azure
+            - export CURRENT_SHARED_CACHE_PREFIX="${SHARED_CACHE_PREFIX}-${group}"
+            - sudo apt install -y net-tools
+            - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY
+            # Set coredump pattern, it should be removed after [FLINK-30787]
+            - sudo sysctl kernel.dmesg_restrict=0
+            - curl -LO https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/minikube-linux-amd64-1-28-0
+            - sudo install minikube-linux-amd64-1-28-0 /usr/local/bin/minikube
+            # openssl requirements
+            - curl -O https://confluent-packaging-tools-891377121322-us-west-2.s3.us-west-2.amazonaws.com/libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - sudo apt-get install -y libapr1
+            - sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - rm libssl1.0.0_1.0.2n-1ubuntu5.10_amd64.deb
+            - mkdir -p $MAVEN_LOCAL_CACHE
+            - mkdir -p $E2E_CACHE_FOLDER
+            - mkdir -p $E2E_TARBALL_CACHE
+            - mkdir -p $DOCKER_IMAGES_CACHE_FOLDER
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache
+            - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache
+            - cache restore "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache
+            - export PROFILE="-Pfast -Pskip-webui-build -Pjdk11"
+            - ./tools/azure-pipelines/cache_docker_images.sh load
+            - ./tools/ci/compile_ci.sh
+            - FLINK_DIR=$(pwd)/build-target ./tools/azure-pipelines/uploading_watchdog.sh flink-end-to-end-tests/run-nightly-tests.sh $group
+      epilogue:
+        always:
+          commands:
+            - source .semaphore/functions.sh && publish_test_results "e2e-tests-${group}"
+            - ./tools/azure-pipelines/cache_docker_images.sh save
+            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
+            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache $E2E_CACHE_FOLDER
+            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache $E2E_TARBALL_CACHE
+        on_fail:
+          commands:
+            - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
+            - artifact push job flink_debug_files_"$group".tar.gz --force
+
+  - name: docs-check
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: s1-prod-ubuntu20-04-amd64-1
+      jobs:
+        - name: docs-check
+          commands:
+            - sem-version go 1.18.1
+            - ./tools/ci/docs.sh
+
+  - name: release
+    # Release after compile, in parallel to tests.
+    # This is an accelerant while we work to meet EA deadlines pre-produciton.
+    # This will be reverted here --> https://confluentinc.atlassian.net/browse/TIF-158
+    dependencies: []
+    task:
+      jobs:
+        - name: release
+          commands:
+            - git fetch --all --tags
+            - cache restore "$CACHE_PREFIX"-maven-cache
+            - make flink-bump-version
+            - make flink-deploy
+
+after_pipeline:
+  task:
+    jobs:
+      - name: Generate tests overview
+        commands:
+          - test-results gen-pipeline-report
+
+promotions:
+  - name: trigger kdb
+    pipeline_file: trigger-kdb.yml
+    auto_promote:
+      when: "result = 'passed' and branch =~ '^release-[0-9]+\\.[0-9]+-confluent$'"

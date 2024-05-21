@@ -18,6 +18,8 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
+
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.ReadOptions;
@@ -63,9 +65,11 @@ public interface RocksDBOptionsFactory extends java.io.Serializable {
      * @param currentOptions The options object with the pre-defined options.
      * @param handlesToClose The collection to register newly created {@link
      *     org.rocksdb.RocksObject}s.
+     * @param jobID ID of the job this backend will be used for
      * @return The options object on which the additional options are set.
      */
-    DBOptions createDBOptions(DBOptions currentOptions, Collection<AutoCloseable> handlesToClose);
+    DBOptions createDBOptions(
+            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose, JobID jobID);
 
     /**
      * This method should set the additional options on top of the current options object. The

@@ -19,6 +19,7 @@
 package org.apache.flink.api.connector.source;
 
 import org.apache.flink.annotation.Public;
+import org.apache.flink.api.common.CommonConfluentContext;
 import org.apache.flink.metrics.groups.SplitEnumeratorMetricGroup;
 
 import java.util.Map;
@@ -38,7 +39,7 @@ import java.util.function.BiConsumer;
  * @param <SplitT> the type of the splits.
  */
 @Public
-public interface SplitEnumeratorContext<SplitT extends SourceSplit> {
+public interface SplitEnumeratorContext<SplitT extends SourceSplit> extends CommonConfluentContext {
 
     SplitEnumeratorMetricGroup metricGroup();
 

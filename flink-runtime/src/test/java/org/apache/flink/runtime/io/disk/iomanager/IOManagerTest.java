@@ -29,6 +29,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static org.junit.Assert.assertEquals;
@@ -86,7 +87,7 @@ public class IOManagerTest {
     private static class TestIOManager extends IOManager {
 
         protected TestIOManager(String[] paths) {
-            super(paths);
+            super(paths, Executors.newSingleThreadScheduledExecutor());
         }
 
         @Override

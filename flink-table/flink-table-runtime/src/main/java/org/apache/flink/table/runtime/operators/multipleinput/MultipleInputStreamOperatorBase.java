@@ -271,7 +271,8 @@ public abstract class MultipleInputStreamOperatorBase extends AbstractStreamOper
                 streamConfig,
                 output,
                 multipleInputOperatorParameters::getProcessingTimeService,
-                multipleInputOperatorParameters.getOperatorEventDispatcher());
+                multipleInputOperatorParameters.getOperatorEventDispatcher(),
+                multipleInputOperatorParameters.getMailboxExecutor());
     }
 
     protected StreamConfig createStreamConfig(

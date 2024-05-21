@@ -86,7 +86,8 @@ public class KubernetesCheckpointRecoveryFactory implements CheckpointRecoveryFa
             RestoreMode restoreMode)
             throws Exception {
         final String configMapName = getConfigMapNameFunction.apply(jobID);
-        KubernetesUtils.createConfigMapIfItDoesNotExist(kubeClient, configMapName, clusterId);
+        KubernetesUtils.createConfigMapIfItDoesNotExist(
+                kubeClient, configMapName, clusterId, jobID);
 
         return KubernetesUtils.createCompletedCheckpointStore(
                 configuration,
@@ -103,7 +104,8 @@ public class KubernetesCheckpointRecoveryFactory implements CheckpointRecoveryFa
     @Override
     public CheckpointIDCounter createCheckpointIDCounter(JobID jobID) throws Exception {
         final String configMapName = getConfigMapNameFunction.apply(jobID);
-        KubernetesUtils.createConfigMapIfItDoesNotExist(kubeClient, configMapName, clusterId);
+        KubernetesUtils.createConfigMapIfItDoesNotExist(
+                kubeClient, configMapName, clusterId, jobID);
 
         return new KubernetesCheckpointIDCounter(kubeClient, configMapName, lockIdentity);
     }

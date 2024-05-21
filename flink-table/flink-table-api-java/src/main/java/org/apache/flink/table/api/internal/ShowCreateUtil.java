@@ -27,6 +27,7 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.QueryOperationCatalogView;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.utils.EncodingUtils;
 
@@ -34,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /** SHOW CREATE statement Util. */
@@ -64,6 +66,7 @@ public class ShowCreateUtil {
         extractFormattedComment(table)
                 .ifPresent(
                         c -> sb.append(String.format("COMMENT '%s'%s", c, System.lineSeparator())));
+        extractFormattedDistributedInfo((ResolvedCatalogTable) table).ifPresent(sb::append);
         extractFormattedPartitionedInfo((ResolvedCatalogTable) table)
                 .ifPresent(
                         partitionedInfoFormatted ->
@@ -197,6 +200,10 @@ public class ShowCreateUtil {
         return Optional.empty();
     }
 
+    static Optional<String> extractFormattedDistributedInfo(ResolvedCatalogTable catalogTable) {
+        return catalogTable.getDistribution().map(TableDistribution::asSerializableString);
+    }
+
     static Optional<String> extractFormattedPartitionedInfo(ResolvedCatalogTable catalogTable) {
         if (!catalogTable.isPartitioned()) {
             return Optional.empty();
@@ -212,15 +219,17 @@ public class ShowCreateUtil {
         if (Objects.isNull(table.getOptions()) || table.getOptions().isEmpty()) {
             return Optional.empty();
         }
+        TreeSet<String> treeSet = new TreeSet<>(table.getOptions().keySet());
         return Optional.of(
-                table.getOptions().entrySet().stream()
+                treeSet.stream()
                         .map(
                                 entry ->
                                         String.format(
                                                 "%s'%s' = '%s'",
                                                 printIndent,
-                                                EncodingUtils.escapeSingleQuotes(entry.getKey()),
-                                                EncodingUtils.escapeSingleQuotes(entry.getValue())))
+                                                EncodingUtils.escapeSingleQuotes(entry),
+                                                EncodingUtils.escapeSingleQuotes(
+                                                        table.getOptions().get(entry))))
                         .collect(Collectors.joining(",\n")));
     }
 

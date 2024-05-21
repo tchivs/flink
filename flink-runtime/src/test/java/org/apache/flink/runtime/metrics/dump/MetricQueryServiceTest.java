@@ -18,8 +18,10 @@
 
 package org.apache.flink.runtime.metrics.dump;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.core.testutils.EachCallbackWrapper;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Histogram;
@@ -28,54 +30,39 @@ import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.metrics.util.TestHistogram;
 import org.apache.flink.metrics.util.TestMeter;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.metrics.groups.TaskManagerJobMetricGroup;
 import org.apache.flink.runtime.metrics.groups.TaskManagerMetricGroup;
+import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
-import org.apache.flink.runtime.rpc.TestingRpcService;
+import org.apache.flink.runtime.rpc.TestingRpcServiceExtension;
+import org.apache.flink.runtime.webmonitor.retriever.JobMetricsFilter;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for the {@link MetricQueryService}. */
 public class MetricQueryServiceTest extends TestLogger {
 
-    private static final Time TIMEOUT = Time.seconds(1);
+    private static final Time TIMEOUT = Time.hours(1);
 
-    private static TestingRpcService rpcService;
-
-    @BeforeClass
-    public static void setupClass() {
-        rpcService = new TestingRpcService();
-    }
-
-    @After
-    public void teardown() {
-        rpcService.clearGateways();
-    }
-
-    @AfterClass
-    public static void teardownClass() {
-        if (rpcService != null) {
-            rpcService.closeAsync();
-            rpcService = null;
-        }
-    }
+    @RegisterExtension
+    private final EachCallbackWrapper<TestingRpcServiceExtension> rpcServiceExtension =
+            new EachCallbackWrapper<>(new TestingRpcServiceExtension());
 
     @Test
     public void testCreateDump() throws Exception {
-        MetricQueryService queryService =
-                MetricQueryService.createMetricQueryService(
-                        rpcService, ResourceID.generate(), Long.MAX_VALUE);
-        queryService.start();
+        final MetricQueryService queryService = createAndStartMetricQueryService(Long.MAX_VALUE);
 
         final Counter c = new SimpleCounter();
         final Gauge<String> g = () -> "Hello";
@@ -115,10 +102,7 @@ public class MetricQueryServiceTest extends TestLogger {
     @Test
     public void testHandleOversizedMetricMessage() throws Exception {
         final long sizeLimit = 200L;
-        MetricQueryService queryService =
-                MetricQueryService.createMetricQueryService(
-                        rpcService, ResourceID.generate(), sizeLimit);
-        queryService.start();
+        final MetricQueryService queryService = createAndStartMetricQueryService(sizeLimit);
 
         final TaskManagerMetricGroup tm =
                 UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup();
@@ -166,5 +150,70 @@ public class MetricQueryServiceTest extends TestLogger {
         assertEquals(1, recoveredDump.numGauges);
         assertTrue(recoveredDump.serializedHistograms.length > 0);
         assertEquals(1, recoveredDump.numHistograms);
+    }
+
+    @Test
+    public void queryJobMetrics() {
+        final MetricQueryService queryService = createAndStartMetricQueryService(Long.MAX_VALUE);
+
+        final TaskManagerMetricGroup taskManagerMetricGroup =
+                UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup();
+
+        final List<String> jobIds = new ArrayList<>();
+        final int numJobs = 10;
+        final int numTasks = 5;
+
+        for (int jobIdx = 0; jobIdx < numJobs; jobIdx++) {
+            final JobID jobId = new JobID();
+            final TaskManagerJobMetricGroup jobMetricGroup =
+                    taskManagerMetricGroup.addJob(jobId, "test-job-" + jobIdx);
+            for (int taskIdx = 0; taskIdx < numTasks; taskIdx++) {
+                final TaskMetricGroup taskMetricGroup =
+                        jobMetricGroup.addTask(ExecutionAttemptID.randomId(), "task-" + taskIdx);
+
+                final SimpleCounter firstCounter = new SimpleCounter();
+                queryService.addMetric("firstCounter", firstCounter, taskMetricGroup);
+                firstCounter.inc(jobIdx + 1);
+
+                // this counter should be filtered out
+                final SimpleCounter secondCounter = new SimpleCounter();
+                queryService.addMetric("secondCounter", secondCounter, taskMetricGroup);
+                secondCounter.inc(jobIdx + 1);
+            }
+
+            jobIds.add(jobId.toHexString());
+        }
+
+        final MetricDumpSerialization.MetricDumpDeserializer deserializer =
+                new MetricDumpSerialization.MetricDumpDeserializer();
+
+        for (String jobId : jobIds) {
+            final MetricDumpSerialization.MetricSerializationResult serializedMetrics =
+                    queryService
+                            .queryJobMetrics(
+                                    TIMEOUT,
+                                    JobMetricsFilter.newBuilder(jobId)
+                                            .withTaskMetrics("firstCounter")
+                                            .build())
+                            .join();
+            final List<MetricDump> deserializedMetrics =
+                    deserializer.deserialize(serializedMetrics);
+            Assertions.assertThat(deserializedMetrics).hasSize(numTasks);
+            for (MetricDump dump : deserializedMetrics) {
+                Assertions.assertThat(dump.name).isEqualTo("firstCounter");
+                Assertions.assertThat(dump.scopeInfo)
+                        .isInstanceOf(QueryScopeInfo.TaskQueryScopeInfo.class);
+            }
+        }
+    }
+
+    private MetricQueryService createAndStartMetricQueryService(long sizeLimit) {
+        final MetricQueryService queryService =
+                MetricQueryService.createMetricQueryService(
+                        rpcServiceExtension.getCustomExtension().getTestingRpcService(),
+                        ResourceID.generate(),
+                        sizeLimit);
+        queryService.start();
+        return queryService;
     }
 }

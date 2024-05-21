@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.source.coordinator;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.connector.source.SourceSplit;
@@ -53,6 +54,7 @@ abstract class SourceCoordinatorTestBase {
     protected static final String OPERATOR_NAME = "TestOperator";
     protected static final OperatorID TEST_OPERATOR_ID = new OperatorID(1234L, 5678L);
     protected static final int NUM_SUBTASKS = 3;
+    protected static final JobID JOB_ID = new JobID(1234L, 4321L);
 
     protected boolean supportsConcurrentExecutionAttempts = false;
     private AutoCloseableRegistry closeableRegistry;
@@ -77,7 +79,7 @@ abstract class SourceCoordinatorTestBase {
         closeableRegistry = new AutoCloseableRegistry();
         receivingTasks = EventReceivingTasks.createForRunningTasks();
         operatorCoordinatorContext =
-                new MockOperatorCoordinatorContext(TEST_OPERATOR_ID, NUM_SUBTASKS);
+                new MockOperatorCoordinatorContext(TEST_OPERATOR_ID, NUM_SUBTASKS, JOB_ID);
         splitSplitAssignmentTracker = new SplitAssignmentTracker<>();
         coordinatorThreadName = TEST_OPERATOR_ID.toHexString();
 

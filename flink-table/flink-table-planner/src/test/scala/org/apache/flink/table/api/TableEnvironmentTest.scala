@@ -22,6 +22,7 @@ import org.apache.flink.api.common.typeinfo.Types.STRING
 import org.apache.flink.api.scala._
 import org.apache.flink.configuration.{Configuration, CoreOptions, ExecutionOptions}
 import org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches
+import org.apache.flink.sql.parser.error.SqlValidateException
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.table.api.bridge.scala.{StreamTableEnvironment, _}
@@ -2657,6 +2658,334 @@ class TableEnvironmentTest {
     val tableResult2 = tableEnv.executeSql("desc T1")
     assertEquals(ResultKind.SUCCESS_WITH_CONTENT, tableResult2.getResultKind)
     checkData(expectedResult1.iterator(), tableResult2.collect())
+  }
+
+  @Test
+  def testAlterModelOptions(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    tableEnv.executeSql(sourceDDL)
+
+    val alterDDL =
+      """
+        |ALTER MODEL M1
+        |SET(
+        |  'provider' = 'azureml',
+        |  'azueml.endpoint' = 'azure-endpoint',
+        |  'task' = 'clustering'
+        |)
+        |""".stripMargin
+    tableEnv.executeSql(alterDDL)
+  }
+
+  @Test
+  def testAlterNonExistModel(): Unit = {
+    val alterDDL =
+      """
+        |ALTER MODEL M1
+        |SET(
+        |  'provider' = 'azureml',
+        |  'azueml.endpoint' = 'azure-endpoint',
+        |  'task' = 'clustering'
+        |)
+        |""".stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
+      .isInstanceOf(classOf[ValidationException])
+      .hasMessageContaining(
+        "Could not execute AlterModel in path `default_catalog`.`default_database`.`M1`")
+  }
+
+  @Test
+  def testAlterNonExistModelWithIfExist(): Unit = {
+    val alterDDL =
+      """
+        |ALTER MODEL IF EXISTS M1
+        |SET(
+        |  'provider' = 'azureml',
+        |  'azueml.endpoint' = 'azure-endpoint',
+        |  'task' = 'clustering'
+        |)
+        |""".stripMargin
+    tableEnv.executeSql(alterDDL)
+  }
+
+  @Test
+  def testAlterModelRename(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    tableEnv.executeSql(sourceDDL)
+
+    val alterDDL =
+      """
+        |ALTER MODEL M1 RENAME TO M2
+        |""".stripMargin
+    tableEnv.executeSql(alterDDL)
+  }
+
+  @Test
+  def testAlterModelRenameNonExist(): Unit = {
+    val alterDDL =
+      """
+        |ALTER MODEL M1 RENAME TO M2
+        |""".stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
+      .isInstanceOf(classOf[ModelException])
+      .hasMessageContaining(
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
+  }
+
+  @Test
+  def testAlterModelRenameWithIfExists(): Unit = {
+    val alterDDL =
+      """
+        |ALTER MODEL IF EXISTS M1 RENAME TO M2
+        |""".stripMargin
+    tableEnv.executeSql(alterDDL)
+  }
+
+  @Test
+  def testCreateModelMissingInput(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(sourceDDL))
+      .isInstanceOf(classOf[SqlValidateException])
+      .hasMessageContaining("Input column list can not be empty with non-empty output column list.")
+
+  }
+
+  @Test
+  def testCreateModelMissingOutput(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f1 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(sourceDDL))
+      .isInstanceOf(classOf[SqlValidateException])
+      .hasMessageContaining("Output column list can not be empty with non-empty input column list.")
+  }
+
+  @Test
+  def testCreateModelMissingOption(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f1 string)
+        |  OUTPUT(f2 string)
+        |with ()
+      """.stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(sourceDDL))
+      .isInstanceOf(classOf[SqlValidateException])
+      .hasMessageContaining("Model property list can not be empty.")
+  }
+
+  @Test
+  def testDescribeModel(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+
+    tableEnv.executeSql(sourceDDL)
+
+    val expectedResult1 = util.Arrays.asList(
+      Row.of(
+        "(\n  `f0` CHAR(10),\n  `f1` VARCHAR(10)\n)",
+        "(\n  `f2` STRING\n)"
+      )
+    )
+    val modelResult1 = tableEnv.executeSql("describe MODEL M1")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, modelResult1.getResultKind)
+    checkData(expectedResult1.iterator(), modelResult1.collect())
+    val modelResult2 = tableEnv.executeSql("desc model M1")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, modelResult2.getResultKind)
+    checkData(expectedResult1.iterator(), modelResult2.collect())
+  }
+
+  @Test
+  def testDescribeModelWithNoInputOutput(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  COMMENT 'this is a model'
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+
+    tableEnv.executeSql(sourceDDL)
+
+    val expectedResult1 = util.Arrays.asList(
+      Row.of(
+        "(\n\n)",
+        "(\n\n)"
+      )
+    )
+    val modelResult1 = tableEnv.executeSql("describe model M1")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, modelResult1.getResultKind)
+    checkData(expectedResult1.iterator(), modelResult1.collect())
+    val modelResult2 = tableEnv.executeSql("desc model M1")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, modelResult2.getResultKind)
+    checkData(expectedResult1.iterator(), modelResult2.collect())
+  }
+
+  @Test
+  def testDropModel(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    tableEnv.executeSql(sourceDDL)
+
+    val dropDDL =
+      """
+        |DROP MODEL M1
+        |""".stripMargin
+    tableEnv.executeSql(dropDDL)
+
+    // Alter shouldn't find model now
+    val alterDDL =
+      """
+        |ALTER MODEL M1 RENAME TO M2
+        |""".stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
+      .isInstanceOf(classOf[ModelException])
+      .hasMessageContaining(
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
+  }
+
+  @Test
+  def testDropNonExistModel(): Unit = {
+    val dropDDL =
+      """
+        |DROP MODEL M1
+        |""".stripMargin
+    assertThatThrownBy(() => tableEnv.executeSql(dropDDL))
+      .isInstanceOf(classOf[ValidationException])
+      .hasMessageContaining(
+        "Model with identifier 'default_catalog.default_database.M1' does not exist.")
+  }
+
+  @Test
+  def testDropNonExistModelWithIfExist(): Unit = {
+    val dropDDL =
+      """
+        |DROP MODEL IF EXISTS M1
+        |""".stripMargin
+    tableEnv.executeSql(dropDDL)
+  }
+
+  @Test
+  def testExecuteSqlWithShowModels(): Unit = {
+    val createTableStmt =
+      """
+        |CREATE TABLE tbl1 (
+        |  a bigint,
+        |  b int,
+        |  c varchar
+        |) with (
+        |  'connector' = 'COLLECTION',
+        |  'is-bounded' = 'false'
+        |)
+      """.stripMargin
+    val tableResult1 = tableEnv.executeSql(createTableStmt)
+    assertEquals(ResultKind.SUCCESS, tableResult1.getResultKind)
+
+    val tableResult2 = tableEnv.executeSql("SHOW TABLES")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, tableResult2.getResultKind)
+    assertEquals(
+      ResolvedSchema.of(Column.physical("table name", DataTypes.STRING())),
+      tableResult2.getResolvedSchema)
+    checkData(util.Arrays.asList(Row.of("tbl1")).iterator(), tableResult2.collect())
+  }
+
+  def testExecuteSqlWithEnhancedShowModels(): Unit = {
+    val createCatalogResult =
+      tableEnv.executeSql("CREATE CATALOG catalog1 WITH('type'='generic_in_memory')")
+    assertEquals(ResultKind.SUCCESS, createCatalogResult.getResultKind)
+
+    val createDbResult = tableEnv.executeSql("CREATE database catalog1.db1")
+    assertEquals(ResultKind.SUCCESS, createDbResult.getResultKind)
+
+    val createTableStmt =
+      """
+        |CREATE TABLE catalog1.db1.person (
+        |  a bigint,
+        |  b int,
+        |  c varchar
+        |) with (
+        |  'connector' = 'COLLECTION',
+        |  'is-bounded' = 'false'
+        |)
+      """.stripMargin
+    val tableResult1 = tableEnv.executeSql(createTableStmt)
+    assertEquals(ResultKind.SUCCESS, tableResult1.getResultKind)
+
+    val createTableStmt2 =
+      """
+        |CREATE TABLE catalog1.db1.dim (
+        |  a bigint
+        |) with (
+        |  'connector' = 'COLLECTION',
+        |  'is-bounded' = 'false'
+        |)
+      """.stripMargin
+    val tableResult2 = tableEnv.executeSql(createTableStmt2)
+    assertEquals(ResultKind.SUCCESS, tableResult2.getResultKind)
+
+    val tableResult3 = tableEnv.executeSql("SHOW TABLES FROM catalog1.db1 like 'p_r%'")
+    assertEquals(ResultKind.SUCCESS_WITH_CONTENT, tableResult3.getResultKind)
+    assertEquals(
+      ResolvedSchema.of(Column.physical("table name", DataTypes.STRING())),
+      tableResult3.getResolvedSchema)
+    checkData(util.Arrays.asList(Row.of("person")).iterator(), tableResult3.collect())
   }
 
   @Test

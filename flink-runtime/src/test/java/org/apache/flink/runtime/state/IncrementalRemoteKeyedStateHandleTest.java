@@ -25,9 +25,11 @@ import org.apache.flink.util.TernaryBoolean;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -63,7 +65,7 @@ public class IncrementalRemoteKeyedStateHandleTest {
             verifyDiscard(handleAndLocalPath.getHandle(), TernaryBoolean.TRUE);
         }
 
-        verify(stateHandle.getMetaStateHandle()).discardState();
+        verify(stateHandle.getMetaDataStateHandle()).discardState();
     }
 
     /**
@@ -130,8 +132,8 @@ public class IncrementalRemoteKeyedStateHandleTest {
             verify(handleAndLocalPath.getHandle(), times(0)).discardState();
         }
 
-        verify(stateHandle1.getMetaStateHandle(), times(1)).discardState();
-        verify(stateHandle2.getMetaStateHandle(), times(0)).discardState();
+        verify(stateHandle1.getMetaDataStateHandle(), times(1)).discardState();
+        verify(stateHandle2.getMetaDataStateHandle(), times(0)).discardState();
 
         // We discard the second
         stateHandle2.discardState();
@@ -146,8 +148,8 @@ public class IncrementalRemoteKeyedStateHandleTest {
             verifyDiscard(handleAndLocalPath.getHandle(), TernaryBoolean.TRUE);
         }
 
-        verify(stateHandle1.getMetaStateHandle(), times(1)).discardState();
-        verify(stateHandle2.getMetaStateHandle(), times(1)).discardState();
+        verify(stateHandle1.getMetaDataStateHandle(), times(1)).discardState();
+        verify(stateHandle2.getMetaDataStateHandle(), times(1)).discardState();
     }
 
     /**
@@ -178,7 +180,7 @@ public class IncrementalRemoteKeyedStateHandleTest {
 
         // Everything should be discarded for this handle
         stateHandleZ.discardState();
-        verify(stateHandleZ.getMetaStateHandle(), times(1)).discardState();
+        verify(stateHandleZ.getMetaDataStateHandle(), times(1)).discardState();
 
         // Close the first registry
         stateRegistryA.close();
@@ -192,16 +194,16 @@ public class IncrementalRemoteKeyedStateHandleTest {
 
         // Private state should still get discarded
         stateHandleY.discardState();
-        verify(stateHandleY.getMetaStateHandle(), times(1)).discardState();
+        verify(stateHandleY.getMetaDataStateHandle(), times(1)).discardState();
 
         // This should still be unaffected
-        verify(stateHandleX.getMetaStateHandle(), never()).discardState();
+        verify(stateHandleX.getMetaDataStateHandle(), never()).discardState();
 
         // We re-register the handle with a new registry
         SharedStateRegistry sharedStateRegistryB = spy(new SharedStateRegistryImpl());
         stateHandleX.registerSharedStates(sharedStateRegistryB, 0L);
         stateHandleX.discardState();
-        verify(stateHandleX.getMetaStateHandle(), times(1)).discardState();
+        verify(stateHandleX.getMetaDataStateHandle(), times(1)).discardState();
 
         // Should be completely discarded because it is tracked through the new registry
         sharedStateRegistryB.unregisterUnusedState(1L);
@@ -237,6 +239,23 @@ public class IncrementalRemoteKeyedStateHandleTest {
         KeyedStateHandle newHandle = handle.getIntersection(expectedRange);
         assertTrue(newHandle instanceof IncrementalRemoteKeyedStateHandle);
         assertEquals(handle.getStateHandleId(), newHandle.getStateHandleId());
+    }
+
+    @Test
+    public void testCollectSizeStats() {
+        IncrementalRemoteKeyedStateHandle handle = create(ThreadLocalRandom.current());
+        StateObject.StateObjectSizeStatsCollector statsCollector =
+                StateObject.StateObjectSizeStatsCollector.create();
+        handle.collectSizeStats(statsCollector);
+        Assertions.assertEquals(
+                new HashMap<StateObject.StateObjectLocation, Long>() {
+                    {
+                        // Location is LOCAL_MEMORY, even though the handle is called remote because
+                        // we test against a local file system
+                        put(StateObject.StateObjectLocation.LOCAL_MEMORY, handle.getStateSize());
+                    }
+                },
+                statsCollector.getStats());
     }
 
     @Test

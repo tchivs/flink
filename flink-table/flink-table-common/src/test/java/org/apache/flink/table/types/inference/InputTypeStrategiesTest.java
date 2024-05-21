@@ -636,7 +636,20 @@ class InputTypeStrategiesTest extends InputTypeStrategiesTestBase {
                         .expectSignature("f(<ARRAY>, <ARRAY ELEMENT>)")
                         .expectArgumentTypes(
                                 DataTypes.ARRAY(DataTypes.INT().notNull()).notNull(),
-                                DataTypes.INT()));
+                                DataTypes.INT()),
+                TestSpec.forStrategy(sequence(SpecificInputTypeStrategies.ARRAY_FULLY_COMPARABLE))
+                        .expectSignature("f(<ARRAY<COMPARABLE>>)")
+                        .calledWithArgumentTypes(DataTypes.ARRAY(DataTypes.ROW()))
+                        .expectErrorMessage(
+                                "Invalid input arguments. Expected signatures are:\n"
+                                        + "f(<ARRAY<COMPARABLE>>)"),
+                TestSpec.forStrategy(
+                                "Strategy fails if input argument type is not ARRAY",
+                                sequence(SpecificInputTypeStrategies.ARRAY_FULLY_COMPARABLE))
+                        .calledWithArgumentTypes(DataTypes.INT())
+                        .expectErrorMessage(
+                                "Invalid input arguments. Expected signatures are:\n"
+                                        + "f(<ARRAY<COMPARABLE>>)"));
     }
 
     /** Simple pojo that should be converted to a Structured type. */

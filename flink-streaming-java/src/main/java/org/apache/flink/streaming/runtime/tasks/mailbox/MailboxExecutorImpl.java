@@ -103,4 +103,9 @@ public final class MailboxExecutorImpl implements MailboxExecutor {
             return false;
         }
     }
+
+    @Override
+    public boolean shouldInterrupt() {
+        return mailbox.hasMail();
+    }
 }

@@ -27,6 +27,8 @@ import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.rest.messages.checkpoints.CheckpointStatistics;
 import org.apache.flink.runtime.rest.util.RestMapperUtils;
+import org.apache.flink.traces.Span;
+import org.apache.flink.traces.SpanBuilder;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,10 +39,12 @@ import javax.annotation.Nullable;
 
 import java.io.StringWriter;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * Tracker for checkpoint statistics.
@@ -83,9 +87,11 @@ public class CheckpointStatsTracker {
     private final CheckpointStatsHistory history;
 
     private final JobID jobID;
+    private final MetricGroup metricGroup;
+    private int totalNumberOfSubTasks;
 
-    /** The latest restored checkpoint. */
-    @Nullable private RestoredCheckpointStats latestRestoredCheckpoint;
+    private Optional<JobInitializationMetricsBuilder> jobInitializationMetricsBuilder =
+            Optional.empty();
 
     /** Latest created snapshot. */
     private volatile CheckpointStatsSnapshot latestSnapshot;
@@ -109,9 +115,19 @@ public class CheckpointStatsTracker {
      */
     public CheckpointStatsTracker(
             int numRememberedCheckpoints, MetricGroup metricGroup, JobID jobID) {
+        this(numRememberedCheckpoints, metricGroup, jobID, Integer.MAX_VALUE);
+    }
+
+    CheckpointStatsTracker(
+            int numRememberedCheckpoints,
+            MetricGroup metricGroup,
+            JobID jobID,
+            int totalNumberOfSubTasks) {
         checkArgument(numRememberedCheckpoints >= 0, "Negative number of remembered checkpoints");
         this.history = new CheckpointStatsHistory(numRememberedCheckpoints);
         this.jobID = jobID;
+        this.metricGroup = metricGroup;
+        this.totalNumberOfSubTasks = totalNumberOfSubTasks;
 
         // Latest snapshot is empty
         latestSnapshot =
@@ -123,6 +139,16 @@ public class CheckpointStatsTracker {
 
         // Register the metrics
         registerMetrics(metricGroup);
+    }
+
+    public CheckpointStatsTracker updateTotalNumberOfSubtasks(int totalNumberOfSubTasks) {
+        this.totalNumberOfSubTasks = totalNumberOfSubTasks;
+        return this;
+    }
+
+    @VisibleForTesting
+    Optional<JobInitializationMetricsBuilder> getJobInitializationMetricsBuilder() {
+        return jobInitializationMetricsBuilder;
     }
 
     /**
@@ -143,7 +169,11 @@ public class CheckpointStatsTracker {
                                 counts.createSnapshot(),
                                 summary.createSnapshot(),
                                 history.createSnapshot(),
-                                latestRestoredCheckpoint);
+                                jobInitializationMetricsBuilder
+                                        .flatMap(
+                                                JobInitializationMetricsBuilder
+                                                        ::buildRestoredCheckpointStats)
+                                        .orElse(null));
 
                 latestSnapshot = snapshot;
 
@@ -196,14 +226,30 @@ public class CheckpointStatsTracker {
      *
      * @param restored The restored checkpoint stats.
      */
+    @Deprecated
     void reportRestoredCheckpoint(RestoredCheckpointStats restored) {
         checkNotNull(restored, "Restored checkpoint");
+        reportRestoredCheckpoint(
+                restored.getCheckpointId(),
+                restored.getProperties(),
+                restored.getExternalPath(),
+                restored.getStateSize());
+    }
 
+    public void reportRestoredCheckpoint(
+            long checkpointID,
+            CheckpointProperties properties,
+            String externalPath,
+            long stateSize) {
         statsReadWriteLock.lock();
         try {
             counts.incrementRestoredCheckpoints();
-            latestRestoredCheckpoint = restored;
-
+            checkState(
+                    jobInitializationMetricsBuilder.isPresent(),
+                    "JobInitializationMetrics should have been set first, before RestoredCheckpointStats");
+            jobInitializationMetricsBuilder
+                    .get()
+                    .setRestoredCheckpointStats(checkpointID, stateSize, properties, externalPath);
             dirty = true;
         } finally {
             statsReadWriteLock.unlock();
@@ -252,6 +298,14 @@ public class CheckpointStatsTracker {
 
     private void logCheckpointStatistics(AbstractCheckpointStats checkpointStats) {
         try {
+            metricGroup.addSpan(
+                    Span.builder(CheckpointStatsTracker.class, "Checkpoint")
+                            .setStartTsMillis(checkpointStats.getTriggerTimestamp())
+                            .setEndTsMillis(checkpointStats.getLatestAckTimestamp())
+                            .setAttribute("checkpointId", checkpointStats.getCheckpointId())
+                            .setAttribute("fullSize", checkpointStats.getStateSize())
+                            .setAttribute("checkpointedSize", checkpointStats.getCheckpointedSize())
+                            .setAttribute("checkpointStatus", checkpointStats.getStatus().name()));
             if (LOG.isDebugEnabled()) {
                 StringWriter sw = new StringWriter();
                 MAPPER.writeValue(
@@ -321,6 +375,61 @@ public class CheckpointStatsTracker {
         } finally {
             statsReadWriteLock.unlock();
         }
+    }
+
+    public void reportInitializationStartTs(long initializationStartTs) {
+        jobInitializationMetricsBuilder =
+                Optional.of(
+                        new JobInitializationMetricsBuilder(
+                                totalNumberOfSubTasks, initializationStartTs));
+    }
+
+    public void reportInitializationMetrics(SubTaskInitializationMetrics initializationMetrics) {
+        statsReadWriteLock.lock();
+        try {
+            if (!jobInitializationMetricsBuilder.isPresent()) {
+                LOG.warn(
+                        "Attempted to report SubTaskInitializationMetrics [{}] without jobInitializationMetricsBuilder present",
+                        initializationMetrics);
+                return;
+            }
+            JobInitializationMetricsBuilder builder = jobInitializationMetricsBuilder.get();
+            builder.reportInitializationMetrics(initializationMetrics);
+            if (builder.isComplete()) {
+                traceInitializationMetrics(builder.build());
+            }
+        } catch (Exception ex) {
+            LOG.warn("Failed to log SubTaskInitializationMetrics[{}]", ex, initializationMetrics);
+        } finally {
+            statsReadWriteLock.unlock();
+        }
+    }
+
+    private void traceInitializationMetrics(JobInitializationMetrics jobInitializationMetrics) {
+        SpanBuilder span =
+                Span.builder(CheckpointStatsTracker.class, "JobInitialization")
+                        .setStartTsMillis(jobInitializationMetrics.getStartTs())
+                        .setEndTsMillis(jobInitializationMetrics.getEndTs())
+                        .setAttribute(
+                                "initializationStatus",
+                                jobInitializationMetrics.getStatus().name());
+        for (JobInitializationMetrics.SumMaxDuration duration :
+                jobInitializationMetrics.getDurationMetrics().values()) {
+            setDurationSpanAttribute(span, duration);
+        }
+        if (jobInitializationMetrics.getCheckpointId() != JobInitializationMetrics.UNSET) {
+            span.setAttribute("checkpointId", jobInitializationMetrics.getCheckpointId());
+        }
+        if (jobInitializationMetrics.getStateSize() != JobInitializationMetrics.UNSET) {
+            span.setAttribute("fullSize", jobInitializationMetrics.getStateSize());
+        }
+        metricGroup.addSpan(span);
+    }
+
+    private void setDurationSpanAttribute(
+            SpanBuilder span, JobInitializationMetrics.SumMaxDuration duration) {
+        span.setAttribute("max" + duration.getName(), duration.getMax());
+        span.setAttribute("sum" + duration.getName(), duration.getSum());
     }
 
     // ------------------------------------------------------------------------
@@ -434,12 +543,9 @@ public class CheckpointStatsTracker {
     private class LatestRestoredCheckpointTimestampGauge implements Gauge<Long> {
         @Override
         public Long getValue() {
-            RestoredCheckpointStats restored = latestRestoredCheckpoint;
-            if (restored != null) {
-                return restored.getRestoreTimestamp();
-            } else {
-                return -1L;
-            }
+            return jobInitializationMetricsBuilder
+                    .map(JobInitializationMetricsBuilder::getStartTs)
+                    .orElse(-1L);
         }
     }
 

@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.rest.messages;
 
+import org.apache.flink.api.common.JobID;
+
 import java.util.Collection;
 import java.util.Collections;
 
@@ -34,5 +36,10 @@ public class JobMessageParameters extends MessageParameters {
     @Override
     public Collection<MessageQueryParameter<?>> getQueryParameters() {
         return Collections.emptySet();
+    }
+
+    public JobMessageParameters resolveJobId(JobID jobId) {
+        jobPathParameter.resolve(jobId);
+        return this;
     }
 }

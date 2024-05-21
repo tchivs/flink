@@ -19,10 +19,13 @@
 package org.apache.flink.runtime.state.memory;
 
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.runtime.state.StateObject;
 
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -183,5 +186,21 @@ public class ByteStreamStateHandleTest {
             assertEquals(0, in.read(dataGot, 0, 0)); // got return 0 because len == 0.
             assertEquals(-1, in.read()); // got -1 because of EOF.
         }
+    }
+
+    @Test
+    public void testCollectSizeStats() {
+        final byte[] data = new byte[5];
+        final ByteStreamStateHandle handle = new ByteStreamStateHandle("name", data);
+        StateObject.StateObjectSizeStatsCollector statsCollector =
+                StateObject.StateObjectSizeStatsCollector.create();
+        handle.collectSizeStats(statsCollector);
+        Assertions.assertEquals(
+                new HashMap<StateObject.StateObjectLocation, Long>() {
+                    {
+                        put(StateObject.StateObjectLocation.LOCAL_MEMORY, (long) data.length);
+                    }
+                },
+                statsCollector.getStats());
     }
 }

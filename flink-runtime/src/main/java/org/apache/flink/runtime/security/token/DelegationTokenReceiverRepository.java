@@ -133,7 +133,7 @@ public class DelegationTokenReceiverRepository {
      *     based on service name.
      */
     public void onNewTokensObtained(DelegationTokenContainer container) throws Exception {
-        LOG.info("New delegation tokens arrived, sending them to receivers");
+        LOG.debug("New delegation tokens arrived, sending them to receivers");
         for (Map.Entry<String, byte[]> entry : container.getTokens().entrySet()) {
             String serviceName = entry.getKey();
             byte[] tokens = entry.getValue();
@@ -147,6 +147,6 @@ public class DelegationTokenReceiverRepository {
                 LOG.warn("Failed to send tokens to delegation token receiver {}", serviceName, e);
             }
         }
-        LOG.info("Delegation tokens sent to receivers");
+        LOG.debug("Delegation tokens sent to receivers");
     }
 }

@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
@@ -138,8 +140,13 @@ public final class FileUtils {
         return new String(bytes, charsetName);
     }
 
+    public static String readFile(File file, Charset charset) throws IOException {
+        byte[] bytes = readAllBytes(file.toPath());
+        return new String(bytes, charset);
+    }
+
     public static String readFileUtf8(File file) throws IOException {
-        return readFile(file, "UTF-8");
+        return readFile(file, StandardCharsets.UTF_8);
     }
 
     public static void writeFile(File file, String contents, String encoding) throws IOException {
@@ -147,8 +154,13 @@ public final class FileUtils {
         Files.write(file.toPath(), bytes, StandardOpenOption.WRITE);
     }
 
+    public static void writeFile(File file, String contents, Charset charset) throws IOException {
+        byte[] bytes = contents.getBytes(charset);
+        Files.write(file.toPath(), bytes, StandardOpenOption.WRITE);
+    }
+
     public static void writeFileUtf8(File file, String contents) throws IOException {
-        writeFile(file, contents, "UTF-8");
+        writeFile(file, contents, StandardCharsets.UTF_8);
     }
 
     /**
@@ -418,14 +430,6 @@ public final class FileUtils {
             throws IOException {
         synchronized (DELETE_LOCK) {
             toRun.accept(file);
-            // briefly wait and fall through the loop
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                // restore the interruption flag and error out of the method
-                Thread.currentThread().interrupt();
-                throw new IOException("operation interrupted");
-            }
         }
     }
 
@@ -578,6 +582,30 @@ public final class FileUtils {
                 filterFileVisitor);
 
         return filterFileVisitor.getFiles();
+    }
+
+    /**
+     * Computes the sum of sizes of all files in the directory and it's subdirectories.
+     *
+     * @param path the root path from which to start the calculation.
+     * @param options visitation options for the directory traversal.
+     * @return sum of sizes of all files in the directory and it's subdirectories.
+     * @throws IOException if the size cannot be determined.
+     */
+    public static long getDirectoryFilesSize(java.nio.file.Path path, FileVisitOption... options)
+            throws IOException {
+
+        if (path == null) {
+            return 0L;
+        }
+
+        try (Stream<java.nio.file.Path> pathStream = Files.walk(path, options)) {
+            return pathStream
+                    .map(java.nio.file.Path::toFile)
+                    .filter(File::isFile)
+                    .mapToLong(File::length)
+                    .sum();
+        }
     }
 
     /**

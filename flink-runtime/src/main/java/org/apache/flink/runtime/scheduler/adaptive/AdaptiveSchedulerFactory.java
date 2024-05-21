@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.scheduler.adaptive;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
@@ -55,7 +56,7 @@ import java.util.concurrent.ScheduledExecutorService;
 /** Factory for the adaptive scheduler. */
 public class AdaptiveSchedulerFactory implements SchedulerNGFactory {
 
-    private final Duration initialResourceAllocationTimeout;
+    @VisibleForTesting public final Duration initialResourceAllocationTimeout;
     private final Duration resourceStabilizationTimeout;
 
     public AdaptiveSchedulerFactory(

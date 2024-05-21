@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.ReadableConfig;
@@ -81,7 +82,7 @@ public class DefaultConfigurableOptionsFactory implements ConfigurableRocksDBOpt
 
     @Override
     public DBOptions createDBOptions(
-            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose, JobID jobID) {
         if (isOptionConfigured(MAX_BACKGROUND_THREADS)) {
             currentOptions.setMaxBackgroundJobs(getMaxBackgroundThreads());
         }

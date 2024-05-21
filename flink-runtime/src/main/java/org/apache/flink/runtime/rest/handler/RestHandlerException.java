@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.rest.handler;
 
+import org.apache.flink.runtime.rest.messages.ErrorResponseBody;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
@@ -60,6 +62,10 @@ public class RestHandlerException extends FlinkException {
 
     public boolean logException() {
         return LoggingBehavior.LOG == loggingBehavior;
+    }
+
+    public ErrorResponseBody toErrorResponseBody() {
+        return new ErrorResponseBody(ExceptionUtils.stringifyException(this));
     }
 
     /** Enum to control logging behavior of RestHandlerExceptions. */

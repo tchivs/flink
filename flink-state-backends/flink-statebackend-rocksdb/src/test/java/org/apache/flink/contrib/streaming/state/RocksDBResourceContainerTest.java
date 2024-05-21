@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.util.function.ThrowingRunnable;
 
@@ -281,13 +282,17 @@ public class RocksDBResourceContainerTest {
         final ThrowingRunnable<Exception> disposer = sharedResources::close;
         OpaqueMemoryResource<RocksDBSharedResources> opaqueResource =
                 new OpaqueMemoryResource<>(sharedResources, 1024L, disposer);
-        BloomFilter blockBasedFilter = new BloomFilter();
+        // todo NGN-217: consider fixing RocksDBResourceContainer#overwriteFilterIfExist
+        // the behavior changed in RocksDB 8 since 6: BF needs to be explicitly partitioned now
+        BloomFilter blockBasedFilter = new BloomFilter(1d, true);
         RocksDBOptionsFactory blockBasedBloomFilterOptionFactory =
                 new RocksDBOptionsFactory() {
 
                     @Override
                     public DBOptions createDBOptions(
-                            DBOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
+                            DBOptions currentOptions,
+                            Collection<AutoCloseable> handlesToClose,
+                            JobID jobID) {
                         return currentOptions;
                     }
 

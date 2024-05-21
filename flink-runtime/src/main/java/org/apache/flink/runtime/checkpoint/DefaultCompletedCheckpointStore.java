@@ -79,6 +79,25 @@ public class DefaultCompletedCheckpointStore<R extends ResourceVersion<R>>
     /** False if store has been shutdown. */
     private final AtomicBoolean running = new AtomicBoolean(true);
 
+    private final boolean keepCheckpointPathEntriesForRetainedCheckpoints;
+
+    public DefaultCompletedCheckpointStore(
+            int maxNumberOfCheckpointsToRetain,
+            StateHandleStore<CompletedCheckpoint, R> stateHandleStore,
+            CheckpointStoreUtil completedCheckpointStoreUtil,
+            Collection<CompletedCheckpoint> completedCheckpoints,
+            SharedStateRegistry sharedStateRegistry,
+            Executor executor) {
+        this(
+                maxNumberOfCheckpointsToRetain,
+                false,
+                stateHandleStore,
+                completedCheckpointStoreUtil,
+                completedCheckpoints,
+                sharedStateRegistry,
+                executor);
+    }
+
     /**
      * Creates a {@link DefaultCompletedCheckpointStore} instance.
      *
@@ -91,12 +110,15 @@ public class DefaultCompletedCheckpointStore<R extends ResourceVersion<R>>
      */
     public DefaultCompletedCheckpointStore(
             int maxNumberOfCheckpointsToRetain,
+            boolean keepCheckpointPathEntriesForRetainedCheckpoints,
             StateHandleStore<CompletedCheckpoint, R> stateHandleStore,
             CheckpointStoreUtil completedCheckpointStoreUtil,
             Collection<CompletedCheckpoint> completedCheckpoints,
             SharedStateRegistry sharedStateRegistry,
             Executor executor) {
         super(sharedStateRegistry);
+        this.keepCheckpointPathEntriesForRetainedCheckpoints =
+                keepCheckpointPathEntriesForRetainedCheckpoints;
         checkArgument(maxNumberOfCheckpointsToRetain >= 1, "Must retain at least one checkpoint.");
         this.maxNumberOfCheckpointsToRetain = maxNumberOfCheckpointsToRetain;
         this.checkpointStateHandleStore = checkNotNull(stateHandleStore);
@@ -143,7 +165,8 @@ public class DefaultCompletedCheckpointStore<R extends ResourceVersion<R>>
                         completedCheckpoints,
                         maxNumberOfCheckpointsToRetain,
                         completedCheckpoint -> {
-                            tryRemove(completedCheckpoint.getCheckpointID());
+                            tryRemoveStateHandleStoreData(
+                                    completedCheckpoint.getCheckpointID(), true);
                             checkpointsCleaner.addSubsumedCheckpoint(completedCheckpoint);
                         });
 
@@ -229,7 +252,12 @@ public class DefaultCompletedCheckpointStore<R extends ResourceVersion<R>>
             CheckpointsCleaner checkpointsCleaner,
             Runnable postCleanup)
             throws Exception {
-        if (tryRemove(completedCheckpoint.getCheckpointID())) {
+
+        boolean deleteCheckpointPath =
+                shouldDiscard || !keepCheckpointPathEntriesForRetainedCheckpoints;
+
+        if (tryRemoveStateHandleStoreData(
+                completedCheckpoint.getCheckpointID(), deleteCheckpointPath)) {
             checkpointsCleaner.cleanCheckpoint(
                     completedCheckpoint, shouldDiscard, postCleanup, ioExecutor);
             return shouldDiscard;
@@ -243,8 +271,10 @@ public class DefaultCompletedCheckpointStore<R extends ResourceVersion<R>>
      * @param checkpointId identifying the checkpoint to remove
      * @return true if the checkpoint could be removed
      */
-    private boolean tryRemove(long checkpointId) throws Exception {
+    private boolean tryRemoveStateHandleStoreData(long checkpointId, boolean deleteCheckpointPath)
+            throws Exception {
         return checkpointStateHandleStore.releaseAndTryRemove(
+                deleteCheckpointPath,
                 completedCheckpointStoreUtil.checkpointIDToName(checkpointId));
     }
 }

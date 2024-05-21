@@ -21,6 +21,7 @@ package org.apache.flink.runtime.dispatcher;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.operators.ResourceSpec;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.PipelineOptions;
@@ -78,6 +79,7 @@ import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.messages.webmonitor.MultipleJobsDetails;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.rest.handler.RestHandlerException;
+import org.apache.flink.runtime.rest.handler.job.ConfluentFailException;
 import org.apache.flink.runtime.rest.handler.legacy.utils.ArchivedExecutionGraphBuilder;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -1575,6 +1577,49 @@ public class DispatcherTest extends AbstractDispatcherTest {
         }
     }
 
+    @Test
+    public void testFailingJob() throws Exception {
+        dispatcher =
+                createAndStartDispatcher(
+                        heartbeatServices,
+                        haServices,
+                        new ExpectedJobIdJobManagerRunnerFactory(jobId));
+        jobMasterLeaderElection.isLeader(UUID.randomUUID());
+        DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
+
+        // create a job graph of a job that blocks forever
+        Tuple2<JobGraph, BlockingJobVertex> blockingJobGraph = getBlockingJobGraphAndVertex();
+        JobID jobID = blockingJobGraph.f0.getJobID();
+
+        dispatcherGateway.submitJob(blockingJobGraph.f0, TIMEOUT).get();
+
+        // submission has succeeded, now fail the job
+        String expectedFailReason = "Test fail";
+        CompletableFuture<Void> failFuture =
+                dispatcherGateway.failJob(
+                        jobID, new ConfluentFailException(expectedFailReason), TIMEOUT);
+        assertThat(
+                dispatcherGateway.requestJobStatus(jobID, TIMEOUT).get(),
+                is(JobStatus.INITIALIZING));
+        assertThat(failFuture.isDone(), is(false));
+        // unblock
+        blockingJobGraph.f1.unblock();
+        // wait until failed
+        failFuture.get();
+        JobResult jobResult = dispatcherGateway.requestJobResult(jobID, TIMEOUT).get();
+        assertThat(jobResult.getApplicationStatus(), is(ApplicationStatus.FAILED));
+
+        Assertions.assertThat(jobResult.getSerializedThrowable())
+                .isNotEmpty()
+                .get()
+                .extracting(e -> e.deserializeError(Thread.currentThread().getContextClassLoader()))
+                .satisfies(
+                        exception ->
+                                Assertions.assertThat(exception.getCause())
+                                        .isInstanceOf(ConfluentFailException.class)
+                                        .hasMessage(expectedFailReason));
+    }
+
     private JobResourceRequirements getJobRequirements() {
         JobResourceRequirements.Builder builder = JobResourceRequirements.newBuilder();
 
@@ -1596,6 +1641,7 @@ public class DispatcherTest extends AbstractDispatcherTest {
                                                         jobGraph.getName(),
                                                         JobStatus.RUNNING,
                                                         null,
+                                                        "{}",
                                                         null,
                                                         System.currentTimeMillis(),
                                                         jobGraph.getVertices(),
@@ -1875,6 +1921,20 @@ public class DispatcherTest extends AbstractDispatcherTest {
         }
     }
 
+    private Tuple2<JobGraph, BlockingJobVertex> getBlockingJobGraphAndVertex() {
+        final BlockingJobVertex blockingJobVertex = new BlockingJobVertex("testVertex");
+        blockingJobVertex.setInvokableClass(NoOpInvokable.class);
+        // AdaptiveScheduler expects the parallelism to be set for each vertex
+        blockingJobVertex.setParallelism(1);
+
+        return Tuple2.of(
+                JobGraphBuilder.newStreamingJobGraphBuilder()
+                        .setJobId(jobId)
+                        .addJobVertex(blockingJobVertex)
+                        .build(),
+                blockingJobVertex);
+    }
+
     private static final class TestingJobMasterGatewayJobManagerRunnerFactory
             extends TestingJobMasterServiceLeadershipRunnerFactory {
         private final TestingJobMasterGateway testingJobMasterGateway;
@@ -2008,6 +2068,24 @@ public class DispatcherTest extends AbstractDispatcherTest {
                             .build();
             runner.getTerminationFuture().thenRun(onClose::run);
             return runner;
+        }
+    }
+
+    private static class BlockingJobVertex extends JobVertex {
+        private final OneShotLatch oneShotLatch = new OneShotLatch();
+
+        private BlockingJobVertex(String name) {
+            super(name);
+        }
+
+        @Override
+        public void initializeOnMaster(InitializeOnMasterContext context) throws Exception {
+            super.initializeOnMaster(context);
+            oneShotLatch.await();
+        }
+
+        public void unblock() {
+            oneShotLatch.trigger();
         }
     }
 }

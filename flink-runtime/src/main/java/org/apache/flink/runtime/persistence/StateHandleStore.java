@@ -126,6 +126,11 @@ public interface StateHandleStore<T extends Serializable, R extends ResourceVers
      */
     boolean releaseAndTryRemove(String name) throws Exception;
 
+    default boolean releaseAndTryRemove(boolean deleteCheckpointPath, String name)
+            throws Exception {
+        return releaseAndTryRemove(name);
+    }
+
     /**
      * Only clears all the state handle pointers on Kubernetes or ZooKeeper.
      *

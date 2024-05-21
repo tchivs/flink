@@ -277,13 +277,20 @@ class StateTrackingMockExecutionGraph implements ExecutionGraph {
             CheckpointStorage checkpointStorage,
             CheckpointStatsTracker statsTracker,
             CheckpointsCleaner checkpointsCleaner,
-            String changelogStorage) {
+            String changelogStorage,
+            boolean storeSavepointsInCheckpointStore) {
         throw new UnsupportedOperationException();
     }
 
     @Nullable
     @Override
     public CheckpointCoordinator getCheckpointCoordinator() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Nullable
+    @Override
+    public CheckpointStatsTracker getCheckpointStatsTracker() {
         throw new UnsupportedOperationException();
     }
 

@@ -156,7 +156,7 @@ public class TestSinkInitContext implements Sink.InitContext {
 
     @Override
     public JobID getJobId() {
-        return null;
+        return JobID.generate();
     }
 
     public TestProcessingTimeService getTestProcessingTimeService() {

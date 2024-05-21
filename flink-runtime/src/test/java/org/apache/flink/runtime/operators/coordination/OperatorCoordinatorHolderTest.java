@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.operators.coordination;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
@@ -518,6 +519,7 @@ public class OperatorCoordinatorHolderTest extends TestLogger {
                         getClass().getClassLoader(),
                         3,
                         1775,
+                        JobID.generate(),
                         eventTarget,
                         false,
                         new TaskInformation(

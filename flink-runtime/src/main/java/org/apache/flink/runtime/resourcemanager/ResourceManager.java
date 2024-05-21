@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.blocklist.BlockedNode;
 import org.apache.flink.runtime.blocklist.BlocklistContext;
@@ -80,10 +81,13 @@ import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationRejection;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationSuccess;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorThreadInfoGateway;
 import org.apache.flink.runtime.taskexecutor.partition.ClusterPartitionReport;
+import org.apache.flink.types.SerializableOptional;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkExpectedException;
+import org.apache.flink.util.MdcUtils;
+import org.apache.flink.util.MdcUtils.MdcCloseable;
 import org.apache.flink.util.concurrent.FutureUtils;
 
 import javax.annotation.Nullable;
@@ -362,12 +366,14 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
             final ResourceID jobManagerResourceId,
             final String jobManagerAddress,
             final JobID jobId,
+            final Configuration jobConfiguration,
             final Time timeout) {
 
         checkNotNull(jobMasterId);
         checkNotNull(jobManagerResourceId);
         checkNotNull(jobManagerAddress);
         checkNotNull(jobId);
+        checkNotNull(jobConfiguration);
 
         if (!jobLeaderIdService.containsJob(jobId)) {
             try {
@@ -417,6 +423,13 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
                         jobMasterIdFuture,
                         (JobMasterGateway jobMasterGateway, JobMasterId leadingJobMasterId) -> {
                             if (Objects.equals(leadingJobMasterId, jobMasterId)) {
+                                // First register the job with the delegation token manager, so that
+                                // if anything fails, we don't register the job master.
+                                try {
+                                    delegationTokenManager.registerJob(jobId, jobConfiguration);
+                                } catch (Exception e) {
+                                    return new RegistrationResponse.Failure(e);
+                                }
                                 return registerJobMasterInternal(
                                         jobMasterGateway,
                                         jobId,
@@ -433,7 +446,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
                                         new FlinkException(declineMessage));
                             }
                         },
-                        getMainThreadExecutor());
+                        getMainThreadExecutor(jobId));
 
         // handle exceptions which might have occurred in one of the futures inputs of combine
         return registrationResponseFuture.handleAsync(
@@ -570,30 +583,34 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
     public CompletableFuture<Acknowledge> declareRequiredResources(
             JobMasterId jobMasterId, ResourceRequirements resourceRequirements, Time timeout) {
         final JobID jobId = resourceRequirements.getJobId();
-        final JobManagerRegistration jobManagerRegistration = jobManagerRegistrations.get(jobId);
+        try (MdcCloseable ignored = MdcUtils.withContext(MdcUtils.asContextData(jobId))) {
+            final JobManagerRegistration jobManagerRegistration =
+                    jobManagerRegistrations.get(jobId);
 
-        if (null != jobManagerRegistration) {
-            if (Objects.equals(jobMasterId, jobManagerRegistration.getJobMasterId())) {
-                return getReadyToServeFuture()
-                        .thenApply(
-                                acknowledge -> {
-                                    validateRunsInMainThread();
-                                    slotManager.processResourceRequirements(resourceRequirements);
-                                    return null;
-                                });
+            if (null != jobManagerRegistration) {
+                if (Objects.equals(jobMasterId, jobManagerRegistration.getJobMasterId())) {
+                    return getReadyToServeFuture()
+                            .thenApply(
+                                    acknowledge -> {
+                                        validateRunsInMainThread();
+                                        slotManager.processResourceRequirements(
+                                                resourceRequirements);
+                                        return null;
+                                    });
+                } else {
+                    return FutureUtils.completedExceptionally(
+                            new ResourceManagerException(
+                                    "The job leader's id "
+                                            + jobManagerRegistration.getJobMasterId()
+                                            + " does not match the received id "
+                                            + jobMasterId
+                                            + '.'));
+                }
             } else {
                 return FutureUtils.completedExceptionally(
                         new ResourceManagerException(
-                                "The job leader's id "
-                                        + jobManagerRegistration.getJobMasterId()
-                                        + " does not match the received id "
-                                        + jobMasterId
-                                        + '.'));
+                                "Could not find registered job manager for job " + jobId + '.'));
             }
-        } else {
-            return FutureUtils.completedExceptionally(
-                    new ResourceManagerException(
-                            "Could not find registered job manager for job " + jobId + '.'));
         }
     }
 
@@ -745,6 +762,39 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
                         totalBlockedFreeSlots,
                         totalResource,
                         freeResource));
+    }
+
+    @Override
+    public CompletableFuture<Collection<Tuple2<ResourceID, String>>>
+            requestTaskManagerMetricQueryServiceAddresses(Time timeout, JobID jobId) {
+        final Collection<TaskExecutorConnection> connections =
+                slotManager.getTaskExecutorsWithAllocatedSlotsForJob(jobId);
+        final ArrayList<CompletableFuture<Optional<Tuple2<ResourceID, String>>>>
+                metricQueryServiceAddressFutures = new ArrayList<>(connections.size());
+        for (TaskExecutorConnection connection : connections) {
+            final CompletableFuture<Optional<Tuple2<ResourceID, String>>>
+                    metricQueryServiceAddressFuture =
+                            connection
+                                    .getTaskExecutorGateway()
+                                    .requestMetricQueryServiceAddress(timeout)
+                                    .thenApply(SerializableOptional::toOptional)
+                                    .thenApply(
+                                            o ->
+                                                    o.map(
+                                                            address ->
+                                                                    Tuple2.of(
+                                                                            connection
+                                                                                    .getResourceID(),
+                                                                            address)));
+            metricQueryServiceAddressFutures.add(metricQueryServiceAddressFuture);
+        }
+        return FutureUtils.combineAll(metricQueryServiceAddressFutures)
+                .thenApply(
+                        collection ->
+                                collection.stream()
+                                        .filter(Optional::isPresent)
+                                        .map(Optional::get)
+                                        .collect(Collectors.toList()));
     }
 
     @Override
@@ -1157,6 +1207,15 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
         if (jobManagerRegistrations.containsKey(jobId)) {
             closeJobManagerConnection(jobId, ResourceRequirementHandling.CLEAR, cause);
         }
+
+        try {
+            delegationTokenManager.unregisterJob(jobId);
+        } catch (Exception e) {
+            log.warn(
+                    "Could not properly remove the job {} from the delegation token manager.",
+                    jobId,
+                    e);
+        }
     }
 
     protected void jobLeaderLostLeadership(JobID jobId, JobMasterId oldJobMasterId) {
@@ -1524,7 +1583,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
     public void onNewTokensObtained(byte[] tokens) throws Exception {
         latestTokens.set(tokens);
 
-        log.info("Updating delegation tokens for {} task manager(s).", taskExecutors.size());
+        log.debug("Updating delegation tokens for {} task manager(s).", taskExecutors.size());
 
         if (!taskExecutors.isEmpty()) {
             final List<CompletableFuture<Acknowledge>> futures =
@@ -1533,7 +1592,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
             for (Map.Entry<ResourceID, WorkerRegistration<WorkerType>> workerRegistrationEntry :
                     taskExecutors.entrySet()) {
                 WorkerRegistration<WorkerType> registration = workerRegistrationEntry.getValue();
-                log.info("Updating delegation tokens for node {}.", registration.getNodeId());
+                log.debug("Updating delegation tokens for node {}.", registration.getNodeId());
                 final TaskExecutorGateway taskExecutorGateway =
                         registration.getTaskExecutorGateway();
                 futures.add(taskExecutorGateway.updateDelegationTokens(getFencingToken(), tokens));

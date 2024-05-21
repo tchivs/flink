@@ -115,6 +115,10 @@ flink-connectors/flink-file-sink-common,\
 flink-connectors/flink-hadoop-compatibility,\
 flink-connectors,\
 flink-connectors/flink-connector-files,\
+flink-connectors/confluent-connector-kafka,\
+flink-connectors/confluent-connector-kafka/flink-connector-kafka,\
+flink-connectors/confluent-connector-kafka/flink-sql-connector-kafka,\
+flink-connectors/confluent-connector-kafka/flink-connector-kafka-e2e-tests,\
 flink-metrics/flink-metrics-dropwizard,\
 flink-metrics/flink-metrics-graphite,\
 flink-metrics/flink-metrics-jmx,\

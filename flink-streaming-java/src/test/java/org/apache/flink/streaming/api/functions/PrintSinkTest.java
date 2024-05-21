@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.Optional;
 import java.util.OptionalLong;
 
 import static org.junit.Assert.assertEquals;
@@ -231,7 +232,12 @@ class PrintSinkTest {
 
         @Override
         public JobID getJobId() {
-            return null;
+            return JobID.generate();
+        }
+
+        @Override
+        public Optional<JobID> getJobID() {
+            return Optional.empty();
         }
     }
 
@@ -248,6 +254,11 @@ class PrintSinkTest {
 
         @Override
         public boolean tryYield() throws FlinkRuntimeException {
+            return false;
+        }
+
+        @Override
+        public boolean shouldInterrupt() {
             return false;
         }
     }

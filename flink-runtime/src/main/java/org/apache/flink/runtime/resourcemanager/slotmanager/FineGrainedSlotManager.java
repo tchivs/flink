@@ -910,4 +910,12 @@ public class FineGrainedSlotManager implements SlotManager {
         Preconditions.checkNotNull(blockedTaskManagerChecker);
         return blockedTaskManagerChecker.isBlockedTaskManager(resourceID);
     }
+
+    @Override
+    public Collection<TaskExecutorConnection> getTaskExecutorsWithAllocatedSlotsForJob(
+            JobID jobId) {
+        return taskManagerTracker.getTaskManagersWithAllocatedSlotsForJob(jobId).stream()
+                .map(TaskManagerInfo::getTaskExecutorConnection)
+                .collect(Collectors.toList());
+    }
 }

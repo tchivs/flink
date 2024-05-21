@@ -19,28 +19,45 @@
 package org.apache.flink.runtime.metrics.dump;
 
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.webmonitor.retriever.JobMetricsFilter;
 import org.apache.flink.runtime.webmonitor.retriever.MetricQueryServiceGateway;
 
 import javax.annotation.Nonnull;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /** Testing implementation of the {@link MetricQueryServiceGateway}. */
 public class TestingMetricQueryServiceGateway implements MetricQueryServiceGateway {
 
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
     @Nonnull
     private final Supplier<CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
             queryMetricsSupplier;
 
+    @Nonnull
+    private final Function<
+                    JobMetricsFilter,
+                    CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
+            queryJobMetricsFunction;
+
     @Nonnull private final String address;
 
-    public TestingMetricQueryServiceGateway(
+    private TestingMetricQueryServiceGateway(
             @Nonnull
                     Supplier<CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
                             queryMetricsSupplier,
+            Function<
+                            JobMetricsFilter,
+                            CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
+                    queryJobMetricsFunction,
             @Nonnull String address) {
         this.queryMetricsSupplier = queryMetricsSupplier;
+        this.queryJobMetricsFunction = queryJobMetricsFunction;
         this.address = address;
     }
 
@@ -48,6 +65,12 @@ public class TestingMetricQueryServiceGateway implements MetricQueryServiceGatew
     public CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryMetrics(
             Time timeout) {
         return queryMetricsSupplier.get();
+    }
+
+    @Override
+    public CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryJobMetrics(
+            Time timeout, JobMetricsFilter filter) {
+        return queryJobMetricsFunction.apply(filter);
     }
 
     @Override
@@ -64,12 +87,32 @@ public class TestingMetricQueryServiceGateway implements MetricQueryServiceGatew
     public static class Builder {
         private Supplier<CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
                 queryMetricsSupplier = CompletableFuture::new;
+
+        private Function<
+                        JobMetricsFilter,
+                        CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
+                queryJobMetricsFunction = filter -> new CompletableFuture<>();
+
         private String address = "localhost";
+
+        private Builder() {
+            // no-op
+        }
 
         public Builder setQueryMetricsSupplier(
                 Supplier<CompletableFuture<MetricDumpSerialization.MetricSerializationResult>>
                         queryMetricsSupplier) {
             this.queryMetricsSupplier = queryMetricsSupplier;
+            return this;
+        }
+
+        public Builder setQueryJobMetricsFunction(
+                Function<
+                                JobMetricsFilter,
+                                CompletableFuture<
+                                        MetricDumpSerialization.MetricSerializationResult>>
+                        queryJobMetricsFunction) {
+            this.queryJobMetricsFunction = queryJobMetricsFunction;
             return this;
         }
 
@@ -79,7 +122,8 @@ public class TestingMetricQueryServiceGateway implements MetricQueryServiceGatew
         }
 
         public TestingMetricQueryServiceGateway build() {
-            return new TestingMetricQueryServiceGateway(queryMetricsSupplier, address);
+            return new TestingMetricQueryServiceGateway(
+                    queryMetricsSupplier, queryJobMetricsFunction, address);
         }
     }
 }

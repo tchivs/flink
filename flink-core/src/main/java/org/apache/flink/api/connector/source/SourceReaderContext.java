@@ -19,13 +19,14 @@
 package org.apache.flink.api.connector.source;
 
 import org.apache.flink.annotation.Public;
+import org.apache.flink.api.common.CommonConfluentContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
 import org.apache.flink.util.UserCodeClassLoader;
 
 /** The interface that exposes some context from runtime to the {@link SourceReader}. */
 @Public
-public interface SourceReaderContext {
+public interface SourceReaderContext extends CommonConfluentContext {
 
     /** @return The metric group this source belongs to. */
     SourceReaderMetricGroup metricGroup();

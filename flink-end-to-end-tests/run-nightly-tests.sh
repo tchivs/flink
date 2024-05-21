@@ -121,6 +121,9 @@ function run_group_1 {
 
     run_test "RocksDB Memory Management end-to-end test" "$END_TO_END_DIR/test-scripts/test_rocksdb_state_memory_control.sh"
 
+ }
+
+function run_group_3 {
     ################################################################################
     # Docker / Container / Kubernetes tests
     ################################################################################
@@ -149,7 +152,9 @@ function run_group_1 {
             run_test "Running Kerberized YARN application on Docker test (custom fs plugin)" "$END_TO_END_DIR/test-scripts/test_yarn_application_kerberos_docker.sh dummy-fs"
         fi
     fi
+}
 
+function run_group_1b {
     ################################################################################
     # High Availability
     ################################################################################
@@ -160,7 +165,9 @@ function run_group_1 {
     run_test "Running HA (hashmap, sync) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_datastream.sh hashmap false false" "skip_check_exceptions"
     run_test "Running HA (rocks, non-incremental) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_datastream.sh rocks true false" "skip_check_exceptions"
     run_test "Running HA (rocks, incremental) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_datastream.sh rocks true true" "skip_check_exceptions"
+}
 
+function run_group_3b {
     run_test "Running HA per-job cluster (hashmap, async) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_per_job_cluster_datastream.sh hashmap true false" "skip_check_exceptions"
     run_test "Running HA per-job cluster (hashmap, sync) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_per_job_cluster_datastream.sh hashmap false false" "skip_check_exceptions"
     run_test "Running HA per-job cluster (rocks, non-incremental) end-to-end test" "$END_TO_END_DIR/test-scripts/test_ha_per_job_cluster_datastream.sh rocks true false" "skip_check_exceptions"
@@ -207,6 +214,9 @@ function run_group_2 {
 
     run_test "TPC-H end-to-end test" "$END_TO_END_DIR/test-scripts/test_tpch.sh"
     run_test "TPC-DS end-to-end test" "$END_TO_END_DIR/test-scripts/test_tpcds.sh"
+ }
+
+function run_group_4 {
     run_test "TPC-DS end-to-end test with adaptive batch scheduler" "$END_TO_END_DIR/test-scripts/test_tpcds.sh AdaptiveBatch run_test" "custom_check_exceptions" "$END_TO_END_DIR/test-scripts/test_tpcds.sh AdaptiveBatch check_exceptions"
 
     run_test "Heavy deployment end-to-end test" "$END_TO_END_DIR/test-scripts/test_heavy_deployment.sh" "skip_check_exceptions"
@@ -260,11 +270,21 @@ function run_group_2 {
 
 if [ "$1" == "1" ]; then
     run_group_1
+    run_group_1b
 elif [ "$1" == "2" ]; then
     run_group_2
+elif [ "$1" == "3" ]; then
+    run_group_3
+    run_group_3b
+elif [ "$1" == "4" ]; then
+    run_group_4
 else
     run_group_1
+    run_group_1b
     run_group_2
+    run_group_3
+    run_group_3b
+    run_group_4
 fi
 
 

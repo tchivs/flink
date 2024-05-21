@@ -1,0 +1,66 @@
+#!/bin/bash
+################################################################################
+#  Licensed to the Apache Software Foundation (ASF) under one
+#  or more contributor license agreements.  See the NOTICE file
+#  distributed with this work for additional information
+#  regarding copyright ownership.  The ASF licenses this file
+#  to you under the Apache License, Version 2.0 (the
+#  "License"); you may not use this file except in compliance
+#  with the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+
+REMOTE_NAME="$1"
+REMOTE_URL="$2"
+
+# If the remote repository is https://github.com/confluentinc/flink we can allow any
+# push including with private paths as this is the intended internal/private repository
+if [[ $REMOTE_URL =~ ^(https://|ssh://)?(git@)?github\.com[/:]confluentinc/flink(\.git)?/?$ ]]; then
+  exit 0
+fi
+
+# This is a partial list of known unique paths to https://github.com/confluentinc/flink
+# If we find any objects under these paths in apache/kafka refs we will refuse the push
+PRIVATE_PATHS=(
+  "cc-flink-extensions/"
+)
+
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local oid> <remote ref> <remote oid>
+#
+PRIVATE_REFS=()
+while read -r LOCAL_REF LOCAL_OID REMOTE_REF REMOTE_OID; do
+  # If the local OID is zero we are deleting a remote ref, ignore
+  if [[ "$LOCAL_OID" != "0000000000000000000000000000000000000000" ]]; then
+    # If there are any commits that contain the private paths in that ref, add to PRIVATE_REFS array
+    if [[ $(git rev-list --count "$LOCAL_OID" -- "${PRIVATE_PATHS[@]}") != "0" ]]; then
+      PRIVATE_REFS[${#PRIVATE_REFS[@]}]="$LOCAL_REF ($LOCAL_OID) -> $REMOTE_REF ($REMOTE_OID)"
+    fi
+  fi
+done
+
+# If any private paths were found in the refs, prevent the push
+if [[ ${#PRIVATE_REFS[@]} != 0 ]]; then
+  # The remote is likely a known public repository like apache/flink
+  # Outright refuse to allow the push by exiting with an error and informing the user
+  echo "FATAL: Refusing to allow push to remote '$REMOTE_NAME' ($REMOTE_URL)!" >&2
+  echo "The following refs contain private source code from confluentinc/flink:" >&2
+  printf "    %s\n" "${PRIVATE_REFS[@]}"
+  exit 1
+fi

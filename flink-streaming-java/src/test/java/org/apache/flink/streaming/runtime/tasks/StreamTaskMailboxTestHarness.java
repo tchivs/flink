@@ -136,6 +136,17 @@ public class StreamTaskMailboxTestHarness<OUT> implements AutoCloseable {
         return false;
     }
 
+    public boolean processSingleMailboxLoop() throws Exception {
+        if (streamTask.mailboxProcessor.isMailboxLoopRunning()) {
+            return streamTask.runSingleMailboxLoop();
+        }
+        return false;
+    }
+
+    public MailboxExecutor getMainMailboxExecutor() {
+        return streamTask.mailboxProcessor.getMainMailboxExecutor();
+    }
+
     public MailboxExecutor getExecutor(int priority) {
         return streamTask.getMailboxExecutorFactory().createExecutor(priority);
     }

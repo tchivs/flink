@@ -20,6 +20,7 @@ package org.apache.flink.runtime.source.coordinator;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.connector.source.ReaderInfo;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceSplit;
@@ -54,6 +55,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -679,5 +681,10 @@ public class SourceCoordinatorContext<SplitT extends SourceSplit>
         private void reset(int subtaskIndex) {
             gateways[subtaskIndex].clear();
         }
+    }
+
+    @Override
+    public Optional<JobID> getJobID() {
+        return operatorCoordinatorContext.getJobID();
     }
 }

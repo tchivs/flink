@@ -1482,6 +1482,30 @@ Sink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b, c])
 ]]>
     </Resource>
   </TestCase>
+  <TestCase name="testCdcSourceWithoutPkSinkWithoutPk[nonDeterministicUpdateStrategy=IGNORE]">
+    <Resource name="sql">
+      <![CDATA[
+insert into sink_without_pk
+select metadata_1, b, metadata_2
+from cdc_without_pk
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- LogicalProject(metadata_1=[$4], b=[$1], metadata_2=[$5])
+   +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_without_pk, metadata=[metadata_1, metadata_2]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- Calc(select=[metadata_1, b, metadata_2])
+   +- TableSourceScan(table=[[default_catalog, default_database, cdc_without_pk, project=[b], metadata=[metadata_1, metadata_2]]], fields=[b, metadata_1, metadata_2])
+]]>
+    </Resource>
+  </TestCase>
   <TestCase name="testCdcWithMetaCorrelateSinkWithPk[nonDeterministicUpdateStrategy=IGNORE]">
     <Resource name="sql">
       <![CDATA[
@@ -1496,7 +1520,7 @@ LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b,
 +- LogicalProject(a=[CAST($0):INTEGER], b=[CAST($4):BIGINT], c=[$7])
    +- LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{2}])
       :- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      :  +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      :  +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
       +- LogicalTableFunctionScan(invocation=[str_split($cor0.c)], rowType=[RecordType(VARCHAR(2147483647) EXPR$0)])
 ]]>
     </Resource>
@@ -1505,7 +1529,7 @@ LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b,
 Sink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b, c], upsertMaterialize=[true])
 +- Calc(select=[CAST(a AS INTEGER) AS a, CAST(metadata_1 AS BIGINT) AS b, EXPR$0 AS c])
    +- Correlate(invocation=[str_split($cor0.c)], correlate=[table(str_split($cor0.c))], select=[a,b,c,d,metadata_1,metadata_2,metadata_3,EXPR$0], rowType=[RecordType(INTEGER a, BIGINT b, VARCHAR(2147483647) c, BOOLEAN d, INTEGER metadata_1, VARCHAR(2147483647) metadata_2, BIGINT metadata_3, VARCHAR(2147483647) EXPR$0)], joinType=[INNER])
-      +- TableSourceScan(table=[[default_catalog, default_database, cdc_with_meta]], fields=[a, b, c, d, metadata_1, metadata_2, metadata_3])
+      +- TableSourceScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]], fields=[a, b, c, d, metadata_1, metadata_2, metadata_3])
 ]]>
     </Resource>
   </TestCase>
@@ -1522,7 +1546,7 @@ from cdc_with_meta
 LogicalLegacySink(name=[`default_catalog`.`default_database`.`legacy_retract_sink`], fields=[a, b, c])
 +- LogicalProject(a=[$0], metadata_3=[$6], c=[$2])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1546,7 +1570,7 @@ from cdc_with_meta
 LogicalLegacySink(name=[`default_catalog`.`default_database`.`legacy_upsert_sink`], fields=[a, b, c])
 +- LogicalProject(a=[CAST($0):INTEGER], b=[$6], c=[CAST($2):VARCHAR(100) CHARACTER SET "UTF-16LE"])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1571,7 +1595,7 @@ from cdc_with_meta
 LogicalLegacySink(name=[`default_catalog`.`default_database`.`legacy_upsert_sink`], fields=[a, b, c])
 +- LogicalProject(a=[CAST($0):INTEGER], b=[$6], c=[CAST($2):VARCHAR(100) CHARACTER SET "UTF-16LE"])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1595,7 +1619,7 @@ select a, b, c, e from cdc_with_meta_rename
 LogicalSink(table=[default_catalog.default_database.sink_with_composite_pk], fields=[a, b, c, e])
 +- LogicalProject(a=[$0], b=[$1], c=[$2], e=[$5])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_3=[$4], e=[$4])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta_rename]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta_rename, metadata=[metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1618,7 +1642,7 @@ from cdc_with_meta
 LogicalSink(table=[default_catalog.default_database.sink_with_composite_pk], fields=[a, b, c, metadata_3])
 +- LogicalProject(a=[$0], b=[$1], c=[$2], metadata_3=[$6])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1641,7 +1665,7 @@ from cdc_with_meta
 LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[a, metadata_3, c])
 +- LogicalProject(a=[$0], metadata_3=[$6], c=[$2])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1665,7 +1689,7 @@ from cdc_with_meta
 LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[a, metadata_3, c])
 +- LogicalProject(a=[$0], metadata_3=[$6], c=[$2])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -1690,7 +1714,7 @@ from cdc_with_meta
 LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[a, metadata_3, c])
 +- LogicalProject(a=[$0], metadata_3=[$6], c=[$2])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -2478,14 +2502,14 @@ LogicalSink(table=[default_catalog.default_database.sink1], fields=[a, b, d])
          +- LogicalProject(a=[$1], b=[$3], day=[DATE_FORMAT(CURRENT_TIMESTAMP, _UTF-16LE'yyMMdd')])
             +- LogicalProject(id=[$0], a=[$1.nested2.num], name=[$1.nested1.name], b=[+(+($1.nested1.value, $1.nested2.num), $3)])
                +- LogicalProject(id=[$0], deepNested=[$1], name=[$2], metadata_1=[$3], metadata_2=[$4])
-                  +- LogicalTableScan(table=[[default_catalog, default_database, nested_src]])
+                  +- LogicalTableScan(table=[[default_catalog, default_database, nested_src, metadata=[metadata_1, metadata_2]]])
 
 LogicalSink(table=[default_catalog.default_database.sink2], fields=[a, b, d])
 +- LogicalProject(a=[$1], b=[$2], d=[CAST($3):BIGINT])
    +- LogicalFilter(condition=[>($3, 100)])
       +- LogicalProject(id=[$0], a=[$1.nested2.num], name=[$1.nested1.name], b=[+(+($1.nested1.value, $1.nested2.num), $3)])
          +- LogicalProject(id=[$0], deepNested=[$1], name=[$2], metadata_1=[$3], metadata_2=[$4])
-            +- LogicalTableScan(table=[[default_catalog, default_database, nested_src]])
+            +- LogicalTableScan(table=[[default_catalog, default_database, nested_src, metadata=[metadata_1, metadata_2]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -3021,6 +3045,88 @@ Sink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b, day], 
 ]]>
     </Resource>
   </TestCase>
+  <TestCase name="testTemporalJoinSinkWithoutPk[nonDeterministicUpdateStrategy=IGNORE]">
+    <Resource name="sql">
+      <![CDATA[
+INSERT INTO sink_without_pk
+SELECT metadata_1, rate, o.currency
+FROM Orders AS o JOIN
+  UpsertRates FOR SYSTEM_TIME AS OF o.rowtime AS r
+    ON o.currency = r.currency WHERE valid = 'true'
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[a, b, c])
++- LogicalProject(a=[$7], b=[CAST($5):BIGINT], c=[$1])
+   +- LogicalFilter(condition=[=($6, _UTF-16LE'true')])
+      +- LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{1, 2}])
+         :- LogicalWatermarkAssigner(rowtime=[rowtime], watermark=[$2])
+         :  +- LogicalProject(amount=[$0], currency=[$1], rowtime=[$2], proctime=[PROCTIME()])
+         :     +- LogicalTableScan(table=[[default_catalog, default_database, Orders]])
+         +- LogicalFilter(condition=[=($cor0.currency, $0)])
+            +- LogicalSnapshot(period=[$cor0.rowtime])
+               +- LogicalWatermarkAssigner(rowtime=[rowtime], watermark=[$4])
+                  +- LogicalProject(currency=[$0], rate=[$1], valid=[$2], metadata_1=[$4], rowtime=[$3])
+                     +- LogicalTableScan(table=[[default_catalog, default_database, UpsertRates, metadata=[metadata_1]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_without_pk], fields=[a, b, c])
++- Calc(select=[metadata_1 AS a, CAST(rate AS BIGINT) AS b, currency AS c], where=[(valid = 'true')])
+   +- TemporalJoin(joinType=[InnerJoin], where=[((currency = currency0) AND __TEMPORAL_JOIN_CONDITION(rowtime, rowtime0, __TEMPORAL_JOIN_CONDITION_PRIMARY_KEY(currency0), __TEMPORAL_JOIN_LEFT_KEY(currency), __TEMPORAL_JOIN_RIGHT_KEY(currency0)))], select=[currency, rowtime, currency0, rate, valid, metadata_1, rowtime0])
+      :- Exchange(distribution=[hash[currency]])
+      :  +- WatermarkAssigner(rowtime=[rowtime], watermark=[rowtime])
+      :     +- TableSourceScan(table=[[default_catalog, default_database, Orders, project=[currency, rowtime], metadata=[]]], fields=[currency, rowtime])
+      +- Exchange(distribution=[hash[currency]])
+         +- WatermarkAssigner(rowtime=[rowtime], watermark=[rowtime])
+            +- Calc(select=[currency, rate, valid, metadata_1, rowtime])
+               +- TableSourceScan(table=[[default_catalog, default_database, UpsertRates, metadata=[metadata_1]]], fields=[currency, rate, valid, rowtime, metadata_1])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testTemporalJoinSinkWithoutPk[nonDeterministicUpdateStrategy=TRY_RESOLVE]">
+    <Resource name="sql">
+      <![CDATA[
+INSERT INTO sink_without_pk
+SELECT metadata_1, rate, o.currency
+FROM Orders AS o JOIN
+  UpsertRates FOR SYSTEM_TIME AS OF o.rowtime AS r
+    ON o.currency = r.currency WHERE valid = 'true'
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[a, b, c])
++- LogicalProject(a=[$7], b=[CAST($5):BIGINT], c=[$1])
+   +- LogicalFilter(condition=[=($6, _UTF-16LE'true')])
+      +- LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{1, 2}])
+         :- LogicalWatermarkAssigner(rowtime=[rowtime], watermark=[$2])
+         :  +- LogicalProject(amount=[$0], currency=[$1], rowtime=[$2], proctime=[PROCTIME()])
+         :     +- LogicalTableScan(table=[[default_catalog, default_database, Orders]])
+         +- LogicalFilter(condition=[=($cor0.currency, $0)])
+            +- LogicalSnapshot(period=[$cor0.rowtime])
+               +- LogicalWatermarkAssigner(rowtime=[rowtime], watermark=[$4])
+                  +- LogicalProject(currency=[$0], rate=[$1], valid=[$2], metadata_1=[$4], rowtime=[$3])
+                     +- LogicalTableScan(table=[[default_catalog, default_database, UpsertRates, metadata=[metadata_1]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_without_pk], fields=[a, b, c])
++- Calc(select=[metadata_1 AS a, CAST(rate AS BIGINT) AS b, currency AS c], where=[(valid = 'true')])
+   +- TemporalJoin(joinType=[InnerJoin], where=[((currency = currency0) AND __TEMPORAL_JOIN_CONDITION(rowtime, rowtime0, __TEMPORAL_JOIN_CONDITION_PRIMARY_KEY(currency0), __TEMPORAL_JOIN_LEFT_KEY(currency), __TEMPORAL_JOIN_RIGHT_KEY(currency0)))], select=[currency, rowtime, currency0, rate, valid, metadata_1, rowtime0])
+      :- Exchange(distribution=[hash[currency]])
+      :  +- WatermarkAssigner(rowtime=[rowtime], watermark=[rowtime])
+      :     +- TableSourceScan(table=[[default_catalog, default_database, Orders, project=[currency, rowtime], metadata=[]]], fields=[currency, rowtime])
+      +- Exchange(distribution=[hash[currency]])
+         +- WatermarkAssigner(rowtime=[rowtime], watermark=[rowtime])
+            +- Calc(select=[currency, rate, valid, metadata_1, rowtime])
+               +- TableSourceScan(table=[[default_catalog, default_database, UpsertRates, metadata=[metadata_1]]], fields=[currency, rate, valid, rowtime, metadata_1])
+]]>
+    </Resource>
+  </TestCase>
   <TestCase name="testUnionAllSinkWithCompositePk[nonDeterministicUpdateStrategy=IGNORE]">
     <Resource name="sql">
       <![CDATA[
@@ -3040,7 +3146,7 @@ LogicalSink(table=[default_catalog.default_database.sink_with_composite_pk], fie
    :  +- LogicalTableScan(table=[[default_catalog, default_database, src]])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], metadata_3=[$6])
       +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -3072,7 +3178,7 @@ LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[a,
    :  +- LogicalTableScan(table=[[default_catalog, default_database, src]])
    +- LogicalProject(a=[$0], metadata_3=[$6], c=[$2])
       +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -3104,7 +3210,7 @@ LogicalSink(table=[default_catalog.default_database.sink_with_composite_pk], fie
    :  +- LogicalTableScan(table=[[default_catalog, default_database, src]])
    +- LogicalProject(a=[$0], b=[$1], c=[$2], metadata_3=[$6])
       +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5], metadata_3=[$6])
-         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta]])
+         +- LogicalTableScan(table=[[default_catalog, default_database, cdc_with_meta, metadata=[metadata_1, metadata_2, metadata_3]]])
 ]]>
     </Resource>
     <Resource name="optimized exec plan">
@@ -3258,6 +3364,110 @@ Sink(table=[default_catalog.default_database.sink_with_pk], fields=[a, b, c])
 +- ChangelogNormalize(key=[a])
    +- Exchange(distribution=[hash[a]])
       +- TableSourceScan(table=[[default_catalog, default_database, upsert_src, project=[a, b, c], metadata=[]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testUpsertSourceWithMetaSinkWithoutPk[nonDeterministicUpdateStrategy=IGNORE]">
+    <Resource name="sql">
+      <![CDATA[
+insert into sink_without_pk
+select metadata_1, b, metadata_2
+from upsert_src_with_meta
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- LogicalProject(metadata_1=[$4], b=[$1], metadata_2=[$5])
+   +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5])
+      +- LogicalTableScan(table=[[default_catalog, default_database, upsert_src_with_meta, metadata=[metadata_1, metadata_2]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- Calc(select=[metadata_1, b, metadata_2])
+   +- ChangelogNormalize(key=[a])
+      +- Exchange(distribution=[hash[a]])
+         +- TableSourceScan(table=[[default_catalog, default_database, upsert_src_with_meta, project=[b, a], metadata=[metadata_1, metadata_2]]], fields=[b, a, metadata_1, metadata_2])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testUpsertSourceWithMetaSinkWithoutPk[nonDeterministicUpdateStrategy=TRY_RESOLVE]">
+    <Resource name="sql">
+      <![CDATA[
+insert into sink_without_pk
+select metadata_1, b, metadata_2
+from upsert_src_with_meta
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- LogicalProject(metadata_1=[$4], b=[$1], metadata_2=[$5])
+   +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5])
+      +- LogicalTableScan(table=[[default_catalog, default_database, upsert_src_with_meta, metadata=[metadata_1, metadata_2]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_without_pk], fields=[metadata_1, b, metadata_2])
++- Calc(select=[metadata_1, b, metadata_2])
+   +- ChangelogNormalize(key=[a])
+      +- Exchange(distribution=[hash[a]])
+         +- TableSourceScan(table=[[default_catalog, default_database, upsert_src_with_meta, project=[b, a], metadata=[metadata_1, metadata_2]]], fields=[b, a, metadata_1, metadata_2])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testUpsertSourceWithMetaSinkWithPk[nonDeterministicUpdateStrategy=TRY_RESOLVE]">
+    <Resource name="sql">
+      <![CDATA[
+insert into sink_with_pk
+select metadata_1, b, metadata_2
+from upsert_src_with_meta
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[metadata_1, b, metadata_2])
++- LogicalProject(metadata_1=[$4], b=[$1], metadata_2=[$5])
+   +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5])
+      +- LogicalTableScan(table=[[default_catalog, default_database, upsert_src_with_meta, metadata=[metadata_1, metadata_2]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_with_pk], fields=[metadata_1, b, metadata_2], upsertMaterialize=[true])
++- Calc(select=[metadata_1, b, metadata_2])
+   +- ChangelogNormalize(key=[a])
+      +- Exchange(distribution=[hash[a]])
+         +- TableSourceScan(table=[[default_catalog, default_database, upsert_src_with_meta, project=[b, a], metadata=[metadata_1, metadata_2]]], fields=[b, a, metadata_1, metadata_2])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testUpsertSourceWithMetaSinkWithPk[nonDeterministicUpdateStrategy=IGNORE]">
+    <Resource name="sql">
+      <![CDATA[
+insert into sink_with_pk
+select metadata_1, b, metadata_2
+from upsert_src_with_meta
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSink(table=[default_catalog.default_database.sink_with_pk], fields=[metadata_1, b, metadata_2])
++- LogicalProject(metadata_1=[$4], b=[$1], metadata_2=[$5])
+   +- LogicalProject(a=[$0], b=[$1], c=[$2], d=[$3], metadata_1=[$4], metadata_2=[$5])
+      +- LogicalTableScan(table=[[default_catalog, default_database, upsert_src_with_meta, metadata=[metadata_1, metadata_2]]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sink(table=[default_catalog.default_database.sink_with_pk], fields=[metadata_1, b, metadata_2], upsertMaterialize=[true])
++- Calc(select=[metadata_1, b, metadata_2])
+   +- ChangelogNormalize(key=[a])
+      +- Exchange(distribution=[hash[a]])
+         +- TableSourceScan(table=[[default_catalog, default_database, upsert_src_with_meta, project=[b, a], metadata=[metadata_1, metadata_2]]], fields=[b, a, metadata_1, metadata_2])
 ]]>
     </Resource>
   </TestCase>

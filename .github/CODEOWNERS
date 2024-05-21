@@ -1,0 +1,15 @@
+*	@confluentinc/flink-core
+
+cc-flink-extensions/cc-flink-table-extended	@confluentinc/flink-sql
+cc-flink-extensions/cc-flink-managed-table-validation	@confluentinc/flink-sql @confluentinc/flink-storage
+cc-flink-extensions/cc-flink-schema-converters	@confluentinc/flink-sql
+cc-flink-extensions/cc-flink-schema-registry	@confluentinc/flink-sql
+flink-connectors/confluent-connector-kafka  @confluentinc/flink-storage
+
+# Matrix specific extension code
+cc-flink-extensions/cc-flink-table-extended/src/main/java/io/confluent/flink/table/modules/ml/	@confluentinc/matrix
+cc-flink-extensions/cc-flink-table-extended/src/test/java/io/confluent/flink/table/modules/ml/	@confluentinc/matrix
+cc-flink-extensions/cc-flink-managed-table-validation/src/main/java/io/confluent/flink/table/modules/ml/ @confluentinc/matrix
+cc-flink-extensions/cc-flink-managed-table-validation/src/test/java/io/confluent/flink/table/modules/ml/ @confluentinc/matrix
+cc-flink-extensions/cc-flink-table-extended/src/main/java/io/confluent/flink/table/utils/mlutils/ @confluentinc/matrix
+cc-flink-extensions/cc-flink-table-extended/src/test/java/io/confluent/flink/table/utils/mlutils/ @confluentinc/matrix

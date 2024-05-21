@@ -24,6 +24,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.configuration.SchedulerExecutionMode;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.core.failure.TestingFailureEnricher;
@@ -79,6 +80,7 @@ import org.apache.flink.runtime.messages.checkpoint.DeclineCheckpoint;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.groups.JobManagerMetricGroup;
+import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.metrics.util.TestingMetricRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.TaskNotRunningException;
@@ -102,6 +104,8 @@ import org.apache.flink.runtime.util.ResourceCounter;
 import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.testutils.TestingUtils;
 import org.apache.flink.testutils.executor.TestExecutorExtension;
+import org.apache.flink.traces.Span;
+import org.apache.flink.traces.SpanBuilder;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.IterableUtils;
 import org.apache.flink.util.Preconditions;
@@ -504,6 +508,10 @@ public class AdaptiveSchedulerTest {
 
     @Test
     void testNumRestartsMetric() throws Exception {
+        final CompletableFuture<Gauge<Integer>> numRescaleRestartsMetricFuture =
+                new CompletableFuture<>();
+        final CompletableFuture<Gauge<Integer>> numFailureRestartsMetricFuture =
+                new CompletableFuture<>();
         final CompletableFuture<Gauge<Long>> numRestartsMetricFuture = new CompletableFuture<>();
         final MetricRegistry metricRegistry =
                 TestingMetricRegistry.builder()
@@ -511,6 +519,12 @@ public class AdaptiveSchedulerTest {
                                 (metric, name, group) -> {
                                     if (MetricNames.NUM_RESTARTS.equals(name)) {
                                         numRestartsMetricFuture.complete((Gauge<Long>) metric);
+                                    } else if (MetricNames.NUM_RESCALE_RESTARTS.equals(name)) {
+                                        numRescaleRestartsMetricFuture.complete(
+                                                (Gauge<Integer>) metric);
+                                    } else if (MetricNames.NUM_ERROR_RESTARTS.equals(name)) {
+                                        numFailureRestartsMetricFuture.complete(
+                                                (Gauge<Integer>) metric);
                                     }
                                 })
                         .build();
@@ -540,9 +554,12 @@ public class AdaptiveSchedulerTest {
                                                 metricRegistry, "localhost")
                                         .addJob(new JobID(), "jobName"))
                         .setDeclarativeSlotPool(declarativeSlotPool)
+                        .setRestartBackoffTimeStrategy(new TestRestartBackoffTimeStrategy(true, 0L))
                         .build();
 
         final Gauge<Long> numRestartsMetric = numRestartsMetricFuture.get();
+        final Gauge<Integer> numRescaleRestartsMetric = numRescaleRestartsMetricFuture.get();
+        final Gauge<Integer> numErrorRestartsMetric = numFailureRestartsMetricFuture.get();
 
         final SubmissionBufferingTaskManagerGateway taskManagerGateway =
                 new SubmissionBufferingTaskManagerGateway(1 + PARALLELISM);
@@ -565,6 +582,8 @@ public class AdaptiveSchedulerTest {
         taskManagerGateway.waitForSubmissions(1);
 
         assertThat(numRestartsMetric.getValue()).isEqualTo(0L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(0L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(0L);
 
         singleThreadMainThreadExecutor.execute(
                 () -> {
@@ -581,6 +600,18 @@ public class AdaptiveSchedulerTest {
         taskManagerGateway.waitForSubmissions(PARALLELISM);
 
         assertThat(numRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(0L);
+
+        singleThreadMainThreadExecutor.execute(
+                () -> scheduler.handleGlobalFailure(new Exception("test exception")));
+
+        // wait for the redeployed task submissions
+        taskManagerGateway.waitForSubmissions(PARALLELISM);
+
+        assertThat(numRestartsMetric.getValue()).isEqualTo(2L);
+        assertThat(numRescaleRestartsMetric.getValue()).isEqualTo(1L);
+        assertThat(numErrorRestartsMetric.getValue()).isEqualTo(1L);
     }
 
     @Test
@@ -1373,19 +1404,41 @@ public class AdaptiveSchedulerTest {
 
     @Test
     void testHowToHandleFailureRejectedByStrategy() throws Exception {
+        final Configuration configuration = new Configuration();
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        final List<Span> spanCollector = new ArrayList<>(1);
+        final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
+                createTestMetricGroup(spanCollector);
+
         final AdaptiveScheduler scheduler =
                 new AdaptiveSchedulerBuilder(
                                 createJobGraph(),
                                 mainThreadExecutor,
                                 EXECUTOR_RESOURCE.getExecutor())
                         .setRestartBackoffTimeStrategy(NoRestartBackoffTimeStrategy.INSTANCE)
+                        .setJobMasterConfiguration(configuration)
+                        .setJobManagerJobMetricGroup(testMetricGroup)
                         .build();
 
-        assertThat(scheduler.howToHandleFailure(new Exception("test")).canRestart()).isFalse();
+        assertThat(
+                        scheduler
+                                .howToHandleFailure(
+                                        new Exception("test"), createFailureLabelsFuture())
+                                .canRestart())
+                .isFalse();
+
+        assertThat(spanCollector).isEmpty();
+        mainThreadExecutor.trigger();
+        checkMetrics(spanCollector, false);
     }
 
     @Test
     void testHowToHandleFailureAllowedByStrategy() throws Exception {
+        final Configuration configuration = new Configuration();
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        final List<Span> spanCollector = new ArrayList<>(1);
+        final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
+                createTestMetricGroup(spanCollector);
         final TestRestartBackoffTimeStrategy restartBackoffTimeStrategy =
                 new TestRestartBackoffTimeStrategy(true, 1234);
 
@@ -1395,28 +1448,72 @@ public class AdaptiveSchedulerTest {
                                 mainThreadExecutor,
                                 EXECUTOR_RESOURCE.getExecutor())
                         .setRestartBackoffTimeStrategy(restartBackoffTimeStrategy)
+                        .setJobMasterConfiguration(configuration)
+                        .setJobManagerJobMetricGroup(testMetricGroup)
                         .build();
 
-        final FailureResult failureResult = scheduler.howToHandleFailure(new Exception("test"));
+        final FailureResult failureResult =
+                scheduler.howToHandleFailure(new Exception("test"), createFailureLabelsFuture());
 
         assertThat(failureResult.canRestart()).isTrue();
         assertThat(failureResult.getBackoffTime().toMillis())
                 .isEqualTo(restartBackoffTimeStrategy.getBackoffTime());
+
+        assertThat(spanCollector).isEmpty();
+        mainThreadExecutor.trigger();
+        checkMetrics(spanCollector, true);
     }
 
     @Test
     void testHowToHandleFailureUnrecoverableFailure() throws Exception {
+        final Configuration configuration = new Configuration();
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        final List<Span> spanCollector = new ArrayList<>(1);
+        final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
+                createTestMetricGroup(spanCollector);
+
         final AdaptiveScheduler scheduler =
                 new AdaptiveSchedulerBuilder(
                                 createJobGraph(),
                                 mainThreadExecutor,
                                 EXECUTOR_RESOURCE.getExecutor())
+                        .setJobMasterConfiguration(configuration)
+                        .setJobManagerJobMetricGroup(testMetricGroup)
                         .build();
 
         assertThat(
                         scheduler
                                 .howToHandleFailure(
-                                        new SuppressRestartsException(new Exception("test")))
+                                        new SuppressRestartsException(new Exception("test")),
+                                        createFailureLabelsFuture())
+                                .canRestart())
+                .isFalse();
+
+        assertThat(spanCollector).isEmpty();
+        mainThreadExecutor.trigger();
+        checkMetrics(spanCollector, false);
+    }
+
+    @Test
+    void testHowToHandleFailureWithCannotRestartLabel() throws Exception {
+        final TestRestartBackoffTimeStrategy restartBackoffTimeStrategy =
+                new TestRestartBackoffTimeStrategy(true, 0);
+        final AdaptiveScheduler scheduler =
+                new AdaptiveSchedulerBuilder(
+                                createJobGraph(),
+                                mainThreadExecutor,
+                                EXECUTOR_RESOURCE.getExecutor())
+                        .setRestartBackoffTimeStrategy(restartBackoffTimeStrategy)
+                        .build();
+
+        assertThat(
+                        scheduler
+                                .howToHandleFailure(
+                                        new Exception("test"),
+                                        CompletableFuture.completedFuture(
+                                                Collections.singletonMap(
+                                                        FailureEnricher.KEY_JOB_CANNOT_RESTART,
+                                                        "")))
                                 .canRestart())
                 .isFalse();
     }
@@ -2393,6 +2490,109 @@ public class AdaptiveSchedulerTest {
             scheduler.getJobTerminationFuture().get();
 
             return scheduler.requestJob().getExceptionHistory();
+        }
+    }
+
+    @Test
+    public void testResourceTimeoutIgnoredOnRestart() throws Exception {
+        final Configuration configuration =
+                new Configuration()
+                        .set(JobManagerOptions.RESOURCE_WAIT_TIMEOUT, Duration.ofMillis(1))
+                        .set(JobManagerOptions.RESOURCE_STABILIZATION_TIMEOUT, Duration.ofDays(1));
+
+        final JobGraph jobGraph = createJobGraph();
+
+        final DefaultDeclarativeSlotPool declarativeSlotPool =
+                new DefaultDeclarativeSlotPool(
+                        jobGraph.getJobID(),
+                        new DefaultAllocatedSlotPool(),
+                        ignored -> {},
+                        Time.minutes(10),
+                        Time.minutes(10));
+
+        final AdaptiveScheduler scheduler =
+                new AdaptiveSchedulerBuilder(
+                                jobGraph,
+                                singleThreadMainThreadExecutor,
+                                EXECUTOR_RESOURCE.getExecutor())
+                        .setRestartBackoffTimeStrategy(
+                                new FixedDelayRestartBackoffTimeStrategy
+                                                .FixedDelayRestartBackoffTimeStrategyFactory(1, 1)
+                                        .create())
+                        .setDeclarativeSlotPool(declarativeSlotPool)
+                        .setJobMasterConfiguration(configuration)
+                        .build();
+
+        final SubmissionBufferingTaskManagerGateway taskManagerGateway =
+                new SubmissionBufferingTaskManagerGateway(PARALLELISM);
+        final LocalTaskManagerLocation taskManagerLocation = new LocalTaskManagerLocation();
+
+        taskManagerGateway.setCancelConsumer(createCancelConsumer(scheduler));
+
+        singleThreadMainThreadExecutor.execute(
+                () -> {
+                    scheduler.startScheduling();
+
+                    declarativeSlotPool.offerSlots(
+                            createSlotOffersForResourceRequirements(
+                                    ResourceCounter.withResource(
+                                            ResourceProfile.UNKNOWN, PARALLELISM)),
+                            taskManagerLocation,
+                            taskManagerGateway,
+                            System.currentTimeMillis());
+                });
+
+        // wait for task submissions
+        taskManagerGateway.waitForSubmissions(PARALLELISM);
+
+        singleThreadMainThreadExecutor.execute(
+                () ->
+                        declarativeSlotPool.releaseSlots(
+                                taskManagerLocation.getResourceID(), new Exception("TM failure")));
+
+        // wait until we started waiting for resources
+        while (CompletableFuture.supplyAsync(scheduler::getState, singleThreadMainThreadExecutor)
+                        .join()
+                        .getClass()
+                != WaitingForResources.class) {
+            Thread.sleep(50L);
+        }
+
+        // wait some time
+        Thread.sleep(50L);
+
+        // check that we're still waiting for resources and didn't fail the job
+        CompletableFuture.runAsync(
+                        () ->
+                                assertThat(scheduler.getState().getClass())
+                                        .isEqualTo(WaitingForResources.class),
+                        singleThreadMainThreadExecutor)
+                .join();
+    }
+
+    private static CompletableFuture<Map<String, String>> createFailureLabelsFuture() {
+        return CompletableFuture.completedFuture(Collections.singletonMap("failKey", "failValue"));
+    }
+
+    private static UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup
+            createTestMetricGroup(List<Span> output) {
+        return new UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup() {
+            @Override
+            public void addSpan(SpanBuilder spanBuilder) {
+                output.add(spanBuilder.build());
+            }
+        };
+    }
+
+    private static void checkMetrics(List<Span> results, boolean canRestart) {
+        assertThat(results).isNotEmpty();
+        for (Span span : results) {
+            assertThat(span.getScope())
+                    .isEqualTo(JobFailureMetricReporter.class.getCanonicalName());
+            assertThat(span.getName()).isEqualTo("JobFailure");
+            Map<String, Object> attributes = span.getAttributes();
+            assertThat(attributes).containsEntry("failureLabel.failKey", "failValue");
+            assertThat(attributes).containsEntry("canRestart", String.valueOf(canRestart));
         }
     }
 }

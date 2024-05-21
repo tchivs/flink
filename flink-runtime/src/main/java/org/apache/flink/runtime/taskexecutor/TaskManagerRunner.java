@@ -22,8 +22,11 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.AkkaOptions;
+import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JMXServerOptions;
+import org.apache.flink.configuration.TaskManagerConfluentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.configuration.TaskManagerOptionsInternal;
 import org.apache.flink.core.fs.FileSystem;
@@ -51,6 +54,7 @@ import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.MetricRegistryConfiguration;
 import org.apache.flink.runtime.metrics.MetricRegistryImpl;
 import org.apache.flink.runtime.metrics.ReporterSetup;
+import org.apache.flink.runtime.metrics.TraceReporterSetup;
 import org.apache.flink.runtime.metrics.groups.TaskManagerMetricGroup;
 import org.apache.flink.runtime.metrics.util.MetricUtils;
 import org.apache.flink.runtime.rpc.AddressResolution;
@@ -75,6 +79,7 @@ import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.ExecutorUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.FlinkRuntimeMetricReporter;
 import org.apache.flink.util.Reference;
 import org.apache.flink.util.ShutdownHookUtil;
 import org.apache.flink.util.StringUtils;
@@ -86,6 +91,7 @@ import org.apache.flink.util.function.FunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
@@ -144,6 +150,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
     private RpcService rpcService;
 
     @GuardedBy("lock")
+    private RpcService standbyRpcService;
+
+    @GuardedBy("lock")
     private HighAvailabilityServices highAvailabilityServices;
 
     @GuardedBy("lock")
@@ -160,6 +169,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     @GuardedBy("lock")
     private boolean shutdown;
+
+    @GuardedBy("lock")
+    private StandbyTaskManager standbyTaskManager;
 
     public TaskManagerRunner(
             Configuration configuration,
@@ -184,7 +196,9 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     private void startTaskManagerRunnerServices() throws Exception {
         synchronized (lock) {
-            rpcSystem = RpcSystem.load(configuration);
+            if (rpcSystem == null) {
+                rpcSystem = RpcSystem.load(configuration);
+            }
 
             this.executor =
                     Executors.newScheduledThreadPool(
@@ -221,7 +235,8 @@ public class TaskManagerRunner implements FatalErrorHandler {
                             MetricRegistryConfiguration.fromConfiguration(
                                     configuration,
                                     rpcSystem.getMaximumMessageSizeInBytes(configuration)),
-                            ReporterSetup.fromConfiguration(configuration, pluginManager));
+                            ReporterSetup.fromConfiguration(configuration, pluginManager),
+                            TraceReporterSetup.fromConfiguration(configuration, pluginManager));
 
             final RpcService metricQueryServiceRpcService =
                     MetricUtils.startRemoteMetricsRpcService(
@@ -289,10 +304,51 @@ public class TaskManagerRunner implements FatalErrorHandler {
     // --------------------------------------------------------------------------------------------
 
     public void start() throws Exception {
+        handleStandbyConfiguration();
         synchronized (lock) {
             startTaskManagerRunnerServices();
             taskExecutorService.start();
         }
+    }
+
+    private void handleStandbyConfiguration() throws Exception {
+        if (!configuration.get(TaskManagerConfluentOptions.STANDBY_MODE)) {
+            return;
+        }
+
+        CompletableFuture<Void> activationFuture;
+        synchronized (lock) {
+            // This RPC System won't be restarted after the activation. So all configurations like
+            // TMP_DIRS that are required for its start are impossible to override from JM.
+            rpcSystem = RpcSystem.load(configuration);
+            // use STANDBY_HOST as the host for the standby rpc service
+            final String standbyHost = getStandbyConfig(TaskManagerConfluentOptions.STANDBY_HOST);
+            // use STANDBY_RPC_PORT as the rpc port for the standby rpc service
+            final int standbyRpcPort =
+                    getStandbyConfig(TaskManagerConfluentOptions.STANDBY_RPC_PORT);
+            final Configuration standbyConfiguration =
+                    new Configuration(configuration)
+                            .set(TaskManagerOptions.RPC_PORT, String.valueOf(standbyRpcPort))
+                            .set(TaskManagerOptions.HOST, standbyHost);
+
+            standbyRpcService = createRpcService(standbyConfiguration, null, rpcSystem);
+            standbyTaskManager = new StandbyTaskManager(standbyRpcService);
+            standbyTaskManager.start();
+
+            activationFuture =
+                    standbyTaskManager.getActivationFuture().thenAccept(configuration::addAll);
+        }
+
+        activationFuture.get();
+    }
+
+    private <T> T getStandbyConfig(ConfigOption<T> option) {
+        return configuration
+                .getOptional(option)
+                .orElseThrow(
+                        () ->
+                                new IllegalConfigurationException(
+                                        String.format("Option %s must be set.", option.key())));
     }
 
     public void close() throws Exception {
@@ -316,11 +372,17 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 return terminationFuture;
             }
 
-            final CompletableFuture<Void> taskManagerTerminationFuture;
-            if (taskExecutorService != null) {
-                taskManagerTerminationFuture = taskExecutorService.closeAsync();
+            CompletableFuture<Void> taskManagerTerminationFuture;
+            if (standbyTaskManager != null) {
+                taskManagerTerminationFuture = standbyTaskManager.closeAsync();
             } else {
                 taskManagerTerminationFuture = FutureUtils.completedVoidFuture();
+            }
+
+            if (taskExecutorService != null) {
+                taskManagerTerminationFuture =
+                        FutureUtils.composeAfterwards(
+                                taskManagerTerminationFuture, taskExecutorService::closeAsync);
             }
 
             final CompletableFuture<Void> serviceTerminationFuture =
@@ -397,6 +459,10 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 } catch (Exception e) {
                     exception = ExceptionUtils.firstOrSuppressed(e, exception);
                 }
+            }
+
+            if (standbyRpcService != null) {
+                terminationFutures.add(standbyRpcService.closeAsync());
             }
 
             if (rpcService != null) {
@@ -626,6 +692,8 @@ public class TaskManagerRunner implements FatalErrorHandler {
                         externalAddress,
                         resourceID,
                         taskManagerServicesConfiguration.getSystemResourceMetricsProbingInterval());
+        FlinkRuntimeMetricReporter.reportTaskManagerRuntimeVersion(
+                taskManagerMetricGroup.f0, configuration);
 
         final ExecutorService ioExecutor =
                 Executors.newFixedThreadPool(
@@ -684,7 +752,6 @@ public class TaskManagerRunner implements FatalErrorHandler {
             throws Exception {
 
         checkNotNull(configuration);
-        checkNotNull(haServices);
 
         return RpcUtils.createRemoteRpcService(
                 rpcSystem,
@@ -709,10 +776,26 @@ public class TaskManagerRunner implements FatalErrorHandler {
                     "Using configured hostname/address for TaskManager: {}.",
                     configuredTaskManagerHostname);
             return configuredTaskManagerHostname;
-        } else {
-            return determineTaskManagerBindAddressByConnectingToResourceManager(
-                    configuration, haServices, rpcSystemUtils);
         }
+
+        final String hostEnvVar =
+                configuration.getString(TaskManagerConfluentOptions.HOST_ENVIRONMENT_VARIABLE);
+
+        if (hostEnvVar != null) {
+            String host = System.getenv(hostEnvVar);
+            LOG.info(
+                    "Using environment variable for resolving hostname/address for TaskManager: {}='{}'.",
+                    hostEnvVar,
+                    host);
+
+            if (!StringUtils.isNullOrWhitespaceOnly(host)) {
+                return host;
+            }
+        }
+
+        checkNotNull(haServices);
+        return determineTaskManagerBindAddressByConnectingToResourceManager(
+                configuration, haServices, rpcSystemUtils);
     }
 
     private static String determineTaskManagerBindAddressByConnectingToResourceManager(
@@ -775,6 +858,14 @@ public class TaskManagerRunner implements FatalErrorHandler {
                                     return DeterminismEnvelope.nondeterministicValue(
                                             new ResourceID(value, metadata));
                                 }));
+    }
+
+    @VisibleForTesting
+    @Nullable
+    public StandbyTaskManager getStandbyTaskManager() {
+        synchronized (lock) {
+            return standbyTaskManager;
+        }
     }
 
     /** Factory for {@link TaskExecutor}. */

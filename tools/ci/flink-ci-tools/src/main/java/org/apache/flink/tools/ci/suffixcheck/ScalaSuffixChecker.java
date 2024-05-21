@@ -59,12 +59,19 @@ public class ScalaSuffixChecker {
     private static final Set<String> EXCLUDED_MODULES =
             new HashSet<>(
                     Arrays.asList(
+                            "cc-flink-udf-adapter",
+                            "cc-flink-remote-udfs-integration-tests",
+                            "flink-integration-impl-deps",
+                            "cc-flink-managed-table",
+                            "cc-flink-managed-table-validation",
                             // we ignore flink-rpc-akka because it is loaded through a separate
                             // class loader
                             "flink-rpc-akka",
                             // we ignore flink-table-planner-loader because it loads the planner
                             // through a different classpath
-                            "flink-table-planner-loader"));
+                            "flink-table-planner-loader",
+                            // excluded to reduce diff from Apache Flink
+                            "flink-runtime-web"));
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {

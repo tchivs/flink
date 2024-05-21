@@ -17,8 +17,14 @@
 
 package org.apache.flink.contrib.streaming.state;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.ICloseableRegistry;
+import org.apache.flink.core.fs.PathsCopyingFileSystem;
+import org.apache.flink.core.fs.PathsCopyingFileSystem.CopyTask;
+import org.apache.flink.runtime.state.IncrementalKeyedStateHandle.HandleAndLocalPath;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FileUtils;
@@ -29,20 +35,37 @@ import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Help class for downloading RocksDB state files. */
 public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
+    private static final Logger LOG = LoggerFactory.getLogger(RocksDBStateDownloader.class);
+
     public RocksDBStateDownloader(int restoringThreadNum) {
         super(restoringThreadNum);
+    }
+
+    @VisibleForTesting
+    RocksDBStateDownloader(ExecutorService executorService) {
+        super(executorService);
     }
 
     /**
@@ -53,7 +76,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
      */
     public void transferAllStateDataToDirectory(
             Collection<StateHandleDownloadSpec> downloadRequests,
-            CloseableRegistry closeableRegistry)
+            ICloseableRegistry closeableRegistry)
             throws Exception {
 
         // We use this closer for fine-grained shutdown of all parallel downloading.
@@ -61,11 +84,29 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         // Make sure we also react to external close signals.
         closeableRegistry.registerCloseable(internalCloser);
         try {
-            List<CompletableFuture<Void>> futures =
-                    transferAllStateDataToDirectoryAsync(downloadRequests, internalCloser)
-                            .collect(Collectors.toList());
-            // Wait until either all futures completed successfully or one failed exceptionally.
-            FutureUtils.completeAll(futures).get();
+            // We have to wait for all futures to be completed, to make sure in
+            // case of failure that we will clean up all the files
+            FutureUtils.ConjunctFuture<Void> downloadFuture =
+                    FutureUtils.completeAll(
+                            createDownloadRunnables(downloadRequests, internalCloser).stream()
+                                    .map(
+                                            runnable ->
+                                                    CompletableFuture.runAsync(
+                                                            runnable, executorService))
+                                    .collect(Collectors.toList()));
+            Exception interruptedException = null;
+            while (!downloadFuture.isDone() || downloadFuture.isCompletedExceptionally()) {
+                try {
+                    downloadFuture.get();
+                } catch (InterruptedException e) {
+                    LOG.warn("Interrupted while waiting for state download, continue waiting");
+                    interruptedException = interruptedException == null ? e : interruptedException;
+                }
+            }
+            if (interruptedException != null) {
+                Thread.currentThread().interrupt();
+                throw interruptedException;
+            }
         } catch (Exception e) {
             downloadRequests.stream()
                     .map(StateHandleDownloadSpec::getDownloadDestination)
@@ -87,43 +128,100 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         }
     }
 
-    /** Asynchronously runs the specified download requests on executorService. */
-    private Stream<CompletableFuture<Void>> transferAllStateDataToDirectoryAsync(
-            Collection<StateHandleDownloadSpec> handleWithPaths,
+    private Collection<Runnable> createDownloadRunnables(
+            Collection<StateHandleDownloadSpec> downloadRequests,
+            CloseableRegistry closeableRegistry)
+            throws IOException {
+        // We need to support recovery from multiple FileSystems. At least one scenario that it can
+        // happen is when:
+        // 1. A checkpoint/savepoint is created on FileSystem_1
+        // 2. Job terminates
+        // 3. Configuration is changed use checkpoint directory using FileSystem_2
+        // 4. Job is restarted from checkpoint (1.) using claim mode
+        // 5. New incremental checkpoint is created, that can refer to files both from FileSystem_1
+        // and FileSystem_2.
+        Map<FileSystem.FSKey, List<CopyTask>> filesSystemsFilesToDownload = new HashMap<>();
+        List<Runnable> runnables = new ArrayList<>();
+
+        for (StateHandleDownloadSpec downloadSpec : downloadRequests) {
+            for (HandleAndLocalPath handleAndLocalPath : getAllHandles(downloadSpec)) {
+                Path downloadDestination =
+                        downloadSpec
+                                .getDownloadDestination()
+                                .resolve(handleAndLocalPath.getLocalPath());
+                if (canCopyPaths(handleAndLocalPath.getHandle())) {
+                    org.apache.flink.core.fs.Path remotePath =
+                            handleAndLocalPath.getHandle().maybeGetPath().get();
+                    long size = handleAndLocalPath.getHandle().getStateSize();
+                    FileSystem.FSKey newFSKey = new FileSystem.FSKey(remotePath.toUri());
+                    List<CopyTask> filesToDownload =
+                            filesSystemsFilesToDownload.computeIfAbsent(
+                                    newFSKey, fsKey -> new ArrayList<>());
+                    filesToDownload.add(
+                            new CopyTask(
+                                    remotePath,
+                                    new org.apache.flink.core.fs.Path(downloadDestination.toUri()),
+                                    size));
+                } else {
+                    runnables.add(
+                            createDownloadRunnableUsingStreams(
+                                    handleAndLocalPath.getHandle(),
+                                    downloadDestination,
+                                    closeableRegistry));
+                }
+            }
+        }
+
+        for (List<CopyTask> filesToDownload : filesSystemsFilesToDownload.values()) {
+            checkState(!filesToDownload.isEmpty());
+            FileSystem srcFileSystem = FileSystem.get(filesToDownload.get(0).getSrcPath().toUri());
+            checkState(srcFileSystem.canCopyPaths());
+            runnables.add(
+                    createDownloadRunnableUsingCopyFiles(
+                            (PathsCopyingFileSystem) srcFileSystem,
+                            filesToDownload,
+                            closeableRegistry));
+        }
+
+        return runnables;
+    }
+
+    private boolean canCopyPaths(StreamStateHandle handle) throws IOException {
+        Optional<org.apache.flink.core.fs.Path> remotePath = handle.maybeGetPath();
+        if (!remotePath.isPresent()) {
+            return false;
+        }
+        return FileSystem.canCopyPaths(remotePath.get().toUri());
+    }
+
+    private Iterable<? extends HandleAndLocalPath> getAllHandles(
+            StateHandleDownloadSpec downloadSpec) {
+        return Streams.concat(
+                        downloadSpec.getStateHandle().getSharedState().stream(),
+                        downloadSpec.getStateHandle().getPrivateState().stream())
+                .collect(Collectors.toList());
+    }
+
+    private Runnable createDownloadRunnableUsingCopyFiles(
+            PathsCopyingFileSystem fileSystem,
+            List<CopyTask> copyTasks,
             CloseableRegistry closeableRegistry) {
-        return handleWithPaths.stream()
-                .flatMap(
-                        downloadRequest ->
-                                // Take all files from shared and private state.
-                                Streams.concat(
-                                                downloadRequest.getStateHandle().getSharedState()
-                                                        .stream(),
-                                                downloadRequest.getStateHandle().getPrivateState()
-                                                        .stream())
-                                        .map(
-                                                // Create one runnable for each StreamStateHandle
-                                                entry -> {
-                                                    String localPath = entry.getLocalPath();
-                                                    StreamStateHandle remoteFileHandle =
-                                                            entry.getHandle();
-                                                    Path downloadDest =
-                                                            downloadRequest
-                                                                    .getDownloadDestination()
-                                                                    .resolve(localPath);
-                                                    return ThrowingRunnable.unchecked(
-                                                            () ->
-                                                                    downloadDataForStateHandle(
-                                                                            downloadDest,
-                                                                            remoteFileHandle,
-                                                                            closeableRegistry));
-                                                }))
-                .map(runnable -> CompletableFuture.runAsync(runnable, executorService));
+        LOG.debug("Using copy paths for {} of file system [{}]", copyTasks, fileSystem);
+        return ThrowingRunnable.unchecked(() -> fileSystem.copyFiles(copyTasks, closeableRegistry));
+    }
+
+    private Runnable createDownloadRunnableUsingStreams(
+            StreamStateHandle remoteFileHandle,
+            Path destination,
+            CloseableRegistry closeableRegistry) {
+        return ThrowingRunnable.unchecked(
+                () -> downloadDataForStateHandle(remoteFileHandle, destination, closeableRegistry));
     }
 
     /** Copies the file from a single state handle to the given path. */
     private void downloadDataForStateHandle(
-            Path restoreFilePath,
             StreamStateHandle remoteFileHandle,
+            Path restoreFilePath,
             CloseableRegistry closeableRegistry)
             throws IOException {
 
@@ -136,7 +234,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             closeableRegistry.registerCloseable(inputStream);
 
             Files.createDirectories(restoreFilePath.getParent());
-            OutputStream outputStream = Files.newOutputStream(restoreFilePath);
+            OutputStream outputStream = Files.newOutputStream(restoreFilePath, CREATE_NEW);
             closeableRegistry.registerCloseable(outputStream);
 
             byte[] buffer = new byte[8 * 1024];

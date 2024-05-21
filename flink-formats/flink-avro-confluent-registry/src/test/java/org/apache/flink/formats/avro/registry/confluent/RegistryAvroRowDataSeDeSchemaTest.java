@@ -138,8 +138,8 @@ class RegistryAvroRowDataSeDeSchemaTest {
         AvroRowDataDeserializationSchema deserializer =
                 getDeserializationSchema(rowType, writeSchema);
 
-        serializer.open(null);
-        deserializer.open(null);
+        serializer.open(TestContext.CONTEXT);
+        deserializer.open(TestContext.CONTEXT);
 
         assertThat(deserializer.deserialize(null)).isNull();
 

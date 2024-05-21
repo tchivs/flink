@@ -18,6 +18,7 @@
 
 package org.apache.flink.kubernetes.highavailability;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.kubernetes.kubeclient.resources.KubernetesLeaderElector;
 import org.apache.flink.kubernetes.utils.Constants;
@@ -164,7 +165,10 @@ class KubernetesCheckpointIDCounterTest extends KubernetesHighAvailabilityTestBa
 
                             // fixing the internal issue should make the shutdown succeed again
                             KubernetesUtils.createConfigMapIfItDoesNotExist(
-                                    flinkKubeClient, LEADER_CONFIGMAP_NAME, getClusterId());
+                                    flinkKubeClient,
+                                    LEADER_CONFIGMAP_NAME,
+                                    getClusterId(),
+                                    JobID.generate());
                             checkpointIDCounter.shutdown(JobStatus.FINISHED).get();
                         });
             }

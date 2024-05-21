@@ -42,6 +42,8 @@ under the License.
 				<include>org.apache.logging.log4j:log4j-core</include>
 				<include>org.apache.logging.log4j:log4j-slf4j-impl</include>
 				<include>org.apache.logging.log4j:log4j-1.2-api</include>
+				<include>org.apache.logging.log4j:log4j-layout-template-json</include>
+				<include>org.apache.logging.log4j:log4j-jul</include>
 			</includes>
 		</dependencySet>
 	</dependencySets>

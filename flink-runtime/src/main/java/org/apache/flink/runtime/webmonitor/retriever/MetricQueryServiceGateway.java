@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.webmonitor.retriever;
 
+import org.apache.flink.annotation.Confluent;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.metrics.dump.MetricDumpSerialization;
 import org.apache.flink.runtime.metrics.dump.MetricQueryService;
@@ -27,6 +28,10 @@ import java.util.concurrent.CompletableFuture;
 
 /** {@link MetricQueryService} rpc gateway interface. */
 public interface MetricQueryServiceGateway extends RpcGateway {
+
+    @Confluent
+    CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryJobMetrics(
+            Time timeout, JobMetricsFilter filter);
 
     CompletableFuture<MetricDumpSerialization.MetricSerializationResult> queryMetrics(Time timeout);
 }

@@ -163,7 +163,7 @@ class MetricDumpSerializerTest {
                 h1,
                 new Tuple2<>(
                         new QueryScopeInfo.OperatorQueryScopeInfo(
-                                "jid", "vid", 2, 0, "opname", "E"),
+                                "jid", "vid", 2, 0, "opname", "opid", "E"),
                         "h1"));
 
         MetricDumpSerialization.MetricSerializationResult serialized =

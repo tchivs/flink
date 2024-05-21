@@ -72,6 +72,15 @@ public class RegistryAvroSerializationSchema<T> extends AvroSerializationSchema<
     }
 
     @Override
+    public void open(InitializationContext context) throws Exception {
+        super.open(context);
+
+        if (schemaCoder == null) {
+            schemaCoder = schemaCoderProvider.get(RegistryAvroUtil.createContextFrom(context));
+        }
+    }
+
+    @Override
     public byte[] serialize(T object) {
         checkAvroInitialized();
 

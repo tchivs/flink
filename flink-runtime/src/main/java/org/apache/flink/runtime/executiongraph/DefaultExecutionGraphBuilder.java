@@ -330,7 +330,6 @@ public class DefaultExecutionGraphBuilder {
 
             final CheckpointCoordinatorConfiguration chkConfig =
                     snapshotSettings.getCheckpointCoordinatorConfiguration();
-            String changelogStorage = jobManagerConfig.getString(STATE_CHANGE_LOG_STORAGE);
 
             executionGraph.enableCheckpointing(
                     chkConfig,
@@ -341,7 +340,10 @@ public class DefaultExecutionGraphBuilder {
                     rootStorage,
                     checkpointStatsTrackerFactory.get(),
                     checkpointsCleaner,
-                    jobManagerConfig.getString(STATE_CHANGE_LOG_STORAGE));
+                    jobManagerConfig.getString(STATE_CHANGE_LOG_STORAGE),
+                    jobManagerConfig.getBoolean(
+                            org.apache.flink.configuration.JobManagerConfluentOptions
+                                    .STORE_SAVEPOINTS_IN_CHECKPOINT_STORE));
         }
 
         return executionGraph;

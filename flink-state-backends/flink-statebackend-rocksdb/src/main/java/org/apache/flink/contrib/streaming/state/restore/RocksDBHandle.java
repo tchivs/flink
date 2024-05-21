@@ -23,16 +23,19 @@ import org.apache.flink.contrib.streaming.state.RocksDBNativeMetricMonitor;
 import org.apache.flink.contrib.streaming.state.RocksDBNativeMetricOptions;
 import org.apache.flink.contrib.streaming.state.RocksDBOperationUtils;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.core.fs.ICloseableRegistry;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.metainfo.StateMetaInfoSnapshot;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.IOUtils;
+import org.apache.flink.util.Preconditions;
 
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.ExportImportFilesMetaData;
 import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,7 +119,8 @@ class RocksDBHandle implements AutoCloseable {
     void openDB(
             @Nonnull List<ColumnFamilyDescriptor> columnFamilyDescriptors,
             @Nonnull List<StateMetaInfoSnapshot> stateMetaInfoSnapshots,
-            @Nonnull Path restoreSourcePath)
+            @Nonnull Path restoreSourcePath,
+            @Nonnull ICloseableRegistry cancelStreamRegistryForRestore)
             throws IOException {
         this.columnFamilyDescriptors = columnFamilyDescriptors;
         this.columnFamilyHandles = new ArrayList<>(columnFamilyDescriptors.size() + 1);
@@ -125,7 +129,9 @@ class RocksDBHandle implements AutoCloseable {
         // Register CF handlers
         for (int i = 0; i < stateMetaInfoSnapshots.size(); i++) {
             getOrRegisterStateColumnFamilyHandle(
-                    columnFamilyHandles.get(i), stateMetaInfoSnapshots.get(i));
+                    columnFamilyHandles.get(i),
+                    stateMetaInfoSnapshots.get(i),
+                    cancelStreamRegistryForRestore);
         }
     }
 
@@ -149,7 +155,9 @@ class RocksDBHandle implements AutoCloseable {
     }
 
     RocksDbKvStateInfo getOrRegisterStateColumnFamilyHandle(
-            ColumnFamilyHandle columnFamilyHandle, StateMetaInfoSnapshot stateMetaInfoSnapshot) {
+            ColumnFamilyHandle columnFamilyHandle,
+            StateMetaInfoSnapshot stateMetaInfoSnapshot,
+            ICloseableRegistry cancelStreamRegistryForRestore) {
 
         RocksDbKvStateInfo registeredStateMetaInfoEntry =
                 kvStateInformation.get(stateMetaInfoSnapshot.getName());
@@ -166,7 +174,8 @@ class RocksDBHandle implements AutoCloseable {
                                 db,
                                 columnFamilyOptionsFactory,
                                 ttlCompactFiltersManager,
-                                writeBufferManagerCapacity);
+                                writeBufferManagerCapacity,
+                                cancelStreamRegistryForRestore);
             } else {
                 registeredStateMetaInfoEntry =
                         new RocksDbKvStateInfo(columnFamilyHandle, stateMetaInfo);
@@ -183,6 +192,40 @@ class RocksDBHandle implements AutoCloseable {
         }
 
         return registeredStateMetaInfoEntry;
+    }
+
+    /**
+     * Registers a new column family and imports data from the given export.
+     *
+     * @param stateMetaInfoKey info about the state to create.
+     * @param cfMetaDataList the data to import.
+     */
+    void registerStateColumnFamilyHandleWithImport(
+            RegisteredStateMetaInfoBase.Key stateMetaInfoKey,
+            List<ExportImportFilesMetaData> cfMetaDataList,
+            ICloseableRegistry cancelStreamRegistryForRestore) {
+
+        RegisteredStateMetaInfoBase stateMetaInfo =
+                stateMetaInfoKey.getRegisteredStateMetaInfoBase();
+
+        Preconditions.checkState(
+                !kvStateInformation.containsKey(stateMetaInfo.getName()),
+                "Error: stateMetaInfo.name is not unique:" + stateMetaInfo.getName());
+
+        RocksDbKvStateInfo stateInfo =
+                RocksDBOperationUtils.createStateInfo(
+                        stateMetaInfo,
+                        db,
+                        columnFamilyOptionsFactory,
+                        ttlCompactFiltersManager,
+                        writeBufferManagerCapacity,
+                        cfMetaDataList,
+                        cancelStreamRegistryForRestore);
+
+        RocksDBOperationUtils.registerKvStateInformation(
+                kvStateInformation, nativeMetricMonitor, stateMetaInfo.getName(), stateInfo);
+
+        columnFamilyHandles.add(stateInfo.columnFamilyHandle);
     }
 
     /**

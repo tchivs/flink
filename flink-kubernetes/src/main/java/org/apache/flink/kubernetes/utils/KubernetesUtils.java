@@ -18,12 +18,14 @@
 
 package org.apache.flink.kubernetes.utils;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.resources.ExternalResource;
 import org.apache.flink.client.program.PackagedProgramUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.kubernetes.configuration.KubernetesConfigOptions;
+import org.apache.flink.kubernetes.highavailability.KubernetesCheckpointStateHandleStore;
 import org.apache.flink.kubernetes.highavailability.KubernetesCheckpointStoreUtil;
 import org.apache.flink.kubernetes.highavailability.KubernetesJobGraphStoreUtil;
 import org.apache.flink.kubernetes.highavailability.KubernetesStateHandleStore;
@@ -199,6 +201,7 @@ public class KubernetesUtils {
     public static Map<String, String> getConfigMapLabels(String clusterId, String type) {
         final Map<String, String> labels = new HashMap<>(getCommonLabels(clusterId));
         labels.put(Constants.LABEL_CONFIGMAP_TYPE_KEY, type);
+        labels.put(ConfluentConstants.CONFLUENT_CLUSTER_ID_LABEL_KEY, clusterId);
         return Collections.unmodifiableMap(labels);
     }
 
@@ -327,7 +330,8 @@ public class KubernetesUtils {
                                 configuration),
                         COMPLETED_CHECKPOINT_FILE_SUFFIX);
         final KubernetesStateHandleStore<CompletedCheckpoint> stateHandleStore =
-                new KubernetesStateHandleStore<>(
+                new KubernetesCheckpointStateHandleStore(
+                        KubernetesCheckpointStoreUtil.INSTANCE,
                         kubeClient,
                         configMapName,
                         stateStorage,
@@ -339,6 +343,9 @@ public class KubernetesUtils {
 
         return new DefaultCompletedCheckpointStore<>(
                 maxNumberOfCheckpointsToRetain,
+                configuration.get(
+                        org.apache.flink.configuration.JobManagerConfluentOptions
+                                .RETAIN_JOB_HA_CP_STORE_ON_TERMINATION),
                 stateHandleStore,
                 KubernetesCheckpointStoreUtil.INSTANCE,
                 checkpoints,
@@ -560,7 +567,7 @@ public class KubernetesUtils {
      * @throws FlinkException if the config map could not be created
      */
     public static void createConfigMapIfItDoesNotExist(
-            FlinkKubeClient flinkKubeClient, String configMapName, String clusterId)
+            FlinkKubeClient flinkKubeClient, String configMapName, String clusterId, JobID jobID)
             throws FlinkException {
 
         int attempt = 0;
@@ -573,8 +580,10 @@ public class KubernetesUtils {
                                 .withNewMetadata()
                                 .withName(configMapName)
                                 .withLabels(
-                                        getConfigMapLabels(
-                                                clusterId, LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY))
+                                        getJobConfigMapLabels(
+                                                clusterId,
+                                                LABEL_CONFIGMAP_TYPE_HIGH_AVAILABILITY,
+                                                jobID))
                                 .endMetadata()
                                 .build());
 
@@ -594,6 +603,14 @@ public class KubernetesUtils {
                     String.format("Could not create the config map %s.", configMapName),
                     lastException);
         }
+    }
+
+    private static Map<String, String> getJobConfigMapLabels(
+            String clusterId, String type, JobID jobId) {
+        final Map<String, String> labels = new HashMap<>(getCommonLabels(clusterId));
+        labels.putAll(getConfigMapLabels(clusterId, type));
+        labels.put(ConfluentConstants.CONFLUENT_JOB_ID_LABEL_KEY, jobId.toHexString());
+        return Collections.unmodifiableMap(labels);
     }
 
     public static String encodeLeaderInformation(LeaderInformation leaderInformation) {

@@ -24,6 +24,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.FlinkAssertions;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.CatalogModel.ModelKind;
+import org.apache.flink.table.catalog.CatalogModel.ModelTask;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
@@ -41,6 +43,8 @@ import org.apache.flink.util.MutableURLClassLoader;
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.IOException;
 import java.net.URL;
@@ -737,6 +741,75 @@ class FactoryUtilTest {
                                         + "or indirectly in static fields. If the stacktrace suggests that the leak occurs in a third "
                                         + "party library and cannot be fixed immediately, you can disable this check with the "
                                         + "configuration 'classloader.check-leaked-classloader'"));
+    }
+
+    @Test
+    void testGetModelKindException() {
+        assertThatThrownBy(() -> FactoryUtil.getModelKind(Collections.emptyMap()))
+                .satisfies(
+                        FlinkAssertions.anyCauseMatches(
+                                ValidationException.class,
+                                "'provider' must be specified for model."));
+    }
+
+    @Test
+    void testGetModelKind() {
+        final ModelKind modelKind =
+                FactoryUtil.getModelKind(Collections.singletonMap("provider", "openai"));
+        assertThat(modelKind).isEqualTo(ModelKind.REMOTE);
+    }
+
+    @Test
+    void testGetModelTaskExceptionEmptyMap() {
+        assertThatThrownBy(() -> FactoryUtil.getModelTask(Collections.emptyMap()))
+                .satisfies(
+                        FlinkAssertions.anyCauseMatches(
+                                ValidationException.class, "'task' must be specified for model."));
+    }
+
+    @Test
+    void testGetModelTaskExceptionInvalidTask() {
+        assertThatThrownBy(
+                        () -> FactoryUtil.getModelTask(Collections.singletonMap("task", "invalid")))
+                .satisfies(
+                        FlinkAssertions.anyCauseMatches(
+                                IllegalArgumentException.class,
+                                "Could not parse value 'invalid' for key 'task'"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(ModelTask.class)
+    void testGetModelTaskUpperCase(ModelTask task) {
+        final ModelTask modelTask =
+                FactoryUtil.getModelTask(Collections.singletonMap("task", task.name()));
+        assertThat(modelTask).isEqualTo(task);
+    }
+
+    @ParameterizedTest
+    @EnumSource(ModelTask.class)
+    void testGetModelTaskKeyUpperCase(ModelTask task) {
+        final ModelTask modelTask =
+                FactoryUtil.getModelTask(Collections.singletonMap("TASK", task.name()));
+        assertThat(modelTask).isEqualTo(task);
+    }
+
+    @ParameterizedTest
+    @EnumSource(ModelTask.class)
+    void testGetModelTaskLowerCase(ModelTask task) {
+        final ModelTask modelTask =
+                FactoryUtil.getModelTask(
+                        Collections.singletonMap("task", task.name().toLowerCase()));
+        assertThat(modelTask).isEqualTo(task);
+    }
+
+    @Test
+    void testGetInvalidModelTask() {
+        assertThatThrownBy(
+                        () ->
+                                FactoryUtil.getModelTask(
+                                        Collections.singletonMap("task", "somename")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Could not parse value 'somename' for key 'task'.");
     }
 
     // --------------------------------------------------------------------------------------------

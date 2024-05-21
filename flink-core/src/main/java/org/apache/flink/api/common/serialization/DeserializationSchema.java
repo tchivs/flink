@@ -19,6 +19,7 @@ package org.apache.flink.api.common.serialization;
 
 import org.apache.flink.annotation.Public;
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.common.CommonConfluentContext;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.Collector;
@@ -104,7 +105,7 @@ public interface DeserializationSchema<T> extends Serializable, ResultTypeQuerya
      * </ul>
      */
     @PublicEvolving
-    interface InitializationContext {
+    interface InitializationContext extends CommonConfluentContext {
         /**
          * Returns the metric group for the parallel subtask of the source that runs this {@link
          * DeserializationSchema}.

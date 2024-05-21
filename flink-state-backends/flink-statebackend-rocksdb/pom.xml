@@ -61,9 +61,9 @@ under the License.
 		</dependency>
 
 		<dependency>
-			<groupId>com.ververica</groupId>
+			<groupId>io.confluent</groupId>
 			<artifactId>frocksdbjni</artifactId>
-			<version>6.20.3-ververica-2.0</version>
+			<version>8.10.0-ga</version>
 		</dependency>
 
 		<!-- test dependencies -->

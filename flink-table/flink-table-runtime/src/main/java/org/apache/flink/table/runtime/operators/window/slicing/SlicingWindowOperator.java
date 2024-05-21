@@ -189,7 +189,7 @@ public final class SlicingWindowOperator<K, W> extends TableStreamOperator<RowDa
         if (context.isRestored()) {
             Iterable<Long> watermarks = watermarkState.get();
             if (watermarks != null) {
-                Long minWatermark = Long.MAX_VALUE;
+                long minWatermark = Long.MAX_VALUE;
                 for (Long watermark : watermarks) {
                     minWatermark = Math.min(watermark, minWatermark);
                 }

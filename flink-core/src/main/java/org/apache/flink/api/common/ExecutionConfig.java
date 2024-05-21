@@ -22,6 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.Public;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.configuration.AlgorithmOptions;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
@@ -30,6 +31,7 @@ import org.apache.flink.configuration.DescribedEnum;
 import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.JobManagerOptions.SchedulerType;
+import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.configuration.ReadableConfig;
@@ -272,6 +274,26 @@ public class ExecutionConfig implements Serializable, Archiveable<ArchivedExecut
     @PublicEvolving
     public long getLatencyTrackingInterval() {
         return configuration.get(MetricOptions.LATENCY_INTERVAL);
+    }
+
+    @PublicEvolving
+    public Optional<MemorySize> getGlobalAggregationBufferSize() {
+        return this.configuration.getOptional(AlgorithmOptions.GLOBAL_AGG_BUFFER_SIZE);
+    }
+
+    @PublicEvolving
+    public Optional<Integer> getGlobalAggregationMaxBufferedRecords() {
+        return this.configuration.getOptional(AlgorithmOptions.GLOBAL_AGG_MAX_BUFFERED_RECORDS);
+    }
+
+    @PublicEvolving
+    public Optional<MemorySize> getLocalAggregationBufferSize() {
+        return this.configuration.getOptional(AlgorithmOptions.LOCAL_AGG_BUFFER_SIZE);
+    }
+
+    @PublicEvolving
+    public Optional<Integer> getLocalAggregationMaxBufferedRecords() {
+        return this.configuration.getOptional(AlgorithmOptions.LOCAL_AGG_MAX_BUFFERED_RECORDS);
     }
 
     @Internal
@@ -1197,6 +1219,27 @@ public class ExecutionConfig implements Serializable, Archiveable<ArchivedExecut
         configuration
                 .getOptional(JobManagerOptions.SCHEDULER)
                 .ifPresent(t -> this.configuration.set(JobManagerOptions.SCHEDULER, t));
+
+        configuration
+                .getOptional(AlgorithmOptions.GLOBAL_AGG_BUFFER_SIZE)
+                .ifPresent(t -> this.configuration.set(AlgorithmOptions.GLOBAL_AGG_BUFFER_SIZE, t));
+
+        configuration
+                .getOptional(AlgorithmOptions.GLOBAL_AGG_MAX_BUFFERED_RECORDS)
+                .ifPresent(
+                        t ->
+                                this.configuration.set(
+                                        AlgorithmOptions.GLOBAL_AGG_MAX_BUFFERED_RECORDS, t));
+        configuration
+                .getOptional(AlgorithmOptions.LOCAL_AGG_BUFFER_SIZE)
+                .ifPresent(t -> this.configuration.set(AlgorithmOptions.LOCAL_AGG_BUFFER_SIZE, t));
+
+        configuration
+                .getOptional(AlgorithmOptions.LOCAL_AGG_MAX_BUFFERED_RECORDS)
+                .ifPresent(
+                        t ->
+                                this.configuration.set(
+                                        AlgorithmOptions.LOCAL_AGG_MAX_BUFFERED_RECORDS, t));
     }
 
     /**

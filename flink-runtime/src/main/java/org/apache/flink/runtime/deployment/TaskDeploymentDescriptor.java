@@ -28,14 +28,17 @@ import org.apache.flink.runtime.executiongraph.JobInformation;
 import org.apache.flink.runtime.executiongraph.TaskInformation;
 import org.apache.flink.runtime.taskexecutor.ShuffleDescriptorsCache;
 import org.apache.flink.util.FileUtils;
+import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.SerializedValue;
 
 import javax.annotation.Nullable;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Files;
 import java.util.List;
 
 /**
@@ -103,6 +106,12 @@ public final class TaskDeploymentDescriptor implements Serializable {
     /** Serialized task information or <tt>null</tt> if offloaded. */
     private MaybeOffloaded<TaskInformation> serializedTaskInformation;
 
+    /** Information to restore the task. This can be null if there is no state to restore. */
+    @Nullable private final MaybeOffloaded<JobManagerTaskRestore> serializedTaskRestore;
+
+    /** Information to restore the task. This can be null if there is no state to restore. */
+    @Nullable private transient JobManagerTaskRestore taskRestore;
+
     /**
      * The ID referencing the job this task belongs to.
      *
@@ -123,16 +132,13 @@ public final class TaskDeploymentDescriptor implements Serializable {
     /** The list of consumed intermediate result partitions. */
     private final List<InputGateDeploymentDescriptor> inputGates;
 
-    /** Information to restore the task. This can be null if there is no state to restore. */
-    @Nullable private final JobManagerTaskRestore taskRestore;
-
     public TaskDeploymentDescriptor(
             JobID jobId,
             MaybeOffloaded<JobInformation> serializedJobInformation,
             MaybeOffloaded<TaskInformation> serializedTaskInformation,
             ExecutionAttemptID executionAttemptId,
             AllocationID allocationId,
-            @Nullable JobManagerTaskRestore taskRestore,
+            @Nullable MaybeOffloaded<JobManagerTaskRestore> serializedTaskRestore,
             List<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
             List<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
@@ -144,7 +150,7 @@ public final class TaskDeploymentDescriptor implements Serializable {
         this.executionId = Preconditions.checkNotNull(executionAttemptId);
         this.allocationId = Preconditions.checkNotNull(allocationId);
 
-        this.taskRestore = taskRestore;
+        this.serializedTaskRestore = serializedTaskRestore;
 
         this.producedPartitions = Preconditions.checkNotNull(resultPartitionDeploymentDescriptors);
         this.inputGates = Preconditions.checkNotNull(inputGateDeploymentDescriptors);
@@ -222,8 +228,16 @@ public final class TaskDeploymentDescriptor implements Serializable {
     }
 
     @Nullable
-    public JobManagerTaskRestore getTaskRestore() {
-        return taskRestore;
+    public JobManagerTaskRestore getTaskRestore() throws IOException, ClassNotFoundException {
+        if (taskRestore != null || serializedTaskRestore == null) {
+            return taskRestore;
+        }
+        if (serializedTaskRestore instanceof NonOffloaded) {
+            NonOffloaded<JobManagerTaskRestore> taskRestore =
+                    (NonOffloaded<JobManagerTaskRestore>) serializedTaskRestore;
+            return taskRestore.serializedValue.deserializeValue(getClass().getClassLoader());
+        }
+        throw new IllegalStateException("Trying to work with offloaded serialized task restore.");
     }
 
     public AllocationID getAllocationId() {
@@ -276,6 +290,21 @@ public final class TaskDeploymentDescriptor implements Serializable {
             SerializedValue<TaskInformation> serializedValue =
                     SerializedValue.fromBytes(FileUtils.readAllBytes(dataFile.toPath()));
             serializedTaskInformation = new NonOffloaded<>(serializedValue);
+        }
+
+        if (serializedTaskRestore == null) {
+            this.taskRestore = null;
+        } else if (serializedTaskRestore instanceof Offloaded) {
+            final PermanentBlobKey blobKey =
+                    ((Offloaded<JobManagerTaskRestore>) serializedTaskRestore).serializedValueKey;
+
+            Preconditions.checkNotNull(blobService);
+
+            final File dataFile = blobService.getFile(jobId, blobKey);
+            taskRestore =
+                    InstantiationUtil.deserializeObject(
+                            new BufferedInputStream(Files.newInputStream(dataFile.toPath())),
+                            getClass().getClassLoader());
         }
 
         for (InputGateDeploymentDescriptor inputGate : inputGates) {

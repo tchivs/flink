@@ -85,6 +85,7 @@ import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.IterableUtils;
+import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.OptionalFailure;
 import org.apache.flink.util.SerializedValue;
 import org.apache.flink.util.TernaryBoolean;
@@ -260,7 +261,7 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
      * Checkpoint stats tracker separate from the coordinator in order to be available after
      * archiving.
      */
-    private CheckpointStatsTracker checkpointStatsTracker;
+    @Nullable private CheckpointStatsTracker checkpointStatsTracker;
 
     // ------ Fields that are only relevant for archived execution graphs ------------
     @Nullable private String stateBackendName;
@@ -448,7 +449,8 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
             CheckpointStorage checkpointStorage,
             CheckpointStatsTracker statsTracker,
             CheckpointsCleaner checkpointsCleaner,
-            String changelogStorageName) {
+            String changelogStorageName,
+            boolean storeSavepointsInCheckpointStore) {
 
         checkState(state == JobStatus.CREATED, "Job must be in CREATED state");
         checkState(checkpointCoordinator == null, "checkpointing already enabled");
@@ -483,9 +485,12 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
         checkState(checkpointCoordinatorTimer == null);
 
         checkpointCoordinatorTimer =
-                Executors.newSingleThreadScheduledExecutor(
-                        new DispatcherThreadFactory(
-                                Thread.currentThread().getThreadGroup(), "Checkpoint Timer"));
+                MdcUtils.scopeToJob(
+                        getJobID(),
+                        Executors.newSingleThreadScheduledExecutor(
+                                new DispatcherThreadFactory(
+                                        Thread.currentThread().getThreadGroup(),
+                                        "Checkpoint Timer")));
 
         // create the coordinator that triggers and commits checkpoints and holds the state
         checkpointCoordinator =
@@ -502,7 +507,8 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
                         failureManager,
                         createCheckpointPlanCalculator(
                                 chkConfig.isEnableCheckpointsAfterTasksFinish()),
-                        checkpointStatsTracker);
+                        checkpointStatsTracker,
+                        storeSavepointsInCheckpointStore);
 
         // register the master hooks on the checkpoint coordinator
         for (MasterTriggerRestoreHook<?> hook : masterHooks) {
@@ -541,6 +547,12 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
     @Nullable
     public CheckpointCoordinator getCheckpointCoordinator() {
         return checkpointCoordinator;
+    }
+
+    @Nullable
+    @Override
+    public CheckpointStatsTracker getCheckpointStatsTracker() {
+        return checkpointStatsTracker;
     }
 
     @Override

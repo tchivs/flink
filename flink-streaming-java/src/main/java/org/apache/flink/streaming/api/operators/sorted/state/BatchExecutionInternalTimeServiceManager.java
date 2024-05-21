@@ -19,6 +19,7 @@
 package org.apache.flink.streaming.api.operators.sorted.state;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.state.CheckpointableKeyedStateBackend;
 import org.apache.flink.runtime.state.KeyGroupStatePartitionStreamProvider;
 import org.apache.flink.runtime.state.KeyedStateBackend;
@@ -79,12 +80,20 @@ public class BatchExecutionInternalTimeServiceManager<K>
     }
 
     @Override
+    public boolean tryAdvanceWatermark(
+            Watermark watermark, ShouldStopAdvancingFn shouldStopAdvancingFn) {
+        advanceWatermark(watermark);
+        return true;
+    }
+
+    @Override
     public void snapshotToRawKeyedState(
             KeyedStateCheckpointOutputStream context, String operatorName) throws Exception {
         throw new UnsupportedOperationException("Checkpoints are not supported in BATCH execution");
     }
 
     public static <K> InternalTimeServiceManager<K> create(
+            TaskIOMetricGroup taskIOMetricGroup,
             CheckpointableKeyedStateBackend<K> keyedStatedBackend,
             ClassLoader userClassloader,
             KeyContext keyContext, // the operator

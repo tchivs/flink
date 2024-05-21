@@ -64,6 +64,14 @@ public class RegistryAvroDeserializationSchema<T> extends AvroDeserializationSch
     }
 
     @Override
+    public void open(InitializationContext context) throws Exception {
+        super.open(context);
+        if (schemaCoder == null) {
+            this.schemaCoder = schemaCoderProvider.get(RegistryAvroUtil.createContextFrom(context));
+        }
+    }
+
+    @Override
     public T deserialize(@Nullable byte[] message) throws IOException {
         if (message == null) {
             return null;

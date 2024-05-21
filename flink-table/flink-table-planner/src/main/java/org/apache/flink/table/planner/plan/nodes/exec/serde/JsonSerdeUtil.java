@@ -27,6 +27,7 @@ import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.TableDistribution;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.connector.ChangelogMode;
@@ -143,6 +144,7 @@ public class JsonSerdeUtil {
         module.addSerializer(new ResolvedExpressionJsonSerializer());
         module.addSerializer(new ResolvedSchemaJsonSerializer());
         module.addSerializer(new RequiredDistributionJsonSerializer());
+        module.addSerializer(new TableDistributionJsonSerializer());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -171,6 +173,7 @@ public class JsonSerdeUtil {
         module.addDeserializer(ResolvedSchema.class, new ResolvedSchemaJsonDeserializer());
         module.addDeserializer(
                 RequiredDistribution.class, new RequiredDistributionJsonDeserializer());
+        module.addDeserializer(TableDistribution.class, new TableDistributionJsonDeserializer());
     }
 
     private static void registerMixins(SimpleModule module) {

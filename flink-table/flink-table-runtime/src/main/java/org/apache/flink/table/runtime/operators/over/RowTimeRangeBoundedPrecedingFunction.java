@@ -19,12 +19,14 @@
 package org.apache.flink.table.runtime.operators.over;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.java.typeutils.ListTypeInfo;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
@@ -36,7 +38,6 @@ import org.apache.flink.table.runtime.generated.GeneratedAggsHandleFunction;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Process Function for RANGE clause event-time bounded OVER window.
@@ -55,6 +57,7 @@ import java.util.List;
 public class RowTimeRangeBoundedPrecedingFunction<K>
         extends KeyedProcessFunction<K, RowData, RowData> {
     private static final long serialVersionUID = 1L;
+    private static final long stateVersionID = 1L;
 
     private static final Logger LOG =
             LoggerFactory.getLogger(RowTimeRangeBoundedPrecedingFunction.class);
@@ -70,17 +73,24 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
     // the state which keeps the last triggering timestamp
     private transient ValueState<Long> lastTriggeringTsState;
 
+    // the version to which the state is fully migrated
+    private transient ValueState<Long> stateVersionState;
+
     // the state which used to materialize the accumulator for incremental calculation
     private transient ValueState<RowData> accState;
 
-    // the state which keeps the safe timestamp to cleanup states
-    private transient ValueState<Long> cleanupTsState;
+    // Stores pending records keyed by event time.
+    // Records are added by processElement() and moved by onTimer() to accumulatedRecords.
+    // The size is bounded by watermark delay, so access is relatively fast.
+    // MapState is used for 3 reasons:
+    // 1. We have to use timers to maintain time order in output; for that, we need lookup by time
+    // 2. MapState iterator doesn't load everything into memory
+    // 3. MapState iterator supports removals
+    private transient MapState<Long, List<RowData>> pendingRecords;
 
-    // the state which keeps all the data that are not expired.
-    // The first element (as the mapState key) of the tuple is the time stamp. Per each time stamp,
-    // the second element of tuple is a list that contains the entire data of all the rows belonging
-    // to this time stamp.
-    private transient MapState<Long, List<RowData>> inputState;
+    // Stores records that were added to function and need to be retracted at some point.
+    // The size is bounded by precedingOffset.
+    private transient MapState<Long, List<RowData>> accumulatedRecords;
 
     private transient AggsHandleFunction function;
 
@@ -101,7 +111,6 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
             LogicalType[] inputFieldTypes,
             long precedingOffset,
             int rowTimeIdx) {
-        Preconditions.checkNotNull(precedingOffset);
         this.genAggsHandler = genAggsHandler;
         this.accTypes = accTypes;
         this.inputFieldTypes = inputFieldTypes;
@@ -116,30 +125,39 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
 
         output = new JoinedRowData();
 
-        ValueStateDescriptor<Long> lastTriggeringTsDescriptor =
-                new ValueStateDescriptor<Long>("lastTriggeringTsState", Types.LONG);
-        lastTriggeringTsState = getRuntimeContext().getState(lastTriggeringTsDescriptor);
+        lastTriggeringTsState =
+                getRuntimeContext()
+                        .getState(new ValueStateDescriptor<>("lastTriggeringTsState", Types.LONG));
 
-        InternalTypeInfo<RowData> accTypeInfo = InternalTypeInfo.ofFields(accTypes);
-        ValueStateDescriptor<RowData> accStateDesc =
-                new ValueStateDescriptor<RowData>("accState", accTypeInfo);
-        accState = getRuntimeContext().getState(accStateDesc);
+        stateVersionState =
+                getRuntimeContext()
+                        .getState(new ValueStateDescriptor<>("stateVersionState", Types.LONG));
+
+        accState =
+                getRuntimeContext()
+                        .getState(
+                                new ValueStateDescriptor<>(
+                                        "accState", InternalTypeInfo.ofFields(accTypes)));
 
         // input element are all binary row as they are came from network
-        InternalTypeInfo<RowData> inputType = InternalTypeInfo.ofFields(inputFieldTypes);
-        ListTypeInfo<RowData> rowListTypeInfo = new ListTypeInfo<RowData>(inputType);
-        MapStateDescriptor<Long, List<RowData>> inputStateDesc =
-                new MapStateDescriptor<Long, List<RowData>>(
-                        "inputState", Types.LONG, rowListTypeInfo);
-        inputState = getRuntimeContext().getMapState(inputStateDesc);
-
-        ValueStateDescriptor<Long> cleanupTsStateDescriptor =
-                new ValueStateDescriptor<>("cleanupTsState", Types.LONG);
-        this.cleanupTsState = getRuntimeContext().getState(cleanupTsStateDescriptor);
+        pendingRecords = createMapState("inputState");
+        accumulatedRecords = createMapState("accumulatedState");
 
         // metrics
         this.numLateRecordsDropped =
                 getRuntimeContext().getMetricGroup().counter(LATE_ELEMENTS_DROPPED_METRIC_NAME);
+    }
+
+    private MapState<Long, List<RowData>> createMapState(String name) {
+        ExecutionConfig executionConfig = getRuntimeContext().getExecutionConfig();
+        TypeSerializer<RowData> rowDataTypeSerializer =
+                InternalTypeInfo.ofFields(inputFieldTypes).createSerializer(executionConfig);
+        return getRuntimeContext()
+                .getMapState(
+                        new MapStateDescriptor<>(
+                                name,
+                                Types.LONG.createSerializer(executionConfig),
+                                new ListSerializer<>(rowDataTypeSerializer)));
     }
 
     @Override
@@ -148,47 +166,20 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
             KeyedProcessFunction<K, RowData, RowData>.Context ctx,
             Collector<RowData> out)
             throws Exception {
-        // triggering timestamp for trigger calculation
         long triggeringTs = input.getLong(rowTimeIdx);
 
         Long lastTriggeringTs = lastTriggeringTsState.value();
-        if (lastTriggeringTs == null) {
-            lastTriggeringTs = 0L;
-        }
-
-        // check if the data is expired, if not, save the data and register event time timer
-        if (triggeringTs > lastTriggeringTs) {
-            List<RowData> data = inputState.get(triggeringTs);
-            if (null != data) {
-                data.add(input);
-                inputState.put(triggeringTs, data);
-            } else {
-                data = new ArrayList<RowData>();
-                data.add(input);
-                inputState.put(triggeringTs, data);
-                // register event time timer
-                ctx.timerService().registerEventTimeTimer(triggeringTs);
-            }
-            registerCleanupTimer(ctx, triggeringTs);
-        } else {
+        if (lastTriggeringTs != null && lastTriggeringTs >= triggeringTs) {
             numLateRecordsDropped.inc();
+            return;
         }
-    }
-
-    private void registerCleanupTimer(
-            KeyedProcessFunction<K, RowData, RowData>.Context ctx, long timestamp)
-            throws Exception {
-        // calculate safe timestamp to cleanup states
-        long minCleanupTimestamp = timestamp + precedingOffset + 1;
-        long maxCleanupTimestamp = timestamp + (long) (precedingOffset * 1.5) + 1;
-        // update timestamp and register timer if needed
-        Long curCleanupTimestamp = cleanupTsState.value();
-        if (curCleanupTimestamp == null || curCleanupTimestamp < minCleanupTimestamp) {
-            // we don't delete existing timer since it may delete timer for data processing
-            // TODO Use timer with namespace to distinguish timers
-            ctx.timerService().registerEventTimeTimer(maxCleanupTimestamp);
-            cleanupTsState.update(maxCleanupTimestamp);
+        List<RowData> list = pendingRecords.get(triggeringTs);
+        if (list == null) {
+            list = new ArrayList<>();
+            ctx.timerService().registerEventTimeTimer(triggeringTs);
         }
+        list.add(input);
+        pendingRecords.put(triggeringTs, list);
     }
 
     @Override
@@ -197,94 +188,107 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
             KeyedProcessFunction<K, RowData, RowData>.OnTimerContext ctx,
             Collector<RowData> out)
             throws Exception {
-        Long cleanupTimestamp = cleanupTsState.value();
-        // if cleanupTsState has not been updated then it is safe to cleanup states
-        if (cleanupTimestamp != null && cleanupTimestamp <= timestamp) {
-            inputState.clear();
-            accState.clear();
-            lastTriggeringTsState.clear();
-            cleanupTsState.clear();
-            function.cleanup();
+        function.setAccumulators(restoreOrCreateAccumulators());
+
+        migrateStateIfNeeded(timestamp, ctx);
+
+        retractAndRemove(timestamp);
+
+        final List<RowData> newRecords = pendingRecords.get(timestamp);
+        if (newRecords == null) {
+            storeAccumulators();
             return;
         }
 
-        // gets all window data from state for the calculation
-        List<RowData> inputs = inputState.get(timestamp);
+        RowData accValue = accumulate(newRecords);
+        output(accValue, out, newRecords);
+        pendingRecords.remove(timestamp);
+        rememberToRetract(newRecords, ctx, getRetractTimestamp(timestamp));
+        storeAccumulators();
+        lastTriggeringTsState.update(timestamp);
+    }
 
-        if (null != inputs) {
-
-            int dataListIndex = 0;
-            RowData accumulators = accState.value();
-
-            // initialize when first run or failover recovery per key
-            if (null == accumulators) {
-                accumulators = function.createAccumulators();
+    private void migrateStateIfNeeded(
+            long timestamp, KeyedProcessFunction<K, RowData, RowData>.OnTimerContext ctx)
+            throws Exception {
+        Long migratedToVersion = stateVersionState.value();
+        if (migratedToVersion != null && migratedToVersion >= stateVersionID) {
+            return;
+        }
+        Long lastTriggeringTs = lastTriggeringTsState.value();
+        if (lastTriggeringTs == null) {
+            lastTriggeringTs = -1L;
+        }
+        LOG.info(
+                "Migrate state from version {} to {}, last trigger ts={}, current ts={}",
+                migratedToVersion,
+                stateVersionID,
+                lastTriggeringTs,
+                timestamp);
+        Iterator<Map.Entry<Long, List<RowData>>> it = pendingRecords.iterator();
+        while (it.hasNext()) {
+            Map.Entry<Long, List<RowData>> e = it.next();
+            Long recordsTs = e.getKey();
+            if (recordsTs > lastTriggeringTs) {
+                // not in the window yet regardless of version - no need to migrate
+                continue;
             }
-            // set accumulators in context first
-            function.setAccumulators(accumulators);
-
-            // keep up timestamps of retract data
-            List<Long> retractTsList = new ArrayList<Long>();
-
-            // do retraction
-            Iterator<Long> dataTimestampIt = inputState.keys().iterator();
-            while (dataTimestampIt.hasNext()) {
-                Long dataTs = dataTimestampIt.next();
-                Long offset = timestamp - dataTs;
-                if (offset > precedingOffset) {
-                    List<RowData> retractDataList = inputState.get(dataTs);
-                    if (retractDataList != null) {
-                        dataListIndex = 0;
-                        while (dataListIndex < retractDataList.size()) {
-                            RowData retractRow = retractDataList.get(dataListIndex);
-                            function.retract(retractRow);
-                            dataListIndex += 1;
-                        }
-                        retractTsList.add(dataTs);
-                    } else {
-                        // Does not retract values which are outside of window if the state is
-                        // cleared already.
-                        LOG.warn(
-                                "The state is cleared because of state ttl. "
-                                        + "This will result in incorrect result. "
-                                        + "You can increase the state ttl to avoid this.");
-                    }
+            long retractTs = getRetractTimestamp(recordsTs);
+            if (retractTs > timestamp) {
+                rememberToRetract(e.getValue(), ctx, retractTs);
+            } else {
+                for (RowData rowData : e.getValue()) {
+                    checkNotInterrupted();
+                    function.retract(rowData);
                 }
             }
-
-            // do accumulation
-            dataListIndex = 0;
-            while (dataListIndex < inputs.size()) {
-                RowData curRow = inputs.get(dataListIndex);
-                // accumulate current row
-                function.accumulate(curRow);
-                dataListIndex += 1;
-            }
-
-            // get aggregate result
-            RowData aggValue = function.getValue();
-
-            // copy forwarded fields to output row and emit output row
-            dataListIndex = 0;
-            while (dataListIndex < inputs.size()) {
-                RowData curRow = inputs.get(dataListIndex);
-                output.replace(curRow, aggValue);
-                out.collect(output);
-                dataListIndex += 1;
-            }
-
-            // remove the data that has been retracted
-            dataListIndex = 0;
-            while (dataListIndex < retractTsList.size()) {
-                inputState.remove(retractTsList.get(dataListIndex));
-                dataListIndex += 1;
-            }
-
-            // update the value of accumulators for future incremental computation
-            accumulators = function.getAccumulators();
-            accState.update(accumulators);
+            it.remove();
         }
-        lastTriggeringTsState.update(timestamp);
+        stateVersionState.update(stateVersionID);
+    }
+
+    private void retractAndRemove(long timestamp) throws Exception {
+        LOG.debug("Retract and remove records at timestamp (-offset): {}", timestamp);
+        final List<RowData> staleRecords = accumulatedRecords.get(timestamp);
+        if (staleRecords != null) {
+            for (RowData rowData : staleRecords) {
+                checkNotInterrupted();
+                function.retract(rowData);
+            }
+            accumulatedRecords.remove(timestamp);
+        }
+    }
+
+    private RowData accumulate(List<RowData> newRecords) throws Exception {
+        LOG.debug("Accumulate {} records", newRecords.size());
+        for (RowData rowData : newRecords) {
+            function.accumulate(rowData);
+        }
+        storeAccumulators();
+        return function.getValue();
+    }
+
+    private void output(RowData value, Collector<RowData> output, List<RowData> records)
+            throws InterruptedException {
+        LOG.debug("Output result for {} records", records.size());
+        for (RowData rowData : records) {
+            checkNotInterrupted();
+            output.collect(this.output.replace(rowData, value));
+        }
+    }
+
+    private void rememberToRetract(
+            List<RowData> records,
+            KeyedProcessFunction<K, RowData, RowData>.OnTimerContext ctx,
+            long retractTimestamp)
+            throws Exception {
+        // expect to transfer records once per timestamp, so just put not merge
+        accumulatedRecords.put(retractTimestamp, records);
+        ctx.timerService().registerEventTimeTimer(retractTimestamp);
+    }
+
+    private long getRetractTimestamp(long atTimestamp) {
+        return atTimestamp + precedingOffset + 1;
     }
 
     @Override
@@ -292,5 +296,23 @@ public class RowTimeRangeBoundedPrecedingFunction<K>
         if (null != function) {
             function.close();
         }
+    }
+
+    private static void checkNotInterrupted() throws InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException();
+        }
+    }
+
+    private void storeAccumulators() throws Exception {
+        accState.update(function.getAccumulators());
+    }
+
+    private RowData restoreOrCreateAccumulators() throws Exception {
+        RowData accumulators = accState.value();
+        if (accumulators == null) {
+            accumulators = function.createAccumulators();
+        }
+        return accumulators;
     }
 }

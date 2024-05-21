@@ -60,6 +60,10 @@ public class DocumentingDispatcherRestEndpoint extends DispatcherRestEndpoint
         config.setString(RestOptions.ADDRESS, "localhost");
         // necessary for loading the web-submission extension
         config.setString(JobManagerOptions.ADDRESS, "localhost");
+        config.set(
+                org.apache.flink.configuration.JobManagerConfluentOptions
+                        .ENABLE_SUBMISSION_ENDPOINT,
+                true);
         handlerConfig = RestHandlerConfiguration.fromConfiguration(config);
 
         dispatcherGatewayRetriever = () -> null;

@@ -21,7 +21,13 @@ package org.apache.flink.table.planner.calcite;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.config.TableConfigOptions;
+import org.apache.flink.table.api.config.TableConfigOptions.ColumnExpansionStrategy;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.planner.catalog.CatalogSchemaTable;
+import org.apache.flink.table.planner.functions.sql.SqlWindowTableFunction;
 import org.apache.flink.table.planner.plan.utils.FlinkRexUtil;
 import org.apache.flink.table.planner.utils.ShortcutUtils;
 import org.apache.flink.table.types.logical.DecimalType;
@@ -37,19 +43,28 @@ import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.sql.JoinType;
 import org.apache.calcite.sql.SqlAsOperator;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSnapshot;
+import org.apache.calcite.sql.SqlTableFunction;
 import org.apache.calcite.sql.SqlUtil;
-import org.apache.calcite.sql.SqlWindowTableFunction;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.DelegatingScope;
 import org.apache.calcite.sql.validate.IdentifierNamespace;
 import org.apache.calcite.sql.validate.IdentifierSnapshotNamespace;
+import org.apache.calcite.sql.validate.SelectScope;
+import org.apache.calcite.sql.validate.SqlQualified;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
@@ -60,15 +75,22 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.util.Static;
 import org.apache.calcite.util.TimestampString;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.checker.nullness.qual.PolyNull;
 
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.calcite.sql.type.SqlTypeName.DECIMAL;
+import static org.apache.flink.table.expressions.resolver.lookups.FieldReferenceLookup.includeExpandedColumn;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Extends Calcite's {@link SqlValidator} by Flink-specific behavior. */
@@ -80,6 +102,7 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
     private RelDataType expectedOutputType;
 
     private final RelOptCluster relOptCluster;
+    private final List<ColumnExpansionStrategy> columnExpansionStrategies;
 
     private final RelOptTable.ToRelContext toRelContext;
 
@@ -97,6 +120,9 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
         this.relOptCluster = relOptCluster;
         this.toRelContext = toRelcontext;
         this.frameworkConfig = frameworkConfig;
+        this.columnExpansionStrategies =
+                ShortcutUtils.unwrapTableConfig(relOptCluster)
+                        .get(TableConfigOptions.TABLE_COLUMN_EXPANSION_STRATEGY);
     }
 
     public void setExpectedOutputType(SqlNode sqlNode, RelDataType expectedOutputType) {
@@ -135,7 +161,7 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
                 SqlNode operand0 = call.operand(0);
                 if (operand0 instanceof SqlBasicCall
                         && ((SqlBasicCall) operand0).getOperator()
-                                instanceof SqlWindowTableFunction) {
+                                instanceof org.apache.calcite.sql.SqlWindowTableFunction) {
                     return;
                 }
             }
@@ -177,7 +203,7 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
         Optional<SqlSnapshot> snapshot = getSnapShotNode(ns);
         if (usingScope != null
                 && snapshot.isPresent()
-                && !(snapshot.get().getPeriod() instanceof SqlIdentifier)) {
+                && !(hasInputReference(snapshot.get().getPeriod()))) {
             SqlSnapshot sqlSnapshot = snapshot.get();
             SqlNode periodNode = sqlSnapshot.getPeriod();
             SqlToRelConverter sqlToRelConverter = this.createSqlToRelConverter();
@@ -196,14 +222,23 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
                             Collections.singletonList(simplifiedRexNode),
                             reducedNodes);
             // check whether period is the unsupported expression
-            if (!(reducedNodes.get(0) instanceof RexLiteral)) {
-                throw new UnsupportedOperationException(
+            final RexNode reducedNode = reducedNodes.get(0);
+            if (!(reducedNode instanceof RexLiteral)) {
+                throw new ValidationException(
                         String.format(
                                 "Unsupported time travel expression: %s for the expression can not be reduced to a constant by Flink.",
                                 periodNode));
             }
 
-            RexLiteral rexLiteral = (RexLiteral) (reducedNodes).get(0);
+            RexLiteral rexLiteral = (RexLiteral) reducedNode;
+            final RelDataType sqlType = rexLiteral.getType();
+            if (!SqlTypeUtil.isTimestamp(sqlType)) {
+                throw newValidationError(
+                        periodNode,
+                        Static.RESOURCE.illegalExpressionForTemporal(
+                                sqlType.getSqlTypeName().getName()));
+            }
+
             TimestampString timestampString = rexLiteral.getValueAs(TimestampString.class);
             checkNotNull(
                     timestampString,
@@ -236,6 +271,10 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
         }
 
         super.registerNamespace(usingScope, alias, ns, forceNullable);
+    }
+
+    private static boolean hasInputReference(SqlNode node) {
+        return node.accept(new SqlToRelConverter.SqlIdentifierFinder());
     }
 
     /**
@@ -275,5 +314,193 @@ public final class FlinkCalciteSqlValidator extends SqlValidatorImpl {
                 relOptCluster,
                 frameworkConfig.getConvertletTable(),
                 frameworkConfig.getSqlToRelConverterConfig());
+    }
+
+    @Override
+    protected void addToSelectList(
+            List<SqlNode> list,
+            Set<String> aliases,
+            List<Map.Entry<String, RelDataType>> fieldList,
+            SqlNode exp,
+            SelectScope scope,
+            boolean includeSystemVars) {
+        // Extract column's origin to apply strategy
+        if (!columnExpansionStrategies.isEmpty() && exp instanceof SqlIdentifier) {
+            final SqlQualified qualified = scope.fullyQualify((SqlIdentifier) exp);
+            if (qualified.namespace != null && qualified.namespace.getTable() != null) {
+                final CatalogSchemaTable schemaTable =
+                        (CatalogSchemaTable) qualified.namespace.getTable().table();
+                final ResolvedSchema resolvedSchema =
+                        schemaTable.getContextResolvedTable().getResolvedSchema();
+                final String columnName = qualified.suffix().get(0);
+                final Column column = resolvedSchema.getColumn(columnName).orElse(null);
+                if (qualified.suffix().size() == 1 && column != null) {
+                    if (includeExpandedColumn(column, columnExpansionStrategies)
+                            || declaredDescriptorColumn(scope, column)) {
+                        super.addToSelectList(
+                                list, aliases, fieldList, exp, scope, includeSystemVars);
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Always add to list
+        super.addToSelectList(list, aliases, fieldList, exp, scope, includeSystemVars);
+    }
+
+    @Override
+    protected @PolyNull SqlNode performUnconditionalRewrites(
+            @PolyNull SqlNode node, boolean underFrom) {
+
+        // Special case for window TVFs like:
+        // TUMBLE(TABLE t, DESCRIPTOR(metadata_virtual), INTERVAL '1' MINUTE))
+        //
+        // "TABLE t" is translated into an implicit "SELECT * FROM t". This would ignore columns
+        // that are not expanded by default. However, the descriptor explicitly states the need
+        // for this column. Therefore, explicit table expressions (for window TVFs at most one)
+        // are captured before rewriting and replaced with a "marker" SqlSelect that contains the
+        // descriptor information. The "marker" SqlSelect is considered during column expansion.
+        final List<SqlIdentifier> explicitTableArgs = getExplicitTableOperands(node);
+
+        final SqlNode rewritten = super.performUnconditionalRewrites(node, underFrom);
+
+        if (!(node instanceof SqlBasicCall)) {
+            return rewritten;
+        }
+        final SqlBasicCall call = (SqlBasicCall) node;
+        final SqlOperator operator = call.getOperator();
+
+        if (operator instanceof SqlWindowTableFunction) {
+            if (explicitTableArgs.stream().allMatch(Objects::isNull)) {
+                return rewritten;
+            }
+
+            final List<SqlIdentifier> descriptors =
+                    call.getOperandList().stream()
+                            .flatMap(FlinkCalciteSqlValidator::extractDescriptors)
+                            .collect(Collectors.toList());
+
+            for (int i = 0; i < call.operandCount(); i++) {
+                final SqlIdentifier tableArg = explicitTableArgs.get(i);
+                if (tableArg != null) {
+                    final SqlNode opReplacement = new ExplicitTableSqlSelect(tableArg, descriptors);
+                    if (call.operand(i).getKind() == SqlKind.ARGUMENT_ASSIGNMENT) {
+                        // for TUMBLE(DATA => TABLE t3, ...)
+                        final SqlCall assignment = call.operand(i);
+                        assignment.setOperand(0, opReplacement);
+                    } else {
+                        // for TUMBLE(TABLE t3, ...)
+                        call.setOperand(i, opReplacement);
+                    }
+                }
+                // for TUMBLE([DATA =>] SELECT ..., ...)
+            }
+        }
+
+        return rewritten;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Column expansion
+    // --------------------------------------------------------------------------------------------
+
+    /**
+     * A special {@link SqlSelect} to capture the origin of a {@link SqlKind#EXPLICIT_TABLE} within
+     * TVF operands.
+     */
+    private static class ExplicitTableSqlSelect extends SqlSelect {
+
+        private final List<SqlIdentifier> descriptors;
+
+        public ExplicitTableSqlSelect(SqlIdentifier table, List<SqlIdentifier> descriptors) {
+            super(
+                    SqlParserPos.ZERO,
+                    null,
+                    SqlNodeList.of(SqlIdentifier.star(SqlParserPos.ZERO)),
+                    table,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            this.descriptors = descriptors;
+        }
+    }
+
+    /**
+     * Returns whether the given column has been declared in a {@link SqlKind#DESCRIPTOR} next to a
+     * {@link SqlKind#EXPLICIT_TABLE} within TVF operands.
+     */
+    private static boolean declaredDescriptorColumn(SelectScope scope, Column column) {
+        if (!(scope.getNode() instanceof ExplicitTableSqlSelect)) {
+            return false;
+        }
+        final ExplicitTableSqlSelect select = (ExplicitTableSqlSelect) scope.getNode();
+        return select.descriptors.stream()
+                .map(SqlIdentifier::getSimple)
+                .anyMatch(id -> id.equals(column.getName()));
+    }
+
+    /**
+     * Returns all {@link SqlKind#EXPLICIT_TABLE} operands within TVF operands. A list entry is
+     * {@code null} if the operand is not an {@link SqlKind#EXPLICIT_TABLE}.
+     */
+    private static List<SqlIdentifier> getExplicitTableOperands(SqlNode node) {
+        if (!(node instanceof SqlBasicCall)) {
+            return null;
+        }
+        final SqlBasicCall call = (SqlBasicCall) node;
+
+        if (!(call.getOperator() instanceof SqlFunction)) {
+            return null;
+        }
+        final SqlFunction function = (SqlFunction) call.getOperator();
+
+        if (!isTableFunction(function)) {
+            return null;
+        }
+
+        return call.getOperandList().stream()
+                .map(FlinkCalciteSqlValidator::extractExplicitTable)
+                .collect(Collectors.toList());
+    }
+
+    private static @Nullable SqlIdentifier extractExplicitTable(SqlNode op) {
+        if (op.getKind() == SqlKind.EXPLICIT_TABLE) {
+            final SqlBasicCall opCall = (SqlBasicCall) op;
+            if (opCall.operandCount() == 1 && opCall.operand(0) instanceof SqlIdentifier) {
+                // for TUMBLE(TABLE t3, ...)
+                return opCall.operand(0);
+            }
+        } else if (op.getKind() == SqlKind.ARGUMENT_ASSIGNMENT) {
+            // for TUMBLE(DATA => TABLE t3, ...)
+            final SqlBasicCall opCall = (SqlBasicCall) op;
+            return extractExplicitTable(opCall.operand(0));
+        }
+        return null;
+    }
+
+    private static Stream<SqlIdentifier> extractDescriptors(SqlNode op) {
+        if (op.getKind() == SqlKind.DESCRIPTOR) {
+            // for TUMBLE(..., DESCRIPTOR(col), ...)
+            final SqlBasicCall opCall = (SqlBasicCall) op;
+            return opCall.getOperandList().stream()
+                    .filter(SqlIdentifier.class::isInstance)
+                    .map(SqlIdentifier.class::cast);
+        } else if (op.getKind() == SqlKind.ARGUMENT_ASSIGNMENT) {
+            // for TUMBLE(..., TIMECOL => DESCRIPTOR(col), ...)
+            final SqlBasicCall opCall = (SqlBasicCall) op;
+            return extractDescriptors(opCall.operand(0));
+        }
+        return Stream.empty();
+    }
+
+    private static boolean isTableFunction(SqlFunction function) {
+        return function instanceof SqlTableFunction
+                || function.getFunctionType() == SqlFunctionCategory.USER_DEFINED_TABLE_FUNCTION;
     }
 }

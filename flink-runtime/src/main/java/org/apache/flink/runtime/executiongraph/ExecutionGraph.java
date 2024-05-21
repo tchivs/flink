@@ -91,10 +91,14 @@ public interface ExecutionGraph extends AccessExecutionGraph {
             CheckpointStorage checkpointStorage,
             CheckpointStatsTracker statsTracker,
             CheckpointsCleaner checkpointsCleaner,
-            String changelogStorage);
+            String changelogStorage,
+            boolean storeSavepointsInCheckpointStore);
 
     @Nullable
     CheckpointCoordinator getCheckpointCoordinator();
+
+    @Nullable
+    CheckpointStatsTracker getCheckpointStatsTracker();
 
     KvStateLocationRegistry getKvStateLocationRegistry();
 

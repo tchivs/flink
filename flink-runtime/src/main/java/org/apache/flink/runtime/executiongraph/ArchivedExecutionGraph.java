@@ -373,6 +373,7 @@ public class ArchivedExecutionGraph implements AccessExecutionGraph, Serializabl
                 jobStatus,
                 Collections.emptyMap(),
                 Collections.emptyList(),
+                "{}",
                 throwable,
                 checkpointingSettings,
                 initializationTimestamp);
@@ -383,6 +384,7 @@ public class ArchivedExecutionGraph implements AccessExecutionGraph, Serializabl
             String jobName,
             JobStatus jobStatus,
             @Nullable Throwable throwable,
+            String jsonPlan,
             @Nullable JobCheckpointingSettings checkpointingSettings,
             long initializationTimestamp,
             Iterable<JobVertex> jobVertices,
@@ -412,6 +414,7 @@ public class ArchivedExecutionGraph implements AccessExecutionGraph, Serializabl
                 jobStatus,
                 archivedJobVertices,
                 archivedVerticesInCreationOrder,
+                jsonPlan,
                 throwable,
                 checkpointingSettings,
                 initializationTimestamp);
@@ -423,6 +426,7 @@ public class ArchivedExecutionGraph implements AccessExecutionGraph, Serializabl
             JobStatus jobStatus,
             Map<JobVertexID, ArchivedExecutionJobVertex> archivedTasks,
             List<ArchivedExecutionJobVertex> archivedVerticesInCreationOrder,
+            String jsonPlan,
             @Nullable Throwable throwable,
             @Nullable JobCheckpointingSettings checkpointingSettings,
             long initializationTimestamp) {
@@ -433,8 +437,6 @@ public class ArchivedExecutionGraph implements AccessExecutionGraph, Serializabl
 
         final long[] timestamps = new long[JobStatus.values().length];
         timestamps[JobStatus.INITIALIZING.ordinal()] = initializationTimestamp;
-
-        String jsonPlan = "{}";
 
         ErrorInfo failureInfo = null;
         if (throwable != null) {

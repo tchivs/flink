@@ -1,0 +1,24 @@
+name: flink
+lang: java
+lang_version: 11
+git:
+  enable: true
+github:
+  enable: true
+contact:
+  name: flink
+  jira_project_key: FLINKCC
+  slack_team_channel: flink-oncall
+make:
+  enable: true
+  enable_updates: true
+grpc:
+  enable: true
+code_artifact:
+  enable: true
+  package_paths:
+    - maven-snapshots/maven/io.confluent.flink/flink
+    - maven-snapshots/maven/io.confluent.flink/cc-flink-*
+    - maven-snapshots/maven/org.apache.flink/flink-*
+    - maven-snapshots/maven/io.confluent.flink/flink-*
+    - maven-snapshots/maven/org.apache.flink/fink-migration-test-utils

@@ -95,7 +95,9 @@ public class RocksDBConfigurableOptions implements Serializable {
                             "The directory for RocksDB's information logging files. "
                                     + "If empty (Flink default setting), log files will be in the same directory as the Flink log. "
                                     + "If non-empty, this directory will be used and the data directory's absolute path will be used as the prefix of the log file name. "
-                                    + "If setting this option as a non-existing location, e.g '/dev/null', RocksDB will then create the log under its own database folder as before.");
+                                    // todo: consider restoring rocksdb-6 behavior to place the logs
+                                    // in rocksdb folder if the folder doesn't exist
+                                    + "The directory must exist");
 
     public static final ConfigOption<InfoLogLevel> LOG_LEVEL =
             key("state.backend.rocksdb.log.level")
@@ -119,6 +121,17 @@ public class RocksDBConfigurableOptions implements Serializable {
                                     .linebreak()
                                     .text(
                                             "There is no need to modify the RocksDB log level, unless for troubleshooting RocksDB.")
+                                    .build());
+
+    public static final ConfigOption<Boolean> BRIDGE_LOGGING =
+            key("state.backend.rocksdb.log.bridging")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Whether to use the same logging for RocksDB as for Flink (i.e. sl4j frontend). Overrides %s but preserves %s.",
+                                            code(LOG_DIR.key()), code(LOG_LEVEL.key()))
                                     .build());
 
     // --------------------------------------------------------------------------
@@ -266,6 +279,28 @@ public class RocksDBConfigurableOptions implements Serializable {
                                     + "has a chance to be an initial handle. "
                                     + "The default value is 0.0, there is always a handle will be selected for initialization. ");
 
+    public static final ConfigOption<Boolean> USE_INGEST_DB_RESTORE_MODE =
+            key("state.backend.rocksdb.use-ingest-db-restore-mode")
+                    .booleanType()
+                    .defaultValue(Boolean.FALSE)
+                    .withDescription(
+                            "A recovery mode that directly clips and ingests multiple DBs during state recovery if the keys"
+                                    + " in the SST files does not exceed the declared key-group range.");
+
+    public static final ConfigOption<Boolean> INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE =
+            key("state.backend.rocksdb.incremental-restore-async-compact-after-rescale")
+                    .booleanType()
+                    .defaultValue(Boolean.FALSE)
+                    .withDescription(
+                            "If true, an async compaction of RocksDB is started after every restore after which we detect keys (including tombstones) in the database that are outside the key-groups range of the backend.");
+
+    public static final ConfigOption<Boolean> USE_DELETE_FILES_IN_RANGE_DURING_RESCALING =
+            key("state.backend.rocksdb.rescaling.use-delete-files-in-range")
+                    .booleanType()
+                    .defaultValue(Boolean.FALSE)
+                    .withDescription(
+                            "If true, during rescaling, the deleteFilesInRange API will be invoked to clean up the useless files so that local disk space can be reclaimed more promptly.");
+
     static final ConfigOption<?>[] CANDIDATE_CONFIGS =
             new ConfigOption<?>[] {
                 // configurable DBOptions
@@ -290,7 +325,9 @@ public class RocksDBConfigurableOptions implements Serializable {
                 USE_BLOOM_FILTER,
                 BLOOM_FILTER_BITS_PER_KEY,
                 BLOOM_FILTER_BLOCK_BASED_MODE,
-                RESTORE_OVERLAP_FRACTION_THRESHOLD
+                RESTORE_OVERLAP_FRACTION_THRESHOLD,
+                USE_INGEST_DB_RESTORE_MODE,
+                INCREMENTAL_RESTORE_ASYNC_COMPACT_AFTER_RESCALE
             };
 
     private static final Set<ConfigOption<?>> POSITIVE_INT_CONFIG_SET =

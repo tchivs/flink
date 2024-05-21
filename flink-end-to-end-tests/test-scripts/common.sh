@@ -281,20 +281,12 @@ function wait_rest_endpoint_up {
   exit 1
 }
 
-function relocate_rocksdb_logs {
-  # After FLINK-24785, RocksDB's log would be created under Flink's log directory by default,
-  # this would make e2e tests' artifacts containing too many log files.
-  # As RocksDB's log would not help much in e2e tests, move the location back to its own folder.
-  set_config_key "state.backend.rocksdb.log.dir" "/dev/null"
-}
-
 function wait_dispatcher_running {
   local query_url="${REST_PROTOCOL}://${NODENAME}:8081/taskmanagers"
   wait_rest_endpoint_up "${query_url}" "Dispatcher" "\{\"taskmanagers\":\[.+\]\}"
 }
 
 function start_cluster {
-  relocate_rocksdb_logs
   "$FLINK_DIR"/bin/start-cluster.sh
   wait_dispatcher_running
 }
@@ -723,9 +715,9 @@ function get_num_metric_samples {
 
 function wait_oper_metric_num_in_records {
     OPERATOR=$1
-    MAX_NUM_METRICS="${2:-200}"
+    MAX_NUM_RECORDS="${2:-200}"
     JOB_NAME="${3:-General purpose test job}"
-    NUM_METRICS=$(get_num_metric_samples ${OPERATOR} '${JOB_NAME}')
+    NUM_METRICS=$(get_num_metric_samples ${OPERATOR} "${JOB_NAME}")
     OLD_NUM_METRICS=${4:-${NUM_METRICS}}
     local timeout="${5:-600}"
     local i=0
@@ -740,12 +732,12 @@ function wait_oper_metric_num_in_records {
         NUM_RECORDS=0
       fi
 
-      if (( $NUM_RECORDS < $MAX_NUM_METRICS )); then
-        echo "Waiting for job to process up to ${MAX_NUM_METRICS} records, current progress: ${NUM_RECORDS} records ..."
+      if (( $NUM_RECORDS < $MAX_NUM_RECORDS )); then
+        echo "Waiting for job to process up to ${MAX_NUM_RECORDS} records, current progress: ${NUM_RECORDS} records ..."
         sleep 1
         ((i++))
         if ((i > timeout)); then
-            echo "A timeout occurred waiting for job to process up to ${MAX_NUM_METRICS} records"
+            echo "A timeout occurred waiting for job to process up to ${MAX_NUM_RECORDS} records"
             exit 1
         fi
       else
