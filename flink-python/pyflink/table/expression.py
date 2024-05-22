@@ -1584,6 +1584,17 @@ class Expression(Generic[T]):
         else:
             return _ternary_op("array_join")(self, delimiter, null_replacement)
 
+    def split(self, delimiter) -> 'Expression':
+        """
+        Returns an array of substrings by splitting the input string based on the given delimiter.
+        If the delimiter is not found in the string, the original string is returned as the only
+        element in the array. If the delimiter is empty, every character in the string is split.
+        If the string or delimiter is null, a null value is returned. If the delimiter is found a
+        t the beginning or end of the string, or there are contiguous delimiters, then an empty
+        string is added to the array.
+        """
+        return _binary_op("split")(self, delimiter)
+
     @property
     def map_keys(self) -> 'Expression':
         """
