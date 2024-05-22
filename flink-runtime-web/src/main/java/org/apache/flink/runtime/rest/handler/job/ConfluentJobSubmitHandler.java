@@ -26,6 +26,7 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.TemporaryClassLoaderContext;
 import org.apache.flink.util.concurrent.FutureUtils;
+import org.apache.flink.util.function.BiFunctionWithException;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
@@ -38,7 +39,6 @@ import javax.annotation.Nullable;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +62,8 @@ public final class ConfluentJobSubmitHandler
 
     private final Configuration configuration;
     private final Executor executor;
-    private final JobGraphGenerator jobGraphGenerator;
+    private final BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
+            jobGraphGenerator;
     private final Function<Throwable, RestHandlerException> exceptionClassifier;
 
     private final Semaphore inProgressRequests;
@@ -92,7 +93,8 @@ public final class ConfluentJobSubmitHandler
             Map<String, String> headers,
             Configuration configuration,
             Executor executor,
-            JobGraphGenerator jobGraphGenerator,
+            BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
+                    jobGraphGenerator,
             Function<Throwable, RestHandlerException> exceptionClassifier) {
         super(leaderRetriever, timeout, headers, ConfluentJobSubmitHeaders.getInstance());
         this.configuration = configuration;
@@ -116,7 +118,7 @@ public final class ConfluentJobSubmitHandler
 
         try {
             generateJobGraph(
-                    Collections.singletonList(ResourceUtils.loadResource("/preload_plan.json")),
+                    Collections.singleton(ResourceUtils.loadResource("/preload_plan.json")),
                     Collections.emptyMap());
         } catch (Throwable e) {
             LOG.warn("Preloading failed with an exception.", e);
@@ -252,13 +254,7 @@ public final class ConfluentJobSubmitHandler
             Collection<String> arguments, Map<String, String> generatorConfiguration)
             throws Exception {
         try (TemporaryClassLoaderContext ignored = TemporaryClassLoaderContext.of(classLoader)) {
-            final Iterator it = arguments.iterator();
-
-            final String compiledPlan = (String) it.next();
-            final String tableOptionsOverrides = (arguments.size() > 1) ? (String) it.next() : "";
-
-            return jobGraphGenerator.generateJobGraph(
-                    compiledPlan, tableOptionsOverrides, generatorConfiguration);
+            return jobGraphGenerator.apply(arguments.iterator().next(), generatorConfiguration);
         }
     }
 
@@ -272,12 +268,5 @@ public final class ConfluentJobSubmitHandler
         if (savepointPath != null) {
             jobGraph.setSavepointRestoreSettings(SavepointRestoreSettings.forPath(savepointPath));
         }
-    }
-
-    /** A function that generates a {@link JobGraph} from a compiled plan. */
-    interface JobGraphGenerator {
-        JobGraph generateJobGraph(
-                String compiledPlan, String tableOptionsOverrides, Map<String, String> allOptions)
-                throws Exception;
     }
 }

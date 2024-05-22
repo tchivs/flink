@@ -25,6 +25,7 @@ import org.apache.flink.testutils.executor.TestExecutorExtension;
 import org.apache.flink.testutils.logging.LoggerAuditingExtension;
 import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.concurrent.FutureUtils;
+import org.apache.flink.util.function.BiFunctionWithException;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
@@ -326,7 +327,7 @@ class ConfluentJobSubmitHandlerTest {
 
         testErrorHandling(
                 createHandler(
-                        (i1, i2, i3) -> {
+                        (i1, i2) -> {
                             ConfluentJobSubmitHandler.LOG.error("generation error");
                             throw generationFailure;
                         },
@@ -359,7 +360,7 @@ class ConfluentJobSubmitHandlerTest {
 
         testErrorHandling(
                 createHandler(
-                        (i1, i2, i3) -> {
+                        (i1, i2) -> {
                             throw generationFailure;
                         },
                         e -> {
@@ -459,7 +460,8 @@ class ConfluentJobSubmitHandlerTest {
     }
 
     private static ConfluentJobSubmitHandler createHandler(
-            ConfluentJobSubmitHandler.JobGraphGenerator jobGraphGenerator,
+            BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
+                    jobGraphGenerator,
             Function<Throwable, RestHandlerException> exceptionClassifier) {
         return new ConfluentJobSubmitHandler(
                 CompletableFuture::new,

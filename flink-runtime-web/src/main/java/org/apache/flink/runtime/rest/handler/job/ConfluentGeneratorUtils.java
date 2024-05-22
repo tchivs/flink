@@ -18,10 +18,7 @@ import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.delegation.InternalPlan;
 import org.apache.flink.table.planner.delegation.DefaultExecutor;
 import org.apache.flink.table.planner.delegation.PlannerBase;
-import org.apache.flink.table.planner.plan.ExecNodeGraphInternalPlan;
-import org.apache.flink.table.planner.plan.nodes.exec.serde.JsonSerdeUtil;
 
-import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
 import io.confluent.flink.table.service.ServiceTasks;
@@ -37,8 +34,7 @@ import static io.confluent.flink.table.service.ServiceTasksOptions.PRIVATE_USER_
 @Confluent
 class ConfluentGeneratorUtils {
 
-    static JobGraph generateJobGraph(
-            String compiledPlan, String tableOptionsOverrides, Map<String, String> allOptions)
+    static JobGraph generateJobGraph(String compiledPlan, Map<String, String> allOptions)
             throws Exception {
         final Configuration allConfig = Configuration.fromMap(allOptions);
         final ClassLoader loader = ConfluentJobSubmitHandler.class.getClassLoader();
@@ -77,15 +73,6 @@ class ConfluentGeneratorUtils {
                 new DefaultExecutor(streamExecutionEnvironment);
         final PlanReference planReference = PlanReference.fromJsonString(compiledPlan);
         final InternalPlan plan = tableEnvironment.getPlanner().loadPlan(planReference);
-
-        // Apply table options overrides to the plan if present.
-        if (!Strings.isNullOrEmpty(tableOptionsOverrides)) {
-            final Map<String, Map<String, String>> optionsOverrides =
-                    JsonSerdeUtil.createObjectReader(planner.createSerdeContext())
-                            .readValue(tableOptionsOverrides, Map.class);
-
-            PlanOverrides.updateTableOptions((ExecNodeGraphInternalPlan) plan, optionsOverrides);
-        }
 
         final List<Transformation<?>> transformations = planner.translatePlan(plan);
         final Pipeline pipeline = execEnv.createPipeline(transformations, allConfig, null);
