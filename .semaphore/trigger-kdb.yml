@@ -8,8 +8,6 @@ global_job_config:
   env_vars:
     - name: CTS_SEMAPHORE_ID
       value: 08033a0d-285d-44a2-82c3-71fb11861ccf
-    - name: CTS_BRANCH
-      value: master
 
 blocks:
   - name: trigger kdb
@@ -21,4 +19,5 @@ blocks:
           commands:
             - . vault-setup
             - . vault-sem-get-secret onprem-prod-semaphorebot-api-token
-            - 'curl --fail -i -H "Authorization: Token $SEMAPHORE_API_TOKEN" -d "project_id=$CTS_SEMAPHORE_ID&reference=refs/heads/$CTS_BRANCH" -X POST  "https://semaphore.ci.confluent.io/api/v1alpha/plumber-workflows"'
+            - 'curl --fail -i -H "Authorization: Token $SEMAPHORE_API_TOKEN" -d "project_id=$CTS_SEMAPHORE_ID&reference=refs/heads/master" -X POST  "https://semaphore.ci.confluent.io/api/v1alpha/plumber-workflows"'
+            - 'curl --fail -i -H "Authorization: Token $SEMAPHORE_API_TOKEN" -d "project_id=$CTS_SEMAPHORE_ID&reference=refs/heads/tmp-cts-ea&pipeline-file=.semaphore/dependency-bump.yml" -X POST  "https://semaphore.ci.confluent.io/api/v1alpha/plumber-workflows"'
