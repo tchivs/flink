@@ -356,6 +356,7 @@ public class CoreProxyModuleTest {
                     "SINGLE_VALUE",
                     "SINH",
                     "SOURCE_WATERMARK",
+                    "SPLIT",
                     "SPLIT_INDEX",
                     "SQRT",
                     "STDDEV",

@@ -228,6 +228,7 @@ public class CoreProxyModule implements Module {
                         "SIN",
                         "SINH",
                         "SOURCE_WATERMARK",
+                        "SPLIT",
                         "SPLIT_INDEX",
                         "SQRT",
                         "STDDEV",
