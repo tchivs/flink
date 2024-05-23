@@ -4,6 +4,8 @@
 
 package io.confluent.flink.udf.adapter.api;
 
+import org.apache.flink.configuration.Configuration;
+
 import com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -57,10 +59,12 @@ public interface UdfSerialization {
      * TM to the remote UDF service when creating a function instance.
      *
      * @param spec the spec to serialize.
+     * @param configuration the configuration for the shim
      * @return the serialized spec.
      * @throws IOException on serialization error.
      */
-    ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec) throws IOException;
+    ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec, Configuration configuration)
+            throws IOException;
 
     /** Called when the object is done being used. */
     void close();

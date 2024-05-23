@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter.api;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.configuration.Configuration;
 
 import com.google.protobuf.ByteString;
 
@@ -56,9 +57,10 @@ public class ThreadLocalRemoteUdfSerialization implements UdfSerialization {
     }
 
     @Override
-    public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec) throws IOException {
+    public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec, Configuration configuration)
+            throws IOException {
         RemoteUdfSerialization serialization = getUdfSerialization();
-        return createCopy(serialization.serializeRemoteUdfSpec(spec));
+        return createCopy(serialization.serializeRemoteUdfSpec(spec, configuration));
     }
 
     @Override

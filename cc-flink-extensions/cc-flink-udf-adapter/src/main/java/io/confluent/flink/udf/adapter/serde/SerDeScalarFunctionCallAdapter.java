@@ -13,6 +13,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import io.confluent.flink.udf.adapter.ScalarFunctionInstanceCallAdapter;
+import io.confluent.flink.udf.adapter.api.OpenPayload;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.flink.udf.adapter.codegen.ScalarFunctionAdapterGenerator;
 
@@ -45,9 +46,8 @@ public class SerDeScalarFunctionCallAdapter {
 
     public static SerDeScalarFunctionCallAdapter create(
             String instanceId, byte[] openPayload, ClassLoader classLoader) throws Exception {
-
-        DataInputDeserializer in = new DataInputDeserializer(openPayload);
-        RemoteUdfSpec remoteUdfSpec = RemoteUdfSpec.deserialize(in, classLoader);
+        OpenPayload open = OpenPayload.open(openPayload, classLoader);
+        RemoteUdfSpec remoteUdfSpec = open.getRemoteUdfSpec();
 
         LogicalType returnLogicalType = remoteUdfSpec.getReturnType().getLogicalType();
         List<LogicalType> argumentLogicalTypes =

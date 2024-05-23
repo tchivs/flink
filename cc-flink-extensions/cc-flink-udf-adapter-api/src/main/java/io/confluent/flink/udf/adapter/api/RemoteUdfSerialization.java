@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter.api;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.util.Preconditions;
@@ -109,9 +110,11 @@ public class RemoteUdfSerialization implements UdfSerialization {
      * @throws IOException on serialization error.
      */
     @Override
-    public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec) throws IOException {
+    public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec, Configuration configuration)
+            throws IOException {
         dataOutput.clear();
         spec.serialize(dataOutput);
+        FlinkConfiguration.serialize(configuration, dataOutput);
         return outputToByteString();
     }
 

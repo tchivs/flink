@@ -26,7 +26,9 @@ import io.confluent.flink.udf.adapter.api.UdfSerialization;
 
 import java.io.IOException;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER_RETRY_BACKOFF_MS;
@@ -34,6 +36,7 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUE
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
+import static io.confluent.flink.udf.adapter.api.AdapterOptions.ADAPTER_PREFIX;
 
 /** Common utilities for the ApiServer. */
 public class ApiServerUtils {
@@ -75,9 +78,14 @@ public class ApiServerUtils {
         // Entrypoint must contain className, open and close Payloads
         ComputeV1EntryPoint udfTaskEntryPoint = new ComputeV1EntryPoint();
         udfTaskEntryPoint.setClassName("io.confluent.flink.udf.adapter.ScalarFunctionHandler");
+        Configuration configuration =
+                Configuration.fromMap(
+                        config.toMap().entrySet().stream()
+                                .filter(e -> e.getKey().startsWith(ADAPTER_PREFIX))
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
         udfTaskEntryPoint.setOpenPayload(
                 udfSerialization
-                        .serializeRemoteUdfSpec(remoteUdfSpec)
+                        .serializeRemoteUdfSpec(remoteUdfSpec, configuration)
                         .toByteArray()); // to be removed
         // Unused at the moment -- pass something until platform supports empty payloads
         udfTaskEntryPoint.setClosePayload(Base64.getEncoder().encode("bye".getBytes()));

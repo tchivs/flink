@@ -6,7 +6,6 @@ package io.confluent.flink.table.modules.remoteudf;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCacheImpl;
 import org.apache.flink.metrics.Counter;
@@ -34,6 +33,8 @@ import io.confluent.flink.table.modules.remoteudf.testcontainers.ApiServerContai
 import io.confluent.flink.table.modules.remoteudf.util.ApiServerContainerUtils;
 import io.confluent.flink.table.modules.remoteudf.util.TestUtils;
 import io.confluent.flink.table.modules.remoteudf.utils.NamesGenerator;
+import io.confluent.flink.udf.adapter.api.AdapterOptions;
+import io.confluent.flink.udf.adapter.api.OpenPayload;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.grpc.Metadata;
 import io.grpc.Server;
@@ -156,12 +157,16 @@ public class RemoteUdfIntegrationTest {
                             job.getMetadata().getName());
 
                     // Make sure metadata from Payload is properly propagated
-                    RemoteUdfSpec udfSpec =
-                            RemoteUdfSpec.deserialize(
-                                    new DataInputDeserializer(
-                                            udfTask.getSpec().getEntryPoint().getOpenPayload()),
+                    OpenPayload open =
+                            OpenPayload.open(
+                                    udfTask.getSpec().getEntryPoint().getOpenPayload(),
                                     Thread.currentThread().getContextClassLoader());
+                    RemoteUdfSpec udfSpec = open.getRemoteUdfSpec();
+                    Configuration configuration = open.getConfiguration();
                     testUdfGateway.registerUdfSpec(udfSpec);
+
+                    Assertions.assertEquals(
+                            123, configuration.get(AdapterOptions.ADAPTER_PARALLELISM));
 
                     // Set to Running to move to GW invocation
                     udfTask.getStatus().setPhase(ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING);
@@ -231,6 +236,7 @@ public class RemoteUdfIntegrationTest {
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
+        confMap.put(AdapterOptions.ADAPTER_PARALLELISM.key(), Integer.toString(123));
         final TableEnvironment tEnv =
                 jss
                         ? TestUtils.getJssTableEnvironment(
@@ -339,6 +345,7 @@ public class RemoteUdfIntegrationTest {
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
+        confMap.put(AdapterOptions.ADAPTER_PARALLELISM.key(), Integer.toString(123));
         final TableEnvironment tEnv =
                 TestUtils.getSqlServiceTableEnvironment(
                         TEST_ORG, TEST_ENV, confMap, testFunctionMeta, true, false);

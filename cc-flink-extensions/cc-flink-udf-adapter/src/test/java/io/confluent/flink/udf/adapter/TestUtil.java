@@ -4,14 +4,18 @@
 
 package io.confluent.flink.udf.adapter;
 
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.utils.DataTypeUtils;
 
 import com.google.protobuf.UnsafeByteOperations;
+import io.confluent.flink.udf.adapter.api.FlinkConfiguration;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.function.runtime.core.Context;
+import io.confluent.function.runtime.core.RequestInvocationException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,7 +34,8 @@ public class TestUtil {
             List<LogicalType> argTypes,
             String functionClass,
             boolean isDeterministic,
-            DataOutputSerializer out)
+            DataOutputSerializer out,
+            Configuration configuration)
             throws Exception {
         new RemoteUdfSpec(
                         organization,
@@ -44,6 +49,7 @@ public class TestUtil {
                                 .map(DataTypeUtils::toInternalDataType)
                                 .collect(Collectors.toList()))
                 .serialize(out);
+        FlinkConfiguration.serialize(configuration, out);
     }
 
     public static byte[] createSerializedOpenPayload(
@@ -54,7 +60,8 @@ public class TestUtil {
             LogicalType retType,
             List<LogicalType> argTypes,
             String functionClass,
-            boolean isDeterministic)
+            boolean isDeterministic,
+            Configuration configuration)
             throws Exception {
         DataOutputSerializer out = new DataOutputSerializer(512);
         writeSerializedOpenPayload(
@@ -66,7 +73,8 @@ public class TestUtil {
                 argTypes,
                 functionClass,
                 isDeterministic,
-                out);
+                out,
+                configuration);
         return out.getCopyOfBuffer();
     }
 
@@ -88,10 +96,13 @@ public class TestUtil {
                                 DUMMY_CONTEXT)));
     }
 
-    public static RemoteUdfSerialization createSerializers(ScalarFunctionHandler function) {
+    public static RemoteUdfSerialization createSerializers(ScalarFunctionHandler function)
+            throws RequestInvocationException {
         return new RemoteUdfSerialization(
-                function.getCallAdapter().getReturnValueSerializer(),
-                function.getCallAdapter().getArgumentSerializers());
+                function.getCallAdapter().getReturnValueSerializer().duplicate(),
+                function.getCallAdapter().getArgumentSerializers().stream()
+                        .map(TypeSerializer::duplicate)
+                        .collect(Collectors.toList()));
     }
 
     static class SimpleContext implements Context {

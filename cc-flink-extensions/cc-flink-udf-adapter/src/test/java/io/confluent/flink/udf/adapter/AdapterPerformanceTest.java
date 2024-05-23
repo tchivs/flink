@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
@@ -50,7 +51,8 @@ public class AdapterPerformanceTest {
                     argTypes,
                     functionClass,
                     true,
-                    out);
+                    out,
+                    new Configuration());
             byte[] openPayloadBytes = out.getCopyOfBuffer();
             final ScalarFunctionHandler handler = new ScalarFunctionHandler();
             handler.open(openPayloadBytes, TestUtil.DUMMY_CONTEXT);
@@ -68,6 +70,7 @@ public class AdapterPerformanceTest {
                 Object resultObject = retTypeSerializer.deserialize(in);
                 sum += (Integer) resultObject;
             }
+            handler.close(new byte[0], TestUtil.DUMMY_CONTEXT);
             System.out.println(System.currentTimeMillis() - t);
             System.out.println(sum);
         }
