@@ -34,6 +34,9 @@ public class MLEvaluationMetricsAccumulator {
             this.clusteringMetricsAccumulator = new ClusteringMetricsAccumulator();
         } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
             this.textGenerationMetricsAccumulator = new TextGenerationMetricsAccumulator();
+        } else if (modelTask.equals(MLModelCommonConstants.ModelTask.EMBEDDING)) {
+            throw new IllegalArgumentException(
+                    "Evaluation is not currently supported for Embedding models.");
         } else {
             throw new IllegalArgumentException("Model task not supported.");
         }

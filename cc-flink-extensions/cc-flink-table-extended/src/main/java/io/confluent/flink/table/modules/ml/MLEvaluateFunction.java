@@ -179,6 +179,10 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                                         DataTypes.ROW(
                                                 DataTypes.FIELD(
                                                         "MEAN_SIMILARITY", DataTypes.DOUBLE())));
+                            } else if (modelTask.equals(
+                                    MLModelCommonConstants.ModelTask.EMBEDDING)) {
+                                throw new FlinkRuntimeException(
+                                        "Evaluation is not currently supported for Embedding models.");
                             } else {
                                 throw new FlinkRuntimeException(
                                         "unsupported model task type: " + modelTask);
@@ -260,6 +264,9 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                 } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
                     acc.count++;
                     // TODO: Matrix to implement text generation evaluation metrics.
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.EMBEDDING)) {
+                    throw new FlinkRuntimeException(
+                            "Evaluation is not currently supported for Embedding models.");
                 } else {
                     throw new FlinkRuntimeException("unsupported model task type: " + modelTask);
                 }
@@ -321,6 +328,9 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
                 } else if (modelTask.equals(MLModelCommonConstants.ModelTask.TEXT_GENERATION)) {
                     acc.count--;
                     // TODO: Matrix to implement text generation evaluation metrics.
+                } else if (modelTask.equals(MLModelCommonConstants.ModelTask.EMBEDDING)) {
+                    throw new FlinkRuntimeException(
+                            "Evaluation is not currently supported for Embedding models.");
                 } else {
                     throw new FlinkRuntimeException("unsupported model task type: " + modelTask);
                 }

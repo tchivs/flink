@@ -88,7 +88,7 @@ public class ModelOptionsUtilsTest {
                 .satisfies(
                         FlinkAssertions.anyCauseMatches(
                                 ValidationException.class,
-                                "Task value 'INVALID' is not supported. Supported values are: [REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION]"));
+                                "Task value 'INVALID' is not supported. Supported values are: [REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION, EMBEDDING]"));
     }
 
     @ParameterizedTest
@@ -124,7 +124,7 @@ public class ModelOptionsUtilsTest {
                                         Collections.singletonMap("task", "somename")))
                 .isInstanceOf(ValidationException.class)
                 .hasMessage(
-                        "Task value 'SOMENAME' is not supported. Supported values are: [REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION]");
+                        "Task value 'SOMENAME' is not supported. Supported values are: [REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION, EMBEDDING]");
     }
 
     @NotNull

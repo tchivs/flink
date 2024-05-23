@@ -56,11 +56,12 @@ public class MLModelCommonConstants {
         NATIVE
     }
 
-    /** Supported Model Task: REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION. */
+    /** Supported Model Task: REGRESSION, CLASSIFICATION, CLUSTERING, TEXT_GENERATION, EMBEDDING. */
     public enum ModelTask {
         REGRESSION,
         CLASSIFICATION,
         CLUSTERING,
-        TEXT_GENERATION
+        TEXT_GENERATION,
+        EMBEDDING
     }
 }
