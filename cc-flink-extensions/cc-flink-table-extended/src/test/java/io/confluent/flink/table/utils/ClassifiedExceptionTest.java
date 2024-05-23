@@ -257,6 +257,12 @@ public class ClassifiedExceptionTest {
                                         + "Using current catalog '' and current database ''."),
 
                 // ---
+                TestSpec.test("alter table that does not exist")
+                        .executeSql("ALTER TABLE `not_exist` ADD (b INT)")
+                        .expectExactUserError(
+                                "Table `default_catalog`.`default_database`.`not_exist` does not exist or you do not have permission to access it."),
+
+                // ---
                 TestSpec.test("alter a table when no database is set")
                         .setupTableEnvironment(env -> env.useDatabase(null))
                         .executeSql("ALTER TABLE t ADD (b INT)")

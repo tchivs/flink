@@ -472,6 +472,22 @@ public final class ClassifiedException {
                                             .orElse(""));
                         }));
 
+        putClassifiedException(
+                CodeLocation.inMethod(
+                        SqlNodeToOperationConversion.class,
+                        // needs to match on the method, because otherwise it catches
+                        // the unsupportedOperations, e.g. for cases when one runs ANALYZE `invalid`
+                        "convertAlterTable",
+                        ValidationException.class),
+                Handler.rewriteMessage(
+                        // The message is "Table %s doesn't exist or is a temporary table."
+                        "doesn't exist or is a temporary table.",
+                        ExceptionKind.USER,
+                        (msg) ->
+                                msg.replace(
+                                        "doesn't exist or is a temporary table.",
+                                        "does not exist or you do not have permission to access it.")));
+
         // Don't expose internal errors during failed validation
         putClassifiedException(
                 CodeLocation.inClass(FlinkPlannerImpl.class, ValidationException.class),
