@@ -30,6 +30,7 @@ import org.apache.flink.util.AbstractID;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -145,11 +146,12 @@ public class TaskMetricGroup extends ComponentMetricGroup<TaskManagerJobMetricGr
     // ------------------------------------------------------------------------
 
     public InternalOperatorMetricGroup getOrAddOperator(String operatorName) {
-        return getOrAddOperator(OperatorID.fromJobVertexID(vertexId), operatorName);
+        return getOrAddOperator(
+                OperatorID.fromJobVertexID(vertexId), operatorName, Collections.emptyMap());
     }
 
     public InternalOperatorMetricGroup getOrAddOperator(
-            OperatorID operatorID, String operatorName) {
+            OperatorID operatorID, String operatorName, Map<String, String> additionalVariables) {
         final String truncatedOperatorName;
         if (operatorName != null && operatorName.length() > METRICS_OPERATOR_NAME_MAX_LENGTH) {
             LOG.warn(
@@ -170,7 +172,11 @@ public class TaskMetricGroup extends ComponentMetricGroup<TaskManagerJobMetricGr
                     key,
                     operator ->
                             new InternalOperatorMetricGroup(
-                                    this.registry, this, operatorID, truncatedOperatorName));
+                                    this.registry,
+                                    this,
+                                    operatorID,
+                                    truncatedOperatorName,
+                                    additionalVariables));
         }
     }
 

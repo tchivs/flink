@@ -243,6 +243,22 @@ class DataStream[T](stream: JavaStream[T]) {
       this
   }
 
+  /**
+   * Adds additional variables that will be added to scope of the metrics reported from this
+   * operator.
+   *
+   * @param key
+   * @param value
+   */
+  @PublicEvolving
+  def addMetricVariable(key: String, value: String): DataStream[T] = javaStream match {
+    case stream: SingleOutputStreamOperator[T] =>
+      asScalaStream(stream.addMetricVariable(key, value))
+    case _ =>
+      throw new UnsupportedOperationException("Only supported for operators.")
+      this
+  }
+
   @PublicEvolving
   def getSideOutput[X: TypeInformation](tag: OutputTag[X]): DataStream[X] = javaStream match {
     case stream: SingleOutputStreamOperator[X] =>

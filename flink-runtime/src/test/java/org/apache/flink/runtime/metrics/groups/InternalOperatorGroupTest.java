@@ -36,9 +36,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionAttemptId;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -71,8 +75,11 @@ public class InternalOperatorGroupTest extends TestLogger {
         TaskMetricGroup taskGroup =
                 tmGroup.addJob(new JobID(), "myJobName")
                         .addTask(createExecutionAttemptId(new JobVertexID(), 11, 0), "aTaskName");
+        Map<String, String> additionalVariables = new HashMap<>();
+        additionalVariables.put("foo", "42");
+        additionalVariables.put("bar", "44");
         InternalOperatorMetricGroup opGroup =
-                taskGroup.getOrAddOperator(new OperatorID(), "myOpName");
+                taskGroup.getOrAddOperator(new OperatorID(), "myOpName", additionalVariables);
 
         assertArrayEquals(
                 new String[] {
@@ -83,6 +90,8 @@ public class InternalOperatorGroupTest extends TestLogger {
         assertEquals(
                 "theHostName.taskmanager.test-tm-id.myJobName.myOpName.11.name",
                 opGroup.getMetricIdentifier("name"));
+
+        assertThat(opGroup.getAllVariables()).contains(entry("foo", "42"), entry("bar", "44"));
     }
 
     @Test
@@ -105,7 +114,7 @@ public class InternalOperatorGroupTest extends TestLogger {
                                     registry, "theHostName", new ResourceID(tmID))
                             .addJob(jid, "myJobName")
                             .addTask(createExecutionAttemptId(vertexId, 13, 2), "aTaskname")
-                            .getOrAddOperator(operatorID, operatorName);
+                            .getOrAddOperator(operatorID, operatorName, Collections.emptyMap());
 
             assertArrayEquals(
                     new String[] {
@@ -136,7 +145,7 @@ public class InternalOperatorGroupTest extends TestLogger {
                 tmGroup.addJob(new JobID(), "myJobName")
                         .addTask(createExecutionAttemptId(new JobVertexID(), 11, 0), "aTaskName");
         InternalOperatorMetricGroup opGroup =
-                taskGroup.getOrAddOperator(new OperatorID(), "myOpName");
+                taskGroup.getOrAddOperator(new OperatorID(), "myOpName", Collections.emptyMap());
 
         assertNotNull(opGroup.getIOMetricGroup());
         assertNotNull(opGroup.getIOMetricGroup().getNumRecordsInCounter());
@@ -155,7 +164,8 @@ public class InternalOperatorGroupTest extends TestLogger {
                         registry, "theHostName", new ResourceID("test-tm-id"));
 
         TaskMetricGroup taskGroup = tmGroup.addJob(jid, "myJobName").addTask(eid, "aTaskName");
-        InternalOperatorMetricGroup opGroup = taskGroup.getOrAddOperator(oid, "myOpName");
+        InternalOperatorMetricGroup opGroup =
+                taskGroup.getOrAddOperator(oid, "myOpName", Collections.emptyMap());
 
         Map<String, String> variables = opGroup.getAllVariables();
 
@@ -190,7 +200,8 @@ public class InternalOperatorGroupTest extends TestLogger {
                         registry, "host", new ResourceID("id"));
 
         TaskMetricGroup task = tm.addJob(jid, "jobname").addTask(eid, "taskName");
-        InternalOperatorMetricGroup operator = task.getOrAddOperator(oid, "operator");
+        InternalOperatorMetricGroup operator =
+                task.getOrAddOperator(oid, "operator", Collections.emptyMap());
 
         QueryScopeInfo.OperatorQueryScopeInfo info =
                 operator.createQueryServiceMetricInfo(new DummyCharacterFilter());

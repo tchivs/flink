@@ -28,6 +28,7 @@ import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -38,14 +39,15 @@ public class InternalOperatorMetricGroup extends ComponentMetricGroup<TaskMetric
         implements OperatorMetricGroup {
     private final String operatorName;
     private final OperatorID operatorID;
-
     private final InternalOperatorIOMetricGroup ioMetrics;
+    private final Map<String, String> additionalVariables;
 
     InternalOperatorMetricGroup(
             MetricRegistry registry,
             TaskMetricGroup parent,
             OperatorID operatorID,
-            String operatorName) {
+            String operatorName,
+            Map<String, String> additionalVariables) {
         super(
                 registry,
                 registry.getScopeFormats()
@@ -54,8 +56,16 @@ public class InternalOperatorMetricGroup extends ComponentMetricGroup<TaskMetric
                 parent);
         this.operatorID = operatorID;
         this.operatorName = operatorName;
+        this.additionalVariables = additionalVariables;
 
         ioMetrics = new InternalOperatorIOMetricGroup(this);
+    }
+
+    @Override
+    public Map<String, String> getAllVariables() {
+        HashMap<String, String> allVariables = new HashMap<>(super.getAllVariables());
+        allVariables.putAll(additionalVariables);
+        return allVariables;
     }
 
     // ------------------------------------------------------------------------

@@ -48,6 +48,7 @@ import static org.apache.flink.metrics.testutils.MetricAssertions.assertThatCoun
 import static org.apache.flink.metrics.testutils.MetricAssertions.assertThatGauge;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasSize;
 
 /** Tests whether all provided metrics of a {@link Sink} are of the expected values (FLIP-33). */
@@ -105,7 +106,8 @@ public class SinkMetricsITCase extends TestLogger {
                                 .setDefaultCommitter()
                                 .setWriter(new MetricWriter())
                                 .build())
-                .name(TEST_SINK_NAME);
+                .name(TEST_SINK_NAME)
+                .addMetricVariable("foo", "42");
         JobClient jobClient = env.executeAsync();
         final JobID jobId = jobClient.getJobID();
 
@@ -130,6 +132,7 @@ public class SinkMetricsITCase extends TestLogger {
 
         int subtaskWithMetrics = 0;
         for (OperatorMetricGroup group : groups) {
+            assertThat(group.getAllVariables(), hasEntry("foo", "42"));
             Map<String, Metric> metrics = reporter.getMetricsByGroup(group);
             // There are only 2 splits assigned; so two groups will not update metrics.
             if (group.getIOMetricGroup().getNumRecordsOutCounter().getCount() == 0) {

@@ -46,10 +46,13 @@ import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.TernaryBoolean;
 import org.apache.flink.util.concurrent.FutureUtils;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +111,7 @@ public class StreamConfig implements Serializable {
     private static final String CHECKPOINT_MODE = "checkpointMode";
 
     private static final String SAVEPOINT_DIR = "savepointdir";
+    private static final String ADDITIONAL_METRIC_VARIABLES = "additionalmetricvariables";
     private static final String CHECKPOINT_STORAGE = "checkpointstorage";
     private static final String STATE_BACKEND = "statebackend";
     private static final String ENABLE_CHANGE_LOG_STATE_BACKEND = "enablechangelog";
@@ -679,6 +683,28 @@ public class StreamConfig implements Serializable {
         }
     }
 
+    public void setAdditionalMetricVariables(
+            @Nullable Map<String, String> additionalMetricVariables) {
+        if (additionalMetricVariables != null) {
+            toBeSerializedConfigObjects.put(ADDITIONAL_METRIC_VARIABLES, additionalMetricVariables);
+        }
+    }
+
+    public Map<String, String> getAdditionalMetricVariables() {
+        try {
+            Map<String, String> additionalMetricVariables =
+                    InstantiationUtil.readObjectFromConfig(
+                            this.config,
+                            ADDITIONAL_METRIC_VARIABLES,
+                            this.getClass().getClassLoader());
+            return additionalMetricVariables == null
+                    ? Collections.emptyMap()
+                    : additionalMetricVariables;
+        } catch (Exception e) {
+            throw new StreamTaskException("Could not instantiate additional metric variables.", e);
+        }
+    }
+
     public void setCheckpointStorage(CheckpointStorage storage) {
         if (storage != null) {
             toBeSerializedConfigObjects.put(CHECKPOINT_STORAGE, storage);
@@ -902,9 +928,9 @@ public class StreamConfig implements Serializable {
         }
     }
 
-    public static boolean requiresSorting(StreamConfig.InputConfig inputConfig) {
-        return inputConfig instanceof StreamConfig.NetworkInputConfig
-                && ((StreamConfig.NetworkInputConfig) inputConfig).getInputRequirement()
-                        == StreamConfig.InputRequirement.SORTED;
+    public static boolean requiresSorting(InputConfig inputConfig) {
+        return inputConfig instanceof NetworkInputConfig
+                && ((NetworkInputConfig) inputConfig).getInputRequirement()
+                        == InputRequirement.SORTED;
     }
 }
