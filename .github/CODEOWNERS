@@ -7,6 +7,7 @@ cc-flink-extensions/cc-flink-schema-registry	@confluentinc/flink-sql
 flink-connectors/confluent-connector-kafka  @confluentinc/flink-storage
 
 # Matrix specific extension code
+cc-flink-extensions/cc-flink-ml-functions/	@confluentinc/matrix
 cc-flink-extensions/cc-flink-table-extended/src/main/java/io/confluent/flink/table/modules/ml/	@confluentinc/matrix
 cc-flink-extensions/cc-flink-table-extended/src/test/java/io/confluent/flink/table/modules/ml/	@confluentinc/matrix
 cc-flink-extensions/cc-flink-managed-table-validation/src/main/java/io/confluent/flink/table/modules/ml/ @confluentinc/matrix

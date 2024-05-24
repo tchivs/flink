@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 

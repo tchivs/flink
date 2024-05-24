@@ -7,6 +7,8 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.SimpleCounter;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogModel;
@@ -17,8 +19,10 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.google.auth.oauth2.GoogleCredentials;
-import io.confluent.flink.table.modules.TestUtils.IncrementingClock;
-import io.confluent.flink.table.modules.TestUtils.TrackingMetricsGroup;
+import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
+import io.confluent.flink.table.modules.ml.providers.VertexAIProvider;
+import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
+import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProviderImpl;
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 import okhttp3.Response;
 import org.assertj.core.api.Assertions;
@@ -58,6 +62,77 @@ public class MLModelRuntimeTest {
         @Override
         public String getAccessToken() {
             return "fake-token";
+        }
+    }
+
+    // TODO: Share the IncrementingClock and TrackingMetricsGroup from cc-flink-ml-functions module
+    /** Mock clock for testing. */
+    public static class IncrementingClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        public IncrementingClock(Instant fixedInstant, ZoneId zone) {
+            this.instant = fixedInstant;
+            this.zone = zone;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new IncrementingClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            instant = instant.plusMillis(1);
+            return instant;
+        }
+    }
+
+    /** Metrics Group to track metrics. */
+    public static class TrackingMetricsGroup extends UnregisteredMetricsGroup {
+        private final Map<String, Counter> counters;
+        private final Map<String, Gauge<?>> gauges;
+        private final String base;
+
+        public TrackingMetricsGroup(
+                String name, Map<String, Counter> counters, Map<String, Gauge<?>> gauges) {
+            this.base = name;
+            this.counters = counters;
+            this.gauges = gauges;
+        }
+
+        @Override
+        public Counter counter(String name) {
+            Counter counter = new SimpleCounter();
+            counters.put(base + "." + name, counter);
+            return counter;
+        }
+
+        @Override
+        public <C extends Counter> C counter(String name, C counter) {
+            counters.put(base + "." + name, counter);
+            return counter;
+        }
+
+        @Override
+        public <T, G extends Gauge<T>> G gauge(String name, G gauge) {
+            gauges.put(base + "." + name, gauge);
+            return gauge;
+        }
+
+        @Override
+        public MetricGroup addGroup(String name) {
+            return new TrackingMetricsGroup(base + "." + name, counters, gauges);
+        }
+
+        @Override
+        public MetricGroup addGroup(String key, String value) {
+            return new TrackingMetricsGroup(base + "." + key + "." + value, counters, gauges);
         }
     }
 

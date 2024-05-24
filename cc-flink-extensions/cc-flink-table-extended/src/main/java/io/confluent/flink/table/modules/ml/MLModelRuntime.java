@@ -13,6 +13,16 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
 
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
+import io.confluent.flink.table.modules.ml.providers.AzureMLProvider;
+import io.confluent.flink.table.modules.ml.providers.BedrockProvider;
+import io.confluent.flink.table.modules.ml.providers.GoogleAIProvider;
+import io.confluent.flink.table.modules.ml.providers.MLModelRuntimeProvider;
+import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
+import io.confluent.flink.table.modules.ml.providers.OpenAIProvider;
+import io.confluent.flink.table.modules.ml.providers.SagemakerProvider;
+import io.confluent.flink.table.modules.ml.providers.VertexAIProvider;
+import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
+import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProviderImpl;
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;

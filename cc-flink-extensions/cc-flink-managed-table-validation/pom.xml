@@ -39,6 +39,13 @@ Copyright 2023 Confluent Inc.
 		</dependency>
 
 		<dependency>
+            <groupId>io.confluent.flink</groupId>
+            <artifactId>cc-flink-ml-functions</artifactId>
+            <version>${project.version}</version>
+			<scope>compile</scope>
+        </dependency>
+
+		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-test-utils</artifactId>
 			<version>${project.version}</version>
@@ -74,6 +81,6 @@ Copyright 2023 Confluent Inc.
 			<scope>test</scope>
 		</dependency>
 
-	</dependencies>
+    </dependencies>
 
 </project>

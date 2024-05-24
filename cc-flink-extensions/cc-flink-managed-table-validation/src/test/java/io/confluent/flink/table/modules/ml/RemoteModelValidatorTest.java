@@ -12,6 +12,14 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
 import io.confluent.flink.table.modules.ml.RemoteModelValidator.RemoteModelOptionsFactory;
+import io.confluent.flink.table.modules.ml.options.AzureMLRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.AzureOpenAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.BedrockRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.GoogleAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.OpenAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.SageMakerRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.VertexAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;

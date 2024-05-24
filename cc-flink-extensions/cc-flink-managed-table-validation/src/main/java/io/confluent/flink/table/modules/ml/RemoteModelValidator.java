@@ -12,6 +12,15 @@ import org.apache.flink.table.factories.FactoryUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 
+import io.confluent.flink.table.modules.ml.options.AzureMLRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.AzureOpenAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.BedrockRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.GoogleAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.OpenAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.SageMakerRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.options.VertexAIRemoteModelOptions;
+import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;

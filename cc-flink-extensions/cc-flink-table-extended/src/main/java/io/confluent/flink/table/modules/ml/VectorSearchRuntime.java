@@ -6,6 +6,7 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.types.Row;
 
+import io.confluent.flink.table.modules.ml.providers.MLModelRuntimeProvider;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
