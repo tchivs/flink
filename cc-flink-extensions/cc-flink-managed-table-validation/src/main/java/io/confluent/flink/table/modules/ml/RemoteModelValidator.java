@@ -7,6 +7,7 @@ package io.confluent.flink.table.modules.ml;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
@@ -20,6 +21,7 @@ import io.confluent.flink.table.modules.ml.options.OpenAIRemoteModelOptions;
 import io.confluent.flink.table.modules.ml.options.SageMakerRemoteModelOptions;
 import io.confluent.flink.table.modules.ml.options.VertexAIRemoteModelOptions;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
+import io.confluent.flink.table.modules.ml.providers.ProviderSelector;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -84,6 +86,19 @@ public class RemoteModelValidator {
             newOptions.put(key, option.getValue());
         }
         return newOptions;
+    }
+
+    public static void validateModel(String modelIdentifier, CatalogModel catalogModel) {
+        Map<String, String> options = new HashMap<>(catalogModel.getOptions());
+        RemoteModelValidator.validateCreateModelOptions(modelIdentifier, options);
+        ProviderSelector.validateSchemas(catalogModel);
+    }
+
+    public static void validateModel(
+            String modelIdentifier, CatalogModel catalogModel, int paramSizeLimit) {
+        Map<String, String> options = new HashMap<>(catalogModel.getOptions());
+        RemoteModelValidator.validateCreateModelOptions(modelIdentifier, options, paramSizeLimit);
+        ProviderSelector.validateSchemas(catalogModel);
     }
 
     public static Map<String, String> validateCreateModelOptions(

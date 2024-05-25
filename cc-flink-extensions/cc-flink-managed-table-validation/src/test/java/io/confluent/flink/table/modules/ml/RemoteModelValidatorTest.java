@@ -5,7 +5,13 @@
 package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedCatalogModel;
+import org.apache.flink.table.catalog.ResolvedSchema;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -25,6 +31,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -529,5 +536,61 @@ public class RemoteModelValidatorTest {
                         SageMakerRemoteModelOptions.SESSION_TOKEN.key(),
                         VertexAIRemoteModelOptions.SERVICE_KEY.key());
         assertThat(keys).isEqualTo(expected);
+    }
+
+    @Test
+    void testValidateModel() {
+        CatalogModel model = getBedrockModel();
+        // Validation should pass
+        RemoteModelValidator.validateModel("m1", model);
+    }
+
+    @Test
+    void testValidateModelOverLimit() {
+        CatalogModel model = getBedrockModel();
+        model.getOptions().put("bedrock.params.custom", "1");
+        assertThatThrownBy(() -> RemoteModelValidator.validateModel("m1", model, 0))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Number of param options starting with 'bedrock.params.' exceeds limit: 0. Current size: 1");
+    }
+
+    @Test
+    void testValidateModelBadSchema() {
+        CatalogModel model = getBedrockModel();
+        model.getOptions().put("bedrock.input_format", "openai-chat");
+        assertThatThrownBy(() -> RemoteModelValidator.validateModel("m1", model))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Invalid Schema for model input: OpenAI Chat input format requires a single input column of type STRING");
+    }
+
+    CatalogModel getBedrockModel() {
+        Map<String, String> modelOptions = new HashMap<>();
+        modelOptions.put(
+                "bedrock.endpoint",
+                "https://bedrock-runtime.us-west-2.amazonaws.com/model/amazon.titan-text-lite-v1/invoke");
+        modelOptions.put("bedrock.AWS_ACCESS_KEY_ID", "ABCD");
+        modelOptions.put("bedrock.AWS_SECRET_ACCESS_KEY", "1234");
+        modelOptions.put("task", "text_generation");
+        modelOptions.put("bedrock.input_format", "json");
+        modelOptions.put("bedrock.output_format", "json");
+        modelOptions.put("provider", "bedrock");
+        return getModel(modelOptions);
+    }
+
+    CatalogModel getModel(Map<String, String> modelOptions) {
+        // inputs
+        Schema inputSchema = Schema.newBuilder().column("input", "INT").build();
+        ResolvedSchema resolvedInputSchema =
+                ResolvedSchema.of(Column.physical("input", DataTypes.INT()));
+        // outputs
+        Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
+        ResolvedSchema resolvedOutputSchema =
+                ResolvedSchema.of(Column.physical("output", DataTypes.STRING()));
+        CatalogModel catalogModel = CatalogModel.of(inputSchema, outputSchema, modelOptions, "");
+        ResolvedCatalogModel model =
+                ResolvedCatalogModel.of(catalogModel, resolvedInputSchema, resolvedOutputSchema);
+        return catalogModel;
     }
 }

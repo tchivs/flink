@@ -162,7 +162,7 @@ public class MLModelRuntimeTest {
             } catch (Exception e) {
                 if (e.getMessage().contains("Model provider not supported")) {
                     // If you are seeing this, you forgot to add a provider to the list in
-                    // validateSchemas.
+                    // ProviderSelector.
                     throw e;
                 }
             }
