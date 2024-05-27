@@ -43,7 +43,6 @@ import org.apache.flink.streaming.runtime.tasks.StreamTaskException;
 import org.apache.flink.util.ClassLoaderUtil;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.OutputTag;
-import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TernaryBoolean;
 import org.apache.flink.util.concurrent.FutureUtils;
 
@@ -313,7 +312,7 @@ public class StreamConfig implements Serializable {
     }
 
     public <T> TypeSerializer<T> getTypeSerializerSideOut(OutputTag<?> outputTag, ClassLoader cl) {
-        Preconditions.checkNotNull(outputTag, "Side output id must not be null.");
+        checkNotNull(outputTag, "Side output id must not be null.");
         try {
             return InstantiationUtil.readObjectFromConfig(
                     this.config, TYPE_SERIALIZER_SIDEOUT_PREFIX + outputTag.getId(), cl);
@@ -609,7 +608,7 @@ public class StreamConfig implements Serializable {
 
     public OperatorID getOperatorID() {
         byte[] operatorIDBytes = config.getBytes(OPERATOR_ID, null);
-        return new OperatorID(Preconditions.checkNotNull(operatorIDBytes));
+        return new OperatorID(checkNotNull(operatorIDBytes));
     }
 
     public void setOperatorName(String name) {
