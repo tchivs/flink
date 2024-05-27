@@ -511,16 +511,20 @@ public abstract class CommonExecSink extends ExecNodeBase<Object>
                 sinkMeta.fill(transformation);
                 return transformation;
             } else if (runtimeProvider instanceof SinkV2Provider) {
+                SinkV2Provider sinkV2Provider = (SinkV2Provider) runtimeProvider;
                 Transformation<RowData> sinkTransformation =
                         applyRowtimeTransformation(
                                 inputTransform, rowtimeFieldIndex, sinkParallelism, config);
                 final DataStream<RowData> dataStream = new DataStream<>(env, sinkTransformation);
-                final Transformation<?> transformation =
+                final Transformation<RowData> transformation =
                         DataStreamSink.forSink(
                                         dataStream,
-                                        ((SinkV2Provider) runtimeProvider).createSink(),
+                                        sinkV2Provider.createSink(),
                                         CustomSinkOperatorUidHashes.DEFAULT)
                                 .getTransformation();
+                sinkV2Provider
+                        .getAdditionalMetricVariables()
+                        .forEach(transformation::addMetricVariable);
                 transformation.setParallelism(sinkParallelism, sinkParallelismConfigured);
                 sinkMeta.fill(transformation);
                 return transformation;
