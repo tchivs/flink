@@ -20,6 +20,7 @@ package org.apache.flink.runtime.rest.handler.job.checkpoints;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.runtime.checkpoint.CheckpointStatsSnapshot;
 import org.apache.flink.runtime.checkpoint.CheckpointStatsTracker;
 import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
@@ -66,7 +67,8 @@ public class AbstractCheckpointStatsHandlerTest extends TestLogger {
             new CheckpointStatsTracker(
                     10,
                     UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup(),
-                    new JobID());
+                    new JobID(),
+                    TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
 
     @Test
     public void testRetrieveSnapshotFromCache() throws Exception {

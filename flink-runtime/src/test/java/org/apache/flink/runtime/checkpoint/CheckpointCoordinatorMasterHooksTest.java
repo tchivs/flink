@@ -20,6 +20,7 @@ package org.apache.flink.runtime.checkpoint;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategyTest.DummyMetricGroup;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
@@ -500,7 +501,11 @@ class CheckpointCoordinatorMasterHooksTest {
                         new ExecutionGraphCheckpointPlanCalculatorContext(graph),
                         graph.getVerticesTopologically(),
                         false),
-                new CheckpointStatsTracker(1, new DummyMetricGroup(), new JobID()),
+                new CheckpointStatsTracker(
+                        1,
+                        new DummyMetricGroup(),
+                        new JobID(),
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS),
                 false);
     }
 

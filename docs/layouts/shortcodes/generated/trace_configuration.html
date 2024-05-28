@@ -9,6 +9,16 @@
     </thead>
     <tbody>
         <tr>
+            <td><h5>traces.checkpoint.span-detail-level</h5></td>
+            <td style="word-wrap: break-word;">SPANS_PER_TASK</td>
+            <td><p>Enum</p></td>
+            <td>Detail level for reporting checkpoint spans. Possible values:
+- BREAKDOWN_PER_CHECKPOINT (default): Sum/Max for submetrics per checkpoint
+- BREAKDOWN_PER_CHECKPOINT_WITH_TASKS: Sum/Max for submetrics per checkpoint and arrays of task aggregates.
+- BREAKDOWN_PER_TASK: Sub/Max for submetrics of checkpoint and tasks (tasks as child spans)
+- BREAKDOWN_PER_SUBTASK: Sub/Max for submetrics of checkpoint, tasks, and subtasks (tasks as child spans, subtasks as grand-child spans)<br /><br />Possible values:<ul><li>"SPANS_PER_CHECKPOINT"</li><li>"SPANS_PER_CHECKPOINT_WITH_TASKS"</li><li>"SPANS_PER_TASK"</li><li>"SPANS_PER_SUBTASK"</li></ul></td>
+        </tr>
+        <tr>
             <td><h5>traces.reporter.&lt;name&gt;.&lt;parameter&gt;</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>

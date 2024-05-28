@@ -21,6 +21,7 @@ package org.apache.flink.runtime.checkpoint;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategyTest.DummyMetricGroup;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -726,7 +727,11 @@ public class CheckpointCoordinatorTestingUtils {
         private boolean allowCheckpointsAfterTasksFinished;
 
         private CheckpointStatsTracker checkpointStatsTracker =
-                new CheckpointStatsTracker(1, new DummyMetricGroup(), new JobID());
+                new CheckpointStatsTracker(
+                        1,
+                        new DummyMetricGroup(),
+                        new JobID(),
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
 
         private BiFunction<
                         Set<ExecutionJobVertex>,

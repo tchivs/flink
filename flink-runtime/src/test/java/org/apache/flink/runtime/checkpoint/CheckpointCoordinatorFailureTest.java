@@ -20,6 +20,7 @@ package org.apache.flink.runtime.checkpoint;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
+import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinatorTestingUtils.CheckpointCoordinatorBuilder;
 import org.apache.flink.runtime.checkpoint.channel.InputChannelInfo;
@@ -216,7 +217,10 @@ class CheckpointCoordinatorFailureTest extends TestLogger {
 
         CheckpointStatsTracker statsTracker =
                 new CheckpointStatsTracker(
-                        Integer.MAX_VALUE, new UnregisteredMetricsGroup(), new JobID());
+                        Integer.MAX_VALUE,
+                        new UnregisteredMetricsGroup(),
+                        new JobID(),
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
         final AtomicInteger cleanupCallCount = new AtomicInteger(0);
         final CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
