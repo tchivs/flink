@@ -86,6 +86,7 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -147,6 +148,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
     private final boolean useDeleteFilesInRange;
 
+    private final ExecutorService ioExecutor;
+
     private final AsyncExceptionHandler asyncExceptionHandler;
 
     public RocksDBIncrementalRestoreOperation(
@@ -175,6 +178,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
             boolean useIngestDbRestoreMode,
             boolean asyncCompactAfterRescale,
             boolean useDeleteFilesInRange,
+            ExecutorService ioExecutor,
             AsyncExceptionHandler asyncExceptionHandler) {
         this.rocksHandle =
                 new RocksDBHandle(
@@ -206,6 +210,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
         this.useIngestDbRestoreMode = useIngestDbRestoreMode;
         this.asyncCompactAfterRescale = asyncCompactAfterRescale;
         this.useDeleteFilesInRange = useDeleteFilesInRange;
+        this.ioExecutor = ioExecutor;
         this.asyncExceptionHandler = asyncExceptionHandler;
     }
 
@@ -766,7 +771,8 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                 keyGroupRange.prettyPrintInterval());
         try (RocksDBStateDownloader rocksDBStateDownloader =
                 new RocksDBStateDownloader(
-                        RocksDBStateDataTransferHelper.forThreadNum(numberOfTransferringThreads))) {
+                        RocksDBStateDataTransferHelper.forThreadNumIfSpecified(
+                                numberOfTransferringThreads, ioExecutor))) {
             rocksDBStateDownloader.transferAllStateDataToDirectory(
                     downloadSpecs, cancelStreamRegistryForRestore);
             logger.info(
