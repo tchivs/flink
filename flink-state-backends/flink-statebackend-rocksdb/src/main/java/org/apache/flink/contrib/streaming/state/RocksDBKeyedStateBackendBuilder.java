@@ -603,7 +603,9 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
         RocksDBSnapshotStrategyBase<K, ?> checkpointSnapshotStrategy;
         RocksDBStateUploader stateUploader =
                 injectRocksDBStateUploader == null
-                        ? new RocksDBStateUploader(numberOfTransferingThreads)
+                        ? new RocksDBStateUploader(
+                                RocksDBStateDataTransferHelper.forThreadNum(
+                                        numberOfTransferingThreads))
                         : injectRocksDBStateUploader;
         if (enableIncrementalCheckpointing) {
             checkpointSnapshotStrategy =

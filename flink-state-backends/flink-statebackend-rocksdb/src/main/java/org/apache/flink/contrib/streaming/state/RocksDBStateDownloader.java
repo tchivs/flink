@@ -38,6 +38,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -50,23 +51,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Help class for downloading RocksDB state files. */
-public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
+public class RocksDBStateDownloader implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(RocksDBStateDownloader.class);
 
-    public RocksDBStateDownloader(int restoringThreadNum) {
-        super(restoringThreadNum);
-    }
+    private final RocksDBStateDataTransferHelper transfer;
 
     @VisibleForTesting
-    RocksDBStateDownloader(ExecutorService executorService) {
-        super(executorService);
+    public RocksDBStateDownloader(int restoringThreadNum) {
+        this(RocksDBStateDataTransferHelper.forThreadNum(restoringThreadNum));
+    }
+
+    public RocksDBStateDownloader(RocksDBStateDataTransferHelper transfer) {
+        this.transfer = transfer;
     }
 
     /**
@@ -93,7 +95,8 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                                     .map(
                                             runnable ->
                                                     CompletableFuture.runAsync(
-                                                            runnable, executorService))
+                                                            runnable,
+                                                            transfer.getExecutorService()))
                                     .collect(Collectors.toList()));
             Exception interruptedException = null;
             while (!downloadFuture.isDone() || downloadFuture.isCompletedExceptionally()) {
@@ -277,5 +280,10 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             IOUtils.closeQuietly(closeableRegistry);
             throw new IOException(ex);
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.transfer.close();
     }
 }

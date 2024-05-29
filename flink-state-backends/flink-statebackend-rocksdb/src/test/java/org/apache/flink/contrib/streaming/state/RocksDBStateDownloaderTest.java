@@ -108,7 +108,8 @@ public class RocksDBStateDownloaderTest extends TestLogger {
         return new Thread(
                 () -> {
                     try (RocksDBStateDownloader rocksDBStateDownloader =
-                            new RocksDBStateDownloader(executorService)) {
+                            new RocksDBStateDownloader(
+                                    RocksDBStateDataTransferHelper.forExecutor(executorService))) {
                         try {
                             rocksDBStateDownloader.transferAllStateDataToDirectory(
                                     Collections.singletonList(spec), ICloseableRegistry.NO_OP);
@@ -121,6 +122,8 @@ public class RocksDBStateDownloaderTest extends TestLogger {
                                 completionFuture.completeExceptionally(e);
                             }
                         }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 });
     }
