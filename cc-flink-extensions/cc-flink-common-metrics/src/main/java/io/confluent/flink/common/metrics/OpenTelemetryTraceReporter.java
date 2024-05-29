@@ -14,7 +14,6 @@ import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.TracerProvider;
 import io.opentelemetry.context.Context;
-import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
@@ -27,8 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
- * A Flink {@link org.apache.flink.metrics.reporter.MetricReporter} which is made to export metrics
- * using Open Telemetry's {@link MetricExporter}.
+ * A Flink {@link org.apache.flink.traces.reporter.TraceReporter} which is made to export spans
+ * using Open Telemetry's {@link SpanExporter}.
  */
 @Confluent
 public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implements TraceReporter {
@@ -52,7 +51,7 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
 
     @VisibleForTesting
     void open(MetricConfig metricConfig, SpanExporterFactory spanExporterFactory) {
-        LOG.info("Starting OpenTelemetry Metric Reporter");
+        LOG.info("Starting OpenTelemetry Trace Reporter");
         spanExporter = spanExporterFactory.createSpanExporter(metricConfig);
         spanProcessor = BatchSpanProcessor.builder(spanExporter).build();
         tracerProvider =
