@@ -8,10 +8,13 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.metrics.MetricConfig;
 import org.apache.flink.util.TimeUtils;
 
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter;
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporterBuilder;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporterBuilder;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporterBuilder;
+import io.opentelemetry.sdk.logs.export.LogRecordExporter;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.slf4j.Logger;
@@ -19,7 +22,8 @@ import org.slf4j.LoggerFactory;
 
 /** A factory for creating a {@link OtlpGrpcMetricExporter}. */
 @Confluent
-public class OtlpGrpcMetricExporterFactory implements MetricExporterFactory, SpanExporterFactory {
+public class OtlpGrpcMetricExporterFactory
+        implements MetricExporterFactory, SpanExporterFactory, LogRecordExporterFactory {
     private static final Logger LOG = LoggerFactory.getLogger(OtlpGrpcMetricExporterFactory.class);
 
     public static final String ARG_EXPORTER_ENDPOINT = "exporter.endpoint";
@@ -43,6 +47,17 @@ public class OtlpGrpcMetricExporterFactory implements MetricExporterFactory, Spa
     public SpanExporter createSpanExporter(MetricConfig metricConfig) {
         OtlpGrpcSpanExporterBuilder builder =
                 OtlpGrpcSpanExporter.builder().setEndpoint(tryGetEndpoint(metricConfig));
+        if (metricConfig.containsKey(ARG_EXPORTER_TIMEOUT)) {
+            builder.setTimeout(
+                    TimeUtils.parseDuration(metricConfig.getProperty(ARG_EXPORTER_TIMEOUT)));
+        }
+        return builder.build();
+    }
+
+    @Override
+    public LogRecordExporter createLogRecordExporter(MetricConfig metricConfig) {
+        OtlpGrpcLogRecordExporterBuilder builder =
+                OtlpGrpcLogRecordExporter.builder().setEndpoint(tryGetEndpoint(metricConfig));
         if (metricConfig.containsKey(ARG_EXPORTER_TIMEOUT)) {
             builder.setTimeout(
                     TimeUtils.parseDuration(metricConfig.getProperty(ARG_EXPORTER_TIMEOUT)));

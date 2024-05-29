@@ -1,0 +1,2 @@
+# Copyright 2024 Confluent Inc.
+io.confluent.flink.common.metrics.OpenTelemetryLogRecordReporterFactory
