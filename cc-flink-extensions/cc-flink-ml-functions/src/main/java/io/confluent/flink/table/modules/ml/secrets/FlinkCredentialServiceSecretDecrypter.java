@@ -4,8 +4,8 @@
 
 package io.confluent.flink.table.modules.ml.secrets;
 
+import org.apache.flink.annotation.Public;
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.table.catalog.CatalogModel;
 
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc;
 import cloud.confluent.ksql_api_service.flinkcredential.FlinkCredentialServiceGrpc.FlinkCredentialServiceBlockingStub;
@@ -15,46 +15,105 @@ import com.google.protobuf.ByteString;
 import io.confluent.flink.credentials.utils.CallWithRetry;
 import io.confluent.flink.table.modules.ml.MLModelCommonConstants;
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
-import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import io.confluent.flink.table.utils.mlutils.MlUtils;
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 import io.grpc.Channel;
 import io.grpc.ManagedChannelBuilder;
 
-import java.util.Objects;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.util.Map;
 import java.util.function.Function;
 
 /** Secret decrypter from Flink credential service. */
-public class FlinkCredentialServiceSecretDecrypter implements SecretDecrypter {
-    // TODO (MATRIX-127) get from config
-    private static final int MAX_ATTEMPT = 3;
-    private static final int DELAY_MS = 1000;
+public abstract class FlinkCredentialServiceSecretDecrypter<T> implements SecretDecrypter {
 
-    private final ModelOptionsUtils modelOptionsUtils;
+    /** Config annotation for ParsedConfig fields. */
+    @Target({ElementType.TYPE, ElementType.FIELD})
+    @Retention(RetentionPolicy.RUNTIME)
+    @Public
+    public @interface ConfigAnnotation {
+        String name();
+    }
+
+    /** Parsed configuration pojo. */
+    public static class ParsedConfig {
+        // Below are required fields
+        @ConfigAnnotation(name = MLModelCommonConstants.ORG_ID)
+        public String orgId;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.COMPUTE_POOL_ID)
+        public String computePoolId;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.COMPUTE_POOL_ENV_ID)
+        public String computePoolEnvId;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.CREDENTIAL_SERVICE_HOST)
+        public String credentialServiceHost;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.CREDENTIAL_SERVICE_PORT)
+        public int credentialServicePort;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.ENCRYPT_STRATEGY)
+        public String encryptStrategy;
+
+        // Below are optional fields
+        @ConfigAnnotation(name = MLModelCommonConstants.DATABASE_ID)
+        public String databaseId;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.ENV_ID)
+        public String resourceEnvId;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.MODEL_VERSION)
+        public String resourceVersion;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.MODEL_NAME)
+        public String resourceName;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.KMS_SECRET_RETRY_COUNT)
+        public int maxAttempt;
+
+        @ConfigAnnotation(name = MLModelCommonConstants.KMS_SECRET_RETRY_DELAY_MS)
+        public int delayMs;
+    }
+
+    // TODO (MATRIX-127) get from config
+    public static final int MAX_ATTEMPT_DEFAULT = 3;
+    public static final int DELAY_MS_DEFAULT = 1000;
+
     private final FlinkCredentialServiceBlockingStub credentialService;
     private final Function<String, byte[]> dataSigner;
     private final CallWithRetry callWithRetry;
+    protected final ParsedConfig parsedConfig;
+    protected final T resource;
+    protected final Map<String, String> configuration;
 
-    public FlinkCredentialServiceSecretDecrypter(CatalogModel model) {
-        modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+    public FlinkCredentialServiceSecretDecrypter(T resource, Map<String, String> configuration) {
+        this.configuration = configuration;
+        this.resource = resource;
+        parsedConfig = configure(resource, configuration);
         Channel channel =
                 ManagedChannelBuilder.forAddress(
-                                modelOptionsUtils.getCredentialServiceHost(),
-                                modelOptionsUtils.getCredentialServicePort())
+                                parsedConfig.credentialServiceHost,
+                                parsedConfig.credentialServicePort)
                         .usePlaintext()
                         .build();
         credentialService = FlinkCredentialServiceGrpc.newBlockingStub(channel);
         dataSigner = MlUtils::signData;
-        callWithRetry = new CallWithRetry(MAX_ATTEMPT, DELAY_MS);
+        callWithRetry = new CallWithRetry(parsedConfig.maxAttempt, parsedConfig.delayMs);
     }
 
     @VisibleForTesting
     public FlinkCredentialServiceSecretDecrypter(
-            CatalogModel model,
+            T resource,
+            Map<String, String> configuration,
             FlinkCredentialServiceBlockingStub stub,
             Function<String, byte[]> dataSigner,
             CallWithRetry callWithRetry) {
-        modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+        this.resource = resource;
+        this.configuration = configuration;
+        parsedConfig = configure(resource, configuration);
         credentialService = stub;
         this.dataSigner = dataSigner;
         this.callWithRetry = callWithRetry;
@@ -62,66 +121,45 @@ public class FlinkCredentialServiceSecretDecrypter implements SecretDecrypter {
 
     @Override
     public String decryptFromKey(final String secretKey) {
-        final String secret = modelOptionsUtils.getOption(secretKey);
+        final String secret = getSecretValue(secretKey);
         if (secret == null || secret.isEmpty()) {
             return "";
         }
 
-        final String strategy = modelOptionsUtils.getEncryptStrategy();
+        final String strategy = parsedConfig.encryptStrategy;
         if (!EncryptionStrategy.KMS.name().equalsIgnoreCase(strategy)) {
             // Caller's responsibility to ensure decrypting right key
             throw new IllegalArgumentException("Decrypt key which is not KMS encrypted");
         }
-
-        // OrgId, compute pool id, compute pool env are required
-        final String orgId =
-                Objects.requireNonNull(
-                        modelOptionsUtils.getOption(MLModelCommonConstants.ORG_ID),
-                        MLModelCommonConstants.ORG_ID);
-        final String computePoolId =
-                Objects.requireNonNull(
-                        modelOptionsUtils.getOption(MLModelCommonConstants.COMPUTE_POOL_ID),
-                        MLModelCommonConstants.COMPUTE_POOL_ID);
-        final String computePoolEnvId =
-                Objects.requireNonNull(
-                        modelOptionsUtils.getOption(MLModelCommonConstants.COMPUTE_POOL_ENV_ID),
-                        MLModelCommonConstants.COMPUTE_POOL_ENV_ID);
-
-        // Below are optional fields
-        final String envId =
-                modelOptionsUtils.getOptionOrDefault(MLModelCommonConstants.ENV_ID, "");
-        final String dbId =
-                modelOptionsUtils.getOptionOrDefault(MLModelCommonConstants.DATABASE_ID, "");
-        final String modelName =
-                modelOptionsUtils.getOptionOrDefault(MLModelCommonConstants.MODEL_NAME, "");
-        final String modelVersion =
-                modelOptionsUtils.getOptionOrDefault(MLModelCommonConstants.MODEL_VERSION, "");
 
         final byte[] signature = dataSigner.apply(secret);
         final KMSDecryptionRequest.Builder builder =
                 KMSDecryptionRequest.newBuilder()
                         .setCipherText(secret)
                         .setSignature(ByteString.copyFrom(signature))
-                        .setOrgId(orgId)
-                        .setEnvironmentId(envId)
-                        .setDatabaseId(dbId)
-                        .setComputePoolId(computePoolId)
-                        .setComputePoolEnvId(computePoolEnvId)
-                        .setResourceName(modelName)
-                        .setResourceVersion(modelVersion);
+                        .setOrgId(parsedConfig.orgId)
+                        .setEnvironmentId(parsedConfig.resourceEnvId)
+                        .setDatabaseId(parsedConfig.databaseId)
+                        .setComputePoolId(parsedConfig.computePoolId)
+                        .setComputePoolEnvId(parsedConfig.computePoolEnvId)
+                        .setResourceName(parsedConfig.resourceName)
+                        .setResourceVersion(parsedConfig.resourceVersion);
 
         final KMSDecryptionResponse response =
                 callWithRetry.call(() -> credentialService.decryptSecret(builder.build()));
         return response.getPlainText().toStringUtf8();
     }
 
+    abstract ParsedConfig configure(T resource, Map<String, String> configuration);
+
     @Override
     public EncryptionStrategy supportedStrategy() {
         return EncryptionStrategy.KMS;
     }
 
-    @Override
-    public MLModelSupportedProviders getProvider() {
-        return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
+    abstract String getSecretValue(String secretKey);
+
+    ParsedConfig getParsedConfig() {
+        return parsedConfig;
     }
 }

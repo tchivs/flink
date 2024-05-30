@@ -33,6 +33,6 @@ public class ProviderTestBase {
         registeredGauges = new HashMap<>();
         registeredCounters = new HashMap<>();
         metricGroup = new TrackingMetricsGroup("m", registeredCounters, registeredGauges);
-        metrics = new MLFunctionMetrics(metricGroup);
+        metrics = new MLFunctionMetrics(metricGroup, MLFunctionMetrics.PREDICT_METRIC_NAME);
     }
 }

@@ -13,7 +13,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
-import static io.confluent.flink.credentials.KafkaCredentialsOptions.CREDENTIAL_SERVICE_PORT;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.DEFAULT_VERSION;
 import static io.confluent.flink.table.modules.ml.MLModelCommonConstants.ENCRYPT_STRATEGY;
 
@@ -122,7 +121,7 @@ public class ModelOptionsUtils {
             return Integer.parseInt(port);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
-                    CREDENTIAL_SERVICE_PORT.key() + " should be a number", e);
+                    MLModelCommonConstants.CREDENTIAL_SERVICE_PORT + " should be a number", e);
         }
     }
 

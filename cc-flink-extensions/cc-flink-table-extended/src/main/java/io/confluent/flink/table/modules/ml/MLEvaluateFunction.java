@@ -23,6 +23,8 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import java.time.Clock;
@@ -40,6 +42,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
     private transient CatalogModel model;
     private transient MLModelCommonConstants.ModelTask modelTask;
     private final Map<String, String> serializedModelProperties;
+    private final Map<String, String> configuration;
     private final String functionName;
     private transient MLModelRuntime mlModelRuntime = null;
     private transient MLFunctionMetrics metrics = null;
@@ -193,8 +196,16 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
 
     public MLEvaluateFunction(
             final String functionName, final Map<String, String> serializedModelProperties) {
+        this(functionName, serializedModelProperties, ImmutableMap.of());
+    }
+
+    public MLEvaluateFunction(
+            final String functionName,
+            final Map<String, String> serializedModelProperties,
+            final Map<String, String> configuration) {
         this.functionName = functionName;
         this.serializedModelProperties = serializedModelProperties;
+        this.configuration = configuration;
         if (serializedModelProperties != null && !serializedModelProperties.isEmpty()) {
             model = deserialize(serializedModelProperties);
             modelTask = ModelOptionsUtils.getModelTask(model.getOptions());
@@ -476,7 +487,9 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
     @Override
     public void open(FunctionContext context) throws Exception {
         super.open(context);
-        this.metrics = new MLFunctionMetrics(context.getMetricGroup());
+        this.metrics =
+                new MLFunctionMetrics(
+                        context.getMetricGroup(), MLFunctionMetrics.EVALUATE_METRIC_NAME);
         if (mlModelRuntime != null) {
             mlModelRuntime.close();
         }
@@ -486,7 +499,7 @@ public class MLEvaluateFunction extends AggregateFunction<Row, MLEvaluationMetri
             }
             model = deserialize(serializedModelProperties);
         }
-        this.mlModelRuntime = MLModelRuntime.open(model, metrics, Clock.systemUTC());
+        this.mlModelRuntime = MLModelRuntime.open(model, configuration, metrics, Clock.systemUTC());
     }
 
     @Override

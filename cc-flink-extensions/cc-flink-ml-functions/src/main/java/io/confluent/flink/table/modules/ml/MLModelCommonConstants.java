@@ -46,6 +46,10 @@ public class MLModelCommonConstants {
     public static final String MODEL_VERSION = "CONFLUENT.MODEL.VERSION";
     public static final String CREDENTIAL_SERVICE_HOST = "CONFLUENT.CREDENTIAL.SERVICE.HOST";
     public static final String CREDENTIAL_SERVICE_PORT = "CONFLUENT.CREDENTIAL.SERVICE.PORT";
+    public static final String KMS_SECRET_RETRY_COUNT =
+            "CONFLUENT.CREDENTIAL.KMS.SECRET.RETRY_COUNT";
+    public static final String KMS_SECRET_RETRY_DELAY_MS =
+            "CONFLUENT.CREDENTIAL.KMS.SECRET.DELAY_MS";
 
     public static final int DEFAULT_PARAM_SIZE_LIMIT = 32;
 

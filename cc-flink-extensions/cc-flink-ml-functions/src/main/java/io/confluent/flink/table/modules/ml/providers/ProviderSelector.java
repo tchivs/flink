@@ -15,11 +15,15 @@ import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProviderImpl;
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 import java.time.Clock;
+import java.util.Map;
 
 /** Container for functions selecting the correct provider based on the model options. */
 public class ProviderSelector {
     public static MLModelRuntimeProvider pickProvider(
-            CatalogModel model, MLFunctionMetrics metrics, Clock clock) {
+            CatalogModel model,
+            Map<String, String> configuration,
+            MLFunctionMetrics metrics,
+            Clock clock) {
         if (model == null) {
             return null;
         }
@@ -29,7 +33,7 @@ public class ProviderSelector {
         }
 
         final SecretDecrypterProvider secretDecrypterProvider =
-                new SecretDecrypterProviderImpl(model, metrics, clock);
+                new SecretDecrypterProviderImpl(model, configuration, metrics, clock);
 
         if (modelProvider.equalsIgnoreCase(MLModelSupportedProviders.OPENAI.getProviderName())
                 || modelProvider.equalsIgnoreCase(

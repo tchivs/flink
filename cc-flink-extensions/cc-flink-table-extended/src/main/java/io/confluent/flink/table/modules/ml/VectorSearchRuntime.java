@@ -4,6 +4,7 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.types.Row;
 
 import io.confluent.flink.table.modules.ml.providers.MLModelRuntimeProvider;
@@ -11,8 +12,10 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Class implementing VECTOR_SEARCH table function. */
@@ -26,7 +29,12 @@ public class VectorSearchRuntime implements AutoCloseable {
         this.provider = null;
     }
 
-    public static VectorSearchRuntime open() throws Exception {
+    public static VectorSearchRuntime open(
+            CatalogTable table,
+            Map<String, String> configurations,
+            MLFunctionMetrics metrics,
+            Clock clock)
+            throws Exception {
         final long timeout = Duration.ofSeconds(30).toMillis();
         final OkHttpClient httpClient =
                 new OkHttpClient.Builder()

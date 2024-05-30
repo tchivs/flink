@@ -35,7 +35,8 @@ public class MeteredSecretDecrypterTest {
         Map<String, Counter> registeredCounters = new HashMap<>();
         MetricGroup metricGroup =
                 new TrackingMetricsGroup("m", registeredCounters, registeredGauges);
-        MLFunctionMetrics metrics = new MLFunctionMetrics(metricGroup);
+        MLFunctionMetrics metrics =
+                new MLFunctionMetrics(metricGroup, MLFunctionMetrics.PREDICT_METRIC_NAME);
 
         MeteredSecretDecrypter meteredSecretDecrypter =
                 new MeteredSecretDecrypter(

@@ -11,11 +11,13 @@ import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
 
 /** Plain text decrypter. */
-public class PlainTextDecrypter implements SecretDecrypter {
-    private final ModelOptionsUtils modelOptionsUtils;
+public class PlainTextDecrypter<T> implements SecretDecrypter {
+    private ModelOptionsUtils modelOptionsUtils;
 
-    public PlainTextDecrypter(CatalogModel model) {
-        modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+    public PlainTextDecrypter(T model) {
+        if (model instanceof CatalogModel) {
+            modelOptionsUtils = new ModelOptionsUtils(((CatalogModel) model).getOptions());
+        }
     }
 
     @Override
@@ -30,7 +32,8 @@ public class PlainTextDecrypter implements SecretDecrypter {
     }
 
     @Override
-    public MLModelSupportedProviders getProvider() {
-        return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
+    public String getProviderName() {
+        return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider())
+                .getProviderName();
     }
 }

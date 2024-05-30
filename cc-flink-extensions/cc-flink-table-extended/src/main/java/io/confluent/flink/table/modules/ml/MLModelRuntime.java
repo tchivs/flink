@@ -22,6 +22,7 @@ import okhttp3.ResponseBody;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** This class encapsulates the runtime for model computation. */
@@ -35,11 +36,15 @@ public class MLModelRuntime implements AutoCloseable {
     private final Clock clock;
 
     private MLModelRuntime(
-            CatalogModel model, OkHttpClient httpClient, MLFunctionMetrics metrics, Clock clock) {
+            CatalogModel model,
+            Map<String, String> configuration,
+            OkHttpClient httpClient,
+            MLFunctionMetrics metrics,
+            Clock clock) {
         this.httpClient = httpClient;
         this.metrics = metrics;
         this.clock = clock;
-        this.provider = pickProvider(model);
+        this.provider = pickProvider(model, configuration);
         metrics.provision(provider.getMetricsName());
     }
 
@@ -55,15 +60,20 @@ public class MLModelRuntime implements AutoCloseable {
         metrics.provision(provider.getMetricsName());
     }
 
-    private MLModelRuntimeProvider pickProvider(CatalogModel model) {
-        return ProviderSelector.pickProvider(model, metrics, clock);
+    private MLModelRuntimeProvider pickProvider(
+            CatalogModel model, Map<String, String> configuration) {
+        return ProviderSelector.pickProvider(model, configuration, metrics, clock);
     }
 
     public static void validateSchemas(CatalogModel model) {
         ProviderSelector.validateSchemas(model);
     }
 
-    public static MLModelRuntime open(CatalogModel model, MLFunctionMetrics metrics, Clock clock)
+    public static MLModelRuntime open(
+            CatalogModel model,
+            Map<String, String> configuration,
+            MLFunctionMetrics metrics,
+            Clock clock)
             throws Exception {
         final long timeout = Duration.ofSeconds(30).toMillis();
         final OkHttpClient httpClient =
@@ -75,14 +85,18 @@ public class MLModelRuntime implements AutoCloseable {
                         .addInterceptor(
                                 new ModelRetryInterceptor(4, Duration.ofSeconds(2).toMillis()))
                         .build();
-        return new MLModelRuntime(model, httpClient, metrics, clock);
+        return new MLModelRuntime(model, configuration, httpClient, metrics, clock);
     }
 
     @VisibleForTesting
     public static MLModelRuntime mockOpen(
-            CatalogModel model, OkHttpClient httpClient, MLFunctionMetrics metrics, Clock clock) {
+            CatalogModel model,
+            Map<String, String> configuration,
+            OkHttpClient httpClient,
+            MLFunctionMetrics metrics,
+            Clock clock) {
         // We don't add the retry interceptor in tests, as that would break the http mock.
-        return new MLModelRuntime(model, httpClient, metrics, clock);
+        return new MLModelRuntime(model, configuration, httpClient, metrics, clock);
     }
 
     @VisibleForTesting

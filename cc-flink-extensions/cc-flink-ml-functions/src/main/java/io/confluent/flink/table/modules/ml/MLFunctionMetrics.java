@@ -15,11 +15,14 @@ import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** All the metrics for ML functions. */
 public class MLFunctionMetrics {
-    static final String METRIC_NAME = "ConfluentML";
+    public static final String PREDICT_METRIC_NAME = "ConfluentML";
+    public static final String EVALUATE_METRIC_NAME = "ConfluentEVLT";
+    public static final String VECTOR_SEARCH_METRIC_NAME = "ConfluentVCTS";
 
     // For Azure AI Studio endpoints in AzureML.
     public static final String AZURE_ML_AI = "AZUREML-AI";
@@ -181,23 +184,28 @@ public class MLFunctionMetrics {
         }
     }
 
-    public MLFunctionMetrics(MetricGroup parentGroup) {
-        this.group = parentGroup.addGroup(METRIC_NAME);
+    public MLFunctionMetrics(MetricGroup parentGroup, String metricName) {
+        Objects.requireNonNull(metricName, "metricName is null");
+        this.group = parentGroup.addGroup(metricName);
         this.totalMetrics = new ProviderMetrics(group);
-        // One group per MLModelSupportedProviders
         providerMetrics = new HashMap<>();
-        // Add a group for each provider
-        for (MLModelSupportedProviders provider : MLModelSupportedProviders.values()) {
+
+        if (metricName.equals(PREDICT_METRIC_NAME)) {
+            // One group per MLModelSupportedProviders
+            // Add a group for each provider
+            for (MLModelSupportedProviders provider : MLModelSupportedProviders.values()) {
+                providerMetrics.put(
+                        provider.getProviderName(),
+                        new ProviderMetrics(
+                                parentGroup.addGroup(metricName, provider.getProviderName())));
+            }
+            // Add extra groups for some providers to distinguish between different types of models.
             providerMetrics.put(
-                    provider.getProviderName(),
-                    new ProviderMetrics(
-                            parentGroup.addGroup(METRIC_NAME, provider.getProviderName())));
+                    AZURE_ML_AI,
+                    new ProviderMetrics(parentGroup.addGroup(metricName, AZURE_ML_AI)));
+            providerMetrics.put(
+                    VERTEX_PUB, new ProviderMetrics(parentGroup.addGroup(metricName, VERTEX_PUB)));
         }
-        // Add extra groups for some providers to distinguish between different types of models.
-        providerMetrics.put(
-                AZURE_ML_AI, new ProviderMetrics(parentGroup.addGroup(METRIC_NAME, AZURE_ML_AI)));
-        providerMetrics.put(
-                VERTEX_PUB, new ProviderMetrics(parentGroup.addGroup(METRIC_NAME, VERTEX_PUB)));
     }
 
     public void provision(String provider) {

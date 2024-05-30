@@ -41,7 +41,8 @@ public class PlainTextDecrypterTest {
                         null);
         MLFunctionMetrics metrics =
                 new MLFunctionMetrics(
-                        new TrackingMetricsGroup("m", new HashMap<>(), new HashMap<>()));
+                        new TrackingMetricsGroup("m", new HashMap<>(), new HashMap<>()),
+                        MLFunctionMetrics.PREDICT_METRIC_NAME);
         PlainTextDecrypter decrypter = new PlainTextDecrypter(model);
         assertThat(decrypter.decryptFromKey("some_key")).isEmpty();
         assertThat(decrypter.decryptFromKey("openai.api_key")).isEqualTo("api_key");

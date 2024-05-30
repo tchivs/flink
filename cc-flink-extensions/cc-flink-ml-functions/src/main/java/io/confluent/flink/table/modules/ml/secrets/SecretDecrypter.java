@@ -5,7 +5,6 @@
 package io.confluent.flink.table.modules.ml.secrets;
 
 import io.confluent.flink.table.modules.ml.RemoteModelOptions;
-import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 
 /** Decrypt model secrets from provided key. */
 public interface SecretDecrypter {
@@ -20,5 +19,5 @@ public interface SecretDecrypter {
 
     RemoteModelOptions.EncryptionStrategy supportedStrategy();
 
-    MLModelSupportedProviders getProvider();
+    String getProviderName();
 }

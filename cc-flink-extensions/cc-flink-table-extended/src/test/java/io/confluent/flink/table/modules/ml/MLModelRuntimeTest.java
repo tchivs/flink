@@ -18,6 +18,8 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import com.google.auth.oauth2.GoogleCredentials;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import io.confluent.flink.table.modules.ml.providers.VertexAIProvider;
@@ -46,6 +48,7 @@ public class MLModelRuntimeTest {
     MockOkHttpClient mockHttpClient = new MockOkHttpClient();
     Map<String, Gauge<?>> registeredGauges = new HashMap<>();
     Map<String, Counter> registeredCounters = new HashMap<>();
+    Map<String, String> configuration;
 
     /** Mock VertexAIProvider so we can mock out the google credentials. */
     private static class MockVertexAIProvider extends VertexAIProvider {
@@ -141,7 +144,29 @@ public class MLModelRuntimeTest {
         registeredGauges.clear();
         registeredCounters.clear();
         metricGroup = new TrackingMetricsGroup("m", registeredCounters, registeredGauges);
-        metrics = new MLFunctionMetrics(metricGroup);
+        metrics = new MLFunctionMetrics(metricGroup, MLFunctionMetrics.PREDICT_METRIC_NAME);
+        configuration =
+                ImmutableMap.of(
+                        MLModelCommonConstants.CREDENTIAL_SERVICE_HOST,
+                        "localhost",
+                        MLModelCommonConstants.CREDENTIAL_SERVICE_PORT,
+                        "123",
+                        MLModelCommonConstants.ORG_ID,
+                        "org1",
+                        MLModelCommonConstants.ENV_ID,
+                        "env1",
+                        MLModelCommonConstants.DATABASE_ID,
+                        "db1",
+                        MLModelCommonConstants.MODEL_NAME,
+                        "model1",
+                        MLModelCommonConstants.MODEL_VERSION,
+                        "v1",
+                        MLModelCommonConstants.COMPUTE_POOL_ID,
+                        "cp1",
+                        MLModelCommonConstants.ENCRYPT_STRATEGY,
+                        "kms",
+                        MLModelCommonConstants.COMPUTE_POOL_ENV_ID,
+                        "cp_env1");
     }
 
     @Test
@@ -172,7 +197,8 @@ public class MLModelRuntimeTest {
     @Test
     void testRemoteHttpCallAzure() throws Exception {
         CatalogModel model = getAzureMLModel();
-        MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);
+        MLModelRuntime runtime =
+                MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(MlUtils.makeResponse("{\"output\":\"output-text\"}"));
         Row results = runtime.run(new Object[] {"modelname", "input-text"});
         runtime.close();
@@ -234,7 +260,8 @@ public class MLModelRuntimeTest {
     @Test
     void testRemoteHttpCallAzureAI() throws Exception {
         CatalogModel model = getAzureAIModel();
-        MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);
+        MLModelRuntime runtime =
+                MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(makeErrorResponse("{\"error\":\"output-text\"}", 500));
 
         assertThatThrownBy(() -> runtime.run(new Object[] {"modelname", "input-text"}))
@@ -260,7 +287,8 @@ public class MLModelRuntimeTest {
     @Test
     void testRemoteHttpCallAzureOpenAI() throws Exception {
         CatalogModel model = getAzureOpenAIModel();
-        MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);
+        MLModelRuntime runtime =
+                MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(makeErrorResponse("{\"error\":\"output-text\"}", 400));
 
         assertThatThrownBy(() -> runtime.run(new Object[] {"modelname", "input-text"}))
@@ -297,7 +325,9 @@ public class MLModelRuntimeTest {
     void testRemoteHttpCallVertex() throws Exception {
         CatalogModel model = getVertexAIModel();
         MockVertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model, metrics));
+                new MockVertexAIProvider(
+                        model,
+                        new SecretDecrypterProviderImpl<>(model, ImmutableMap.of(), metrics));
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(vertexAIProvider, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(makeErrorResponse("{\"error\":\"output-text\"}", 100));
@@ -330,7 +360,9 @@ public class MLModelRuntimeTest {
     void testRemoteHttpCallVertexPub() throws Exception {
         CatalogModel model = getVertexAIPubModel();
         MockVertexAIProvider vertexAIProvider =
-                new MockVertexAIProvider(model, new SecretDecrypterProviderImpl(model, metrics));
+                new MockVertexAIProvider(
+                        model,
+                        new SecretDecrypterProviderImpl<>(model, ImmutableMap.of(), metrics));
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(vertexAIProvider, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(MlUtils.makeResponse("parse-fail"));
@@ -364,7 +396,8 @@ public class MLModelRuntimeTest {
     @Test
     void testRemoteHttpCallSagemaker() throws Exception {
         CatalogModel model = getSagemakerModel();
-        MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);
+        MLModelRuntime runtime =
+                MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(MlUtils.makeResponse("prep-fail"));
         Object notString = new NotString();
         assertThatThrownBy(() -> runtime.run(new Object[] {"modelname", notString}))
@@ -391,7 +424,8 @@ public class MLModelRuntimeTest {
     @Test
     void testRemoteHttpCallBedrock() throws Exception {
         CatalogModel model = getBedrockModel();
-        MLModelRuntime runtime = MLModelRuntime.mockOpen(model, mockHttpClient, metrics, clock);
+        MLModelRuntime runtime =
+                MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(MlUtils.makeResponse("{\"output\":\"output-text\"}"));
         Row results = runtime.run(new Object[] {"modelname", "input-text"});
         runtime.close();

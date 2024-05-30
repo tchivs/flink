@@ -116,8 +116,9 @@ public class TestUtils {
         }
 
         @Override
-        public MLModelSupportedProviders getProvider() {
-            return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider());
+        public String getProviderName() {
+            return MLModelSupportedProviders.fromString(modelOptionsUtils.getProvider())
+                    .getProviderName();
         }
     }
 

@@ -30,17 +30,15 @@ public final class MeteredSecretDecrypter {
         try {
             String decrypted = secretDecrypter.decryptFromKey(secretKey);
             metrics.decryptRequestSuccess(
-                    secretDecrypter.getProvider().getProviderName(),
-                    secretDecrypter.supportedStrategy().name());
+                    secretDecrypter.getProviderName(), secretDecrypter.supportedStrategy().name());
             return decrypted;
         } catch (Exception e) {
             metrics.decryptRequestFailure(
-                    secretDecrypter.getProvider().getProviderName(),
-                    secretDecrypter.supportedStrategy().name());
+                    secretDecrypter.getProviderName(), secretDecrypter.supportedStrategy().name());
             throw e;
         } finally {
             metrics.decryptRequestMs(
-                    secretDecrypter.getProvider().getProviderName(),
+                    secretDecrypter.getProviderName(),
                     secretDecrypter.supportedStrategy().name(),
                     clock.millis() - startMs);
         }

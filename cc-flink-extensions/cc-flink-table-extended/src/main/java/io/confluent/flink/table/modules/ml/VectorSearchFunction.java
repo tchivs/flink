@@ -6,17 +6,14 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.DataTypeFactory;
-import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
-
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -25,36 +22,33 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** Class implementing ML_PREDICT table function. */
-public class MLPredictFunction extends TableFunction<Object> {
-    public static final String NAME = "ML_PREDICT";
-    private transient CatalogModel model;
-    private final Map<String, String> serializedModelProperties;
+/** Class implementing VECTOR_SEARCH table function. */
+public class VectorSearchFunction extends TableFunction<Object> {
+    public static final String NAME = "VECTOR_SEARCH";
+    private transient CatalogTable table;
+    private final Map<String, String> serializedTableProperties;
     private final Map<String, String> configuration;
     private final String functionName;
-    private transient MLModelRuntime mlModelRuntime = null;
+    private transient VectorSearchRuntime searchRuntime = null;
     private transient MLFunctionMetrics metrics;
 
-    private static TypeInference getTypeInference(CatalogModel model, DataTypeFactory typeFactory) {
-        Preconditions.checkNotNull(model, "Model must not be null.");
+    private static TypeInference getTypeInference(CatalogTable table, DataTypeFactory typeFactory) {
+        Preconditions.checkNotNull(table, "Table must not be null.");
+        // Vector search input is always topK int and single float array
         final List<DataType> args = new ArrayList<>();
-        // First arg is model name
-        args.add(DataTypes.STRING());
-        args.addAll(
-                model.getInputSchema().getColumns().stream()
-                        .map(
-                                c ->
-                                        typeFactory.createDataType(
-                                                ((Schema.UnresolvedPhysicalColumn) c)
-                                                        .getDataType()))
-                        .collect(Collectors.toList()));
+        args.add(DataTypes.INT()); // int type for topK
+        // TODO: get this type from indexing option. The array element type can be int or double
+        args.add(DataTypes.ARRAY(DataTypes.FLOAT())); // float array for embedding
+        // Output is whole table output
+        // TODO: some provider may not output all columns. May need to let user specify explicitly
+        // in options
         return TypeInference.newBuilder()
                 .typedArguments(args)
                 .outputTypeStrategy(
                         callContext ->
                                 Optional.of(
                                         DataTypes.ROW(
-                                                model.getOutputSchema().getColumns().stream()
+                                                table.getUnresolvedSchema().getColumns().stream()
                                                         .map(
                                                                 unresolvedColumn ->
                                                                         DataTypes.FIELD(
@@ -70,31 +64,26 @@ public class MLPredictFunction extends TableFunction<Object> {
                 .build();
     }
 
-    public MLPredictFunction(
-            final String functionName, final Map<String, String> serializedModelProperties) {
-        this(functionName, serializedModelProperties, ImmutableMap.of());
-    }
-
-    public MLPredictFunction(
+    public VectorSearchFunction(
             final String functionName,
-            final Map<String, String> serializedModelProperties,
+            final Map<String, String> serializedTableProperties,
             final Map<String, String> configuration) {
         this.functionName = functionName;
-        this.serializedModelProperties = serializedModelProperties;
+        this.serializedTableProperties = serializedTableProperties;
         this.configuration = configuration;
-        if (serializedModelProperties != null && !serializedModelProperties.isEmpty()) {
-            model = deserialize(serializedModelProperties);
+        if (serializedTableProperties != null && !serializedTableProperties.isEmpty()) {
+            table = deserialize(serializedTableProperties);
         }
     }
 
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInference(model, typeFactory);
+        return getTypeInference(table, typeFactory);
     }
 
     public void eval(Object... args) {
         try {
-            collect(mlModelRuntime.run(args));
+            collect(searchRuntime.run(args));
         } catch (Exception e) {
             throw new FlinkRuntimeException("ML model runtime error:", e);
         }
@@ -105,23 +94,24 @@ public class MLPredictFunction extends TableFunction<Object> {
         super.open(context);
         this.metrics =
                 new MLFunctionMetrics(
-                        context.getMetricGroup(), MLFunctionMetrics.PREDICT_METRIC_NAME);
-        if (mlModelRuntime != null) {
-            mlModelRuntime.close();
+                        context.getMetricGroup(), MLFunctionMetrics.VECTOR_SEARCH_METRIC_NAME);
+        if (searchRuntime != null) {
+            searchRuntime.close();
         }
-        if (model == null) {
-            if (serializedModelProperties == null) {
-                throw new FlinkRuntimeException("Model and serializedModel are both null");
+        if (table == null) {
+            if (serializedTableProperties == null) {
+                throw new FlinkRuntimeException("Table and serializedTable are both null");
             }
-            model = deserialize(serializedModelProperties);
+            table = deserialize(serializedTableProperties);
         }
-        this.mlModelRuntime = MLModelRuntime.open(model, configuration, metrics, Clock.systemUTC());
+        this.searchRuntime =
+                VectorSearchRuntime.open(table, configuration, metrics, Clock.systemUTC());
     }
 
     @Override
     public void close() throws Exception {
-        if (mlModelRuntime != null) {
-            mlModelRuntime.close();
+        if (searchRuntime != null) {
+            searchRuntime.close();
         }
         super.close();
     }
@@ -133,18 +123,18 @@ public class MLPredictFunction extends TableFunction<Object> {
 
     @Override
     public String toString() {
-        return String.format("MLPredictFunction {functionName=%s}", functionName);
+        return String.format("VectorSearchFunction{functionName=%s}", functionName);
     }
 
-    public CatalogModel getModel() {
-        return model;
+    public CatalogTable getTable() {
+        return table;
     }
 
-    public Map<String, String> getSerializedModelProperties() {
-        return serializedModelProperties;
+    public Map<String, String> getSerializedTableProperties() {
+        return serializedTableProperties;
     }
 
-    private static CatalogModel deserialize(final Map<String, String> serializedModelProperties) {
-        return ResolvedCatalogModel.fromProperties(serializedModelProperties);
+    private static CatalogTable deserialize(final Map<String, String> serializedTableProperties) {
+        return CatalogTable.fromProperties(serializedTableProperties);
     }
 }

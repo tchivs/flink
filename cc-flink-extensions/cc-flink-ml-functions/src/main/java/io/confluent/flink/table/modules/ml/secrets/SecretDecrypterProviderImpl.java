@@ -11,21 +11,26 @@ import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 
 import java.time.Clock;
+import java.util.Map;
 
 /** Implementation of {@link SecretDecrypterProvider}. */
-public class SecretDecrypterProviderImpl implements SecretDecrypterProvider {
+public class SecretDecrypterProviderImpl<T> implements SecretDecrypterProvider {
 
-    private final CatalogModel model;
+    private final T resource;
     private final MLFunctionMetrics metrics;
     private final Clock clock;
+    private final Map<String, String> configuration;
 
-    public SecretDecrypterProviderImpl(CatalogModel model, MLFunctionMetrics metrics) {
-        this(model, metrics, Clock.systemUTC());
+    public SecretDecrypterProviderImpl(
+            T resource, Map<String, String> configuration, MLFunctionMetrics metrics) {
+        this(resource, configuration, metrics, Clock.systemUTC());
     }
 
     @VisibleForTesting
-    public SecretDecrypterProviderImpl(CatalogModel model, MLFunctionMetrics metrics, Clock clock) {
-        this.model = model;
+    public SecretDecrypterProviderImpl(
+            T resource, Map<String, String> configuration, MLFunctionMetrics metrics, Clock clock) {
+        this.resource = resource;
+        this.configuration = configuration;
         this.metrics = metrics;
         this.clock = clock;
     }
@@ -34,9 +39,16 @@ public class SecretDecrypterProviderImpl implements SecretDecrypterProvider {
     public SecretDecrypter getDecrypter(String decryptStrategy) {
         if (decryptStrategy == null
                 || decryptStrategy.equalsIgnoreCase(EncryptionStrategy.PLAINTEXT.name())) {
-            return new PlainTextDecrypter(model);
+            return new PlainTextDecrypter(resource);
         } else if (decryptStrategy.equalsIgnoreCase(EncryptionStrategy.KMS.name())) {
-            return new FlinkCredentialServiceSecretDecrypter(model);
+            if (resource instanceof CatalogModel) {
+                return new ModelSecretDecrypter((CatalogModel) resource, configuration);
+            } else {
+                // TODO: support table
+                throw new UnsupportedOperationException(
+                        "Not supported resource type for decrypter: "
+                                + resource.getClass().getSimpleName());
+            }
         }
         throw new IllegalArgumentException("Unsupported decrypte strategy: " + decryptStrategy);
     }
