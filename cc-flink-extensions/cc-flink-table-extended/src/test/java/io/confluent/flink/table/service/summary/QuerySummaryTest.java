@@ -20,6 +20,7 @@ import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResult
 import io.confluent.flink.table.service.ResultPlanUtils;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +47,9 @@ public class QuerySummaryTest {
                     .setClassName("io.confluent.Foo")
                     .parseIsDeterministic("true")
                     .addArgumentTypes(Collections.singletonList("INT"))
+                    .addArgumentTypes(Arrays.asList("INT", "INT"))
                     .addArgumentTypes(Collections.singletonList("STRING"))
+                    .addReturnType("INT")
                     .addReturnType("INT")
                     .addReturnType("STRING")
                     .build();
@@ -310,6 +313,34 @@ public class QuerySummaryTest {
                 .extracting(NodeSummary::getKind)
                 .isEqualTo(NodeKind.ASYNC_CALC);
         assertThat(asyncCalcSummary.getTag(NodeTag.EXPRESSIONS, Set.class)).isNotNull().hasSize(2);
+    }
+
+    @Test
+    void testSummaryUdfJoin() throws Exception {
+        final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        env.createTemporaryFunction(
+                "a.b.c",
+                new ConfiguredRemoteScalarFunction(
+                        Collections.singletonMap(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), "false"),
+                        UDF_SPECS));
+
+        createTable(env, "bounded1", Boundedness.BOUNDED);
+        createTable(env, "bounded2", Boundedness.BOUNDED);
+
+        final QuerySummary querySummary =
+                assertProperties(
+                        env,
+                        "SELECT * "
+                                + "FROM bounded1 x RIGHT JOIN bounded2 y "
+                                + "ON x.k=y.k where "
+                                + " x.k=y.k and a.b.c(x.v, y.v) > 10",
+                        QueryProperty.FOREGROUND,
+                        QueryProperty.SINGLE_SINK);
+
+        assertThat(querySummary.getUdfCalls()).hasSize(1);
+        assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
+        assertThat(querySummary.getUdfCalls().iterator().next().getResourceConfigs().size())
+                .isGreaterThan(0);
     }
 
     private static void createConfluentCatalogTable(

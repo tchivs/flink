@@ -18,7 +18,10 @@ import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamPhysicalT
 import org.apache.flink.table.planner.plan.schema.TableSourceTable;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 
+import org.apache.calcite.rel.core.Join;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +128,27 @@ public enum NodeTag {
                     tags.put(NodeTag.TABLE_IDENTIFIER, contextTable.getIdentifier());
                 });
 
+        extractJoins(
+                map, new NodeKind[] {NodeKind.JOIN, NodeKind.TEMPORAL_JOIN, NodeKind.WINDOW_JOIN});
+
         return map;
+    }
+
+    private static void extractJoins(Map<NodeKind, List<Extractor>> map, NodeKind[] kinds) {
+        for (NodeKind nodeKind : kinds) {
+            addNodeTagExtraction(
+                    map,
+                    nodeKind,
+                    (rel, tags) -> {
+                        final Join join = (Join) rel;
+
+                        // Extract UDF metadata
+                        tags.put(
+                                NodeTag.UDF_CALLS,
+                                UdfCall.getUdfCalls(
+                                        Collections.singletonList(join.getCondition())));
+                    });
+        }
     }
 
     private static void addNodeTagExtraction(
