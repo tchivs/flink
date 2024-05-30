@@ -481,7 +481,6 @@ public class InfoSchemaTables {
                 "SYSTEM",
                 null,
                 Collections.emptyList(),
-                Collections.singletonMap("connector", InfoSchemaTableFactory.IDENTIFIER),
-                Collections.emptyMap());
+                Collections.singletonMap("connector", InfoSchemaTableFactory.IDENTIFIER));
     }
 }

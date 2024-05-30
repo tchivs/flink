@@ -670,9 +670,11 @@ class DefaultServiceTasks implements ServiceTasks {
         // It would be great to base the summary purely on the
         // physical graph but currently this is not possible.
         querySummary.ingestExecNodeGraph(graph);
-        graph.getRootNodes().forEach(node -> exposePrivateConnectorOptions(node, connectorOptions));
+
+        graph.getRootNodes().forEach(node -> addConnectorOptions(node, connectorOptions));
 
         graph.getRootNodes().forEach(DefaultServiceTasks::checkForUnsupportedExecNodes);
+
         final String compiledPlan;
         try {
             compiledPlan =
@@ -704,10 +706,10 @@ class DefaultServiceTasks implements ServiceTasks {
         return planner.translateToExecNodeGraph(toScala(optimizedNodes), true);
     }
 
-    private static void exposePrivateConnectorOptions(
-            ExecNode<?> node, ConnectorOptionsProvider connectorOptions) {
+    private static void addConnectorOptions(
+            ExecNode<?> node, ConnectorOptionsProvider optionsProvider) {
         node.getInputEdges()
-                .forEach(edge -> exposePrivateConnectorOptions(edge.getSource(), connectorOptions));
+                .forEach(edge -> addConnectorOptions(edge.getSource(), optionsProvider));
 
         final ContextResolvedTable contextTable;
         if (node instanceof StreamExecTableSourceScan) {
@@ -737,9 +739,12 @@ class DefaultServiceTasks implements ServiceTasks {
         }
         final ConfluentCatalogTable catalogTable = contextTable.getTable();
 
-        final Map<String, String> morePrivateOptions =
-                connectorOptions.generateOptions(contextTable.getIdentifier(), node.getId());
-        catalogTable.exposePrivateOptions(morePrivateOptions);
+        final Map<String, String> connectorOptions =
+                optionsProvider.generateOptions(
+                        contextTable.getIdentifier(),
+                        node.getId(),
+                        Collections.unmodifiableMap(catalogTable.getOptions()));
+        catalogTable.getOptions().putAll(connectorOptions);
     }
 
     private static void checkForUnsupportedExecNodes(ExecNode<?> node) {

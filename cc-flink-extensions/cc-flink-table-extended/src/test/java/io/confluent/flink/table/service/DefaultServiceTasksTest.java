@@ -75,8 +75,7 @@ public class DefaultServiceTasksTest {
                         .column("amount", DataTypes.INT())
                         .column("ts", DataTypes.TIMESTAMP_LTZ(3))
                         .build(),
-                ImmutableMap.of("connector", "datagen", "number-of-rows", "10"),
-                Collections.emptyMap());
+                ImmutableMap.of("connector", "datagen", "number-of-rows", "10"));
 
         final ForegroundJobResultPlan plan =
                 ResultPlanUtils.foregroundJob(
@@ -91,22 +90,12 @@ public class DefaultServiceTasksTest {
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
         final Schema schema = Schema.newBuilder().column("i", "INT").build();
-        final Map<String, String> privateOptions =
-                Collections.singletonMap("confluent.specific", "option");
 
         ResultPlanUtils.createConfluentCatalogTable(
-                tableEnv,
-                "source",
-                schema,
-                Collections.singletonMap("connector", "datagen"),
-                privateOptions);
+                tableEnv, "source", schema, Collections.singletonMap("connector", "datagen"));
 
         ResultPlanUtils.createConfluentCatalogTable(
-                tableEnv,
-                "sink",
-                schema,
-                Collections.singletonMap("connector", "blackhole"),
-                privateOptions);
+                tableEnv, "sink", schema, Collections.singletonMap("connector", "blackhole"));
 
         final List<Operation> operations =
                 ((TableEnvironmentImpl) tableEnv)
@@ -114,11 +103,9 @@ public class DefaultServiceTasksTest {
                         .getParser()
                         .parse("INSERT INTO sink SELECT * FROM source");
         final SinkModifyOperation modifyOperation = (SinkModifyOperation) operations.get(0);
-        assertThat(modifyOperation.getContextResolvedTable().getTable().getOptions())
-                .doesNotContainKey("confluent.specific");
 
         final ConnectorOptionsProvider optionsProvider =
-                (identifier, execNodeId) -> {
+                (identifier, execNodeId, tableOptions) -> {
                     // execNodeId is omitted because it is not deterministic
                     return Collections.singletonMap(
                             "transactional-id", "my_" + identifier.getObjectName());
@@ -129,10 +116,8 @@ public class DefaultServiceTasksTest {
                         tableEnv, Collections.singletonList(modifyOperation), optionsProvider);
 
         assertThat(plan.getCompiledPlan().replaceAll("[\\s\"]", ""))
-                .contains(
-                        "options:{connector:datagen,confluent.specific:option,transactional-id:my_source}")
-                .contains(
-                        "options:{connector:blackhole,confluent.specific:option,transactional-id:my_sink}");
+                .contains("options:{connector:datagen,transactional-id:my_source}")
+                .contains("options:{connector:blackhole,transactional-id:my_sink}");
     }
 
     @Test
@@ -165,8 +150,7 @@ public class DefaultServiceTasksTest {
         options.put("connector", "values");
         options.put("readable-metadata", "m_virtual:STRING,m_persisted:STRING");
 
-        ResultPlanUtils.createConfluentCatalogTable(
-                tableEnv, "source", schema, options, Collections.emptyMap());
+        ResultPlanUtils.createConfluentCatalogTable(tableEnv, "source", schema, options);
 
         final QueryOperation queryOperation =
                 tableEnv.sqlQuery("SELECT * FROM source").getQueryOperation();
@@ -432,8 +416,7 @@ public class DefaultServiceTasksTest {
                         .column("ts", DataTypes.TIMESTAMP_LTZ(3))
                         .watermark("ts", "SOURCE_WATERMARK()")
                         .build(),
-                Collections.singletonMap("connector", "datagen"),
-                Collections.emptyMap());
+                Collections.singletonMap("connector", "datagen"));
 
         assertThatThrownBy(
                         () ->
@@ -611,13 +594,13 @@ public class DefaultServiceTasksTest {
     void testShowCreateTable() throws Exception {
         final TableEnvironment tableEnv =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
-        Map<String, String> publicOptions = new HashMap<>();
+        Map<String, String> options = new HashMap<>();
 
-        publicOptions.put("key.format", "raw");
-        publicOptions.put("connector", "confluent");
-        publicOptions.put("changelog.mode", "append");
-        publicOptions.put("scan.startup.mode", "earliest-offset");
-        publicOptions.put("value.format", "raw");
+        options.put("key.format", "raw");
+        options.put("connector", "confluent");
+        options.put("changelog.mode", "append");
+        options.put("scan.startup.mode", "earliest-offset");
+        options.put("value.format", "raw");
 
         ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv,
@@ -628,8 +611,7 @@ public class DefaultServiceTasksTest {
                         .column("ts", DataTypes.TIMESTAMP_LTZ(3))
                         .watermark("ts", "SOURCE_WATERMARK()")
                         .build(),
-                publicOptions,
-                Collections.emptyMap());
+                options);
         final String sqlStmt = "SHOW CREATE TABLE source";
         TableResult result = tableEnv.executeSql(sqlStmt);
         String showCreateTableResult = result.collect().next().toString();

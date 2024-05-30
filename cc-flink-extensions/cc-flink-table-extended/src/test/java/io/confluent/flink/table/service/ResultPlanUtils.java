@@ -36,7 +36,7 @@ public class ResultPlanUtils {
                 INSTANCE.compileForegroundQuery(
                         tableEnv,
                         queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        (identifier, execNodeId, tableOptions) -> Collections.emptyMap());
     }
 
     public static ForegroundJobResultPlan foregroundJob(TableEnvironment tableEnv, String sql)
@@ -48,7 +48,7 @@ public class ResultPlanUtils {
                 INSTANCE.compileForegroundQuery(
                         tableEnv,
                         queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        (identifier, execNodeId, tableOptions) -> Collections.emptyMap());
     }
 
     public static BackgroundJobResultPlan backgroundJob(TableEnvironment tableEnv, String sql)
@@ -62,7 +62,9 @@ public class ResultPlanUtils {
                                 .collect(Collectors.toList());
         assert operations.size() == 1;
         return INSTANCE.compileBackgroundQueries(
-                tableEnv, operations, (identifier, execNodeId) -> Collections.emptyMap());
+                tableEnv,
+                operations,
+                (identifier, execNodeId, tableOptions) -> Collections.emptyMap());
     }
 
     public static ForegroundLocalResultPlan foregroundLocal(TableEnvironment tableEnv, String sql)
@@ -74,23 +76,18 @@ public class ResultPlanUtils {
                 INSTANCE.compileForegroundQuery(
                         tableEnv,
                         queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        (identifier, execNodeId, tableOptions) -> Collections.emptyMap());
     }
 
     public static void createConfluentCatalogTable(
-            TableEnvironment tableEnv,
-            String name,
-            Schema schema,
-            Map<String, String> publicOptions,
-            Map<String, String> privateOptions)
+            TableEnvironment tableEnv, String name, Schema schema, Map<String, String> options)
             throws Exception {
         final Catalog catalog =
                 tableEnv.getCatalog(tableEnv.getCurrentCatalog())
                         .orElseThrow(IllegalArgumentException::new);
         catalog.createTable(
                 new ObjectPath(tableEnv.getCurrentDatabase(), name),
-                new ConfluentCatalogTable(
-                        schema, null, null, Collections.emptyList(), publicOptions, privateOptions),
+                new ConfluentCatalogTable(schema, null, null, Collections.emptyList(), options),
                 false);
     }
 }

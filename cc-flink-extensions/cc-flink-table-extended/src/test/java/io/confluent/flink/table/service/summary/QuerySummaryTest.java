@@ -322,8 +322,7 @@ public class QuerySummaryTest {
                         .column("v", DataTypes.INT())
                         .primaryKey("k")
                         .build(),
-                options,
-                Collections.emptyMap());
+                options);
     }
 
     private static void createTable(TableEnvironment env, String name, Boundedness boundedness)

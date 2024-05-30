@@ -5,7 +5,6 @@
 package io.confluent.flink.table.catalog;
 
 import org.apache.flink.annotation.Confluent;
-import org.apache.flink.table.api.CompiledPlan;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -18,17 +17,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * {@link CatalogTable} that splits public options and private options.
+ * Confluent-specific {@link CatalogTable} that ensures the table comes from metastore.
  *
- * <p>Only public options are exposed to the planner. Private options are forwarded under the hood.
- * Once the planning has been completed, private options can be exposed using {@link
- * #exposePrivateOptions(Map)} for serializing them into a {@link CompiledPlan}.
+ * @see ConfluentCatalog
  */
 @Confluent
 public class ConfluentCatalogTable implements CatalogTable {
@@ -37,44 +33,24 @@ public class ConfluentCatalogTable implements CatalogTable {
     private final @Nullable String comment;
     private final @Nullable TableDistribution distribution;
     private final List<String> partitionKeys;
-    private final Map<String, String> publicOptions;
-    private final Map<String, String> privateOptions;
-
-    private final Map<String, String> exposedOptions;
+    private final Map<String, String> options;
 
     public ConfluentCatalogTable(
             Schema schema,
             @Nullable String comment,
             @Nullable TableDistribution distribution,
             List<String> partitionKeys,
-            Map<String, String> publicOptions,
-            Map<String, String> privateOptions) {
+            Map<String, String> options) {
         this.schema = checkNotNull(schema, "Schema must not be null.");
         this.comment = comment;
         this.distribution = distribution;
         this.partitionKeys = checkNotNull(partitionKeys, "Partition keys must not be null.");
-        this.publicOptions = checkNotNull(publicOptions, "Public options must not be null.");
-        this.privateOptions = checkNotNull(privateOptions, "Private options must not be null.");
+        this.options = new HashMap<>(checkNotNull(options, "Options must not be null."));
 
         checkArgument(
-                Stream.concat(publicOptions.entrySet().stream(), privateOptions.entrySet().stream())
+                options.entrySet().stream()
                         .allMatch(e -> e.getKey() != null && e.getValue() != null),
                 "Options cannot have null keys or values.");
-
-        this.exposedOptions = new HashMap<>(publicOptions);
-    }
-
-    /**
-     * Exposes private options to {@link #getOptions()} for serializing them into a {@link
-     * CompiledPlan}.
-     */
-    public void exposePrivateOptions(Map<String, String> morePrivateOptions) {
-        this.exposedOptions.putAll(privateOptions);
-        this.exposedOptions.putAll(morePrivateOptions);
-    }
-
-    public Map<String, String> getPrivateOptions() {
-        return privateOptions;
     }
 
     @Override
@@ -104,19 +80,17 @@ public class ConfluentCatalogTable implements CatalogTable {
 
     @Override
     public Map<String, String> getOptions() {
-        return exposedOptions;
+        return options;
     }
 
     @Override
     public CatalogBaseTable copy() {
-        return new ConfluentCatalogTable(
-                schema, comment, distribution, partitionKeys, publicOptions, privateOptions);
+        return new ConfluentCatalogTable(schema, comment, distribution, partitionKeys, options);
     }
 
     @Override
     public CatalogTable copy(Map<String, String> options) {
-        return new ConfluentCatalogTable(
-                schema, comment, distribution, partitionKeys, options, privateOptions);
+        return new ConfluentCatalogTable(schema, comment, distribution, partitionKeys, options);
     }
 
     @Override
@@ -148,20 +122,11 @@ public class ConfluentCatalogTable implements CatalogTable {
                 && Objects.equals(comment, that.comment)
                 && Objects.equals(distribution, that.distribution)
                 && partitionKeys.equals(that.partitionKeys)
-                && publicOptions.equals(that.publicOptions)
-                && privateOptions.equals(that.privateOptions)
-                && exposedOptions.equals(that.exposedOptions);
+                && options.equals(that.options);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-                schema,
-                comment,
-                distribution,
-                partitionKeys,
-                publicOptions,
-                privateOptions,
-                exposedOptions);
+        return Objects.hash(schema, comment, distribution, partitionKeys, options);
     }
 }

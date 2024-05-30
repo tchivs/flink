@@ -29,7 +29,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -545,8 +544,7 @@ public class InfoSchemaExecutionTest {
                     table.getComment(),
                     table.getDistribution().orElse(null),
                     table.getPartitionKeys(),
-                    table.getOptions(),
-                    Collections.emptyMap());
+                    table.getOptions());
         }
 
         @Override

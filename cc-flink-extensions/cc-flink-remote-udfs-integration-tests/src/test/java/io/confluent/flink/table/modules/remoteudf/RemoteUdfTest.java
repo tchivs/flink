@@ -138,6 +138,6 @@ public class RemoteUdfTest extends AbstractTestBase {
                 ServiceTasks.INSTANCE.compileForegroundQuery(
                         tableEnv,
                         queryOperation,
-                        (identifier, execNodeId) -> Collections.emptyMap());
+                        (identifier, execNodeId, tableOptions) -> Collections.emptyMap());
     }
 }

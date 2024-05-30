@@ -18,7 +18,6 @@ import io.confluent.flink.table.catalog.ConfluentCatalogTable;
 import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.infoschema.InfoSchemaTables;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -90,8 +89,7 @@ public class MockedCatalog extends GenericInMemoryCatalog implements Catalog {
                 table.getComment(),
                 null,
                 table.getPartitionKeys(),
-                table.getOptions(),
-                Collections.emptyMap());
+                table.getOptions());
     }
 
     public List<DatabaseInfo> listDatabaseInfos() {
