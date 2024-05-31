@@ -791,12 +791,17 @@ public class ConfluentManagedTableUtils {
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
 
-        // The setting "max.request.size" needs a number of bytes.
         options.getOptional(KAFKA_MAX_MESSAGE_SIZE)
                 .ifPresent(
-                        maxSize ->
-                                properties.put(
-                                        "max.request.size", String.valueOf(maxSize.getBytes())));
+                        maxSize -> {
+                            final long bytes = maxSize.getBytes();
+                            if (bytes > 0 && bytes <= Integer.MAX_VALUE) {
+                                // Producer settings for large message support
+                                properties.put("max.request.size", String.valueOf(bytes));
+                                // Consumer settings for large message support
+                                properties.put("max.partition.fetch.bytes", String.valueOf(bytes));
+                            }
+                        });
 
         // Maximum transaction timeout (15 min) as allowed by CCloud
         properties.setProperty("transaction.timeout.ms", "900000");
