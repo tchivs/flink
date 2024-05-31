@@ -53,7 +53,6 @@ import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.C
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_EMIT_PER_ROW;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.CONFLUENT_SOURCE_WATERMARK_VERSION;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_CLEANUP_POLICY;
-import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KAFKA_MAX_MESSAGE_SIZE;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FIELDS_PREFIX;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.KEY_FORMAT;
 import static io.confluent.flink.table.connectors.ConfluentManagedTableOptions.SCAN_BOUNDED_MODE;
@@ -791,17 +790,10 @@ public class ConfluentManagedTableUtils {
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
 
-        options.getOptional(KAFKA_MAX_MESSAGE_SIZE)
-                .ifPresent(
-                        maxSize -> {
-                            final long bytes = maxSize.getBytes();
-                            if (bytes > 0 && bytes <= Integer.MAX_VALUE) {
-                                // Producer settings for large message support
-                                properties.put("max.request.size", String.valueOf(bytes));
-                                // Consumer settings for large message support
-                                properties.put("max.partition.fetch.bytes", String.valueOf(bytes));
-                            }
-                        });
+        // Set the producer validation to a high value (20 MB) which should cover
+        // all cluster types on Confluent Cloud and delegate to the broker for rejecting
+        // large messages
+        properties.setProperty("max.request.size", "20971520");
 
         // Maximum transaction timeout (15 min) as allowed by CCloud
         properties.setProperty("transaction.timeout.ms", "900000");
