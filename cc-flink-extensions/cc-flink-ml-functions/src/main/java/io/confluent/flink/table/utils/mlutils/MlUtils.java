@@ -32,6 +32,17 @@ import java.util.List;
 /** Utilities for ML module. */
 public class MlUtils {
 
+    public static AbstractDataType getAbstractType(final UnresolvedColumn column) {
+        if (column instanceof UnresolvedPhysicalColumn) {
+            return ((UnresolvedPhysicalColumn) column).getDataType();
+        } else if (column instanceof UnresolvedMetadataColumn) {
+            return ((UnresolvedMetadataColumn) column).getDataType();
+        } else {
+            throw new IllegalArgumentException(
+                    "Only UnresolvedPhysicalColumn and UnresolvedMetaColumn supported");
+        }
+    }
+
     /**
      * Get logical type from UnresolvedColumn.
      *
@@ -39,15 +50,7 @@ public class MlUtils {
      * @return parsed logical type
      */
     public static LogicalType getLogicalType(final UnresolvedColumn column) {
-        AbstractDataType abstractDataType;
-        if (column instanceof UnresolvedPhysicalColumn) {
-            abstractDataType = ((UnresolvedPhysicalColumn) column).getDataType();
-        } else if (column instanceof UnresolvedMetadataColumn) {
-            abstractDataType = ((UnresolvedMetadataColumn) column).getDataType();
-        } else {
-            throw new IllegalArgumentException(
-                    "Only UnresolvedPhysicalColumn and UnresolvedMetaColumn supported");
-        }
+        AbstractDataType abstractDataType = getAbstractType(column);
 
         if (abstractDataType instanceof DataType) {
             return ((DataType) abstractDataType).getLogicalType();

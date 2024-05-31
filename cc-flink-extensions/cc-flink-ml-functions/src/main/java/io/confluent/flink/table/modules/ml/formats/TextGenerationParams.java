@@ -110,6 +110,13 @@ public class TextGenerationParams {
         getAllParams(caseInsensitiveParams);
     }
 
+    public void overrideParam(String param, Object value) {
+        // Remove the parameter if it already exists, this ensures that the final param uses
+        // the upper/lower casing of the override.
+        allParams.remove(param);
+        allParams.put(param, value);
+    }
+
     private void getStandardParams(Map<String, String> caseInsensitiveParams) {
         for (StandardChatParams param : standardParamNames.keySet()) {
             // Check all the possible names for the parameter.

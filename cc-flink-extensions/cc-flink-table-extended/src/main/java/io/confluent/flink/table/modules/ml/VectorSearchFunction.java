@@ -37,30 +37,30 @@ public class VectorSearchFunction extends TableFunction<Object> {
         // Vector search input is always topK int and single float array
         final List<DataType> args = new ArrayList<>();
         args.add(DataTypes.INT()); // int type for topK
-        // TODO: get this type from indexing option. The array element type can be int or double
+        // TODO: Pull the embedding column from the table schema and make this match it's type.
+        // Any numeric/byte array type should be acceptable here if that's what the input has.
         args.add(DataTypes.ARRAY(DataTypes.FLOAT())); // float array for embedding
-        // Output is whole table output
-        // TODO: some provider may not output all columns. May need to let user specify explicitly
-        // in options
+        // Output is an array of whole table output, which will contain one row per topK result.
+        List<DataTypes.Field> fields =
+                table.getUnresolvedSchema().getColumns().stream()
+                        .map(
+                                unresolvedColumn ->
+                                        DataTypes.FIELD(
+                                                unresolvedColumn.getName(),
+                                                typeFactory.createDataType(
+                                                        ((Schema.UnresolvedPhysicalColumn)
+                                                                        unresolvedColumn)
+                                                                .getDataType())))
+                        .collect(Collectors.toList());
         return TypeInference.newBuilder()
                 .typedArguments(args)
                 .outputTypeStrategy(
                         callContext ->
                                 Optional.of(
                                         DataTypes.ROW(
-                                                table.getUnresolvedSchema().getColumns().stream()
-                                                        .map(
-                                                                unresolvedColumn ->
-                                                                        DataTypes.FIELD(
-                                                                                unresolvedColumn
-                                                                                        .getName(),
-                                                                                typeFactory
-                                                                                        .createDataType(
-                                                                                                ((Schema
-                                                                                                                        .UnresolvedPhysicalColumn)
-                                                                                                                unresolvedColumn)
-                                                                                                        .getDataType())))
-                                                        .collect(Collectors.toList()))))
+                                                DataTypes.FIELD(
+                                                        "search_results",
+                                                        DataTypes.ARRAY(DataTypes.ROW(fields))))))
                 .build();
     }
 
