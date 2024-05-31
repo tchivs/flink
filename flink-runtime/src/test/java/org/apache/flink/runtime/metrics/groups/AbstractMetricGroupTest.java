@@ -32,7 +32,7 @@ import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.metrics.MetricRegistryImpl;
 import org.apache.flink.runtime.metrics.MetricRegistryTestUtils;
 import org.apache.flink.runtime.metrics.NoOpMetricRegistry;
-import org.apache.flink.runtime.metrics.ReporterSetup;
+import org.apache.flink.runtime.metrics.ReporterSetupBuilder;
 import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 import org.apache.flink.runtime.metrics.util.TestingMetricRegistry;
@@ -174,8 +174,10 @@ public class AbstractMetricGroupTest extends TestLogger {
                 new MetricRegistryImpl(
                         MetricRegistryTestUtils.fromConfiguration(config),
                         Arrays.asList(
-                                ReporterSetup.forReporter("test1", metricConfig1, reporter1),
-                                ReporterSetup.forReporter("test2", metricConfig2, reporter2)));
+                                ReporterSetupBuilder.METRIC_SETUP_BUILDER.forReporter(
+                                        "test1", metricConfig1, reporter1),
+                                ReporterSetupBuilder.METRIC_SETUP_BUILDER.forReporter(
+                                        "test2", metricConfig2, reporter2)));
         try {
             MetricGroup tmGroup =
                     TaskManagerMetricGroup.createTaskManagerMetricGroup(
@@ -251,8 +253,10 @@ public class AbstractMetricGroupTest extends TestLogger {
                 new MetricRegistryImpl(
                         MetricRegistryTestUtils.defaultMetricRegistryConfiguration(),
                         Arrays.asList(
-                                ReporterSetup.forReporter("test1", reporter1),
-                                ReporterSetup.forReporter("test2", reporter2)));
+                                ReporterSetupBuilder.METRIC_SETUP_BUILDER.forReporter(
+                                        "test1", reporter1),
+                                ReporterSetupBuilder.METRIC_SETUP_BUILDER.forReporter(
+                                        "test2", reporter2)));
         try {
             MetricGroup tmGroup =
                     TaskManagerMetricGroup.createTaskManagerMetricGroup(

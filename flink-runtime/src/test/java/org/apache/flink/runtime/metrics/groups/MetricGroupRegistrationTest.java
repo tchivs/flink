@@ -28,7 +28,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.metrics.MetricRegistryImpl;
 import org.apache.flink.runtime.metrics.MetricRegistryTestUtils;
-import org.apache.flink.runtime.metrics.ReporterSetup;
+import org.apache.flink.runtime.metrics.ReporterSetupBuilder;
 import org.apache.flink.runtime.metrics.util.TestReporter;
 import org.apache.flink.util.TestLogger;
 
@@ -48,7 +48,8 @@ public class MetricGroupRegistrationTest extends TestLogger {
                 new MetricRegistryImpl(
                         MetricRegistryTestUtils.defaultMetricRegistryConfiguration(),
                         Collections.singletonList(
-                                ReporterSetup.forReporter("test", new TestReporter1())));
+                                ReporterSetupBuilder.METRIC_SETUP_BUILDER.forReporter(
+                                        "test", new TestReporter1())));
 
         MetricGroup root =
                 TaskManagerMetricGroup.createTaskManagerMetricGroup(

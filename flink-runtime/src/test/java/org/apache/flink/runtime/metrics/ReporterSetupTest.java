@@ -76,7 +76,8 @@ class ReporterSetupTest {
 
         configureReporter1(config);
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
@@ -94,7 +95,8 @@ class ReporterSetupTest {
         configureReporter1(config);
         configureReporter2(config);
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         Assert.assertEquals(2, reporterSetups.size());
 
@@ -124,7 +126,8 @@ class ReporterSetupTest {
 
         config.setString(MetricOptions.REPORTERS_LIST, "reporter2");
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
@@ -139,7 +142,8 @@ class ReporterSetupTest {
         MetricOptions.forReporter(config, "reporter1")
                 .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter1.class.getName());
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
@@ -160,7 +164,8 @@ class ReporterSetupTest {
         MetricOptions.forReporter(config, "test3")
                 .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter13.class.getName());
 
-        List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         assertEquals(3, reporterSetups.size());
 
@@ -246,7 +251,8 @@ class ReporterSetupTest {
                         MetricOptions.REPORTER_EXCLUDED_VARIABLES,
                         excludedVariable1 + ";" + excludedVariable2);
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         assertEquals(1, reporterSetups.size());
 
@@ -266,7 +272,8 @@ class ReporterSetupTest {
         MetricOptions.forReporter(config, "test")
                 .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporterFactory.class.getName());
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         assertEquals(1, reporterSetups.size());
 
@@ -290,7 +297,8 @@ class ReporterSetupTest {
                         + MetricOptions.REPORTER_FACTORY_CLASS.key(),
                 FailingFactory.class.getName());
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         assertEquals(1, reporterSetups.size());
     }
@@ -305,7 +313,7 @@ class ReporterSetupTest {
                 ConfigExposingReporterFactory.class.getName());
         config.setString(ConfigConstants.METRICS_REPORTER_PREFIX + "test.arg", "hello");
 
-        ReporterSetup.fromConfiguration(config, null);
+        ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         Properties passedConfig = ConfigExposingReporterFactory.lastConfig;
         assertEquals("hello", passedConfig.getProperty("arg"));
@@ -325,7 +333,8 @@ class ReporterSetupTest {
                         MetricOptions.REPORTER_ADDITIONAL_VARIABLES.key(),
                         String.join(",", tag1 + ":" + tagValue1, tag2 + ":" + tagValue2));
 
-        final List<ReporterSetup> reporterSetups = ReporterSetup.fromConfiguration(config, null);
+        final List<ReporterSetup> reporterSetups =
+                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(config, null);
 
         assertEquals(1, reporterSetups.size());
 
