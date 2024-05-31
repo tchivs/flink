@@ -20,6 +20,7 @@ package org.apache.flink.metrics;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.annotation.Public;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.traces.SpanBuilder;
 
 import java.util.Map;
@@ -34,6 +35,13 @@ import java.util.Map;
  */
 @Public
 public interface MetricGroup {
+
+    // ------------------------------------------------------------------------
+    //  Events
+    // ------------------------------------------------------------------------
+
+    @Experimental
+    default void addEvent(EventBuilder eventBuilder) {}
 
     // ------------------------------------------------------------------------
     //  Spans

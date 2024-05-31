@@ -108,6 +108,8 @@ public final class Documentation {
 
         public static final String TRACE_REPORTERS = "trace_reporters";
 
+        public static final String EVENT_REPORTERS = "event_reporters";
+
         private Sections() {}
     }
 

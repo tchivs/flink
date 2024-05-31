@@ -468,6 +468,8 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
                 ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
                         configuration, pluginManager),
                 ReporterSetupBuilder.TRACE_SETUP_BUILDER.fromConfiguration(
+                        configuration, pluginManager),
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
                         configuration, pluginManager));
     }
 

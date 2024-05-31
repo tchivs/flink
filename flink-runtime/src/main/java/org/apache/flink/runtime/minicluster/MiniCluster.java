@@ -1128,6 +1128,8 @@ public class MiniCluster implements AutoCloseableAsync {
                 ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
                         config, miniClusterConfiguration.getPluginManager()),
                 ReporterSetupBuilder.TRACE_SETUP_BUILDER.fromConfiguration(
+                        config, miniClusterConfiguration.getPluginManager()),
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
                         config, miniClusterConfiguration.getPluginManager()));
     }
 
