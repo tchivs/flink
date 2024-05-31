@@ -105,9 +105,9 @@ public class QuerySummaryTest {
     void testBoundedness() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        createTable(env, "bounded1", Boundedness.BOUNDED);
-        createTable(env, "bounded2", Boundedness.BOUNDED);
-        createTable(env, "unbounded", Boundedness.CONTINUOUS_UNBOUNDED);
+        createTable(env, "bounded1", Boundedness.BOUNDED, false);
+        createTable(env, "bounded2", Boundedness.BOUNDED, false);
+        createTable(env, "unbounded", Boundedness.CONTINUOUS_UNBOUNDED, false);
 
         assertProperties(env, "TABLE bounded1", QueryProperty.BOUNDED);
         assertProperties(env, "TABLE bounded1 UNION ALL TABLE bounded2", QueryProperty.BOUNDED);
@@ -121,7 +121,7 @@ public class QuerySummaryTest {
     void testChangelogMode() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        createTable(env, "unbounded", Boundedness.CONTINUOUS_UNBOUNDED);
+        createTable(env, "unbounded", Boundedness.CONTINUOUS_UNBOUNDED, false);
 
         assertProperties(env, "SELECT * FROM unbounded", QueryProperty.APPEND_ONLY);
         assertProperties(env, "SELECT COUNT(*) FROM unbounded", QueryProperty.UPDATING);
@@ -131,7 +131,7 @@ public class QuerySummaryTest {
     void testChangelogModeForPointInTime() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inBatchMode());
 
-        createTable(env, "bounded1", Boundedness.BOUNDED);
+        createTable(env, "bounded1", Boundedness.BOUNDED, false);
 
         assertProperties(env, "SELECT * FROM bounded1", QueryProperty.APPEND_ONLY);
         assertProperties(env, "SELECT COUNT(*) FROM bounded1", QueryProperty.APPEND_ONLY);
@@ -141,7 +141,7 @@ public class QuerySummaryTest {
     void testSourceAndSinkIdentifierTags() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        createTable(env, "unbounded_source", Boundedness.CONTINUOUS_UNBOUNDED);
+        createTable(env, "unbounded_source", Boundedness.CONTINUOUS_UNBOUNDED, false);
         createTableSink(env, "unbounded_sink");
 
         QuerySummary querySummary =
@@ -172,8 +172,8 @@ public class QuerySummaryTest {
     void testUpsertKeys() throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
-        createTable(env, "unbounded1", Boundedness.CONTINUOUS_UNBOUNDED);
-        createTable(env, "unbounded2", Boundedness.CONTINUOUS_UNBOUNDED);
+        createTable(env, "unbounded1", Boundedness.CONTINUOUS_UNBOUNDED, false);
+        createTable(env, "unbounded2", Boundedness.CONTINUOUS_UNBOUNDED, false);
 
         assertThat(assertProperties(env, "SELECT k, v FROM unbounded1", QueryProperty.APPEND_ONLY))
                 .extracting(QuerySummary::getForegroundSinkUpsertKeys)
@@ -317,6 +317,37 @@ public class QuerySummaryTest {
 
     @Test
     void testSummaryUdfJoin() throws Exception {
+        testUdfQuery(
+                "SELECT * "
+                        + "FROM bounded1 x RIGHT JOIN bounded2 y "
+                        + "ON x.k=y.k where "
+                        + " x.k=y.k and a.b.c(x.v, y.v) > 10");
+    }
+
+    @Test
+    void testSummaryUdfWindowJoin() throws Exception {
+        testUdfQuery(
+                "SELECT * "
+                        + "FROM ("
+                        + "  SELECT * FROM TABLE(TUMBLE(TABLE bounded1, DESCRIPTOR(t), INTERVAL '5' MINUTES))"
+                        + ") L "
+                        + " FULL JOIN ("
+                        + "  SELECT * FROM TABLE(TUMBLE(TABLE bounded2, DESCRIPTOR(t), INTERVAL '5' MINUTES))"
+                        + ") R "
+                        + "ON L.k = R.k AND L.window_start = R.window_start AND L.window_end = R.window_end "
+                        + "AND a.b.c(L.v, R.v) > 10");
+    }
+
+    @Test
+    void testSummaryUdfTemporalJoin() throws Exception {
+        testUdfQuery(
+                "SELECT * "
+                        + "FROM bounded1 JOIN bounded2 FOR SYSTEM_TIME AS OF bounded1.t "
+                        + "ON bounded1.k=bounded2.k where "
+                        + " a.b.c(bounded1.v, bounded2.v) > 10");
+    }
+
+    private static void testUdfQuery(String sqlQuery) throws Exception {
         final TableEnvironment env = TableEnvironment.create(EnvironmentSettings.inStreamingMode());
         env.createTemporaryFunction(
                 "a.b.c",
@@ -324,18 +355,12 @@ public class QuerySummaryTest {
                         Collections.singletonMap(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), "false"),
                         UDF_SPECS));
 
-        createTable(env, "bounded1", Boundedness.BOUNDED);
-        createTable(env, "bounded2", Boundedness.BOUNDED);
+        createTable(env, "bounded1", Boundedness.BOUNDED, true);
+        createTable(env, "bounded2", Boundedness.BOUNDED, true);
 
         final QuerySummary querySummary =
                 assertProperties(
-                        env,
-                        "SELECT * "
-                                + "FROM bounded1 x RIGHT JOIN bounded2 y "
-                                + "ON x.k=y.k where "
-                                + " x.k=y.k and a.b.c(x.v, y.v) > 10",
-                        QueryProperty.FOREGROUND,
-                        QueryProperty.SINGLE_SINK);
+                        env, sqlQuery, QueryProperty.FOREGROUND, QueryProperty.SINGLE_SINK);
 
         assertThat(querySummary.getUdfCalls()).hasSize(1);
         assertThat(querySummary.getUdfCalls().iterator().next().getPath()).isEqualTo("`a`.`b`.`c`");
@@ -344,32 +369,35 @@ public class QuerySummaryTest {
     }
 
     private static void createConfluentCatalogTable(
-            TableEnvironment env, String name, Map<String, String> options) throws Exception {
-        ResultPlanUtils.createConfluentCatalogTable(
-                env,
-                name,
+            TableEnvironment env, String name, Map<String, String> options, boolean rowTime)
+            throws Exception {
+        Schema.Builder builder =
                 Schema.newBuilder()
                         .column("k", DataTypes.INT().notNull())
                         .column("v", DataTypes.INT())
-                        .primaryKey("k")
-                        .build(),
-                options);
+                        .column("t", DataTypes.TIMESTAMP(3))
+                        .primaryKey("k");
+        if (rowTime) {
+            builder.watermark("t", "t - INTERVAL '5' SECOND");
+        }
+        ResultPlanUtils.createConfluentCatalogTable(env, name, builder.build(), options);
     }
 
-    private static void createTable(TableEnvironment env, String name, Boundedness boundedness)
+    private static void createTable(
+            TableEnvironment env, String name, Boundedness boundedness, boolean rowTime)
             throws Exception {
         final Map<String, String> options = new HashMap<>();
         options.put("connector", "datagen");
         if (boundedness == Boundedness.BOUNDED) {
             options.put("number-of-rows", "10");
         }
-        createConfluentCatalogTable(env, name, options);
+        createConfluentCatalogTable(env, name, options, rowTime);
     }
 
     private static void createTableSink(TableEnvironment env, String name) throws Exception {
         final Map<String, String> options = new HashMap<>();
         options.put("connector", "blackhole");
-        createConfluentCatalogTable(env, name, options);
+        createConfluentCatalogTable(env, name, options, false);
     }
 
     private static QuerySummary assertProperties(
