@@ -29,6 +29,7 @@ import static io.confluent.flink.udf.adapter.TestUtil.DUMMY_CONTEXT;
 import static io.confluent.flink.udf.adapter.TestUtil.createSerializedOpenPayload;
 import static io.confluent.flink.udf.adapter.TestUtil.createSerializers;
 import static io.confluent.flink.udf.adapter.TestUtil.testInvoke;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Unit tests for {@link ScalarFunctionHandler}. */
@@ -224,6 +225,31 @@ public class ScalarFunctionHandlerTest {
 
         functionHandler.close(new byte[0], DUMMY_CONTEXT);
         executor.shutdownNow();
+    }
+
+    @Test
+    public void testInvokeConcatFunctionWithNull() throws Throwable {
+        functionHandler.open(
+                createSerializedOpenPayload(
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
+                        new VarCharType(Integer.MAX_VALUE),
+                        Arrays.asList(new VarCharType(), new VarCharType()),
+                        ConcatFunction.class.getName(),
+                        true,
+                        configuration),
+                DUMMY_CONTEXT);
+        RemoteUdfSerialization serializers = createSerializers(functionHandler);
+        assertThat(
+                        testInvoke(
+                                        functionHandler,
+                                        new Object[] {StringData.fromString("blah "), null},
+                                        serializers)
+                                .toString())
+                .isEqualTo("blah null");
+        functionHandler.close(new byte[0], DUMMY_CONTEXT);
     }
 
     /** Simple ScalarFunction with identity behavior for String and Integer types. */

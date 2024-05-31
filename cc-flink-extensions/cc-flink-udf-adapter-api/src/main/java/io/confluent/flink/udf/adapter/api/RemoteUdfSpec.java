@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter.api;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.runtime.NullableSerializer;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -100,13 +101,15 @@ public class RemoteUdfSpec implements Serializable {
 
     /** Creates the serializer for the return value. */
     public TypeSerializer<Object> createReturnTypeSerializer() {
-        return serializerForDataType(returnType);
+        return NullableSerializer.wrapIfNullIsNotSupported(
+                serializerForDataType(returnType), false);
     }
 
     /** Creates a list of serializers for the argument values. */
     public List<TypeSerializer<Object>> createArgumentSerializers() {
         return argumentTypes.stream()
                 .map(RemoteUdfSpec::serializerForDataType)
+                .map(ts -> NullableSerializer.wrapIfNullIsNotSupported(ts, false))
                 .collect(Collectors.toList());
     }
 

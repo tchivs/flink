@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter.serde;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.runtime.NullableSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.functions.ScalarFunction;
@@ -68,10 +69,13 @@ public class SerDeScalarFunctionCallAdapter {
                         remoteUdfSpec.getReturnType(),
                         classLoader);
 
-        TypeSerializer<Object> returnSerializer = InternalSerializers.create(returnLogicalType);
+        TypeSerializer<Object> returnSerializer =
+                NullableSerializer.wrapIfNullIsNotSupported(
+                        InternalSerializers.create(returnLogicalType), false);
         List<TypeSerializer<Object>> argumentSerializers =
                 argumentLogicalTypes.stream()
                         .map(InternalSerializers::create)
+                        .map(ts -> NullableSerializer.wrapIfNullIsNotSupported(ts, false))
                         .collect(Collectors.toList());
         return create(instanceCallAdapter, returnSerializer, argumentSerializers);
     }

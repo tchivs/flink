@@ -5,6 +5,7 @@
 package io.confluent.flink.udf.adapter;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.runtime.NullableSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
@@ -37,9 +38,14 @@ public class AdapterPerformanceTest {
             final LogicalType retType = new IntType();
             final List<LogicalType> argTypes = Arrays.asList(new IntType(), new IntType());
             final String functionClass = SumScalarFunction.class.getName();
-            final TypeSerializer<Object> retTypeSerializer = InternalSerializers.create(retType);
+            final TypeSerializer<Object> retTypeSerializer =
+                    NullableSerializer.wrapIfNullIsNotSupported(
+                            InternalSerializers.create(retType), false);
             final List<TypeSerializer<Object>> argTypeSerializers =
-                    argTypes.stream().map(InternalSerializers::create).collect(Collectors.toList());
+                    argTypes.stream()
+                            .map(InternalSerializers::create)
+                            .map(ts -> NullableSerializer.wrapIfNullIsNotSupported(ts, false))
+                            .collect(Collectors.toList());
 
             DataOutputSerializer out = new DataOutputSerializer(8);
             TestUtil.writeSerializedOpenPayload(
