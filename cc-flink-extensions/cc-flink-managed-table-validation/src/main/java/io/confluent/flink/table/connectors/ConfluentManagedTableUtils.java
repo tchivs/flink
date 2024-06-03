@@ -803,6 +803,10 @@ public class ConfluentManagedTableUtils {
         // minus some time to not hide a potential timeout
         properties.setProperty("delivery.timeout.ms", "300000");
 
+        // Consumers should read only committed data, no duplicates will be seen in
+        // case of a Flink restart.
+        properties.setProperty("isolation.level", "read_committed");
+
         // Note: Make sure to set default properties before this line is applied in order to
         // allow DevOps overwriting defaults via the CompiledPlan if necessary.
         options.getOptional(CONFLUENT_KAFKA_PROPERTIES).ifPresent(properties::putAll);
