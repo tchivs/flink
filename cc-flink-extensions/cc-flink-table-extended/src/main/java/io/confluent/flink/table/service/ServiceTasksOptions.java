@@ -132,6 +132,12 @@ public final class ServiceTasksOptions {
                     .defaultValue(false)
                     .withDescription("A flag to enable or disable Confluent ML functions.");
 
+    public static final ConfigOption<Boolean> CONFLUENT_FEDERATED_SEARCH_ENABLED =
+            ConfigOptions.key(PRIVATE_PREFIX + "federated-search.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("A flag to enable or disable Confluent federated search.");
+
     public static final ConfigOption<Boolean> CONFLUENT_REMOTE_UDF_ENABLED =
             ConfigOptions.key(PRIVATE_PREFIX + "remote-udf.enabled")
                     .booleanType()

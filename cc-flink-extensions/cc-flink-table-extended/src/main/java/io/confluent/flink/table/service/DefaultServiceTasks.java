@@ -273,7 +273,8 @@ class DefaultServiceTasks implements ServiceTasks {
                 privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
 
         if (service == Service.JOB_SUBMISSION_SERVICE
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_FEDERATED_SEARCH_ENABLED)) {
             tableEnvironment.loadModule("ml", new MLFunctionsModule());
         }
 
