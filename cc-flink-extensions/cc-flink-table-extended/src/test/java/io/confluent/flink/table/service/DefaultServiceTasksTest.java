@@ -92,7 +92,11 @@ public class DefaultServiceTasksTest {
         final Schema schema = Schema.newBuilder().column("i", "INT").build();
 
         ResultPlanUtils.createConfluentCatalogTable(
-                tableEnv, "source", schema, Collections.singletonMap("connector", "datagen"));
+                tableEnv,
+                "source",
+                schema,
+                Map.ofEntries(
+                        Map.entry("connector", "datagen"), Map.entry("rows-per-second", "10")));
 
         ResultPlanUtils.createConfluentCatalogTable(
                 tableEnv, "sink", schema, Collections.singletonMap("connector", "blackhole"));
@@ -104,11 +108,12 @@ public class DefaultServiceTasksTest {
                         .parse("INSERT INTO sink SELECT * FROM source");
         final SinkModifyOperation modifyOperation = (SinkModifyOperation) operations.get(0);
 
-        final ConnectorOptionsProvider optionsProvider =
+        final ConnectorOptionsMutator optionsProvider =
                 (identifier, execNodeId, tableOptions) -> {
                     // execNodeId is omitted because it is not deterministic
-                    return Collections.singletonMap(
-                            "transactional-id", "my_" + identifier.getObjectName());
+                    tableOptions.put("transactional-id", "my_" + identifier.getObjectName());
+
+                    tableOptions.remove("rows-per-second");
                 };
 
         final BackgroundJobResultPlan plan =

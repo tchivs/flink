@@ -68,7 +68,7 @@ public interface ServiceTasks {
     ForegroundResultPlan compileForegroundQuery(
             TableEnvironment tableEnvironment,
             QueryOperation queryOperation,
-            ConnectorOptionsProvider connectorOptions)
+            ConnectorOptionsMutator connectorOptions)
             throws Exception;
 
     /**
@@ -78,6 +78,6 @@ public interface ServiceTasks {
     BackgroundJobResultPlan compileBackgroundQueries(
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
-            ConnectorOptionsProvider connectorOptions)
+            ConnectorOptionsMutator connectorOptions)
             throws Exception;
 }

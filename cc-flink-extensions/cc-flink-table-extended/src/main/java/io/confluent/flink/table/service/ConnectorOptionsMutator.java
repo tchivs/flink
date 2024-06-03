@@ -11,17 +11,14 @@ import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 
 import java.util.Map;
 
-/**
- * Generates additional options for connectors that must be globally unique in the {@link
- * CompiledPlan}.
- */
+/** Mutates options for connectors before putting them into {@link CompiledPlan}. */
 @Confluent
-public interface ConnectorOptionsProvider {
+public interface ConnectorOptionsMutator {
 
     /**
-     * Returns a map of options that will be added to the {@link CompiledPlan} for the given
+     * Enables mutating options that will be added to the {@link CompiledPlan} for the given
      * connector {@link ExecNode}.
      */
-    Map<String, String> generateOptions(
+    void mutateOptions(
             ObjectIdentifier identifier, int execNodeId, Map<String, String> tableOptions);
 }

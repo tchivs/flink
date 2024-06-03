@@ -501,7 +501,7 @@ class DefaultServiceTasks implements ServiceTasks {
     public ForegroundResultPlan compileForegroundQuery(
             TableEnvironment tableEnvironment,
             QueryOperation queryOperation,
-            ConnectorOptionsProvider connectorOptions) {
+            ConnectorOptionsMutator connectorOptions) {
         final SinkModifyOperation modifyOperation = convertToModifyOperation(queryOperation);
 
         final CompilationResult compilationResult =
@@ -595,7 +595,7 @@ class DefaultServiceTasks implements ServiceTasks {
     public BackgroundJobResultPlan compileBackgroundQueries(
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
-            ConnectorOptionsProvider connectorOptions) {
+            ConnectorOptionsMutator connectorOptions) {
         final CompilationResult compilationResult =
                 compile(false, tableEnvironment, modifyOperations, connectorOptions);
 
@@ -647,7 +647,7 @@ class DefaultServiceTasks implements ServiceTasks {
             boolean isForeground,
             TableEnvironment tableEnvironment,
             List<ModifyOperation> modifyOperations,
-            ConnectorOptionsProvider connectorOptions) {
+            ConnectorOptionsMutator connectorOptions) {
         final TableEnvironmentImpl tableEnv = (TableEnvironmentImpl) tableEnvironment;
 
         final PlannerBase planner = (PlannerBase) tableEnv.getPlanner();
@@ -672,7 +672,7 @@ class DefaultServiceTasks implements ServiceTasks {
         // physical graph but currently this is not possible.
         querySummary.ingestExecNodeGraph(graph);
 
-        graph.getRootNodes().forEach(node -> addConnectorOptions(node, connectorOptions));
+        graph.getRootNodes().forEach(node -> mutateConnectorOptions(node, connectorOptions));
 
         graph.getRootNodes().forEach(DefaultServiceTasks::checkForUnsupportedExecNodes);
 
@@ -707,10 +707,10 @@ class DefaultServiceTasks implements ServiceTasks {
         return planner.translateToExecNodeGraph(toScala(optimizedNodes), true);
     }
 
-    private static void addConnectorOptions(
-            ExecNode<?> node, ConnectorOptionsProvider optionsProvider) {
+    private static void mutateConnectorOptions(
+            ExecNode<?> node, ConnectorOptionsMutator optionsMutator) {
         node.getInputEdges()
-                .forEach(edge -> addConnectorOptions(edge.getSource(), optionsProvider));
+                .forEach(edge -> mutateConnectorOptions(edge.getSource(), optionsMutator));
 
         final ContextResolvedTable contextTable;
         if (node instanceof StreamExecTableSourceScan) {
@@ -740,12 +740,8 @@ class DefaultServiceTasks implements ServiceTasks {
         }
         final ConfluentCatalogTable catalogTable = contextTable.getTable();
 
-        final Map<String, String> connectorOptions =
-                optionsProvider.generateOptions(
-                        contextTable.getIdentifier(),
-                        node.getId(),
-                        Collections.unmodifiableMap(catalogTable.getOptions()));
-        catalogTable.getOptions().putAll(connectorOptions);
+        optionsMutator.mutateOptions(
+                contextTable.getIdentifier(), node.getId(), catalogTable.getOptions());
     }
 
     private static void checkForUnsupportedExecNodes(ExecNode<?> node) {
