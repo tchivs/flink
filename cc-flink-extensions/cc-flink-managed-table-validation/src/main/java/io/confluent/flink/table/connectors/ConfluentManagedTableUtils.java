@@ -790,10 +790,11 @@ public class ConfluentManagedTableUtils {
         options.getOptional(CONFLUENT_KAFKA_CONSUMER_GROUP_ID)
                 .ifPresent(id -> properties.put("group.id", id));
 
-        // Set the producer validation to a high value (20 MB) which should cover
-        // all cluster types on Confluent Cloud and delegate to the broker for rejecting
-        // large messages
-        properties.setProperty("max.request.size", "20971520");
+        // Set the producer validation to a high value which should cover
+        // all cluster types on Confluent Cloud (20 MB) and delegate to the broker for rejecting
+        // large messages. Since the setting is pre-compression we assume a compression ratio of 10
+        // which makes it 200 MB.
+        properties.setProperty("max.request.size", "209715200");
 
         // Maximum transaction timeout (15 min) as allowed by CCloud
         properties.setProperty("transaction.timeout.ms", "900000");
