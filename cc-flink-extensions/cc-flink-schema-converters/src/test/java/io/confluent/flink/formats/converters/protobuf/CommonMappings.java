@@ -6,7 +6,9 @@ package io.confluent.flink.formats.converters.protobuf;
 
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DateType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -69,7 +71,11 @@ public final class CommonMappings {
 
     public static Stream<TypeMapping> get() {
         return Stream.of(
-                NESTED_ROWS_CASE, NESTED_ROWS_SAME_NAME, ALL_SIMPLE_TYPES_CASE, COLLECTIONS_CASE);
+                NESTED_ROWS_CASE,
+                NESTED_ROWS_SAME_NAME,
+                ALL_SIMPLE_TYPES_CASE,
+                COLLECTIONS_CASE,
+                STRING_TYPES_CASE);
     }
 
     private static final TypeMapping NESTED_ROWS_CASE =
@@ -278,8 +284,6 @@ public final class CommonMappings {
                             + "      }\n"
                             + "    ]\n"
                             + "  }];\n"
-                            + "  optional string string = 23;\n"
-                            + "  optional bytes bytes = 24;\n"
                             + "}",
                     new RowType(
                             false,
@@ -308,13 +312,99 @@ public final class CommonMappings {
                                     new RowField("timestamp", new TimestampType(true, 9)),
                                     new RowField("timestamp_3", new TimestampType(true, 3)),
                                     new RowField("time", new TimeType(true, 3)),
-                                    new RowField("time_2", new TimeType(true, 2)),
+                                    new RowField("time_2", new TimeType(true, 2)))));
+
+    private static final TypeMapping STRING_TYPES_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package io.confluent.protobuf.generated;\n"
+                            + "\n"
+                            + "message Row {\n"
+                            + "  optional string string = 1;\n"
+                            + "  optional string charMax = 2 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"2147483647\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.minLength\",\n"
+                            + "        value: \"2147483647\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional bytes bytes = 3;\n"
+                            + "  optional bytes binaryMax = 4 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"2147483647\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.minLength\",\n"
+                            + "        value: \"2147483647\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional string varchar = 5 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional bytes varbinary = 6 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional string char = 7 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.minLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional bytes binary = 8 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.maxLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.minLength\",\n"
+                            + "        value: \"123\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "}",
+                    new RowType(
+                            false,
+                            Arrays.asList(
                                     new RowField(
                                             "string",
                                             new VarCharType(true, VarCharType.MAX_LENGTH)),
                                     new RowField(
+                                            "charMax", new CharType(true, CharType.MAX_LENGTH)),
+                                    new RowField(
                                             "bytes",
-                                            new VarBinaryType(true, VarBinaryType.MAX_LENGTH)))));
+                                            new VarBinaryType(true, VarBinaryType.MAX_LENGTH)),
+                                    new RowField(
+                                            "binaryMax",
+                                            new BinaryType(true, BinaryType.MAX_LENGTH)),
+                                    new RowField("varchar", new VarCharType(true, 123)),
+                                    new RowField("varbinary", new VarBinaryType(true, 123)),
+                                    new RowField("char", new CharType(true, 123)),
+                                    new RowField("binary", new BinaryType(true, 123)))));
 
     private CommonMappings() {}
 }

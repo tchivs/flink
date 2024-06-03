@@ -30,6 +30,8 @@ class CommonConstants {
     // Kafka Connect adds support for them in the future.
     // ====================================================
     static final String FLINK_PRECISION = "flink.precision";
+    static final String FLINK_MIN_LENGTH = "flink.minLength";
+    static final String FLINK_MAX_LENGTH = "flink.maxLength";
 
     private CommonConstants() {}
 }

@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BinaryType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
@@ -20,6 +21,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
+import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.StringUtils;
 
 import org.apache.avro.LogicalTypes;
@@ -76,8 +78,23 @@ public class FlinkToAvroSchemaConverter {
             case DOUBLE:
                 return SchemaBuilder.builder().doubleType();
             case CHAR:
+                {
+                    CharType charType = (CharType) logicalType;
+                    final Schema stringType = SchemaBuilder.builder().stringType();
+                    stringType.addProp(CommonConstants.FLINK_MIN_LENGTH, charType.getLength());
+                    stringType.addProp(CommonConstants.FLINK_MAX_LENGTH, charType.getLength());
+                    return stringType;
+                }
             case VARCHAR:
-                return SchemaBuilder.builder().stringType();
+                {
+                    VarCharType varCharType = (VarCharType) logicalType;
+                    final Schema stringType = SchemaBuilder.builder().stringType();
+                    if (varCharType.getLength() < VarCharType.MAX_LENGTH) {
+                        stringType.addProp(
+                                CommonConstants.FLINK_MAX_LENGTH, varCharType.getLength());
+                    }
+                    return stringType;
+                }
             case BINARY:
             case VARBINARY:
                 return convertBinary(logicalType, rowName);

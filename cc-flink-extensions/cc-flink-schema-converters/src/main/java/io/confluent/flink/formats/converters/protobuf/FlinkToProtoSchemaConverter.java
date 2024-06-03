@@ -7,6 +7,8 @@ package io.confluent.flink.formats.converters.protobuf;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.BinaryType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
@@ -18,6 +20,8 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
+import org.apache.flink.table.types.logical.VarBinaryType;
+import org.apache.flink.table.types.logical.VarCharType;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.CaseFormat;
 
@@ -174,7 +178,7 @@ public class FlinkToProtoSchemaConverter {
                 return builder.build();
             case SMALLINT:
                 builder.setType(Type.TYPE_INT32);
-                builder.setOptions(
+                builder.mergeOptions(
                         FieldOptions.newBuilder()
                                 .setExtension(
                                         MetaProto.fieldMeta,
@@ -198,13 +202,23 @@ public class FlinkToProtoSchemaConverter {
                 builder.setType(Type.TYPE_DOUBLE);
                 return builder.build();
             case CHAR:
+                return createLengthLimitedType(
+                        builder,
+                        Type.TYPE_STRING,
+                        ((CharType) logicalType).getLength(),
+                        ((CharType) logicalType).getLength());
             case VARCHAR:
-                builder.setType(Type.TYPE_STRING);
-                return builder.build();
+                return createLengthLimitedType(
+                        builder, Type.TYPE_STRING, -1, ((VarCharType) logicalType).getLength());
             case BINARY:
+                return createLengthLimitedType(
+                        builder,
+                        Type.TYPE_BYTES,
+                        ((BinaryType) logicalType).getLength(),
+                        ((BinaryType) logicalType).getLength());
             case VARBINARY:
-                builder.setType(Type.TYPE_BYTES);
-                return builder.build();
+                return createLengthLimitedType(
+                        builder, Type.TYPE_BYTES, -1, ((VarBinaryType) logicalType).getLength());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return createTimestampFieldDescriptor(
                         ((TimestampType) logicalType).getPrecision(),
@@ -310,6 +324,30 @@ public class FlinkToProtoSchemaConverter {
                 throw new ValidationException(
                         "Unsupported to derive Protobuf Schema for type " + logicalType);
         }
+    }
+
+    private static FieldDescriptorProto createLengthLimitedType(
+            FieldDescriptorProto.Builder builder, Type type, int minLength, int maxLength) {
+        final Map<String, String> params = new HashMap<>();
+        if (minLength == maxLength && minLength > 0) {
+            // CHAR or BINARY case
+            params.put(CommonConstants.FLINK_MIN_LENGTH, String.valueOf(minLength));
+            params.put(CommonConstants.FLINK_MAX_LENGTH, String.valueOf(maxLength));
+        } else if (maxLength != VarCharType.MAX_LENGTH) {
+            params.put(CommonConstants.FLINK_MAX_LENGTH, String.valueOf(maxLength));
+        }
+
+        if (!params.isEmpty()) {
+            builder.mergeOptions(
+                    FieldOptions.newBuilder()
+                            .setExtension(
+                                    MetaProto.fieldMeta,
+                                    Meta.newBuilder().putAllParams(params).build())
+                            .build());
+        }
+
+        builder.setType(type);
+        return builder.build();
     }
 
     private static FieldDescriptorProto createTimeFieldDescriptor(

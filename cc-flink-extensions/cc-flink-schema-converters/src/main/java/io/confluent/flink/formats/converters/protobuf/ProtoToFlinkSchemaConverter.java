@@ -8,7 +8,9 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DateType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -184,10 +186,11 @@ public class ProtoToFlinkSchemaConverter {
             case BOOL:
                 return new BooleanType(isOptional);
             case ENUM:
-            case STRING:
                 return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
+            case STRING:
+                return createStringType(isOptional, schema, CharType::new, VarCharType::new);
             case BYTES:
-                return new VarBinaryType(isOptional, VarBinaryType.MAX_LENGTH);
+                return createStringType(isOptional, schema, BinaryType::new, VarBinaryType::new);
             case MESSAGE:
                 {
                     String fullName = schema.getMessageType().getFullName();
@@ -213,6 +216,39 @@ public class ProtoToFlinkSchemaConverter {
                 }
             default:
                 throw new ValidationException("Unknown Protobuf schema type " + schema.getType());
+        }
+    }
+
+    /** Utility to interface just to name the parameters. */
+    @FunctionalInterface
+    private interface LengthLimitedTypeConstructor {
+        LogicalType create(boolean isOptional, int length);
+    }
+
+    private static LogicalType createStringType(
+            boolean isOptional,
+            FieldDescriptor schema,
+            LengthLimitedTypeConstructor constantTypeCtor,
+            LengthLimitedTypeConstructor variableTypeCtor) {
+        final Optional<Meta> meta = getMeta(schema);
+        if (meta.isPresent()) {
+            final Meta fieldMeta = meta.get();
+            final int minLength =
+                    Integer.valueOf(
+                            fieldMeta.getParamsOrDefault(CommonConstants.FLINK_MIN_LENGTH, "-1"));
+            final int maxLength =
+                    Optional.ofNullable(
+                                    fieldMeta.getParamsOrDefault(
+                                            CommonConstants.FLINK_MAX_LENGTH, null))
+                            .map(Integer::valueOf)
+                            .orElse(VarCharType.MAX_LENGTH);
+            if (minLength > 0 && minLength == maxLength) {
+                return constantTypeCtor.create(isOptional, maxLength);
+            } else {
+                return variableTypeCtor.create(isOptional, maxLength);
+            }
+        } else {
+            return variableTypeCtor.create(isOptional, VarCharType.MAX_LENGTH);
         }
     }
 

@@ -8,7 +8,9 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DateType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -199,10 +201,7 @@ public class JsonToFlinkSchemaConverter {
                 }
             }
         } else if (schema instanceof StringSchema) {
-            String type = (String) schema.getUnprocessedProperties().get(CONNECT_TYPE_PROP);
-            return CONNECT_TYPE_BYTES.equals(type)
-                    ? new VarBinaryType(isOptional, VarBinaryType.MAX_LENGTH)
-                    : new VarCharType(isOptional, VarCharType.MAX_LENGTH);
+            return convertStringSchema((StringSchema) schema, isOptional);
         } else if (schema instanceof EnumSchema) {
             // enums are unwrapped to strings and the original enum is not preserved
             return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
@@ -325,6 +324,34 @@ public class JsonToFlinkSchemaConverter {
         } else {
             throw new ValidationException(
                     "Unsupported JSON schema type " + schema.getClass().getName());
+        }
+    }
+
+    private static LogicalType convertStringSchema(StringSchema schema, boolean isOptional) {
+        final Map<String, Object> props = schema.getUnprocessedProperties();
+        String type = (String) props.get(CONNECT_TYPE_PROP);
+        if (CONNECT_TYPE_BYTES.equals(type)) {
+            final Integer minLength =
+                    (Integer) props.getOrDefault(CommonConstants.FLINK_MIN_LENGTH, null);
+            final Integer maxLength =
+                    (Integer) props.getOrDefault(CommonConstants.FLINK_MAX_LENGTH, null);
+            if (minLength != null && Objects.equals(minLength, maxLength)) {
+                return new BinaryType(isOptional, maxLength);
+            } else if (maxLength != null) {
+                return new VarBinaryType(isOptional, maxLength);
+            } else {
+                return new VarBinaryType(isOptional, VarCharType.MAX_LENGTH);
+            }
+        } else {
+            final Integer minLength = schema.getMinLength();
+            final Integer maxLength = schema.getMaxLength();
+            if (minLength != null && Objects.equals(minLength, maxLength)) {
+                return new CharType(isOptional, maxLength);
+            } else if (maxLength != null) {
+                return new VarCharType(isOptional, maxLength);
+            } else {
+                return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
+            }
         }
     }
 

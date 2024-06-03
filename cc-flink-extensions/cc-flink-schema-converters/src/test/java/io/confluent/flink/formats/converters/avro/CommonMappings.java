@@ -7,6 +7,7 @@ package io.confluent.flink.formats.converters.avro;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
@@ -115,6 +116,19 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.builder().stringType(),
                         new VarCharType(false, VarCharType.MAX_LENGTH)),
+                new TypeMapping(
+                        SchemaBuilder.builder()
+                                .stringBuilder()
+                                .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
+                                .endString(),
+                        new VarCharType(false, 123)),
+                new TypeMapping(
+                        SchemaBuilder.builder()
+                                .stringBuilder()
+                                .prop(CommonConstants.FLINK_MIN_LENGTH, 123)
+                                .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
+                                .endString(),
+                        new CharType(false, 123)),
                 new TypeMapping(
                         SchemaBuilder.builder().array().items(SchemaBuilder.builder().longType()),
                         new ArrayType(false, new BigIntType(false))),

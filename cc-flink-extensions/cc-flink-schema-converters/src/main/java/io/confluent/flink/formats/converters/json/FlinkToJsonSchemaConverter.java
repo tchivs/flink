@@ -7,6 +7,8 @@ package io.confluent.flink.formats.converters.json;
 import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.BinaryType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
@@ -18,6 +20,8 @@ import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
+import org.apache.flink.table.types.logical.VarBinaryType;
+import org.apache.flink.table.types.logical.VarCharType;
 
 import org.everit.json.schema.ArraySchema;
 import org.everit.json.schema.BooleanSchema;
@@ -149,13 +153,28 @@ public class FlinkToJsonSchemaConverter {
                         .unprocessedProperties(
                                 Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_FLOAT64));
             case CHAR:
+                {
+                    CharType charType = (CharType) logicalType;
+                    final StringSchema.Builder builder = StringSchema.builder();
+                    builder.minLength(charType.getLength());
+                    builder.maxLength(charType.getLength());
+                    return builder;
+                }
             case VARCHAR:
-                return StringSchema.builder();
+                {
+                    VarCharType varcharType = (VarCharType) logicalType;
+                    final StringSchema.Builder builder = StringSchema.builder();
+                    if (varcharType.getLength() < VarCharType.MAX_LENGTH) {
+                        builder.maxLength(varcharType.getLength());
+                    }
+                    return builder;
+                }
             case BINARY:
+                BinaryType binaryType = (BinaryType) logicalType;
+                return createBinaryStringType(binaryType.getLength(), binaryType.getLength());
             case VARBINARY:
-                return StringSchema.builder()
-                        .unprocessedProperties(
-                                Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES));
+                VarBinaryType varBinaryType = (VarBinaryType) logicalType;
+                return createBinaryStringType(-1, varBinaryType.getLength());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return convertTimestamp(
                         ((TimestampType) logicalType).getPrecision(), logicalType.getTypeRoot());
@@ -218,6 +237,21 @@ public class FlinkToJsonSchemaConverter {
                 throw new ValidationException(
                         "Unsupported to derive JSON Schema for type: " + logicalType);
         }
+    }
+
+    private static Schema.Builder<StringSchema> createBinaryStringType(
+            int minLength, int maxLength) {
+        final StringSchema.Builder builder = StringSchema.builder();
+        final Map<String, Object> props = new HashMap<>();
+        if (minLength == maxLength && minLength > 0) {
+            // BINARY case
+            props.put(CommonConstants.FLINK_MIN_LENGTH, minLength);
+            props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
+        } else if (maxLength < BinaryType.MAX_LENGTH) {
+            props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
+        }
+        props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES);
+        return builder.unprocessedProperties(props);
     }
 
     private static Map<String, Object> getDecimalProperties(DecimalType logicalType) {

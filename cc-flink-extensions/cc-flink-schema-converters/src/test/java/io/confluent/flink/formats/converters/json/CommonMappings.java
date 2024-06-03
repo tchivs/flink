@@ -6,7 +6,9 @@ package io.confluent.flink.formats.converters.json;
 
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
@@ -44,6 +46,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_BYTES;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT8;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
@@ -155,6 +158,13 @@ public final class CommonMappings {
                 new TypeMapping(BooleanSchema.builder().build(), new BooleanType(false)),
                 new TypeMapping(FLOAT32_SCHEMA, new FloatType(false)),
                 new TypeMapping(BYTES_SCHEMA, new VarBinaryType(false, VarBinaryType.MAX_LENGTH)),
+                new TypeMapping(createStringSchema(-1, 123), new VarCharType(false, 123)),
+                new TypeMapping(createBinarySchema(-1, 123), new VarBinaryType(false, 123)),
+                new TypeMapping(createStringSchema(123, 123), new CharType(false, 123)),
+                new TypeMapping(createBinarySchema(123, 123), new BinaryType(false, 123)),
+                new TypeMapping(
+                        createBinarySchema(BinaryType.MAX_LENGTH, BinaryType.MAX_LENGTH),
+                        new BinaryType(false, BinaryType.MAX_LENGTH)),
                 new TypeMapping(
                         MAP_STRING_TINYINT_SCHEMA,
                         new MapType(
@@ -185,6 +195,26 @@ public final class CommonMappings {
                                 false,
                                 Collections.singletonList(
                                         new RowField("decimal", new DecimalType(10, 2))))));
+    }
+
+    private static Schema createStringSchema(int minLength, int maxLength) {
+        final StringSchema.Builder builder = StringSchema.builder();
+        if (minLength > 0) {
+            builder.minLength(minLength);
+        }
+        builder.maxLength(maxLength);
+        return builder.build();
+    }
+
+    private static Schema createBinarySchema(int minLength, int maxLength) {
+        final StringSchema.Builder builder = StringSchema.builder();
+        final Map<String, Object> props = new HashMap<>();
+        if (minLength > 0) {
+            props.put(CommonConstants.FLINK_MIN_LENGTH, minLength);
+        }
+        props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
+        props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES);
+        return builder.unprocessedProperties(props).build();
     }
 
     private static Schema createTimeSchema(int precision) {

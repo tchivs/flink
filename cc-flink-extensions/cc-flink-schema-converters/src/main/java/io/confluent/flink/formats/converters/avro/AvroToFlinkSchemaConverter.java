@@ -9,6 +9,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
+import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DateType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.DoubleType;
@@ -155,6 +156,14 @@ public class AvroToFlinkSchemaConverter {
                                     }
                                 });
             case STRING:
+                final int propertyMaxLength =
+                        Optional.ofNullable(schema.getObjectProp(CommonConstants.FLINK_MAX_LENGTH))
+                                .map(i -> (Integer) i)
+                                .orElse(VarCharType.MAX_LENGTH);
+                return Optional.ofNullable(schema.getObjectProp(CommonConstants.FLINK_MIN_LENGTH))
+                        .filter(minLength -> (int) minLength == propertyMaxLength)
+                        .map(minLength -> (LogicalType) new CharType(isOptional, (int) minLength))
+                        .orElseGet(() -> new VarCharType(isOptional, propertyMaxLength));
             case ENUM:
                 // enums are unwrapped to strings and the original enum is not preserved
                 return new VarCharType(isOptional, VarCharType.MAX_LENGTH);
