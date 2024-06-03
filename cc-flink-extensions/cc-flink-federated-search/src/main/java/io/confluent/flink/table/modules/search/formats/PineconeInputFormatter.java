@@ -2,7 +2,7 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.ml.formats;
+package io.confluent.flink.table.modules.search.formats;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -10,6 +10,8 @@ import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.ml.formats.JsonObjectInputFormatter;
+import io.confluent.flink.table.modules.ml.formats.TextGenerationParams;
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 
 import java.util.List;

@@ -2,11 +2,12 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.ml.formats;
+package io.confluent.flink.table.modules.search.formats;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.ml.formats.TextGenerationParams;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -15,33 +16,33 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Unit tests for pinecone input formatter. */
-public class PineconeInputFormatterTest {
+/** Unit tests for elastic input formatter. */
+public class ElasticInputFormatterTest {
     @Test
     void testGetRequest() throws Exception {
         Schema inputSchema =
                 Schema.newBuilder().column("k", "INT").column("vectors", "ARRAY<FLOAT>").build();
-        PineconeInputFormatter formatter =
-                new PineconeInputFormatter(inputSchema.getColumns(), getEmptyParams());
+        ElasticInputFormatter formatter =
+                new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams());
         Object[] args = new Object[] {3, new float[] {0.1f, 0.2f, 0.3f, 0.4f}};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
-                        "{\"includeMetadata\":true,\"includeValues\":true,\"topK\":3,\"vector\":[0.1,0.2,0.3,0.4]}");
+                        "{\"field\":\"image-vector\",\"k\":3,\"query_vector\":[0.1,0.2,0.3,0.4]}");
     }
 
     @Test
     void testGetRequestWithFilter() throws Exception {
         Schema inputSchema =
                 Schema.newBuilder()
-                        .column("top_k", "BIGINT")
-                        .column("embeds", "ARRAY<DOUBLE>")
+                        .column("k", "BIGINT")
+                        .column("vectors", "ARRAY<DOUBLE>")
                         .build();
-        PineconeInputFormatter formatter =
-                new PineconeInputFormatter(inputSchema.getColumns(), getFilterParams());
+        ElasticInputFormatter formatter =
+                new ElasticInputFormatter(inputSchema.getColumns(), getFilterParams());
         Object[] args = new Object[] {3L, new double[] {0.1, 0.2, 0.3, 0.4}};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
-                        "{\"filter\":{\"genre\":{\"$eq\":\"documentary\"}},\"includeMetadata\":true,\"includeValues\":true,\"topK\":3,\"vector\":[0.1,0.2,0.3,0.4]}");
+                        "{\"field\":\"image-vector\",\"filter\":{\"term\":{\"file-type\":\"png\"}},\"similarity\":0.3,\"k\":3,\"query_vector\":[0.1,0.2,0.3,0.4]}");
     }
 
     @Test
@@ -49,11 +50,9 @@ public class PineconeInputFormatterTest {
         Schema inputSchema =
                 Schema.newBuilder().column("k", "BIGINT").column("vectors", "DOUBLE").build();
         assertThatThrownBy(
-                        () ->
-                                new PineconeInputFormatter(
-                                        inputSchema.getColumns(), getEmptyParams()))
+                        () -> new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams()))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Pinecone vector input must be an array, got DOUBLE");
+                .hasMessageContaining("Elastic vector input must be an array, got DOUBLE");
     }
 
     @Test
@@ -64,24 +63,24 @@ public class PineconeInputFormatterTest {
                         .column("vectors", "ARRAY<DOUBLE>")
                         .build();
         assertThatThrownBy(
-                        () ->
-                                new PineconeInputFormatter(
-                                        inputSchema.getColumns(), getEmptyParams()))
+                        () -> new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams()))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Pinecone topK input must be an integer, got STRING");
+                .hasMessageContaining("Elastic topK input must be an integer, got STRING");
     }
 
-    private static TextGenerationParams getEmptyParams() {
+    private static TextGenerationParams getBaseParams() {
         Map<String, String> modelOptions = new HashMap<>();
-        modelOptions.put("PROVIDER", "PINECONE");
+        modelOptions.put("PROVIDER", "Elastic");
+        modelOptions.put("ELASTIC.PARAMS.field", "image-vector");
         return new TextGenerationParams(modelOptions);
     }
 
     private static TextGenerationParams getFilterParams() {
         Map<String, String> modelOptions = new HashMap<>();
-        modelOptions.put("PROVIDER", "PINECONE");
-        modelOptions.put("PINECONE.PARAMS.filter.genre.$eq", "documentary");
-        modelOptions.put("PINECONE.PARAMS.includevalues", "false");
+        modelOptions.put("PROVIDER", "ELASTIC");
+        modelOptions.put("ELASTIC.PARAMS.filter.term.file-type", "png");
+        modelOptions.put("ELASTIC.PARAMS.field", "image-vector");
+        modelOptions.put("ELASTIC.PARAMS.similarity", "0.3");
         return new TextGenerationParams(modelOptions);
     }
 }

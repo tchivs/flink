@@ -63,6 +63,7 @@ import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import io.confluent.flink.table.modules.remoteudf.UdfUtil;
+import io.confluent.flink.table.modules.search.FederatedSearchFunctionsModule;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
 import io.confluent.flink.table.service.local.LocalExecution;
@@ -273,9 +274,13 @@ class DefaultServiceTasks implements ServiceTasks {
                 privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
 
         if (service == Service.JOB_SUBMISSION_SERVICE
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)
-                || privateConfig.get(ServiceTasksOptions.CONFLUENT_FEDERATED_SEARCH_ENABLED)) {
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("ml", new MLFunctionsModule());
+        }
+
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_FEDERATED_SEARCH_ENABLED)) {
+            tableEnvironment.loadModule("federated-search", new FederatedSearchFunctionsModule());
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE

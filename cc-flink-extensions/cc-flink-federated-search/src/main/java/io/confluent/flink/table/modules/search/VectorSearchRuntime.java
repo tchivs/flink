@@ -2,11 +2,12 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.ml;
+package io.confluent.flink.table.modules.search;
 
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.types.Row;
 
+import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
 import io.confluent.flink.table.modules.ml.providers.MLModelRuntimeProvider;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;

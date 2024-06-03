@@ -54,6 +54,12 @@ Copyright 2023 Confluent Inc.
 
 		<dependency>
 			<groupId>io.confluent.flink</groupId>
+			<artifactId>cc-flink-federated-search</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-managed-table-validation</artifactId>
 			<version>${project.version}</version>
 		</dependency>

@@ -2,11 +2,12 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.ml.formats;
+package io.confluent.flink.table.modules.search.formats;
 
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.confluent.flink.table.modules.ml.formats.OutputParser;
 import io.confluent.flink.table.utils.mlutils.MlUtils;
 import org.junit.jupiter.api.Test;
 

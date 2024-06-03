@@ -2,7 +2,7 @@
  * Copyright 2024 Confluent Inc.
  */
 
-package io.confluent.flink.table.modules.ml;
+package io.confluent.flink.table.modules.search;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -14,6 +14,8 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
+
+import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
 
 import java.time.Clock;
 import java.util.ArrayList;
