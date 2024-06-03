@@ -65,6 +65,20 @@ under the License.
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>io.github.zentol.japicmp</groupId>
+				<artifactId>japicmp-maven-plugin</artifactId>
+				<configuration>
+					<parameter>
+						<excludes>
+							<exclude>org.apache.flink.metrics.reporter.MetricReporter#open(org.apache.flink.metrics.MetricConfig)</exclude>
+							<exclude>org.apache.flink.metrics.reporter.MetricReporter#close()</exclude>
+							<exclude>org.apache.flink.metrics.MetricGroup#addEvent(org.apache.flink.events.EventBuilder)</exclude>
+							<exclude>org.apache.flink.metrics.MetricGroup#addSpan(org.apache.flink.traces.SpanBuilder)</exclude>
+						</excludes>
+					</parameter>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
