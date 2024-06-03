@@ -21,6 +21,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -192,37 +193,13 @@ public class ProtoToFlinkSchemaConverter {
                     String fullName = schema.getMessageType().getFullName();
                     switch (fullName) {
                         case CommonConstants.PROTOBUF_DECIMAL_TYPE:
-                            int precision = DecimalType.DEFAULT_PRECISION;
-                            int scale = DecimalType.DEFAULT_SCALE;
-                            if (schema.getOptions().hasExtension(MetaProto.fieldMeta)) {
-                                Meta fieldMeta =
-                                        schema.getOptions().getExtension(MetaProto.fieldMeta);
-                                Map<String, String> params = fieldMeta.getParamsMap();
-                                String precisionStr =
-                                        params.get(CommonConstants.PROTOBUF_PRECISION_PROP);
-                                if (precisionStr != null) {
-                                    try {
-                                        precision = Integer.parseInt(precisionStr);
-                                    } catch (NumberFormatException e) {
-                                        // ignore
-                                    }
-                                }
-                                String scaleStr = params.get(CommonConstants.PROTOBUF_SCALE_PROP);
-                                if (scaleStr != null) {
-                                    try {
-                                        scale = Integer.parseInt(scaleStr);
-                                    } catch (NumberFormatException e) {
-                                        // ignore
-                                    }
-                                }
-                            }
-                            return new DecimalType(true, precision, scale);
+                            return createDecimalType(schema);
                         case CommonConstants.PROTOBUF_DATE_TYPE:
                             return new DateType(true);
                         case CommonConstants.PROTOBUF_TIME_TYPE:
-                            return new TimeType(true, 3);
+                            return createTimeType(schema);
                         case CommonConstants.PROTOBUF_TIMESTAMP_TYPE:
-                            return new LocalZonedTimestampType(true, 9);
+                            return createTimestampType(schema);
                         default:
                             if (cycleContext.seenMessage.contains(fullName)) {
                                 throw new ValidationException("Cyclic schemas are not supported.");
@@ -235,8 +212,86 @@ public class ProtoToFlinkSchemaConverter {
                     }
                 }
             default:
-                throw new ValidationException("Unknown Protobuf schema type: " + schema.getType());
+                throw new ValidationException("Unknown Protobuf schema type " + schema.getType());
         }
+    }
+
+    private static TimeType createTimeType(FieldDescriptor schema) {
+        final int defaultPrecision = 3;
+        final int precision =
+                getMeta(schema)
+                        .map(
+                                m ->
+                                        Integer.parseInt(
+                                                m.getParamsOrDefault(
+                                                        CommonConstants.FLINK_PRECISION_PROP,
+                                                        String.valueOf(defaultPrecision))))
+                        .orElse(defaultPrecision);
+        if (precision > 3) {
+            throw new ValidationException(
+                    "Flink does not support TIME type with precision "
+                            + precision
+                            + ", it only supports precision less than or equal to 3.");
+        }
+        return new TimeType(true, precision);
+    }
+
+    private static DecimalType createDecimalType(FieldDescriptor schema) {
+        int precision = DecimalType.DEFAULT_PRECISION;
+        int scale = DecimalType.DEFAULT_SCALE;
+        final Optional<Meta> meta = getMeta(schema);
+        if (meta.isPresent()) {
+            Meta fieldMeta = meta.get();
+            Map<String, String> params = fieldMeta.getParamsMap();
+            String precisionStr = params.get(CommonConstants.PROTOBUF_PRECISION_PROP);
+            if (precisionStr != null) {
+                try {
+                    precision = Integer.parseInt(precisionStr);
+                } catch (NumberFormatException e) {
+                    // ignore
+                }
+            }
+            String scaleStr = params.get(CommonConstants.PROTOBUF_SCALE_PROP);
+            if (scaleStr != null) {
+                try {
+                    scale = Integer.parseInt(scaleStr);
+                } catch (NumberFormatException e) {
+                    // ignore
+                }
+            }
+        }
+        return new DecimalType(true, precision, scale);
+    }
+
+    private static LogicalType createTimestampType(FieldDescriptor schema) {
+        final int defaultPrecision = 9;
+        final Optional<Meta> meta = getMeta(schema);
+        if (meta.isPresent()) {
+            final int precision =
+                    meta.map(
+                                    m ->
+                                            Integer.parseInt(
+                                                    m.getParamsOrDefault(
+                                                            CommonConstants.FLINK_PRECISION_PROP,
+                                                            String.valueOf(defaultPrecision))))
+                            .orElse(defaultPrecision);
+
+            if (CommonConstants.FLINK_TYPE_TIMESTAMP.equals(
+                    meta.get().getParamsOrDefault(CommonConstants.FLINK_TYPE_PROP, null))) {
+                return new TimestampType(true, precision);
+            } else {
+                return new LocalZonedTimestampType(true, precision);
+            }
+        } else {
+            return new LocalZonedTimestampType(true, defaultPrecision);
+        }
+    }
+
+    private static Optional<Meta> getMeta(FieldDescriptor schema) {
+        if (schema.getOptions().hasExtension(MetaProto.fieldMeta)) {
+            return Optional.of(schema.getOptions().getExtension(MetaProto.fieldMeta));
+        }
+        return Optional.empty();
     }
 
     private static LogicalType convertRepeated(FieldDescriptor schema, CycleContext context) {

@@ -19,6 +19,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -232,10 +233,53 @@ public final class CommonMappings {
                             + "      }\n"
                             + "    ]\n"
                             + "  }];\n"
-                            + "  optional .google.protobuf.Timestamp timestamp = 17;\n"
-                            + "  optional .google.type.TimeOfDay time = 18;\n"
-                            + "  optional string string = 19;\n"
-                            + "  optional bytes bytes = 20;\n"
+                            + "  optional .google.protobuf.Timestamp timestamp_ltz = 17;\n"
+                            + "  optional .google.protobuf.Timestamp timestamp_ltz_3 = 18 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.precision\",\n"
+                            + "        value: \"3\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional .google.protobuf.Timestamp timestamp = 19 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.type\",\n"
+                            + "        value: \"timestamp\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional .google.protobuf.Timestamp timestamp_3 = 20 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.precision\",\n"
+                            + "        value: \"3\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.type\",\n"
+                            + "        value: \"timestamp\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional .google.type.TimeOfDay time = 21 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.precision\",\n"
+                            + "        value: \"3\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional .google.type.TimeOfDay time_2 = 22 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.precision\",\n"
+                            + "        value: \"2\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "  optional string string = 23;\n"
+                            + "  optional bytes bytes = 24;\n"
                             + "}",
                     new RowType(
                             false,
@@ -256,8 +300,15 @@ public final class CommonMappings {
                                     new RowField("float", new FloatType(true)),
                                     new RowField("date", new DateType(true)),
                                     new RowField("decimal", new DecimalType(true, 5, 1)),
-                                    new RowField("timestamp", new LocalZonedTimestampType(true, 9)),
+                                    new RowField(
+                                            "timestamp_ltz", new LocalZonedTimestampType(true, 9)),
+                                    new RowField(
+                                            "timestamp_ltz_3",
+                                            new LocalZonedTimestampType(true, 3)),
+                                    new RowField("timestamp", new TimestampType(true, 9)),
+                                    new RowField("timestamp_3", new TimestampType(true, 3)),
                                     new RowField("time", new TimeType(true, 3)),
+                                    new RowField("time_2", new TimeType(true, 2)),
                                     new RowField(
                                             "string",
                                             new VarCharType(true, VarCharType.MAX_LENGTH)),

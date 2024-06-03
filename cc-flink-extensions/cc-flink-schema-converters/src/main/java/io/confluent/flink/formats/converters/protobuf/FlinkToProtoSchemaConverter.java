@@ -11,10 +11,13 @@ import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
+import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.CaseFormat;
 
@@ -37,7 +40,9 @@ import io.confluent.protobuf.type.Decimal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
@@ -106,7 +111,7 @@ public class FlinkToProtoSchemaConverter {
                     .findMessageTypeByName(rowName);
         } catch (DescriptorValidationException e) {
             throw new ValidationException(
-                    "Failed to translate the provided schema to" + " a Protobuf descriptor", e);
+                    "Failed to translate the provided schema to a Protobuf descriptor", e);
         }
     }
 
@@ -200,27 +205,26 @@ public class FlinkToProtoSchemaConverter {
             case VARBINARY:
                 builder.setType(Type.TYPE_BYTES);
                 return builder.build();
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return createTimestampFieldDescriptor(
+                        ((TimestampType) logicalType).getPrecision(),
+                        logicalType.getTypeRoot(),
+                        dependencies,
+                        builder);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                final LocalZonedTimestampType timestampLtzType =
-                        (LocalZonedTimestampType) logicalType;
-                if (timestampLtzType.getPrecision() != 9) {
-                    throw new ValidationException(
-                            "Protobuf supports only precision of 9 for TIMESTAMP_LTZ type.");
-                }
-                builder.setType(Type.TYPE_MESSAGE);
-                builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIMESTAMP_TYPE));
-                dependencies.add(CommonConstants.PROTOBUF_TIMESTAMP_LOCATION);
-                return builder.build();
+                return createTimestampFieldDescriptor(
+                        ((LocalZonedTimestampType) logicalType).getPrecision(),
+                        logicalType.getTypeRoot(),
+                        dependencies,
+                        builder);
             case DATE:
                 builder.setType(Type.TYPE_MESSAGE);
                 builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_DATE_TYPE));
                 dependencies.add(CommonConstants.PROTOBUF_DATE_LOCATION);
                 return builder.build();
             case TIME_WITHOUT_TIME_ZONE:
-                builder.setType(Type.TYPE_MESSAGE);
-                builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIME_TYPE));
-                dependencies.add(CommonConstants.PROTOBUF_TIME_LOCATION);
-                return builder.build();
+                return createTimeFieldDescriptor(
+                        ((TimeType) logicalType).getPrecision(), dependencies, builder);
             case DECIMAL:
                 DecimalType decimalType = (DecimalType) logicalType;
                 builder.setType(Type.TYPE_MESSAGE);
@@ -294,7 +298,6 @@ public class FlinkToProtoSchemaConverter {
                             new IntType(false),
                             multisetType.isNullable());
                 }
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
             case INTERVAL_DAY_TIME:
@@ -305,8 +308,51 @@ public class FlinkToProtoSchemaConverter {
             case RAW:
             default:
                 throw new ValidationException(
-                        "Unsupported to derive Protobuf Schema for type: " + logicalType);
+                        "Unsupported to derive Protobuf Schema for type " + logicalType);
         }
+    }
+
+    private static FieldDescriptorProto createTimeFieldDescriptor(
+            int precision, Set<String> dependencies, FieldDescriptorProto.Builder builder) {
+        builder.setType(Type.TYPE_MESSAGE);
+        builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIME_TYPE));
+        if (precision != 9) {
+            builder.mergeOptions(
+                    FieldOptions.newBuilder()
+                            .setExtension(
+                                    MetaProto.fieldMeta,
+                                    Meta.newBuilder()
+                                            .putParams(
+                                                    CommonConstants.FLINK_PRECISION_PROP,
+                                                    String.valueOf(precision))
+                                            .build())
+                            .build());
+        }
+        dependencies.add(CommonConstants.PROTOBUF_TIME_LOCATION);
+        return builder.build();
+    }
+
+    private static FieldDescriptorProto createTimestampFieldDescriptor(
+            int precision,
+            LogicalTypeRoot typeRoot,
+            Set<String> dependencies,
+            FieldDescriptorProto.Builder builder) {
+        builder.setType(Type.TYPE_MESSAGE);
+        builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIMESTAMP_TYPE));
+        final Map<String, String> params = new HashMap<>();
+        if (precision != 9) {
+            params.put(CommonConstants.FLINK_PRECISION_PROP, String.valueOf(precision));
+        }
+        if (typeRoot == LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE) {
+            params.put(CommonConstants.FLINK_TYPE_PROP, CommonConstants.FLINK_TYPE_TIMESTAMP);
+        }
+        builder.mergeOptions(
+                FieldOptions.newBuilder()
+                        .setExtension(
+                                MetaProto.fieldMeta, Meta.newBuilder().putAllParams(params).build())
+                        .build());
+        dependencies.add(CommonConstants.PROTOBUF_TIMESTAMP_LOCATION);
+        return builder.build();
     }
 
     private static String makeItTopLevelScoped(String type) {

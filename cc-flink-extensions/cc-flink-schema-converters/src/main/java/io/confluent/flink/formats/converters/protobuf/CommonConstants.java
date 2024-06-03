@@ -37,5 +37,14 @@ class CommonConstants {
     static final String PROTOBUF_STRING_WRAPPER_TYPE = "google.protobuf.StringValue";
     static final String PROTOBUF_BYTES_WRAPPER_TYPE = "google.protobuf.BytesValue";
 
+    // ====================================================
+    // Flink specific properties. We need those to cover Flink types which are not supported
+    // by neither PROTOBUF nor have extensions in Kafka Connect. Seperate from the above in case
+    // Kafka Connect adds support for them in the future.
+    // ====================================================
+    static final String FLINK_PRECISION_PROP = "flink.precision";
+    static final String FLINK_TYPE_PROP = "flink.type";
+    static final String FLINK_TYPE_TIMESTAMP = "timestamp";
+
     private CommonConstants() {}
 }

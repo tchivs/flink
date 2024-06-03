@@ -42,6 +42,8 @@ import java.util.Map;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_TIMESTAMP;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -252,30 +254,6 @@ class JsonToRowDataConvertersTest {
     }
 
     @Test
-    void testTimestamp() throws Exception {
-        NumberSchema timestmapSchema =
-                NumberSchema.builder()
-                        .title("org.apache.kafka.connect.data.Timestamp")
-                        .unprocessedProperties(mapOf("connect.index", 0, "connect.type", "int64"))
-                        .build();
-        ObjectSchema schema =
-                ObjectSchema.builder()
-                        .addPropertySchema("tmstmp", timestmapSchema)
-                        .title("Record")
-                        .build();
-        ObjectNode obj = JsonNodeFactory.instance.objectNode();
-        obj.set("tmstmp", LongNode.valueOf(123456789L));
-
-        final LogicalType flinkSchema = JsonToFlinkSchemaConverter.toFlinkSchema(schema);
-        final JsonToRowDataConverter converter =
-                JsonToRowDataConverters.createConverter(schema, flinkSchema);
-        final RowData row = (RowData) converter.convert(obj);
-        final GenericRowData expected = new GenericRowData(1);
-        expected.setField(0, TimestampData.fromEpochMillis(123456789L));
-        assertThat(row).isEqualTo(expected);
-    }
-
-    @Test
     void testNullableNestedRow() throws Exception {
         NumberSchema numberSchema =
                 NumberSchema.builder()
@@ -456,7 +434,25 @@ class JsonToRowDataConvertersTest {
         final long milliseconds = 123456;
         final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
         final Object result = converter.convert(LongNode.valueOf(milliseconds));
-        assertThat(result).isEqualTo(TimestampData.fromEpochMillis(milliseconds));
+        assertThat(result).isEqualTo(timestampData);
+    }
+
+    @Test
+    void testTimestamp() throws Exception {
+        final Map<String, Object> properties = new HashMap<>();
+        properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64);
+        properties.put(FLINK_TYPE_PROP, FLINK_TYPE_TIMESTAMP);
+        NumberSchema timestampSchema =
+                NumberSchema.builder().unprocessedProperties(properties).build();
+
+        final LogicalType flinkSchema = DataTypes.TIMESTAMP(3).getLogicalType();
+
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(timestampSchema, flinkSchema);
+        final long milliseconds = 123456;
+        final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
+        final Object result = converter.convert(LongNode.valueOf(milliseconds));
+        assertThat(result).isEqualTo(timestampData);
     }
 
     public static <K, V> Map<K, V> mapOf(K key1, V value1, K key2, V value2) {

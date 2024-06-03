@@ -17,6 +17,7 @@ import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 
 import org.everit.json.schema.ArraySchema;
 import org.everit.json.schema.BooleanSchema;
@@ -50,6 +51,10 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_TIMESTAMP;
 
 /**
  * A converter from {@link LogicalType} to {@link Schema}.
@@ -151,8 +156,13 @@ public class FlinkToJsonSchemaConverter {
                 return StringSchema.builder()
                         .unprocessedProperties(
                                 Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES));
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return convertTimestamp(
+                        ((TimestampType) logicalType).getPrecision(), logicalType.getTypeRoot());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return convertTimestamp((LocalZonedTimestampType) logicalType);
+                return convertTimestamp(
+                        ((LocalZonedTimestampType) logicalType).getPrecision(),
+                        logicalType.getTypeRoot());
             case DATE:
                 // use int to represents Date
                 return NumberSchema.builder()
@@ -196,7 +206,6 @@ public class FlinkToJsonSchemaConverter {
                         .allItemSchema(fromFlinkSchema(arrayType.getElementType(), rowName));
             case MULTISET:
                 return convertMultiset((MultisetType) logicalType, rowName);
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
             case INTERVAL_DAY_TIME:
@@ -263,36 +272,46 @@ public class FlinkToJsonSchemaConverter {
     private static Schema.Builder<?> convertTime(TimeType logicalType) {
         final int precision = logicalType.getPrecision();
         if (precision <= 3) {
+            final Map<String, Object> properties = new HashMap<>();
+            properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT32);
+            if (precision != 3) {
+                properties.put(
+                        FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+            }
             return NumberSchema.builder()
                     .title(CONNECT_TYPE_TIME)
-                    .unprocessedProperties(
-                            Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT32));
-        } else if (precision <= 6) {
-            return NumberSchema.builder()
-                    .title(CONNECT_TYPE_TIME)
-                    .unprocessedProperties(
-                            Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64));
+                    .unprocessedProperties(properties);
         } else {
             throw new ValidationException(
-                    "JSON does not support TIME type with precision: "
+                    "Flink does not support TIME type with precision: "
                             + precision
-                            + ", it only supports precision less than or equal to 6.");
+                            + ", it only supports precision less than or equal to 3.");
         }
     }
 
-    private static Schema.Builder<?> convertTimestamp(LocalZonedTimestampType logicalType) {
-        final int precision = logicalType.getPrecision();
+    private static Schema.Builder<?> convertTimestamp(int precision, LogicalTypeRoot typeRoot) {
         if (precision <= 3) {
-            return NumberSchema.builder()
-                    .title(CONNECT_TYPE_TIMESTAMP)
-                    .unprocessedProperties(
-                            Collections.singletonMap(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64));
+            final Map<String, Object> properties = new HashMap<>();
+            properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64);
+            if (precision != 3) {
+                properties.put(
+                        FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+            }
+            Schema.Builder<NumberSchema> builder = NumberSchema.builder();
+            if (typeRoot == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE) {
+                builder = builder.title(CONNECT_TYPE_TIMESTAMP);
+            } else {
+                properties.put(FLINK_TYPE_PROP, FLINK_TYPE_TIMESTAMP);
+            }
+            return builder.unprocessedProperties(properties);
         } else {
             throw new ValidationException(
-                    "JSON does not support TIMESTAMP type "
-                            + "with precision: "
-                            + precision
-                            + ", it only supports precision less than or equal to 3.");
+                    String.format(
+                            "JSON does not support %s type "
+                                    + "with precision "
+                                    + precision
+                                    + ", it only supports precision less than or equal to 3.",
+                            typeRoot));
         }
     }
 

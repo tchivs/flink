@@ -10,6 +10,7 @@ import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.RowType;
@@ -257,7 +258,13 @@ public class UnionUtil {
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return TimestampData.fromEpochMillis(10);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return TimestampData.fromEpochMillis(30);
+                if (((LocalZonedTimestampType) logicalType).getPrecision() <= 3) {
+                    return TimestampData.fromEpochMillis(30);
+                } else {
+                    return TimestampData.fromEpochMillis(13);
+                }
+            case TIME_WITHOUT_TIME_ZONE:
+                return 20;
             default:
                 throw new UnsupportedOperationException("Unsupported logical type: " + logicalType);
         }
@@ -283,6 +290,9 @@ public class UnionUtil {
                     } else if (avroLogicalTypeName.equals(
                             LogicalTypes.localTimestampMillis().getName())) {
                         return 10L;
+                    } else if (avroLogicalTypeName.equals(
+                            LogicalTypes.timestampMicros().getName())) {
+                        return 13000L;
                     } else {
                         throw new IllegalArgumentException(
                                 "Unsupported logical conversion: " + avroLogicalType.getName());
@@ -291,6 +301,15 @@ public class UnionUtil {
                     return 1L;
                 }
             case INT:
+                if (avroLogicalType != null) {
+                    final String avroLogicalTypeName = avroLogicalType.getName();
+                    if (avroLogicalTypeName.equals(LogicalTypes.timeMillis().getName())) {
+                        return 20;
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Unsupported logical conversion: " + avroLogicalType.getName());
+                    }
+                }
                 return 1;
             case BOOLEAN:
                 return true;

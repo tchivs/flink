@@ -17,6 +17,8 @@ import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
+import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -28,6 +30,7 @@ import org.everit.json.schema.NullSchema;
 import org.everit.json.schema.NumberSchema;
 import org.everit.json.schema.ObjectSchema;
 import org.everit.json.schema.Schema;
+import org.everit.json.schema.Schema.Builder;
 import org.everit.json.schema.StringSchema;
 import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
@@ -44,6 +47,9 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT8;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 
 /** Common data to use in schema mapping tests. */
 public final class CommonMappings {
@@ -88,13 +94,6 @@ public final class CommonMappings {
                     .unprocessedProperties(Collections.singletonMap("connect.type", "map"))
                     .build();
 
-    public static final NumberSchema TIMESTAMP_SCHEMA =
-            NumberSchema.builder()
-                    .title(CONNECT_TYPE_TIMESTAMP)
-                    .unprocessedProperties(
-                            Collections.singletonMap(
-                                    CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64))
-                    .build();
     public static final ArraySchema MAP_TINYINT_SMALLINT =
             ArraySchema.builder()
                     .allItemSchema(
@@ -162,7 +161,12 @@ public final class CommonMappings {
                                 false,
                                 new VarCharType(false, VarCharType.MAX_LENGTH),
                                 new TinyIntType(false))),
-                new TypeMapping(TIMESTAMP_SCHEMA, new LocalZonedTimestampType(false, 3)),
+                new TypeMapping(createTimeSchema(3), new TimeType(false, 3)),
+                new TypeMapping(createTimeSchema(2), new TimeType(false, 2)),
+                new TypeMapping(createTimestampLtzSchema(3), new LocalZonedTimestampType(false, 3)),
+                new TypeMapping(createTimestampLtzSchema(2), new LocalZonedTimestampType(false, 2)),
+                new TypeMapping(createTimestampSchema(3), new TimestampType(false, 3)),
+                new TypeMapping(createTimestampSchema(2), new TimestampType(false, 2)),
                 new TypeMapping(
                         MAP_TINYINT_SMALLINT,
                         new MapType(false, new TinyIntType(false), new SmallIntType(false))),
@@ -181,6 +185,38 @@ public final class CommonMappings {
                                 false,
                                 Collections.singletonList(
                                         new RowField("decimal", new DecimalType(10, 2))))));
+    }
+
+    private static Schema createTimeSchema(int precision) {
+        Builder<NumberSchema> builder =
+                NumberSchema.builder().title(CommonConstants.CONNECT_TYPE_TIME);
+        final Map<String, Object> properties = new HashMap<>();
+        properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT32);
+        if (precision != 3) {
+            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+        }
+        return builder.unprocessedProperties(properties).build();
+    }
+
+    private static Schema createTimestampSchema(int precision) {
+        Builder<NumberSchema> builder = NumberSchema.builder();
+        final Map<String, Object> properties = new HashMap<>();
+        properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64);
+        properties.put(FLINK_TYPE_PROP, CommonConstants.FLINK_TYPE_TIMESTAMP);
+        if (precision != 3) {
+            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+        }
+        return builder.unprocessedProperties(properties).build();
+    }
+
+    private static NumberSchema createTimestampLtzSchema(int precision) {
+        Builder<NumberSchema> builder = NumberSchema.builder().title(CONNECT_TYPE_TIMESTAMP);
+        final Map<String, Object> properties = new HashMap<>();
+        properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64);
+        if (precision != 3) {
+            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+        }
+        return builder.unprocessedProperties(properties).build();
     }
 
     private static TypeMapping toNullable(TypeMapping mapping) {

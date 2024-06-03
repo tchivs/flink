@@ -329,6 +329,7 @@ public class RowDataToProtoConverters {
                                 .build();
                     }
                 };
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return new RowDataToProtoConverter() {
                     @Override
@@ -362,7 +363,6 @@ public class RowDataToProtoConverters {
             case INTERVAL_YEAR_MONTH:
             case RAW:
             case NULL:
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }

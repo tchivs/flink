@@ -25,6 +25,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -556,6 +557,75 @@ public class RowDataToProtoConvertersTest {
                                         .setField(
                                                 targetActionFieldDescriptor,
                                                 targetActionEnumType.findValueByName("OFF"))
+                                        .build())
+                        .build();
+
+        assertThat(converted).isEqualTo(message);
+    }
+
+    @Test
+    void testTimestamps() {
+        final String schemaStr =
+                "syntax = \"proto3\";\n"
+                        + "package io.confluent.protobuf.generated;\n"
+                        + "\n"
+                        + "import \"google/protobuf/timestamp.proto\";\n"
+                        + "\n"
+                        + "message Row {\n"
+                        + "  optional .google.protobuf.Timestamp timestamp = 1 [(confluent.field_meta) = {\n"
+                        + "    params: [\n"
+                        + "      {\n"
+                        + "        key: \"flink.precision\",\n"
+                        + "        value: \"9\"\n"
+                        + "      },\n"
+                        + "      {\n"
+                        + "        key: \"flink.type\",\n"
+                        + "        value: \"timestamp\"\n"
+                        + "      }\n"
+                        + "    ]\n"
+                        + "  }];\n"
+                        + "  optional .google.protobuf.Timestamp timestamp_ltz = 2;"
+                        + "}";
+
+        final RowType rowType =
+                new RowType(
+                        false,
+                        Arrays.asList(
+                                new RowField("timestamp", new TimestampType(true, 9)),
+                                new RowField(
+                                        "timestamp_ltz", new LocalZonedTimestampType(true, 9))));
+
+        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
+        Descriptor schema = protoSchema.toDescriptor();
+
+        final RowDataToProtoConverter converter =
+                RowDataToProtoConverters.createConverter(rowType, schema);
+
+        final int timestampSeconds = 960000000;
+        final int timestampNanos = 34567890;
+        final GenericRowData row = new GenericRowData(2);
+        final TimestampData timestampData =
+                TimestampData.fromEpochMillis(
+                        timestampSeconds * 1000L + timestampNanos / 1000_000,
+                        timestampNanos % 1000_000);
+        row.setField(0, timestampData);
+        row.setField(1, timestampData);
+
+        final DynamicMessage converted = (DynamicMessage) converter.convert(row);
+
+        final DynamicMessage message =
+                DynamicMessage.newBuilder(schema)
+                        .setField(
+                                schema.findFieldByName("timestamp"),
+                                Timestamp.newBuilder()
+                                        .setSeconds(timestampSeconds)
+                                        .setNanos(timestampNanos)
+                                        .build())
+                        .setField(
+                                schema.findFieldByName("timestamp_ltz"),
+                                Timestamp.newBuilder()
+                                        .setSeconds(timestampSeconds)
+                                        .setNanos(timestampNanos)
                                         .build())
                         .build();
 

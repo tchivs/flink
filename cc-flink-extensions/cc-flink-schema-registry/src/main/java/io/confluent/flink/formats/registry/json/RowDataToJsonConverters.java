@@ -16,6 +16,7 @@ import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.TimestampType;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -185,9 +186,12 @@ public class RowDataToJsonConverters {
                         return mapper.getNodeFactory().binaryNode((byte[]) value);
                     }
                 };
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                final LocalZonedTimestampType timestampType = (LocalZonedTimestampType) type;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                final TimestampType timestampType = (TimestampType) type;
                 return createTimestampConverter(timestampType.getPrecision());
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                final LocalZonedTimestampType timestampLtzType = (LocalZonedTimestampType) type;
+                return createTimestampConverter(timestampLtzType.getPrecision());
             case DECIMAL:
                 return new RowDataToJsonConverter() {
                     private static final long serialVersionUID = 1L;
@@ -208,7 +212,6 @@ public class RowDataToJsonConverters {
             case RAW:
             case INTERVAL_YEAR_MONTH: // long
             case INTERVAL_DAY_TIME: // long
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }

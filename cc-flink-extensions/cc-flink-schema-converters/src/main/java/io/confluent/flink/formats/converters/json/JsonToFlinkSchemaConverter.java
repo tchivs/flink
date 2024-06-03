@@ -21,6 +21,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -66,6 +67,8 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
 import static io.confluent.flink.formats.converters.json.CommonConstants.KEY_FIELD;
 import static io.confluent.flink.formats.converters.json.CommonConstants.VALUE_FIELD;
 
@@ -165,9 +168,9 @@ public class JsonToFlinkSchemaConverter {
                     case CONNECT_TYPE_INT16:
                         return new SmallIntType(isOptional);
                     case CONNECT_TYPE_INT32:
-                        return fromInt32Type(isOptional, title);
+                        return fromInt32Type(isOptional, schema);
                     case CONNECT_TYPE_INT64:
-                        return fromInt64Type(isOptional, title);
+                        return fromInt64Type(isOptional, schema);
                     case CONNECT_TYPE_FLOAT32:
                         return new FloatType(isOptional);
                     case CONNECT_TYPE_FLOAT64:
@@ -210,7 +213,7 @@ public class JsonToFlinkSchemaConverter {
                 return fromAllOfSchema(combinedSchema, isOptional, cycleContext);
             } else if (criterion != CombinedSchema.ONE_CRITERION
                     && criterion != CombinedSchema.ANY_CRITERION) {
-                throw new ValidationException("Unsupported criterion: " + criterion);
+                throw new ValidationException("Unsupported criterion " + criterion);
             }
             if (combinedSchema.getSubschemas().size() == 2) {
                 boolean foundNullSchema = false;
@@ -325,16 +328,33 @@ public class JsonToFlinkSchemaConverter {
         }
     }
 
-    private static LogicalType fromInt64Type(boolean isOptional, String title) {
-        if (Objects.equals(title, CONNECT_TYPE_TIMESTAMP)) {
-            return new LocalZonedTimestampType(isOptional, 3);
+    private static LogicalType fromInt64Type(boolean isOptional, Schema schema) {
+        if (Objects.equals(schema.getTitle(), CONNECT_TYPE_TIMESTAMP)) {
+            final int precision = getTimestampPrecision(schema);
+            return new LocalZonedTimestampType(isOptional, precision);
+        } else if (CommonConstants.FLINK_TYPE_TIMESTAMP.equals(
+                schema.getUnprocessedProperties()
+                        .getOrDefault(CommonConstants.FLINK_TYPE_PROP, null))) {
+            final int precision = getTimestampPrecision(schema);
+            return new TimestampType(isOptional, precision);
         }
         return new BigIntType(isOptional);
     }
 
-    private static LogicalType fromInt32Type(boolean isOptional, String title) {
+    @SuppressWarnings("unchecked")
+    private static int getTimestampPrecision(Schema schema) {
+        Map<String, Object> params =
+                (Map<String, Object>)
+                        schema.getUnprocessedProperties()
+                                .getOrDefault(FLINK_PARAMETERS, Collections.emptyMap());
+        return (int) params.getOrDefault(FLINK_PRECISION, 3);
+    }
+
+    private static LogicalType fromInt32Type(boolean isOptional, Schema schema) {
+        final String title = schema.getTitle();
         if (Objects.equals(title, CONNECT_TYPE_TIME)) {
-            return new TimeType(isOptional, 3);
+            final int precision = getTimestampPrecision(schema);
+            return new TimeType(isOptional, precision);
         } else if (Objects.equals(title, CONNECT_TYPE_DATE)) {
             return new DateType(isOptional);
         } else {

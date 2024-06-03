@@ -35,6 +35,8 @@ import java.util.Map;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_TIMESTAMP;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -297,6 +299,24 @@ class RowDataToJsonConvertersTest {
                         .build();
 
         final LogicalType flinkSchema = DataTypes.TIMESTAMP_LTZ(3).getLogicalType();
+
+        final RowDataToJsonConverter converter =
+                RowDataToJsonConverters.createConverter(flinkSchema, timestampSchema);
+        final long milliseconds = 123456;
+        final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
+        final JsonNode result = converter.convert(OBJECT_MAPPER, null, timestampData);
+        assertThat(result).isEqualTo(LongNode.valueOf(milliseconds));
+    }
+
+    @Test
+    void testTimestamp() {
+        final Map<String, Object> properties = new HashMap<>();
+        properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64);
+        properties.put(FLINK_TYPE_PROP, FLINK_TYPE_TIMESTAMP);
+        NumberSchema timestampSchema =
+                NumberSchema.builder().unprocessedProperties(properties).build();
+
+        final LogicalType flinkSchema = DataTypes.TIMESTAMP(3).getLogicalType();
 
         final RowDataToJsonConverter converter =
                 RowDataToJsonConverters.createConverter(flinkSchema, timestampSchema);

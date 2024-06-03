@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -43,21 +44,6 @@ import static org.apache.avro.Schema.Type.NULL;
 /** A converter from {@link Schema} to {@link LogicalType}. */
 @Confluent
 public class AvroToFlinkSchemaConverter {
-
-    private static final String CONNECT_TYPE_PROP = "connect.type";
-    private static final String AVRO_LOGICAL_TYPE_PROP = "logicalType";
-    private static final String AVRO_LOGICAL_DECIMAL = "decimal";
-    private static final String AVRO_LOGICAL_DECIMAL_SCALE_PROP = "scale";
-    private static final String AVRO_LOGICAL_DECIMAL_PRECISION_PROP = "precision";
-    private static final String AVRO_LOGICAL_DATE = "date";
-    private static final String AVRO_LOGICAL_TIME_MILLIS = "time-millis";
-    private static final String AVRO_LOGICAL_TIME_MICROS = "time-micros";
-    private static final String AVRO_LOGICAL_TIMESTAMP_MILLIS = "timestamp-millis";
-    private static final String AVRO_LOGICAL_TIMESTAMP_MICROS = "timestamp-micros";
-    private static final String AVRO_LOGICAL_LOCAL_TIMESTAMP_MILLIS = "local-timestamp-millis";
-    private static final String AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS = "local-timestamp-micros";
-    private static final String KEY_FIELD = "key";
-    private static final String VALUE_FIELD = "value";
 
     /**
      * Mostly copied over from <a
@@ -89,16 +75,17 @@ public class AvroToFlinkSchemaConverter {
 
     private static LogicalType toFlinkSchema(
             final Schema schema, boolean isOptional, CycleContext cycleContext) {
-        final String type = schema.getProp(CONNECT_TYPE_PROP);
-        final String logicalType = schema.getProp(AVRO_LOGICAL_TYPE_PROP);
+        final String type = schema.getProp(CommonConstants.CONNECT_TYPE_PROP);
+        final String logicalType = schema.getProp(CommonConstants.AVRO_LOGICAL_TYPE_PROP);
 
         switch (schema.getType()) {
             case BOOLEAN:
                 return new BooleanType(isOptional);
             case BYTES:
             case FIXED:
-                if (AVRO_LOGICAL_DECIMAL.equalsIgnoreCase(logicalType)) {
-                    final Object scaleNode = schema.getObjectProp(AVRO_LOGICAL_DECIMAL_SCALE_PROP);
+                if (CommonConstants.AVRO_LOGICAL_DECIMAL.equalsIgnoreCase(logicalType)) {
+                    final Object scaleNode =
+                            schema.getObjectProp(CommonConstants.AVRO_LOGICAL_DECIMAL_SCALE_PROP);
                     // In Avro the scale is optional
                     final int scale =
                             scaleNode instanceof Number
@@ -106,12 +93,13 @@ public class AvroToFlinkSchemaConverter {
                                     : DecimalType.DEFAULT_SCALE;
 
                     Object precisionNode =
-                            schema.getObjectProp(AVRO_LOGICAL_DECIMAL_PRECISION_PROP);
+                            schema.getObjectProp(
+                                    CommonConstants.AVRO_LOGICAL_DECIMAL_PRECISION_PROP);
                     final int precision;
                     if (null != precisionNode) {
                         if (!(precisionNode instanceof Number)) {
                             throw new ValidationException(
-                                    AVRO_LOGICAL_DECIMAL_PRECISION_PROP
+                                    CommonConstants.AVRO_LOGICAL_DECIMAL_PRECISION_PROP
                                             + " property must be a JSON Integer."
                                             + " https://avro.apache.org/docs/1.9.1/spec.html#Decimal");
                         }
@@ -135,10 +123,11 @@ public class AvroToFlinkSchemaConverter {
                 if (type == null && logicalType == null) {
                     return new IntType(isOptional);
                 } else if (logicalType != null) {
-                    if (AVRO_LOGICAL_DATE.equalsIgnoreCase(logicalType)) {
+                    if (CommonConstants.AVRO_LOGICAL_DATE.equalsIgnoreCase(logicalType)) {
                         return new DateType(isOptional);
-                    } else if (AVRO_LOGICAL_TIME_MILLIS.equalsIgnoreCase(logicalType)) {
-                        return new TimeType(isOptional, 3);
+                    } else if (CommonConstants.AVRO_LOGICAL_TIME_MILLIS.equalsIgnoreCase(
+                            logicalType)) {
+                        return createTimeType(schema, isOptional);
                     } else {
                         return new IntType(isOptional);
                     }
@@ -151,22 +140,20 @@ public class AvroToFlinkSchemaConverter {
                             "Connect type annotation for Avro int field is null");
                 }
             case LONG:
-                if (AVRO_LOGICAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
-                    return new LocalZonedTimestampType(isOptional, 3);
-                } else if (AVRO_LOGICAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
-                    return new LocalZonedTimestampType(isOptional, 6);
-                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
-                    return new TimestampType(isOptional, 3);
-                } else if (AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
-                    return new TimestampType(isOptional, 6);
-                } else if (AVRO_LOGICAL_TIME_MICROS.equalsIgnoreCase(logicalType)) {
-                    // TODO we support only precision of 3 in Flink runtime, because we store
-                    // time as int representing millis of day
-                    // return new TimeType(isOptional, 6);
-                    return new BigIntType(isOptional);
-                } else {
-                    return new BigIntType(isOptional);
-                }
+                return createTimestampType(schema, isOptional)
+                        .orElseGet(
+                                () -> {
+                                    if (CommonConstants.AVRO_LOGICAL_TIME_MICROS.equalsIgnoreCase(
+                                            logicalType)) {
+                                        // TODO we support only precision of 3 in Flink runtime,
+                                        // because we store
+                                        // time as int representing millis of day
+                                        // return new TimeType(isOptional, 6);
+                                        return new BigIntType(isOptional);
+                                    } else {
+                                        return new BigIntType(isOptional);
+                                    }
+                                });
             case STRING:
             case ENUM:
                 // enums are unwrapped to strings and the original enum is not preserved
@@ -177,8 +164,8 @@ public class AvroToFlinkSchemaConverter {
                 // Special case for custom encoding of non-string maps as list of key-value records
                 if (isMapEntry(elemSchema)) {
                     if (elemSchema.getFields().size() != 2
-                            || elemSchema.getField(KEY_FIELD) == null
-                            || elemSchema.getField(VALUE_FIELD) == null) {
+                            || elemSchema.getField(CommonConstants.KEY_FIELD) == null
+                            || elemSchema.getField(CommonConstants.VALUE_FIELD) == null) {
                         throw new ValidationException(
                                 "Found map encoded as array of key-value pairs, but array "
                                         + "elements do not match the expected format.");
@@ -186,9 +173,11 @@ public class AvroToFlinkSchemaConverter {
                     return new MapType(
                             isOptional,
                             toFlinkSchemaWithCycleDetection(
-                                    elemSchema.getField(KEY_FIELD).schema(), false, cycleContext),
+                                    elemSchema.getField(CommonConstants.KEY_FIELD).schema(),
+                                    false,
+                                    cycleContext),
                             toFlinkSchemaWithCycleDetection(
-                                    elemSchema.getField(VALUE_FIELD).schema(),
+                                    elemSchema.getField(CommonConstants.VALUE_FIELD).schema(),
                                     false,
                                     cycleContext));
                 } else {
@@ -282,6 +271,61 @@ public class AvroToFlinkSchemaConverter {
                                 + schema.getType().getName()
                                 + ".");
         }
+    }
+
+    private static TimeType createTimeType(Schema schema, boolean isOptional) {
+        final int precision =
+                Optional.ofNullable(schema.getObjectProp(CommonConstants.FLINK_PRECISION))
+                        .map(i -> (Integer) i)
+                        .orElse(3);
+        if (precision > 3) {
+            throw new ValidationException(
+                    String.format("Illegal precision %d for TIME type.", precision));
+        }
+        return new TimeType(isOptional, precision);
+    }
+
+    private static Optional<LogicalType> createTimestampType(Schema schema, boolean isOptional) {
+        final Optional<Integer> propertyPrecision =
+                Optional.ofNullable(schema.getObjectProp(CommonConstants.FLINK_PRECISION))
+                        .map(i -> (Integer) i);
+
+        final String logicalType = schema.getProp(CommonConstants.AVRO_LOGICAL_TYPE_PROP);
+        if (CommonConstants.AVRO_LOGICAL_TIMESTAMP_MILLIS.equalsIgnoreCase(logicalType)) {
+            final int precision = propertyPrecision.orElse(3);
+            if (precision > 3) {
+                throw new ValidationException(
+                        String.format("Illegal precision %d for timestamp millis.", precision));
+            }
+            return Optional.of(new LocalZonedTimestampType(isOptional, precision));
+        } else if (CommonConstants.AVRO_LOGICAL_TIMESTAMP_MICROS.equalsIgnoreCase(logicalType)) {
+            final int precision = propertyPrecision.orElse(6);
+            if (precision > 6) {
+                throw new ValidationException(
+                        String.format("Illegal precision %d for timestamp micros.", precision));
+            }
+            return Optional.of(new LocalZonedTimestampType(isOptional, precision));
+        } else if (CommonConstants.AVRO_LOGICAL_LOCAL_TIMESTAMP_MILLIS.equalsIgnoreCase(
+                logicalType)) {
+            final int precision = propertyPrecision.orElse(3);
+            if (precision > 3) {
+                throw new ValidationException(
+                        String.format(
+                                "Illegal precision %d for local timestamp millis.", precision));
+            }
+            return Optional.of(new TimestampType(isOptional, precision));
+        } else if (CommonConstants.AVRO_LOGICAL_LOCAL_TIMESTAMP_MICROS.equalsIgnoreCase(
+                logicalType)) {
+            final int precision = propertyPrecision.orElse(6);
+            if (precision > 6) {
+                throw new ValidationException(
+                        String.format(
+                                "Illegal precision %d for local timestamp micros.", precision));
+            }
+            return Optional.of(new TimestampType(isOptional, precision));
+        }
+
+        return Optional.empty();
     }
 
     private static final class CycleContext {

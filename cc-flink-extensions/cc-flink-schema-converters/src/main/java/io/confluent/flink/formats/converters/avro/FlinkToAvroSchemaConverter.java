@@ -25,6 +25,7 @@ import org.apache.flink.util.StringUtils;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.LongBuilder;
 
 import java.util.List;
 import java.util.Objects;
@@ -32,10 +33,6 @@ import java.util.Objects;
 /** A converter from {@link LogicalType} to {@link Schema}. */
 @Confluent
 public class FlinkToAvroSchemaConverter {
-
-    private static final String CONNECT_TYPE_PROP = "connect.type";
-    private static final String KEY_FIELD = "key";
-    private static final String VALUE_FIELD = "value";
 
     /**
      * Converts a Flink's logical type into an Avro schema. Uses Kafka Connect annotations to store
@@ -61,13 +58,13 @@ public class FlinkToAvroSchemaConverter {
             case TINYINT:
                 {
                     Schema integer = SchemaBuilder.builder().intType();
-                    integer.addProp(CONNECT_TYPE_PROP, "int8");
+                    integer.addProp(CommonConstants.CONNECT_TYPE_PROP, "int8");
                     return integer;
                 }
             case SMALLINT:
                 {
                     Schema integer = SchemaBuilder.builder().intType();
-                    integer.addProp(CONNECT_TYPE_PROP, "int16");
+                    integer.addProp(CommonConstants.CONNECT_TYPE_PROP, "int16");
                     return integer;
                 }
             case INTEGER:
@@ -140,14 +137,14 @@ public class FlinkToAvroSchemaConverter {
             case RAW:
             default:
                 throw new ValidationException(
-                        "Unsupported to derive an Avro Schema for type: " + logicalType);
+                        "Unsupported to derive an Avro Schema for type " + logicalType);
         }
     }
 
     private static ValidationException getInvalidFieldNameException(String fieldName) {
         return new ValidationException(
                 String.format(
-                        "Illegal field name for AVRO format: "
+                        "Illegal field name for AVRO format "
                                 + "`%s`. AVRO expects field"
                                 + " names to start with [A-Za-z_] subsequently contain only [A-Za-z0-9_].",
                         fieldName));
@@ -183,10 +180,10 @@ public class FlinkToAvroSchemaConverter {
                         SchemaBuilder.record("MapEntry")
                                 .namespace("io.confluent.connect.avro")
                                 .fields()
-                                .name(KEY_FIELD)
+                                .name(CommonConstants.KEY_FIELD)
                                 .type(fromFlinkSchema(keyType, rowName + "_key"))
                                 .noDefault()
-                                .name(VALUE_FIELD)
+                                .name(CommonConstants.VALUE_FIELD)
                                 .type(fromFlinkSchema(valueType, rowName + "_value"))
                                 .noDefault()
                                 .endRecord());
@@ -194,15 +191,20 @@ public class FlinkToAvroSchemaConverter {
 
     private static Schema convertTime(TimeType logicalType) {
         final int precision = logicalType.getPrecision();
-        if (precision <= 3) {
+        if (precision == 3) {
             return LogicalTypes.timeMillis().addToSchema(SchemaBuilder.builder().intType());
-        } else if (precision <= 6) {
-            return LogicalTypes.timeMicros().addToSchema(SchemaBuilder.builder().longType());
+        } else if (precision < 3) {
+            return LogicalTypes.timeMillis()
+                    .addToSchema(
+                            SchemaBuilder.builder()
+                                    .intBuilder()
+                                    .prop(CommonConstants.FLINK_PRECISION, precision)
+                                    .endInt());
         } else {
             throw new ValidationException(
-                    "Avro does not support TIME type with precision: "
+                    "Flink does not support TIME type with precision "
                             + precision
-                            + ", it only supports precision less than or equal to 6.");
+                            + ", it only supports precision less than or equal to 3.");
         }
     }
 
@@ -216,11 +218,15 @@ public class FlinkToAvroSchemaConverter {
         } else {
             throw new ValidationException(
                     "Avro does not support TIMESTAMP type "
-                            + "with precision: "
+                            + "with precision "
                             + precision
                             + ", it only supports precision less than or equal to 6.");
         }
-        return avroLogicalType.addToSchema(SchemaBuilder.builder().longType());
+        LongBuilder<Schema> longBuilder = SchemaBuilder.builder().longBuilder();
+        if (precision != 3 && precision != 6) {
+            longBuilder = longBuilder.prop(CommonConstants.FLINK_PRECISION, precision);
+        }
+        return avroLogicalType.addToSchema(longBuilder.endLong());
     }
 
     private static Schema convertLocalTimestamp(LocalZonedTimestampType logicalType) {
@@ -233,11 +239,15 @@ public class FlinkToAvroSchemaConverter {
         } else {
             throw new ValidationException(
                     "Avro does not support TIMESTAMP_LTZ type "
-                            + "with precision: "
+                            + "with precision "
                             + precision
                             + ", it only supports precision less than or equal to 6.");
         }
-        return avroLogicalType.addToSchema(SchemaBuilder.builder().longType());
+        LongBuilder<Schema> longBuilder = SchemaBuilder.builder().longBuilder();
+        if (precision != 3 && precision != 6) {
+            longBuilder = longBuilder.prop(CommonConstants.FLINK_PRECISION, precision);
+        }
+        return avroLogicalType.addToSchema(longBuilder.endLong());
     }
 
     private static Schema convertBinary(LogicalType logicalType, String rowName) {

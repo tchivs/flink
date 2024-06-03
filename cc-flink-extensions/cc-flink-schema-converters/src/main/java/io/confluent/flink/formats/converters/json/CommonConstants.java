@@ -29,4 +29,14 @@ public class CommonConstants {
     public static final String CONNECT_TYPE_DECIMAL_SCALE = "scale";
     public static final String CONNECT_TYPE_DECIMAL_PRECISION = "connect.decimal.precision";
     public static final String GENERALIZED_TYPE_UNION_PREFIX = "connect_union_field_";
+
+    // ====================================================
+    // Flink specific properties. We need those to cover Flink types which are not supported
+    // by neither JSON nor have extensions in Kafka Connect. Seperate from the above in case
+    // Kafka Connect adds support for them in the future.
+    // ====================================================
+    public static final String FLINK_TYPE_PROP = "flink.type";
+    public static final String FLINK_TYPE_TIMESTAMP = "timestamp";
+    public static final String FLINK_PARAMETERS = "flink.parameters";
+    public static final String FLINK_PRECISION = "precision";
 }

@@ -248,6 +248,7 @@ public class ProtoToRowDataConverters {
             case TIME_WITHOUT_TIME_ZONE:
                 return createTimeConverter();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return createTimestampConverter();
             case DATE:
                 return createDateConverter();
@@ -276,7 +277,6 @@ public class ProtoToRowDataConverters {
             case NULL:
             case RAW:
             case SYMBOL:
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case DISTINCT_TYPE:
             case STRUCTURED_TYPE:
             case INTERVAL_DAY_TIME:

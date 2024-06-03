@@ -19,6 +19,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
+import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -185,7 +186,11 @@ public class JsonToRowDataConverters {
                     }
                 };
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                final LocalZonedTimestampType timestampType = (LocalZonedTimestampType) targetType;
+                final LocalZonedTimestampType timestampLtzType =
+                        (LocalZonedTimestampType) targetType;
+                return createTimestampConverter(timestampLtzType.getPrecision());
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                final TimestampType timestampType = (TimestampType) targetType;
                 return createTimestampConverter(timestampType.getPrecision());
             case ARRAY:
                 return createArrayConverter(readSchema, (ArrayType) targetType);
@@ -207,7 +212,6 @@ public class JsonToRowDataConverters {
             case STRUCTURED_TYPE:
             case INTERVAL_DAY_TIME:
             case INTERVAL_YEAR_MONTH:
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
             case TIMESTAMP_WITH_TIME_ZONE:
             case UNRESOLVED:
             default:

@@ -14,6 +14,7 @@ import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -134,9 +135,36 @@ public final class CommonMappings {
                                 new VarCharType(false, VarCharType.MAX_LENGTH),
                                 new BooleanType(false))),
                 new TypeMapping(
+                        LogicalTypes.timeMillis().addToSchema(SchemaBuilder.builder().intType()),
+                        new TimeType(false, 3)),
+                new TypeMapping(
+                        LogicalTypes.timeMillis()
+                                .addToSchema(
+                                        SchemaBuilder.builder()
+                                                .intBuilder()
+                                                .prop(CommonConstants.FLINK_PRECISION, 2)
+                                                .endInt()),
+                        new TimeType(false, 2)),
+                new TypeMapping(
                         LogicalTypes.timestampMillis()
                                 .addToSchema(SchemaBuilder.builder().longType()),
                         new LocalZonedTimestampType(false, 3)),
+                new TypeMapping(
+                        LogicalTypes.timestampMillis()
+                                .addToSchema(
+                                        SchemaBuilder.builder()
+                                                .longBuilder()
+                                                .prop(CommonConstants.FLINK_PRECISION, 2)
+                                                .endLong()),
+                        new LocalZonedTimestampType(false, 2)),
+                new TypeMapping(
+                        LogicalTypes.timestampMicros()
+                                .addToSchema(
+                                        SchemaBuilder.builder()
+                                                .longBuilder()
+                                                .prop(CommonConstants.FLINK_PRECISION, 5)
+                                                .endLong()),
+                        new LocalZonedTimestampType(false, 5)),
                 new TypeMapping(
                         LogicalTypes.localTimestampMillis()
                                 .addToSchema(SchemaBuilder.builder().longType()),

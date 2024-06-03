@@ -74,7 +74,7 @@ class FlinkToAvroSchemaConverterTest {
                                         rowType, "io.confluent.row"))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
-                        "Illegal field name for AVRO format: "
+                        "Illegal field name for AVRO format "
                                 + "`digital.hema.transport.v2.HomeDeliveryAddress`. AVRO expects field"
                                 + " names to start with [A-Za-z_] subsequently contain only [A-Za-z0-9_].");
     }

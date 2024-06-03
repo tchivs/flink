@@ -477,4 +477,65 @@ class ProtoToRowDataConvertersTest {
 
         assertThat(row).isEqualTo(expected);
     }
+
+    @Test
+    void testTimestamps() throws IOException {
+        final String schemaStr =
+                "syntax = \"proto3\";\n"
+                        + "package io.confluent.protobuf.generated;\n"
+                        + "\n"
+                        + "import \"google/protobuf/timestamp.proto\";\n"
+                        + "\n"
+                        + "message Row {\n"
+                        + "  optional .google.protobuf.Timestamp timestamp = 1 [(confluent.field_meta) = {\n"
+                        + "    params: [\n"
+                        + "      {\n"
+                        + "        key: \"flink.precision\",\n"
+                        + "        value: \"9\"\n"
+                        + "      },\n"
+                        + "      {\n"
+                        + "        key: \"flink.type\",\n"
+                        + "        value: \"timestamp\"\n"
+                        + "      }\n"
+                        + "    ]\n"
+                        + "  }];\n"
+                        + "  optional .google.protobuf.Timestamp timestamp_ltz = 2;"
+                        + "}";
+
+        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
+        Descriptor schema = protoSchema.toDescriptor();
+
+        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
+
+        final ProtoToRowDataConverter converter =
+                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+
+        final int timestampSeconds = 960000000;
+        final int timestampNanos = 34567890;
+        final DynamicMessage message =
+                DynamicMessage.newBuilder(schema)
+                        .setField(
+                                schema.findFieldByName("timestamp"),
+                                Timestamp.newBuilder()
+                                        .setSeconds(timestampSeconds)
+                                        .setNanos(timestampNanos)
+                                        .build())
+                        .setField(
+                                schema.findFieldByName("timestamp_ltz"),
+                                Timestamp.newBuilder()
+                                        .setSeconds(timestampSeconds)
+                                        .setNanos(timestampNanos)
+                                        .build())
+                        .build();
+        final RowData row = (RowData) converter.convert(message);
+
+        final GenericRowData expected = new GenericRowData(2);
+        final TimestampData timestampData =
+                TimestampData.fromEpochMillis(
+                        timestampSeconds * 1000L + timestampNanos / 1000_000,
+                        timestampNanos % 1000_000);
+        expected.setField(0, timestampData);
+        expected.setField(1, timestampData);
+        assertThat(row).isEqualTo(expected);
+    }
 }
