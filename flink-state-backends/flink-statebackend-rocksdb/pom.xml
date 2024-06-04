@@ -63,7 +63,7 @@ under the License.
 		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>frocksdbjni</artifactId>
-			<version>8.10.0-ga</version>
+			<version>8.10.0-v3</version>
 		</dependency>
 
 		<!-- test dependencies -->
