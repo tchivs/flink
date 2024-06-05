@@ -19,6 +19,7 @@ package org.apache.flink.runtime.scheduler.metrics;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.MetricOptions;
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.MetricGroup;
 
 /** Utility to define metrics that capture the time that some component spends in a state. */
@@ -52,6 +53,26 @@ public interface StateTimeMetric {
 
         if (jobStatusMetricsSettings.isTotalTimeMetricsEnabled()) {
             metricGroup.gauge(getTotalTimeMetricName(baseName), stateTimeMetric::getTotalTime);
+            metricGroup.counter(
+                    getTotalTimeMetricAsCounterName(baseName),
+                    new Counter() {
+                        @Override
+                        public void inc() {}
+
+                        @Override
+                        public void inc(long n) {}
+
+                        @Override
+                        public void dec() {}
+
+                        @Override
+                        public void dec(long n) {}
+
+                        @Override
+                        public long getCount() {
+                            return stateTimeMetric.getTotalTime();
+                        }
+                    });
         }
     }
 
@@ -68,5 +89,10 @@ public interface StateTimeMetric {
     @VisibleForTesting
     static String getTotalTimeMetricName(String baseName) {
         return baseName + "TimeTotal";
+    }
+
+    @VisibleForTesting
+    static String getTotalTimeMetricAsCounterName(String baseName) {
+        return baseName + "TimeTotalCounter";
     }
 }
