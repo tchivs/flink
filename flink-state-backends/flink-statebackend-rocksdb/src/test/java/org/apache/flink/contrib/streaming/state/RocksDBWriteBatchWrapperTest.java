@@ -82,20 +82,22 @@ public class RocksDBWriteBatchWrapperTest {
                                 cancellationCheckInterval,
                                 batchSizeBytes)) {
             registry.registerCloseable(writeBatchWrapper.getCancelCloseable());
-            writeStartedFuture.complete(null);
 
             //noinspection InfiniteLoopStatement
             for (int i = 0; ; i++) {
-                try {
-                    writeBatchWrapper.put(
-                            handle, ("key:" + i).getBytes(), ("value:" + i).getBytes());
-                } catch (Exception e) {
-                    cancellationRequestedFuture.join(); // shouldn't have any errors
-                    throw e;
+                // should fail when i == cancellationCheckInterval
+                writeBatchWrapper.put(handle, ("key:" + i).getBytes(), ("value:" + i).getBytes());
+                if (i == 0) {
+                    // signal the other thread to close the wrapper and wait for its signal back
+                    // only necessary once and only AFTER the 1st put
+                    // (otherwise, the 1st put will fail)
+                    writeStartedFuture.complete(null);
+                    cancellationRequestedFuture.join();
                 }
                 // make sure that cancellation is triggered earlier than periodic flush
-                // but allow some delay of cancellation propagation
-                assertThat(i).isLessThan(cancellationCheckInterval * 2);
+                assertThat(i)
+                        .describedAs("too many records were inserted")
+                        .isLessThan(cancellationCheckInterval);
             }
         }
     }
