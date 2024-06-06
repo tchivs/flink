@@ -294,6 +294,8 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
     private final ShuffleDescriptorsCache shuffleDescriptorsCache;
 
+    private long activationDurationMs = -1;
+
     public TaskExecutor(
             RpcService rpcService,
             TaskManagerConfiguration taskManagerConfiguration,
@@ -1522,6 +1524,15 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
                         taskExecutorRegistrationId);
 
         stopRegistrationTimeout();
+
+        final long activationTimestamp =
+                taskManagerConfiguration
+                        .getConfiguration()
+                        .getLong(StandbyTaskManager.STANDBY_TASK_MANAGER_ACTIVATION_TIMESTAMP, -1);
+        if (activationTimestamp > 0 && activationDurationMs == -1) {
+            activationDurationMs = System.currentTimeMillis() - activationTimestamp;
+            taskManagerMetricGroup.gauge("activationDurationMs", () -> activationDurationMs);
+        }
     }
 
     private void closeResourceManagerConnection(Exception cause) {

@@ -29,6 +29,8 @@ import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.testutils.MultiShotLatch;
 import org.apache.flink.core.testutils.OneShotLatch;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.Metric;
 import org.apache.flink.runtime.blob.NoOpTaskExecutorBlobService;
 import org.apache.flink.runtime.blob.TransientBlobKey;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
@@ -68,9 +70,9 @@ import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.messages.Acknowledge;
-import org.apache.flink.runtime.metrics.NoOpMetricRegistry;
 import org.apache.flink.runtime.metrics.groups.TaskManagerMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
+import org.apache.flink.runtime.metrics.util.TestingMetricRegistry;
 import org.apache.flink.runtime.query.KvStateRegistry;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RegistrationResponse.Failure;
@@ -143,7 +145,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
@@ -2544,6 +2548,35 @@ public class TaskExecutorTest extends TestLogger {
     }
 
     @Test
+    public void testActivationTimestamp() throws Exception {
+        configuration.setLong(StandbyTaskManager.STANDBY_TASK_MANAGER_ACTIVATION_TIMESTAMP, 1337L);
+        try (TaskExecutorTestingContext ctx = createTaskExecutorTestingContext(2)) {
+            ctx.start();
+            final CompletableFuture<Tuple3<ResourceID, InstanceID, SlotReport>>
+                    initialSlotReportFuture = new CompletableFuture<>();
+            createAndRegisterResourceManager(initialSlotReportFuture);
+            initialSlotReportFuture.get();
+
+            while (!callInMain(
+                    ctx,
+                    () -> {
+                        final Metric metric =
+                                ctx.metrics.get(
+                                        ctx.metricGroup.getMetricIdentifier(
+                                                "activationDurationMs"));
+                        if (metric != null) {
+                            @SuppressWarnings("unchecked")
+                            final Gauge<Long> cast = (Gauge<Long>) metric;
+                            return cast.getValue() > 0;
+                        }
+                        return false;
+                    })) {
+                Thread.sleep(50);
+            }
+        }
+    }
+
+    @Test
     public void testReleasingJobResources() throws Exception {
         AllocationID[] slots =
                 range(0, 5).mapToObj(i -> new AllocationID()).toArray(AllocationID[]::new);
@@ -2887,9 +2920,18 @@ public class TaskExecutorTest extends TestLogger {
                 createTaskExecutorLocalStateStoresManager();
         TaskExecutorStateChangelogStoragesManager changelogStoragesManager =
                 new TaskExecutorStateChangelogStoragesManager();
+        final Map<String, Metric> metrics = new HashMap<>();
         TaskManagerMetricGroup metricGroup =
                 TaskManagerMetricGroup.createTaskManagerMetricGroup(
-                        NoOpMetricRegistry.INSTANCE, "", ResourceID.generate());
+                        TestingMetricRegistry.builder()
+                                .setRegisterConsumer(
+                                        (metric, metricName, group) -> {
+                                            metrics.put(
+                                                    group.getMetricIdentifier(metricName), metric);
+                                        })
+                                .build(),
+                        "",
+                        ResourceID.generate());
 
         final TestingTaskExecutor taskExecutor =
                 createTestingTaskExecutor(
@@ -2910,7 +2952,8 @@ public class TaskExecutorTest extends TestLogger {
                 taskExecutor,
                 changelogStoragesManager,
                 metricGroup,
-                offerSlotsLatch);
+                offerSlotsLatch,
+                metrics);
     }
 
     private class TaskExecutorTestingContext implements AutoCloseable {
@@ -2920,6 +2963,7 @@ public class TaskExecutorTest extends TestLogger {
         private final TaskExecutorStateChangelogStoragesManager changelogStoragesManager;
         private final TaskManagerMetricGroup metricGroup;
         private final OneShotLatch offerSlotsLatch;
+        private final Map<String, Metric> metrics;
 
         private TaskExecutorTestingContext(
                 TestingJobMasterGateway jobMasterGateway,
@@ -2927,13 +2971,15 @@ public class TaskExecutorTest extends TestLogger {
                 TestingTaskExecutor taskExecutor,
                 TaskExecutorStateChangelogStoragesManager changelogStoragesManager,
                 TaskManagerMetricGroup metricGroup,
-                OneShotLatch offerSlotsLatch) {
+                OneShotLatch offerSlotsLatch,
+                Map<String, Metric> metrics) {
             this.jobMasterGateway = jobMasterGateway;
             this.taskSlotTable = taskSlotTable;
             this.taskExecutor = taskExecutor;
             this.changelogStoragesManager = changelogStoragesManager;
             this.metricGroup = metricGroup;
             this.offerSlotsLatch = offerSlotsLatch;
+            this.metrics = metrics;
         }
 
         private void start() {

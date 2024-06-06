@@ -26,6 +26,7 @@ import org.apache.flink.runtime.security.token.DelegationTokenReceiverRepository
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.ThrowingRunnable;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -155,6 +156,11 @@ public class StandbyTaskManagerRunnerTest extends TestLogger {
                 "UNTOUCHED_ORIGINAL_VALUE",
                 taskExecutorServiceFactory.lastReceivedConfig.get(untouchedKey));
         assertEquals(activatedHost, taskExecutorServiceFactory.lastRpcService.getAddress());
+
+        Assertions.assertThat(
+                        taskExecutorServiceFactory.lastReceivedConfig.getLong(
+                                StandbyTaskManager.STANDBY_TASK_MANAGER_ACTIVATION_TIMESTAMP))
+                .isGreaterThan(0);
     }
 
     @SuppressWarnings({"unchecked"})

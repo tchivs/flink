@@ -5,6 +5,8 @@
 package org.apache.flink.runtime.taskexecutor;
 
 import org.apache.flink.annotation.Confluent;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.runtime.rpc.RpcEndpoint;
@@ -19,6 +21,14 @@ import java.util.concurrent.CompletableFuture;
 /** Standby TaskManager API that allows to activate TaskManager with given configuration. */
 @Confluent
 public class StandbyTaskManager extends RpcEndpoint implements StandbyTaskManagerGateway {
+
+    public static final ConfigOption<Long> STANDBY_TASK_MANAGER_ACTIVATION_TIMESTAMP =
+            ConfigOptions.key("$internal.standby-taskmanager.activation-timestamp")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The timestamp when we've received the activation of the Standby TaskManager.");
+
     private static final Logger LOG = LoggerFactory.getLogger(StandbyTaskManager.class);
 
     private static final String TASK_MANAGER_CONFIGURATOR_NAME = "standby_taskmanager";
@@ -45,6 +55,7 @@ public class StandbyTaskManager extends RpcEndpoint implements StandbyTaskManage
         LOG.info(
                 "Received configuration for the activation: {}",
                 ConfigurationUtils.hideSensitiveValues(overrides.toMap()));
+        overrides.setLong(STANDBY_TASK_MANAGER_ACTIVATION_TIMESTAMP, System.currentTimeMillis());
         activationFuture.complete(overrides);
     }
 
