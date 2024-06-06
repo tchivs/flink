@@ -2841,6 +2841,7 @@ SqlShowModels SqlShowModels() :
 /**
 * ALTER MODEL [IF EXISTS] modelName SET (property_key = property_val, ...)
 * ALTER MODEL [IF EXISTS] modelName RENAME TO newModelName
+* ALTER MODEL [IF EXISTS] modelName RESET (property_key, ...)
 */
 SqlAlterModel SqlAlterModel() :
 {
@@ -2849,6 +2850,7 @@ SqlAlterModel SqlAlterModel() :
     SqlIdentifier modelIdentifier;
     SqlIdentifier newModelIdentifier = null;
     SqlNodeList modelOptionList = SqlNodeList.EMPTY;
+    SqlNodeList optionKeyList = SqlNodeList.EMPTY;
 }
 {
     <ALTER> <MODEL> { startPos = getPos(); }
@@ -2859,21 +2861,31 @@ SqlAlterModel SqlAlterModel() :
         <RENAME> <TO>
         newModelIdentifier = CompoundIdentifier()
         {
-            return new SqlAlterModel(
+            return new SqlAlterModelRename(
                         startPos.plus(getPos()),
                         modelIdentifier,
-                        newModelIdentifier,
-                        ifExists);
+                        ifExists,
+                        newModelIdentifier);
         }
     |
         <SET>
         modelOptionList = TableProperties()
         {
-            return new SqlAlterModel(
+            return new SqlAlterModelSet(
                         startPos.plus(getPos()),
                         modelIdentifier,
-                        modelOptionList,
-                        ifExists);
+                        ifExists,
+                        modelOptionList);
+        }
+    |
+        <RESET>
+        optionKeyList = TablePropertyKeys()
+        {
+            return new SqlAlterModelReset(
+                        startPos.plus(getPos()),
+                        modelIdentifier,
+                        ifExists,
+                        optionKeyList);
         }
     )
 }

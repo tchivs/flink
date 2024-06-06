@@ -19,6 +19,8 @@
 package org.apache.flink.table.planner.operations;
 
 import org.apache.flink.sql.parser.ddl.SqlAlterModel;
+import org.apache.flink.sql.parser.ddl.SqlAlterModelRename;
+import org.apache.flink.sql.parser.ddl.SqlAlterModelSet;
 import org.apache.flink.sql.parser.ddl.SqlTableOption;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.ValidationException;
@@ -48,16 +50,18 @@ public class SqlAlterModelConverter {
         UnresolvedIdentifier unresolvedIdentifier =
                 UnresolvedIdentifier.of(sqlAlterModel.fullModelName());
         ObjectIdentifier modelIdentifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
-        if (sqlAlterModel.getNewModelName() != null) {
+        if (sqlAlterModel instanceof SqlAlterModelRename) {
+            SqlAlterModelRename sqlAlterModelRename = (SqlAlterModelRename) sqlAlterModel;
             // Rename model
             UnresolvedIdentifier newUnresolvedIdentifier =
-                    UnresolvedIdentifier.of(sqlAlterModel.fullNewModelName());
+                    UnresolvedIdentifier.of(sqlAlterModelRename.fullNewModelName());
             ObjectIdentifier newModelIdentifier =
                     catalogManager.qualifyIdentifier(newUnresolvedIdentifier);
             return new AlterModelRenameOperation(
                     modelIdentifier, newModelIdentifier, sqlAlterModel.ifModelExists());
-        } else if (sqlAlterModel.getModelOptionList() != null) {
-            Map<String, String> changeModelOptions = getModelOptions(sqlAlterModel);
+        } else if (sqlAlterModel instanceof SqlAlterModelSet) {
+            SqlAlterModelSet sqlAlterModelSet = (SqlAlterModelSet) sqlAlterModel;
+            Map<String, String> changeModelOptions = getModelOptions(sqlAlterModelSet);
             return new AlterModelOptionsOperation(
                     modelIdentifier,
                     CatalogModel.of(
@@ -74,9 +78,9 @@ public class SqlAlterModelConverter {
         }
     }
 
-    private Map<String, String> getModelOptions(SqlAlterModel sqlAlterModel) {
+    private Map<String, String> getModelOptions(SqlAlterModelSet sqlAlterModelSet) {
         Map<String, String> options = new HashMap<>();
-        sqlAlterModel
+        sqlAlterModelSet
                 .getModelOptionList()
                 .getList()
                 .forEach(
