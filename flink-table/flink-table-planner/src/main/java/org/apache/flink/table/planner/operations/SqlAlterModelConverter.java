@@ -20,6 +20,7 @@ package org.apache.flink.table.planner.operations;
 
 import org.apache.flink.sql.parser.ddl.SqlAlterModel;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelRename;
+import org.apache.flink.sql.parser.ddl.SqlAlterModelReset;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelSet;
 import org.apache.flink.sql.parser.ddl.SqlTableOption;
 import org.apache.flink.table.api.Schema;
@@ -27,7 +28,9 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.CatalogModel;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.ResolvedCatalogModel;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
+import org.apache.flink.table.operations.NopOperation;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.AlterModelOptionsOperation;
 import org.apache.flink.table.operations.ddl.AlterModelRenameOperation;
@@ -37,6 +40,9 @@ import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Helper class for converting {@link SqlAlterModel} to {@link AlterModelOptionsOperation}. */
 public class SqlAlterModelConverter {
@@ -50,6 +56,15 @@ public class SqlAlterModelConverter {
         UnresolvedIdentifier unresolvedIdentifier =
                 UnresolvedIdentifier.of(sqlAlterModel.fullModelName());
         ObjectIdentifier modelIdentifier = catalogManager.qualifyIdentifier(unresolvedIdentifier);
+        Optional<ResolvedCatalogModel> optionalCatalogModel =
+                catalogManager.getModel(modelIdentifier);
+        if (!optionalCatalogModel.isPresent()) {
+            if (sqlAlterModel.ifModelExists()) {
+                return new NopOperation();
+            }
+            throw new ValidationException(
+                    String.format("Model with identifier %s doesn't exist", modelIdentifier));
+        }
         if (sqlAlterModel instanceof SqlAlterModelRename) {
             SqlAlterModelRename sqlAlterModelRename = (SqlAlterModelRename) sqlAlterModel;
             // Rename model
@@ -68,6 +83,26 @@ public class SqlAlterModelConverter {
                             Schema.newBuilder().build(),
                             Schema.newBuilder().build(),
                             changeModelOptions,
+                            null),
+                    sqlAlterModel.ifModelExists());
+        } else if (sqlAlterModel instanceof SqlAlterModelReset) {
+            SqlAlterModelReset sqlAlterModelReset = (SqlAlterModelReset) sqlAlterModel;
+            // reset empty is not allowed
+            Set<String> resetKeys =
+                    sqlAlterModelReset.getResetKeys().stream()
+                            .map(String::toUpperCase)
+                            .collect(Collectors.toSet());
+            if (resetKeys.isEmpty()) {
+                throw new ValidationException("ALTER MODEL RESET does not support empty key");
+            }
+            Map<String, String> newOptions = new HashMap<>(optionalCatalogModel.get().getOptions());
+            resetKeys.forEach(newOptions::remove);
+            return new AlterModelOptionsOperation(
+                    modelIdentifier,
+                    CatalogModel.of(
+                            Schema.newBuilder().build(),
+                            Schema.newBuilder().build(),
+                            newOptions,
                             null),
                     sqlAlterModel.ifModelExists());
         } else {
