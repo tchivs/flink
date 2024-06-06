@@ -475,7 +475,7 @@ public class MetricRegistryImpl implements MetricRegistry, AutoCloseableAsync {
     // ------------------------------------------------------------------------
 
     @Override
-    public void register(Metric metric, String metricName, AbstractMetricGroup group) {
+    public void register(Metric metric, String metricName, AbstractMetricGroup<?> group) {
         synchronized (lock) {
             if (isShutdown()) {
                 LOG.warn(
@@ -512,7 +512,7 @@ public class MetricRegistryImpl implements MetricRegistry, AutoCloseableAsync {
     }
 
     @Override
-    public void unregister(Metric metric, String metricName, AbstractMetricGroup group) {
+    public void unregister(Metric metric, String metricName, AbstractMetricGroup<?> group) {
         synchronized (lock) {
             if (isShutdown()) {
                 LOG.warn(
@@ -558,7 +558,7 @@ public class MetricRegistryImpl implements MetricRegistry, AutoCloseableAsync {
             QuadConsumer<MetricReporter, Metric, String, MetricGroup> operation,
             Metric metric,
             String metricName,
-            AbstractMetricGroup group) {
+            AbstractMetricGroup<?> group) {
         for (int i = 0; i < reporters.size(); i++) {
             try {
                 ReporterAndSettings reporterAndSettings = reporters.get(i);
@@ -575,7 +575,7 @@ public class MetricRegistryImpl implements MetricRegistry, AutoCloseableAsync {
                                 i);
                         continue;
                     }
-                    FrontMetricGroup front =
+                    FrontMetricGroup<?> front =
                             new FrontMetricGroup<AbstractMetricGroup<?>>(
                                     reporterAndSettings.getSettings(), group);
 

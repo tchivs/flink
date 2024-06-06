@@ -229,13 +229,13 @@ public class TaskMetricGroupTest extends TestLogger {
         }
 
         @Override
-        public void register(Metric metric, String metricName, AbstractMetricGroup group) {
+        public void register(Metric metric, String metricName, AbstractMetricGroup<?> group) {
             super.register(metric, metricName, group);
             counter++;
         }
 
         @Override
-        public void unregister(Metric metric, String metricName, AbstractMetricGroup group) {
+        public void unregister(Metric metric, String metricName, AbstractMetricGroup<?> group) {
             super.unregister(metric, metricName, group);
             counter--;
         }

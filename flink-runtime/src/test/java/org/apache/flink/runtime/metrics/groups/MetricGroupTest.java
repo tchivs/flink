@@ -395,12 +395,12 @@ public class MetricGroupTest extends TestLogger {
         }
 
         @Override
-        public void register(Metric metric, String name, AbstractMetricGroup parent) {
+        public void register(Metric metric, String name, AbstractMetricGroup<?> parent) {
             fail("Metric should never be registered");
         }
 
         @Override
-        public void unregister(Metric metric, String name, AbstractMetricGroup parent) {
+        public void unregister(Metric metric, String name, AbstractMetricGroup<?> parent) {
             fail("Metric should never be un-registered");
         }
     }
@@ -411,7 +411,8 @@ public class MetricGroupTest extends TestLogger {
      * A dummy {@link AbstractMetricGroup} to be used when a group is required as an argument but
      * not actually used.
      */
-    public static class DummyAbstractMetricGroup extends AbstractMetricGroup {
+    public static class DummyAbstractMetricGroup
+            extends AbstractMetricGroup<DummyAbstractMetricGroup> {
 
         public DummyAbstractMetricGroup(MetricRegistry registry) {
             super(registry, new String[0], null);
