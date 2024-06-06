@@ -19,7 +19,7 @@
 package org.apache.flink.table.planner.functions.casting;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.TableRuntimeException;
 import org.apache.flink.table.data.utils.CastExecutor;
 import org.apache.flink.table.planner.codegen.CodeGenUtils;
 import org.apache.flink.table.runtime.generated.CompileUtils;
@@ -109,7 +109,7 @@ abstract class AbstractCodeGeneratorCastRule<IN, OUT> extends AbstractCastRule<I
         // the cast method
         final String functionSignature =
                 "@Override public Object cast(Object _myInputObj) throws "
-                        + className(TableException.class);
+                        + className(TableRuntimeException.class);
 
         // Write the function body
         final CastRuleUtils.CodeWriter bodyWriter = new CastRuleUtils.CodeWriter();
@@ -124,7 +124,7 @@ abstract class AbstractCodeGeneratorCastRule<IN, OUT> extends AbstractCastRule<I
                     (exceptionTerm, catchWriter) ->
                             catchWriter.throwStmt(
                                     constructorCall(
-                                            TableException.class,
+                                            TableRuntimeException.class,
                                             strLiteral(
                                                     "Error when casting "
                                                             + inputLogicalType

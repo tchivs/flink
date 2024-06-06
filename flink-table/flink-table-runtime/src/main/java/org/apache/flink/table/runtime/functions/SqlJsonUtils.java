@@ -23,9 +23,9 @@ import org.apache.flink.table.api.JsonExistsOnError;
 import org.apache.flink.table.api.JsonQueryOnEmptyOrError;
 import org.apache.flink.table.api.JsonQueryWrapper;
 import org.apache.flink.table.api.JsonValueOnEmptyOrError;
+import org.apache.flink.table.api.TableRuntimeException;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.StringData;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonValue;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonFactory;
@@ -108,7 +108,7 @@ public class SqlJsonUtils {
             final Object convertedNode = MAPPER.treeToValue(node, Object.class);
             return MAPPER.writeValueAsString(convertedNode);
         } catch (JsonProcessingException e) {
-            throw new FlinkRuntimeException(
+            throw new TableRuntimeException(
                     "JSON object could not be serialized: " + node.asText(), e);
         }
     }
@@ -272,7 +272,7 @@ public class SqlJsonUtils {
 
                             return new GenericArrayData(arr);
                         default:
-                            throw new FlinkRuntimeException("illegal return type");
+                            throw new TableRuntimeException("illegal return type");
                     }
                 } catch (Exception e) {
                     exc = e;
@@ -322,7 +322,7 @@ public class SqlJsonUtils {
                     case STRING:
                         return "[]";
                     default:
-                        throw new FlinkRuntimeException("illegal return type");
+                        throw new TableRuntimeException("illegal return type");
                 }
             case EMPTY_OBJECT:
                 if (Objects.requireNonNull(returnType) == JsonQueryReturnType.STRING) {
@@ -452,44 +452,44 @@ public class SqlJsonUtils {
         }
     }
 
-    private static FlinkRuntimeException toUnchecked(Exception e) {
-        if (e instanceof FlinkRuntimeException) {
-            return (FlinkRuntimeException) e;
+    private static TableRuntimeException toUnchecked(Exception e) {
+        if (e instanceof TableRuntimeException) {
+            return (TableRuntimeException) e;
         }
-        return new FlinkRuntimeException(e.getMessage(), e);
+        return new TableRuntimeException(e.getMessage(), e);
     }
 
     private static RuntimeException illegalJsonPathModeInPathSpec(
             String pathMode, String pathSpec) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Illegal jsonpath mode ''%s'' in jsonpath spec: ''%s''",
                         pathMode, pathSpec));
     }
 
     private static RuntimeException illegalJsonPathMode(String pathMode) {
-        return new FlinkRuntimeException(String.format("Illegal jsonpath mode ''%s''", pathMode));
+        return new TableRuntimeException(String.format("Illegal jsonpath mode ''%s''", pathMode));
     }
 
     private static RuntimeException illegalJsonPathSpec(String pathSpec) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Illegal jsonpath spec ''%s'', format of the spec should be: ''<lax|strict> $'{'expr'}'''",
                         pathSpec));
     }
 
     private static RuntimeException strictPathModeRequiresNonEmptyValue() {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 "Strict jsonpath mode requires a non empty returned value, but is null");
     }
 
     private static RuntimeException emptyResultOfJsonValueFuncNotAllowed() {
-        return new FlinkRuntimeException("Empty result of JSON_VALUE function is not allowed");
+        return new TableRuntimeException("Empty result of JSON_VALUE function is not allowed");
     }
 
     private static RuntimeException illegalEmptyBehaviorFunc(
             String emptyBehavior, String functionName) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Illegal empty behavior ''{0}'' specified in %s function",
                         emptyBehavior, functionName));
@@ -497,33 +497,33 @@ public class SqlJsonUtils {
 
     private static RuntimeException illegalErrorBehaviorFunc(
             String errorBehavior, String functionName) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Illegal error behavior ''%s'' specified in %s function",
                         errorBehavior, functionName));
     }
 
     private static RuntimeException scalarValueRequiredInStrictModeOfJsonValueFunc(String value) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Strict jsonpath mode requires scalar value, and the actual value is: ''%s''",
                         value));
     }
 
     private static RuntimeException illegalWrapperBehaviorInJsonQueryFunc(String wrapperBehavior) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Illegal wrapper behavior ''%s'' specified in JSON_QUERY function",
                         wrapperBehavior));
     }
 
     private static RuntimeException emptyResultOfJsonQueryFuncNotAllowed() {
-        return new FlinkRuntimeException("Empty result of JSON_QUERY function is not allowed");
+        return new TableRuntimeException("Empty result of JSON_QUERY function is not allowed");
     }
 
     private static RuntimeException arrayOrObjectValueRequiredInStrictModeOfJsonQueryFunc(
             String value) {
-        return new FlinkRuntimeException(
+        return new TableRuntimeException(
                 String.format(
                         "Strict jsonpath mode requires array or object value, and the actual value is: ''%s''",
                         value));
