@@ -35,7 +35,6 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUE
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER_RETRY_MAX_ATTEMPTS;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
-import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.udf.adapter.api.AdapterOptions.ADAPTER_PREFIX;
 
 /** Common utilities for the ApiServer. */
@@ -49,6 +48,7 @@ public class ApiServerUtils {
      * @param config Configuration
      * @param remoteUdfSpec RemoteUdfSpec
      * @param udfSerialization UdfSerialization
+     * @param job the job that launched this UdfTask
      * @param jobID JobID
      * @return ComputeV1FlinkUdfTask
      * @throws IOException If the RemoteUdfSpec cannot be serialized
@@ -57,6 +57,7 @@ public class ApiServerUtils {
             Configuration config,
             RemoteUdfSpec remoteUdfSpec,
             UdfSerialization udfSerialization,
+            FlinkV1Job job,
             JobID jobID)
             throws IOException {
         String pluginId = config.getString(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID);
@@ -74,6 +75,14 @@ public class ApiServerUtils {
         udfTaskMeta.setOrg(remoteUdfSpec.getOrganization());
         udfTaskMeta.setEnvironment(remoteUdfSpec.getEnvironment());
         udfTaskMeta.setLabels(ImmutableMap.of(LABEL_JOB_ID, jobID.toHexString()));
+
+        // Add the job as the owner of the UdfTask
+        udfTaskMeta.addOwnerReferencesItem(
+                new ApisMetaV1OwnerReference()
+                        .apiVersion(job.getApiVersion())
+                        .kind(job.getKind())
+                        .name(job.getMetadata().getName())
+                        .uid(job.getMetadata().getUid()));
 
         // Entrypoint must contain className, open and close Payloads
         ComputeV1EntryPoint udfTaskEntryPoint = new ComputeV1EntryPoint();
@@ -123,11 +132,10 @@ public class ApiServerUtils {
      * @param apiClient The ApiClient to use to connect to the API server
      * @param udfTask The UdfTask to get from the API server
      * @return The UdfTask from the API server
-     * @throws ApiException If the API server returns an error
+     * @throws RuntimeException If the API server returns an error
      */
     public static ComputeV1FlinkUdfTask getUdfTask(
-            Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask)
-            throws ApiException {
+            Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask) {
         final ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
         final CallWithRetry apiserverRetryCall =
                 new CallWithRetry(
@@ -148,11 +156,40 @@ public class ApiServerUtils {
     }
 
     /**
+     * Retrieve the FlinkJob from the API server.
+     *
+     * @param config The Configuration to use to connect to the API server
+     * @param apiClient The ApiClient to use to connect to the API server
+     * @param org The organization of the job
+     * @param env The environment of the job
+     * @param jobName The name of the job
+     * @return The FlinkJob from the API server
+     * @throws RuntimeException If the API server returns an error
+     */
+    public static FlinkV1Job getFlinkJob(
+            Configuration config, ApiClient apiClient, String org, String env, String jobName) {
+        final FlinkV1Api flinkV1Api = new FlinkV1Api(apiClient);
+        final CallWithRetry apiserverRetryCall =
+                new CallWithRetry(
+                        config.getInteger(CONFLUENT_REMOTE_UDF_APISERVER_RETRY_MAX_ATTEMPTS),
+                        config.getLong(CONFLUENT_REMOTE_UDF_APISERVER_RETRY_BACKOFF_MS));
+        return apiserverRetryCall.call(
+                () -> {
+                    try {
+                        return flinkV1Api.readFlinkV1Job(env, jobName, org, null);
+                    } catch (ApiException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+    /**
      * Connect to the API server and create a UdfTask.
      *
      * @param config The Configuration to use to connect to the API server
      * @param apiClient The ApiClient to use to connect to the API server
      * @param udfTask The UdfTask to create
+     * @throws RuntimeException If the API server returns an error
      */
     public static ComputeV1FlinkUdfTask createApiServerUdfTask(
             Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask) {
@@ -180,11 +217,10 @@ public class ApiServerUtils {
      * @param config The Configuration to use to connect to the API server
      * @param apiClient The ApiClient to use to connect to the API server
      * @param udfTask The UdfTask to delete
-     * @throws ApiException If the API server returns an error
+     * @throws RuntimeException If the API server returns an error
      */
     public static void deleteUdfTask(
-            Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask)
-            throws ApiException {
+            Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask) {
         final ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
         final CallWithRetry apiserverRetryCall =
                 new CallWithRetry(
@@ -217,53 +253,5 @@ public class ApiServerUtils {
         // set the client just in case we use the default ctors somewhere
         io.confluent.flink.apiserver.client.Configuration.setDefaultApiClient(apiClient);
         return apiClient;
-    }
-
-    /**
-     * Connect to the API server and update the Job with the job.name passed from configuration, as
-     * the owner of the given UdfTask owner so that it can be garbage collected when the job is
-     * deleted or terminated.
-     *
-     * @param config The Configuration to use to connect to the API server
-     * @param apiClient The ApiClient to use to connect to the API server
-     * @param udfTask The UdfTask that will be owned by the Job
-     */
-    public static void updateApiServerJobWithUdfTaskOwnerRef(
-            Configuration config, ApiClient apiClient, ComputeV1FlinkUdfTask udfTask) {
-        final FlinkV1Api flinkV1Api = new FlinkV1Api(apiClient);
-        final ComputeV1Api computeV1Api = new ComputeV1Api(apiClient);
-        final String jobName = config.getString(JOB_NAME);
-        Preconditions.checkArgument(!jobName.isEmpty(), "Job Name must be set");
-        final CallWithRetry apiserverRetryCall =
-                new CallWithRetry(
-                        config.getInteger(CONFLUENT_REMOTE_UDF_APISERVER_RETRY_MAX_ATTEMPTS),
-                        config.getLong(CONFLUENT_REMOTE_UDF_APISERVER_RETRY_BACKOFF_MS));
-        apiserverRetryCall.call(
-                () -> {
-                    try {
-                        final FlinkV1Job flinkV1Job =
-                                flinkV1Api.readFlinkV1Job(
-                                        udfTask.getMetadata().getEnvironment(),
-                                        jobName,
-                                        udfTask.getMetadata().getOrg(),
-                                        null);
-
-                        udfTask.getMetadata()
-                                .addOwnerReferencesItem(
-                                        new ApisMetaV1OwnerReference()
-                                                .apiVersion(flinkV1Job.getApiVersion())
-                                                .kind(flinkV1Job.getKind())
-                                                .name(flinkV1Job.getMetadata().getName())
-                                                .uid(flinkV1Job.getMetadata().getUid()));
-
-                        return computeV1Api.updateComputeV1FlinkUdfTask(
-                                udfTask.getMetadata().getEnvironment(),
-                                udfTask.getMetadata().getName(),
-                                udfTask.getMetadata().getOrg(),
-                                udfTask);
-                    } catch (ApiException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
     }
 }

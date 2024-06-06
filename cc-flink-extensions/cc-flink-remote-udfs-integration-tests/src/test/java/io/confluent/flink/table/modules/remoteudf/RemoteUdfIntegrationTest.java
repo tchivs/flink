@@ -388,6 +388,7 @@ public class RemoteUdfIntegrationTest {
     @Test
     public void testRemoteUdfApiServerNotConfigured() {
         Map<String, String> confMap = new HashMap<>();
+        confMap.put(JOB_NAME.key(), TEST_JOB_NAME);
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         final TableEnvironment tableEnv =
@@ -405,12 +406,12 @@ public class RemoteUdfIntegrationTest {
     }
 
     @Test
-    public void testRemoteUdfGateway_error() throws Exception {
+    public void testRemoteUdfGateway_error() {
         testRemoteUdfGatewayError(false);
     }
 
     @Test
-    public void testRemoteUdfGatewayAsync_error() throws Exception {
+    public void testRemoteUdfGatewayAsync_error() {
         testRemoteUdfGatewayError(true);
     }
 

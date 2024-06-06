@@ -10,10 +10,12 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.security.token.kafka.KafkaCredentials;
 import org.apache.flink.core.security.token.kafka.KafkaCredentialsCache;
 import org.apache.flink.util.IOUtils;
+import org.apache.flink.util.Preconditions;
 
 import com.google.protobuf.ByteString;
 import io.confluent.flink.apiserver.client.ApiClient;
 import io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTask;
+import io.confluent.flink.apiserver.client.model.FlinkV1Job;
 import io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSerialization;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
@@ -35,9 +37,10 @@ import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.createApiServerUdfTask;
 import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.generateUdfTaskFromSpec;
-import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.updateApiServerJobWithUdfTaskOwnerRef;
+import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.getFlinkJob;
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 import static org.apache.flink.shaded.guava31.com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
@@ -203,17 +206,25 @@ public class RemoteUdfRuntime implements AutoCloseable {
                         : new RemoteUdfSerialization(
                                 remoteUdfSpec.createReturnTypeSerializer(),
                                 remoteUdfSpec.createArgumentSerializers());
+        final String jobName = config.getString(JOB_NAME);
+        Preconditions.checkArgument(!jobName.isEmpty(), "Job Name must be set");
 
         RemoteUdfGatewayConnection remoteUdfGatewayConnection = null;
         try {
             final ApiClient apiClient = ApiServerUtils.getApiClient(config);
+            final FlinkV1Job udfTaskJob =
+                    getFlinkJob(
+                            config,
+                            apiClient,
+                            remoteUdfSpec.getOrganization(),
+                            remoteUdfSpec.getEnvironment(),
+                            jobName);
             final ComputeV1FlinkUdfTask udfTask =
                     createApiServerUdfTask(
                             config,
                             apiClient,
                             generateUdfTaskFromSpec(
-                                    config, remoteUdfSpec, udfSerialization, jobID));
-            updateApiServerJobWithUdfTaskOwnerRef(config, apiClient, udfTask);
+                                    config, remoteUdfSpec, udfSerialization, udfTaskJob, jobID));
 
             // TODO FRT-353 integrate with Watch API
             Deadline deadline = Deadline.fromNow(MAX_UDFTASK_PROVISION_DURATION);
