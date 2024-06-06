@@ -10,6 +10,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.CatalogTable;
 
 import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
 import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
@@ -85,16 +86,22 @@ public class TestUtils {
     }
 
     /** Mock for {@link FlinkCredentialServiceSecretDecrypter}. */
-    public static class MockFlinkCredentialServiceDecrypter implements SecretDecrypter {
+    public static class MockFlinkCredentialServiceDecrypter<T> implements SecretDecrypter {
         private final ModelOptionsUtils modelOptionsUtils;
         private final boolean shouldThrow;
 
-        public MockFlinkCredentialServiceDecrypter(CatalogModel model) {
+        public MockFlinkCredentialServiceDecrypter(T model) {
             this(model, false);
         }
 
-        public MockFlinkCredentialServiceDecrypter(CatalogModel model, boolean shouldThrow) {
-            modelOptionsUtils = new ModelOptionsUtils(model.getOptions());
+        public MockFlinkCredentialServiceDecrypter(T model, boolean shouldThrow) {
+            if (model instanceof CatalogModel) {
+                modelOptionsUtils = new ModelOptionsUtils(((CatalogModel) model).getOptions());
+            } else if (model instanceof CatalogTable) {
+                modelOptionsUtils = new ModelOptionsUtils(((CatalogTable) model).getOptions());
+            } else {
+                throw new IllegalArgumentException("Not supported " + model.getClass());
+            }
             this.shouldThrow = shouldThrow;
         }
 
@@ -123,13 +130,12 @@ public class TestUtils {
     }
 
     /** Mock for {@link SecretDecrypterProvider}. */
-    public static class MockSecretDecypterProvider implements SecretDecrypterProvider {
-        private final CatalogModel model;
+    public static class MockSecretDecypterProvider<T> implements SecretDecrypterProvider {
+        private final T model;
         private final MLFunctionMetrics metrics;
         private final Clock clock;
 
-        public MockSecretDecypterProvider(
-                CatalogModel model, MLFunctionMetrics metrics, Clock clock) {
+        public MockSecretDecypterProvider(T model, MLFunctionMetrics metrics, Clock clock) {
             this.model = model;
             this.metrics = metrics;
             this.clock = clock;

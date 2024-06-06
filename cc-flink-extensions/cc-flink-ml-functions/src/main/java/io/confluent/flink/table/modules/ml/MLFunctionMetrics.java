@@ -12,6 +12,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
+import io.confluent.flink.table.modules.ml.providers.SearchSupportedProviders;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -205,6 +206,14 @@ public class MLFunctionMetrics {
                     new ProviderMetrics(parentGroup.addGroup(metricName, AZURE_ML_AI)));
             providerMetrics.put(
                     VERTEX_PUB, new ProviderMetrics(parentGroup.addGroup(metricName, VERTEX_PUB)));
+        } else if (metricName.equals(VECTOR_SEARCH_METRIC_NAME)) {
+            // Add the SearchSupportedProviders
+            for (SearchSupportedProviders provider : SearchSupportedProviders.values()) {
+                providerMetrics.put(
+                        provider.getProviderName(),
+                        new ProviderMetrics(
+                                parentGroup.addGroup(metricName, provider.getProviderName())));
+            }
         }
     }
 
