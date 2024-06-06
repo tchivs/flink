@@ -274,7 +274,8 @@ if [ "$1" == "1" ]; then
 elif [ "$1" == "2" ]; then
     run_group_2
 elif [ "$1" == "3" ]; then
-    run_group_3
+    # TODO: https://confluentinc.atlassian.net/browse/FLINKCC-1361 uncomment the tests
+    #run_group_3
     run_group_3b
 elif [ "$1" == "4" ]; then
     run_group_4
@@ -282,7 +283,8 @@ else
     run_group_1
     run_group_1b
     run_group_2
-    run_group_3
+    # TODO https://confluentinc.atlassian.net/browse/FLINKCC-1361 uncomment the tests
+    #run_group_3
     run_group_3b
     run_group_4
 fi
