@@ -27,6 +27,7 @@ import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
 
 import com.google.protobuf.Descriptors.Descriptor;
+import io.confluent.flink.formats.converters.utils.SchemaUtils;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 
 import java.util.Arrays;
@@ -75,7 +76,11 @@ public final class CommonMappings {
                 NESTED_ROWS_SAME_NAME,
                 ALL_SIMPLE_TYPES_CASE,
                 COLLECTIONS_CASE,
-                STRING_TYPES_CASE);
+                STRING_TYPES_CASE,
+                NOT_NULL_MESSAGE_TYPES_CASE,
+                NESTED_ROW_NOT_NULL_CASE,
+                NULLABLE_ARRAYS_CASE,
+                NULLABLE_COLLECTIONS_CASE);
     }
 
     private static final TypeMapping NESTED_ROWS_CASE =
@@ -405,6 +410,105 @@ public final class CommonMappings {
                                     new RowField("varbinary", new VarBinaryType(true, 123)),
                                     new RowField("char", new CharType(true, 123)),
                                     new RowField("binary", new BinaryType(true, 123)))));
+
+    private static final TypeMapping NOT_NULL_MESSAGE_TYPES_CASE =
+            new TypeMapping(
+                    SchemaUtils.readSchemaFromResource("schema/proto/not_null_message_types.proto"),
+                    new RowType(
+                            false,
+                            Arrays.asList(
+                                    new RowField("date", new DateType(false)),
+                                    new RowField("decimal", new DecimalType(false, 5, 1)),
+                                    new RowField(
+                                            "timestamp_ltz", new LocalZonedTimestampType(false, 9)),
+                                    new RowField("timestamp", new TimestampType(false, 9)),
+                                    new RowField("time", new TimeType(false, 3)))));
+
+    private static final TypeMapping NESTED_ROW_NOT_NULL_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package io.confluent.protobuf.generated;\n"
+                            + "\n"
+                            + "message Row {\n"
+                            + "  meta_Row meta = 1 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.notNull\",\n"
+                            + "        value: \"true\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "\n"
+                            + "  message meta_Row {\n"
+                            + "    float a = 1;\n"
+                            + "    float b = 2;\n"
+                            + "  }\n"
+                            + "}\n",
+                    new RowType(
+                            false,
+                            Collections.singletonList(
+                                    new RowField(
+                                            "meta",
+                                            new RowType(
+                                                    false,
+                                                    asList(
+                                                            new RowField("a", new FloatType(false)),
+                                                            new RowField(
+                                                                    "b",
+                                                                    new FloatType(false))))))));
+
+    /** Mix of arrays and nullability. */
+    public static final TypeMapping NULLABLE_ARRAYS_CASE =
+            new TypeMapping(
+                    SchemaUtils.readSchemaFromResource("schema/proto/nullable_arrays.proto"),
+                    new RowType(
+                            false,
+                            Arrays.asList(
+                                    new RowField(
+                                            "arrayNullable",
+                                            new ArrayType(true, new BigIntType(false))),
+                                    new RowField(
+                                            "elementNullable",
+                                            new ArrayType(false, new BigIntType(true))),
+                                    new RowField(
+                                            "arrayAndElementNullable",
+                                            new ArrayType(true, new BigIntType(true))))));
+
+    /** Mix of collections (arrays + maps) and nullability. */
+    public static final TypeMapping NULLABLE_COLLECTIONS_CASE =
+            new TypeMapping(
+                    SchemaUtils.readSchemaFromResource("schema/proto/nullable_collections.proto"),
+                    new RowType(
+                            false,
+                            Arrays.asList(
+                                    new RowField(
+                                            "nullableMap",
+                                            new MapType(
+                                                    true,
+                                                    new BigIntType(false),
+                                                    new BigIntType(false))),
+                                    new RowField(
+                                            "arrayOfMaps",
+                                            new ArrayType(
+                                                    false,
+                                                    new MapType(
+                                                            false,
+                                                            new BigIntType(false),
+                                                            new BigIntType(false)))),
+                                    new RowField(
+                                            "nullableArrayOfNullableMaps",
+                                            new ArrayType(
+                                                    true,
+                                                    new MapType(
+                                                            true,
+                                                            new BigIntType(false),
+                                                            new BigIntType(false)))),
+                                    new RowField(
+                                            "mapOfNullableArrays",
+                                            new MapType(
+                                                    false,
+                                                    new BigIntType(false),
+                                                    new ArrayType(true, new BigIntType(false)))))));
 
     private CommonMappings() {}
 }

@@ -35,8 +35,9 @@ import com.google.protobuf.StringValue;
 import com.google.protobuf.Timestamp;
 import com.google.type.Date;
 import com.google.type.TimeOfDay;
+import io.confluent.flink.formats.converters.protobuf.CommonConstants;
+import io.confluent.protobuf.MetaProto;
 import io.confluent.protobuf.type.utils.DecimalUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 import java.time.LocalDate;
@@ -352,11 +353,38 @@ public class RowDataToProtoConverters {
                     }
                 };
             case ARRAY:
-                return createArrayConverter((ArrayType) type, targetSchema);
+                final ArrayType arrayType = (ArrayType) type;
+                if (arrayType.isNullable() && isRepeatedWrapped(targetSchema)) {
+                    final FieldDescriptor arraySchema =
+                            targetSchema.getMessageType().getFields().get(0);
+                    final RowDataToProtoConverter arrayConverter =
+                            createArrayConverter(arrayType, arraySchema);
+                    return createRepeatedWrapperConverter(targetSchema, arrayConverter);
+                } else {
+                    return createArrayConverter(arrayType, targetSchema);
+                }
             case MULTISET:
-                return createMultisetConverter((MultisetType) type, targetSchema);
+                final MultisetType multisetType = (MultisetType) type;
+                if (multisetType.isNullable() && isRepeatedWrapped(targetSchema)) {
+                    final FieldDescriptor multisetSchema =
+                            targetSchema.getMessageType().getFields().get(0);
+                    final RowDataToProtoConverter multisetConverter =
+                            createMultisetConverter(multisetType, multisetSchema);
+                    return createRepeatedWrapperConverter(targetSchema, multisetConverter);
+                } else {
+                    return createMultisetConverter(multisetType, targetSchema);
+                }
             case MAP:
-                return createMapConverter((MapType) type, targetSchema);
+                final MapType mapType = (MapType) type;
+                if (mapType.isNullable() && isRepeatedWrapped(targetSchema)) {
+                    final FieldDescriptor mapSchema =
+                            targetSchema.getMessageType().getFields().get(0);
+                    final RowDataToProtoConverter mapConverter =
+                            createMapConverter(mapType, mapSchema);
+                    return createRepeatedWrapperConverter(targetSchema, mapConverter);
+                } else {
+                    return createMapConverter(mapType, targetSchema);
+                }
             case ROW:
                 return createConverter((RowType) type, targetSchema.getMessageType());
             case INTERVAL_DAY_TIME:
@@ -368,13 +396,86 @@ public class RowDataToProtoConverters {
         }
     }
 
-    @NotNull
+    private static boolean isRepeatedWrapped(FieldDescriptor descriptor) {
+        return Boolean.parseBoolean(
+                descriptor
+                        .getOptions()
+                        .getExtension(MetaProto.fieldMeta)
+                        .getParamsOrDefault(CommonConstants.FLINK_WRAPPER, "false"));
+    }
+
+    private static RowDataToProtoConverter createRepeatedWrapperConverter(
+            FieldDescriptor wrapperSchema, RowDataToProtoConverter nestedConverter) {
+        final Descriptor wrapperType = wrapperSchema.getMessageType();
+        final FieldDescriptor valueSchema = wrapperType.getFields().get(0);
+        return new RowDataToProtoConverter() {
+            @Override
+            public Object convert(Object value) {
+                final Builder msgBuilder = DynamicMessage.newBuilder(wrapperType);
+                if (value != null) {
+                    final Object nestedValue = nestedConverter.convert(value);
+                    msgBuilder.setField(valueSchema, nestedValue);
+                }
+                return msgBuilder.build();
+            }
+        };
+    }
+
     private static RowDataToProtoConverter createArrayConverter(
             ArrayType type, FieldDescriptor targetSchema) {
         LogicalType elementType = type.getElementType();
         final ArrayData.ElementGetter elementGetter = ArrayData.createElementGetter(elementType);
+        final boolean hasElementWrapper;
+        if (targetSchema.getOptions().hasExtension(MetaProto.fieldMeta)) {
+            hasElementWrapper =
+                    Boolean.parseBoolean(
+                            targetSchema
+                                    .getOptions()
+                                    .getExtension(MetaProto.fieldMeta)
+                                    .getParamsOrDefault(CommonConstants.FLINK_WRAPPER, "false"));
+        } else {
+            hasElementWrapper = false;
+        }
+
+        if (hasElementWrapper) {
+            return createArrayWrapperConverter(type, targetSchema, elementGetter);
+        } else {
+            final RowDataToProtoConverter elementConverter =
+                    createFieldConverter(type.getElementType(), targetSchema);
+            return createArrayNoWrapperConverter(elementConverter, elementGetter);
+        }
+    }
+
+    private static RowDataToProtoConverter createArrayWrapperConverter(
+            ArrayType type, FieldDescriptor targetSchema, ArrayData.ElementGetter elementGetter) {
+        final FieldDescriptor elementField =
+                targetSchema
+                        .getMessageType()
+                        .findFieldByName(CommonConstants.FLINK_WRAPPER_FIELD_NAME);
         final RowDataToProtoConverter elementConverter =
-                createFieldConverter(type.getElementType(), targetSchema);
+                createFieldConverter(type.getElementType(), elementField);
+        return new RowDataToProtoConverter() {
+            @Override
+            public Object convert(Object value) {
+                ArrayData arrayData = (ArrayData) value;
+                List<Object> list = new ArrayList<>();
+                for (int i = 0; i < arrayData.size(); ++i) {
+                    final Builder elementBuilder =
+                            DynamicMessage.newBuilder(targetSchema.getMessageType());
+                    final Object elementOrNull = elementGetter.getElementOrNull(arrayData, i);
+                    if (elementOrNull != null) {
+                        elementBuilder.setField(
+                                elementField, elementConverter.convert(elementOrNull));
+                    }
+                    list.add(elementBuilder.build());
+                }
+                return list;
+            }
+        };
+    }
+
+    private static RowDataToProtoConverter createArrayNoWrapperConverter(
+            RowDataToProtoConverter elementConverter, ArrayData.ElementGetter elementGetter) {
         return new RowDataToProtoConverter() {
             @Override
             public Object convert(Object value) {

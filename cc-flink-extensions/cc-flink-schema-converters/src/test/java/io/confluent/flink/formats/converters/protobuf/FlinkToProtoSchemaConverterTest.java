@@ -40,8 +40,9 @@ class FlinkToProtoSchemaConverterTest {
                 FlinkToProtoSchemaConverter.fromFlinkSchema(
                         (RowType) mapping.getFlinkType(), "Row", PACKAGE_NAME);
 
-        assertThat(new ProtobufSchema(descriptor).toString().trim())
-                .isEqualTo(mapping.getExpectedString().trim());
+        // clear any whitespace only lines
+        assertThat(new ProtobufSchema(descriptor).toString().trim().replaceAll("\\s*\n", "\n"))
+                .isEqualTo(mapping.getExpectedString().trim().replaceAll("\\s*\n", "\n"));
     }
 
     private static final TypeMapping MULTISET_CASE =
@@ -63,7 +64,7 @@ class FlinkToProtoSchemaConverterTest {
                                     new RowField(
                                             "multiset",
                                             new MultisetType(
-                                                    true,
+                                                    false,
                                                     new VarCharType(
                                                             true, VarCharType.MAX_LENGTH))))));
 }

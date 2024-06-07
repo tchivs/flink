@@ -28,6 +28,8 @@ import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Message;
+import io.confluent.flink.formats.converters.protobuf.CommonConstants;
+import io.confluent.protobuf.MetaProto;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.IOException;
@@ -267,11 +269,38 @@ public class ProtoToRowDataConverters {
             case DOUBLE:
                 return createDoubleConverter(targetType, schemaType);
             case ARRAY:
-                return createArrayConverter(readSchema, (ArrayType) targetType);
+                final ArrayType arrayType = (ArrayType) targetType;
+                if (arrayType.isNullable() && isRepeatedWrapped(readSchema)) {
+                    final FieldDescriptor arraySchema =
+                            readSchema.getMessageType().getFields().get(0);
+                    final ProtoToRowDataConverter arrayConverter =
+                            createArrayConverter(arraySchema, arrayType);
+                    return createRepeatedWrapperConverter(arraySchema, arrayConverter);
+                } else {
+                    return createArrayConverter(readSchema, arrayType);
+                }
             case MULTISET:
-                return createMultisetConverter(readSchema, (MultisetType) targetType);
+                final MultisetType multisetType = (MultisetType) targetType;
+                if (multisetType.isNullable() && isRepeatedWrapped(readSchema)) {
+                    final FieldDescriptor multisetSchema =
+                            readSchema.getMessageType().getFields().get(0);
+                    final ProtoToRowDataConverter multisetConverter =
+                            createMultisetConverter(multisetSchema, multisetType);
+                    return createRepeatedWrapperConverter(multisetSchema, multisetConverter);
+                } else {
+                    return createMultisetConverter(readSchema, multisetType);
+                }
             case MAP:
-                return createMapConverter(readSchema, (MapType) targetType);
+                final MapType mapType = (MapType) targetType;
+                if (mapType.isNullable() && isRepeatedWrapped(readSchema)) {
+                    final FieldDescriptor mapSchema =
+                            readSchema.getMessageType().getFields().get(0);
+                    final ProtoToRowDataConverter mapConverter =
+                            createMapConverter(mapSchema, mapType);
+                    return createRepeatedWrapperConverter(mapSchema, mapConverter);
+                } else {
+                    return createMapConverter(readSchema, mapType);
+                }
             case ROW:
                 return createConverter(readSchema.getMessageType(), (RowType) targetType);
             case NULL:
@@ -289,12 +318,82 @@ public class ProtoToRowDataConverters {
         }
     }
 
+    private static boolean isRepeatedWrapped(FieldDescriptor descriptor) {
+        return Boolean.parseBoolean(
+                descriptor
+                        .getOptions()
+                        .getExtension(MetaProto.fieldMeta)
+                        .getParamsOrDefault(CommonConstants.FLINK_WRAPPER, "false"));
+    }
+
+    private static ProtoToRowDataConverter createRepeatedWrapperConverter(
+            FieldDescriptor wrapperField, ProtoToRowDataConverter valueConverter) {
+        return new ProtoToRowDataConverter() {
+            @Override
+            public Object convert(Object object) throws IOException {
+                Message msg = (Message) object;
+                if (wrapperField.isRepeated() || msg.hasField(wrapperField)) {
+                    return valueConverter.convert(msg.getField(wrapperField));
+                }
+                return null;
+            }
+        };
+    }
+
     private static ProtoToRowDataConverter createArrayConverter(
             FieldDescriptor readSchema, ArrayType targetType) {
-        final ProtoToRowDataConverter elementConverter =
-                createFieldConverter(readSchema, targetType.getElementType());
         final Class<?> elementClass =
                 LogicalTypeUtils.toInternalConversionClass(targetType.getElementType());
+
+        final boolean hasElementWrapper;
+        if (readSchema.getOptions().hasExtension(MetaProto.fieldMeta)) {
+            hasElementWrapper =
+                    Boolean.parseBoolean(
+                            readSchema
+                                    .getOptions()
+                                    .getExtension(MetaProto.fieldMeta)
+                                    .getParamsOrDefault(CommonConstants.FLINK_WRAPPER, "false"));
+        } else {
+            hasElementWrapper = false;
+        }
+        if (hasElementWrapper) {
+            return createArrayNullableElementsConverter(readSchema, targetType, elementClass);
+        } else {
+            return createArrayNonNullElementsConverter(readSchema, targetType, elementClass);
+        }
+    }
+
+    private static ProtoToRowDataConverter createArrayNullableElementsConverter(
+            FieldDescriptor readSchema, ArrayType targetType, Class<?> elementClass) {
+        final FieldDescriptor elementField =
+                readSchema
+                        .getMessageType()
+                        .findFieldByName(CommonConstants.FLINK_WRAPPER_FIELD_NAME);
+        final ProtoToRowDataConverter elementConverter =
+                createFieldConverter(elementField, targetType.getElementType());
+        return new ProtoToRowDataConverter() {
+            @Override
+            public Object convert(Object object) throws IOException {
+                final Collection<?> list = (Collection<?>) object;
+                final int length = list.size();
+                final Object[] array = (Object[]) Array.newInstance(elementClass, length);
+                int i = 0;
+                for (Object o : list) {
+                    Message msg = (Message) o;
+                    if (elementField.isRepeated() || msg.hasField(elementField)) {
+                        array[i] = elementConverter.convert(msg.getField(elementField));
+                    }
+                    i++;
+                }
+                return new GenericArrayData(array);
+            }
+        };
+    }
+
+    private static ProtoToRowDataConverter createArrayNonNullElementsConverter(
+            FieldDescriptor readSchema, ArrayType targetType, Class<?> elementClass) {
+        final ProtoToRowDataConverter elementConverter =
+                createFieldConverter(readSchema, targetType.getElementType());
         return new ProtoToRowDataConverter() {
             @Override
             public Object convert(Object object) throws IOException {

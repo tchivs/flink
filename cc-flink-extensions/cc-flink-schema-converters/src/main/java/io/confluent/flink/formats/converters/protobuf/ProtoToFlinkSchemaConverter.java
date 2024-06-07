@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -104,11 +105,11 @@ public class ProtoToFlinkSchemaConverter {
     public static LogicalType toFlinkSchema(final Descriptor schema) {
         final CycleContext context = new CycleContext();
         // top-level row must not be NULLABLE in SQL, thus we change the nullability of the top row
-        return toFlinkSchemaNested(schema, context).copy(false);
+        return toFlinkSchemaNested(false, schema, context);
     }
 
     private static LogicalType toFlinkSchemaNested(
-            final Descriptor schema, final CycleContext context) {
+            boolean isOptional, final Descriptor schema, final CycleContext context) {
         List<OneofDescriptor> oneOfDescriptors = schema.getRealOneofs();
         final List<RowField> fields = new ArrayList<>();
         final List<RowField> oneOfFields = new ArrayList<>();
@@ -129,7 +130,7 @@ public class ProtoToFlinkSchemaConverter {
                             fieldDescriptor.getName(), toFlinkSchema(fieldDescriptor, context)));
         }
         fields.addAll(oneOfFields);
-        return new RowType(true, fields);
+        return new RowType(isOptional, fields);
     }
 
     private static LogicalType toFlinkSchema(
@@ -144,16 +145,26 @@ public class ProtoToFlinkSchemaConverter {
 
     private static LogicalType toFlinkSchema(
             final FieldDescriptor schema, final CycleContext context) {
+        boolean isNullableType =
+                getMeta(schema)
+                        .flatMap(getParam(CommonConstants.FLINK_NOT_NULL))
+                        .map(s -> !Boolean.parseBoolean(s))
+                        // message types are nullable in PROTOBUF, native types are not null
+                        .orElseGet(
+                                () ->
+                                        schema.getType().equals(Type.MESSAGE)
+                                                && !schema.isRepeated());
         if (schema.isRepeated()) {
-            return convertRepeated(schema, context);
+            return convertRepeated(schema, context, isNullableType);
         } else {
-            return convertNonRepeated(schema, context);
+            return convertNonRepeated(schema, context, isNullableType);
         }
     }
 
     private static LogicalType convertNonRepeated(
-            FieldDescriptor schema, CycleContext cycleContext) {
-        final boolean isOptional = schema.hasOptionalKeyword();
+            FieldDescriptor schema, CycleContext cycleContext, boolean isNullableType) {
+        final boolean isOptional = schema.hasOptionalKeyword() || isNullableType;
+
         switch (schema.getType()) {
             case INT32:
             case SINT32:
@@ -196,20 +207,20 @@ public class ProtoToFlinkSchemaConverter {
                     String fullName = schema.getMessageType().getFullName();
                     switch (fullName) {
                         case CommonConstants.PROTOBUF_DECIMAL_TYPE:
-                            return createDecimalType(schema);
+                            return createDecimalType(isOptional, schema);
                         case CommonConstants.PROTOBUF_DATE_TYPE:
-                            return new DateType(true);
+                            return new DateType(isOptional);
                         case CommonConstants.PROTOBUF_TIME_TYPE:
-                            return createTimeType(schema);
+                            return createTimeType(isOptional, schema);
                         case CommonConstants.PROTOBUF_TIMESTAMP_TYPE:
-                            return createTimestampType(schema);
+                            return createTimestampType(isOptional, schema);
                         default:
                             if (cycleContext.seenMessage.contains(fullName)) {
                                 throw new ValidationException("Cyclic schemas are not supported.");
                             }
                             cycleContext.seenMessage.add(fullName);
                             final LogicalType recordSchema =
-                                    toUnwrappedOrRecordSchema(schema, cycleContext);
+                                    toUnwrappedOrRecordSchema(isOptional, schema, cycleContext);
                             cycleContext.seenMessage.remove(fullName);
                             return recordSchema;
                     }
@@ -234,7 +245,7 @@ public class ProtoToFlinkSchemaConverter {
         if (meta.isPresent()) {
             final Meta fieldMeta = meta.get();
             final int minLength =
-                    Integer.valueOf(
+                    Integer.parseInt(
                             fieldMeta.getParamsOrDefault(CommonConstants.FLINK_MIN_LENGTH, "-1"));
             final int maxLength =
                     Optional.ofNullable(
@@ -252,7 +263,7 @@ public class ProtoToFlinkSchemaConverter {
         }
     }
 
-    private static TimeType createTimeType(FieldDescriptor schema) {
+    private static TimeType createTimeType(boolean isOptional, FieldDescriptor schema) {
         final int defaultPrecision = 3;
         final int precision =
                 getMeta(schema)
@@ -269,10 +280,10 @@ public class ProtoToFlinkSchemaConverter {
                             + precision
                             + ", it only supports precision less than or equal to 3.");
         }
-        return new TimeType(true, precision);
+        return new TimeType(isOptional, precision);
     }
 
-    private static DecimalType createDecimalType(FieldDescriptor schema) {
+    private static DecimalType createDecimalType(boolean isOptional, FieldDescriptor schema) {
         int precision = DecimalType.DEFAULT_PRECISION;
         int scale = DecimalType.DEFAULT_SCALE;
         final Optional<Meta> meta = getMeta(schema);
@@ -296,10 +307,10 @@ public class ProtoToFlinkSchemaConverter {
                 }
             }
         }
-        return new DecimalType(true, precision, scale);
+        return new DecimalType(isOptional, precision, scale);
     }
 
-    private static LogicalType createTimestampType(FieldDescriptor schema) {
+    private static LogicalType createTimestampType(boolean isOptional, FieldDescriptor schema) {
         final int defaultPrecision = 9;
         final Optional<Meta> meta = getMeta(schema);
         if (meta.isPresent()) {
@@ -314,12 +325,12 @@ public class ProtoToFlinkSchemaConverter {
 
             if (CommonConstants.FLINK_TYPE_TIMESTAMP.equals(
                     meta.get().getParamsOrDefault(CommonConstants.FLINK_TYPE_PROP, null))) {
-                return new TimestampType(true, precision);
+                return new TimestampType(isOptional, precision);
             } else {
-                return new LocalZonedTimestampType(true, precision);
+                return new LocalZonedTimestampType(isOptional, precision);
             }
         } else {
-            return new LocalZonedTimestampType(true, defaultPrecision);
+            return new LocalZonedTimestampType(isOptional, defaultPrecision);
         }
     }
 
@@ -330,19 +341,50 @@ public class ProtoToFlinkSchemaConverter {
         return Optional.empty();
     }
 
-    private static LogicalType convertRepeated(FieldDescriptor schema, CycleContext context) {
+    private static LogicalType convertRepeated(
+            FieldDescriptor schema, CycleContext context, boolean isNullableType) {
         if (isMapDescriptor(schema)) {
-            return toMapSchema(schema.getMessageType(), context);
+            return toMapSchema(schema.getMessageType(), isNullableType, context);
         } else {
-            // repeated type is always NOT NULL
-            return new ArrayType(false, convertNonRepeated(schema, context));
+            final boolean isArrayElementWrapped =
+                    getMeta(schema)
+                            .flatMap(getParam(CommonConstants.FLINK_WRAPPER))
+                            .map(Boolean::parseBoolean)
+                            // repeated types are not null in PROTOBUF, if no elements were set we
+                            // will get an empty list
+                            .orElse(false);
+            if (isArrayElementWrapped) {
+                // there should be a single field in the wrapper
+                final FieldDescriptor elementSchema = schema.getMessageType().getFields().get(0);
+                return new ArrayType(isNullableType, toFlinkSchema(elementSchema, context));
+            } else {
+                return new ArrayType(isNullableType, convertNonRepeated(schema, context, false));
+            }
         }
     }
 
+    private static Function<Meta, Optional<String>> getParam(String paramKey) {
+        return m -> Optional.ofNullable(m.getParamsOrDefault(paramKey, null));
+    }
+
     private static LogicalType toUnwrappedOrRecordSchema(
-            FieldDescriptor descriptor, CycleContext context) {
+            boolean isOptional, FieldDescriptor descriptor, CycleContext context) {
+        final boolean isRepeatedWrapped =
+                getMeta(descriptor)
+                        .flatMap(getParam(CommonConstants.FLINK_WRAPPER))
+                        .map(Boolean::parseBoolean)
+                        // repeated types are not null in PROTOBUF
+                        .orElse(false);
+        if (isRepeatedWrapped) {
+            final FieldDescriptor elementSchema = descriptor.getMessageType().getFields().get(0);
+            return convertRepeated(elementSchema, context, true);
+        }
+
         return toUnwrappedSchema(descriptor.getMessageType())
-                .orElseGet(() -> toFlinkSchemaNested(descriptor.getMessageType(), context));
+                .orElseGet(
+                        () ->
+                                toFlinkSchemaNested(
+                                        isOptional, descriptor.getMessageType(), context));
     }
 
     private static Optional<LogicalType> toUnwrappedSchema(Descriptor descriptor) {
@@ -369,11 +411,11 @@ public class ProtoToFlinkSchemaConverter {
         }
     }
 
-    private static LogicalType toMapSchema(final Descriptor descriptor, CycleContext context) {
+    private static LogicalType toMapSchema(
+            Descriptor descriptor, boolean isNullableType, CycleContext context) {
         List<FieldDescriptor> fieldDescriptors = descriptor.getFields();
-        // repeated type is always NOT NULL
         return new MapType(
-                false,
+                isNullableType,
                 toFlinkSchema(fieldDescriptors.get(0), context),
                 toFlinkSchema(fieldDescriptors.get(1), context));
     }
@@ -387,9 +429,7 @@ public class ProtoToFlinkSchemaConverter {
         return descriptor.getName().endsWith(CommonConstants.MAP_ENTRY_SUFFIX)
                 && fieldDescriptors.size() == 2
                 && fieldDescriptors.get(0).getName().equals(CommonConstants.KEY_FIELD)
-                && fieldDescriptors.get(1).getName().equals(CommonConstants.VALUE_FIELD)
-                && !fieldDescriptors.get(0).isRepeated()
-                && !fieldDescriptors.get(1).isRepeated();
+                && fieldDescriptors.get(1).getName().equals(CommonConstants.VALUE_FIELD);
     }
 
     private static final class CycleContext {

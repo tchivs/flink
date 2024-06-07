@@ -13,6 +13,7 @@ import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
@@ -44,6 +45,8 @@ import io.confluent.protobuf.type.Decimal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +90,19 @@ import java.util.stream.Stream;
 public class FlinkToProtoSchemaConverter {
 
     /**
+     * Flink {@link LogicalType logicalTypes} that map to protobufs {@link Type#TYPE_MESSAGE}, which
+     * needs special annotation for marking NOT NULL types.
+     */
+    private static final Set<LogicalTypeRoot> PROTO_MESSAGE_TYPES =
+            EnumSet.of(
+                    LogicalTypeRoot.DECIMAL,
+                    LogicalTypeRoot.DATE,
+                    LogicalTypeRoot.TIME_WITHOUT_TIME_ZONE,
+                    LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE,
+                    LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                    LogicalTypeRoot.ROW);
+
+    /**
      * Converts a Flink's logical type into a Protobuf descriptor. Uses Kafka Connect logic to store
      * types that are not natively supported.
      */
@@ -105,6 +121,7 @@ public class FlinkToProtoSchemaConverter {
             return FileDescriptor.buildFrom(
                             fileDescriptorProto,
                             Stream.of(
+                                            Meta.getDescriptor(),
                                             Date.getDescriptor(),
                                             TimeOfDay.getDescriptor(),
                                             Timestamp.getDescriptor(),
@@ -130,77 +147,61 @@ public class FlinkToProtoSchemaConverter {
             final RowField field = fields.get(i);
             builder.addField(
                     fromRowField(
-                            field.getType(),
-                            field.getName(),
-                            i + 1,
-                            nestedRows,
-                            dependencies,
-                            false));
+                            field.getType(), field.getName(), i + 1, nestedRows, dependencies));
         }
         builder.addAllNestedType(nestedRows);
         return builder.build();
     }
 
-    private static FieldDescriptorProto fromRowField(
+    private static FieldDescriptorProto.Builder fromRowField(
             LogicalType logicalType,
             String fieldName,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
-            Set<String> dependencies,
-            boolean isArray) {
+            Set<String> dependencies) {
         final FieldDescriptorProto.Builder builder = FieldDescriptorProto.newBuilder();
         builder.setName(fieldName);
         builder.setNumber(fieldIndex);
-        if (isArray) {
-            builder.setLabel(Label.LABEL_REPEATED);
-        } else if (!logicalType.isNullable()) {
+        if (!logicalType.isNullable()) {
             builder.setLabel(Label.LABEL_REQUIRED);
         } else {
             builder.setProto3Optional(logicalType.isNullable());
         }
 
+        if (!logicalType.isNullable() && PROTO_MESSAGE_TYPES.contains(logicalType.getTypeRoot())) {
+            addMetaParam(builder, CommonConstants.FLINK_NOT_NULL, "true");
+        }
+
         switch (logicalType.getTypeRoot()) {
             case BOOLEAN:
                 builder.setType(Type.TYPE_BOOL);
-                return builder.build();
+                return builder;
             case TINYINT:
                 builder.setType(Type.TYPE_INT32);
-                builder.setOptions(
-                        FieldOptions.newBuilder()
-                                .setExtension(
-                                        MetaProto.fieldMeta,
-                                        Meta.newBuilder()
-                                                .putParams(
-                                                        CommonConstants.CONNECT_TYPE_PROP,
-                                                        CommonConstants.CONNECT_TYPE_INT8)
-                                                .build())
-                                .build());
-                return builder.build();
+                addMetaParam(
+                        builder,
+                        CommonConstants.CONNECT_TYPE_PROP,
+                        CommonConstants.CONNECT_TYPE_INT8);
+                return builder;
             case SMALLINT:
                 builder.setType(Type.TYPE_INT32);
-                builder.mergeOptions(
-                        FieldOptions.newBuilder()
-                                .setExtension(
-                                        MetaProto.fieldMeta,
-                                        Meta.newBuilder()
-                                                .putParams(
-                                                        CommonConstants.CONNECT_TYPE_PROP,
-                                                        CommonConstants.CONNECT_TYPE_INT16)
-                                                .build())
-                                .build());
-                return builder.build();
+                addMetaParam(
+                        builder,
+                        CommonConstants.CONNECT_TYPE_PROP,
+                        CommonConstants.CONNECT_TYPE_INT16);
+                return builder;
             case INTEGER:
                 builder.setType(Type.TYPE_INT32);
-                return builder.build();
+                return builder;
             case BIGINT:
                 builder.setType(Type.TYPE_INT64);
-                return builder.build();
+                return builder;
             case FLOAT:
                 builder.setType(Type.TYPE_FLOAT);
-                return builder.build();
+                return builder;
             case DOUBLE:
                 builder.setType(Type.TYPE_DOUBLE);
-                return builder.build();
+                return builder;
             case CHAR:
                 return createLengthLimitedType(
                         builder,
@@ -235,82 +236,54 @@ public class FlinkToProtoSchemaConverter {
                 builder.setType(Type.TYPE_MESSAGE);
                 builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_DATE_TYPE));
                 dependencies.add(CommonConstants.PROTOBUF_DATE_LOCATION);
-                return builder.build();
+                return builder;
             case TIME_WITHOUT_TIME_ZONE:
                 return createTimeFieldDescriptor(
                         ((TimeType) logicalType).getPrecision(), dependencies, builder);
             case DECIMAL:
-                DecimalType decimalType = (DecimalType) logicalType;
-                builder.setType(Type.TYPE_MESSAGE);
-                builder.setOptions(
-                        FieldOptions.newBuilder()
-                                .setExtension(
-                                        MetaProto.fieldMeta,
-                                        Meta.newBuilder()
-                                                .putParams(
-                                                        CommonConstants.PROTOBUF_PRECISION_PROP,
-                                                        String.valueOf(decimalType.getPrecision()))
-                                                .putParams(
-                                                        CommonConstants.PROTOBUF_SCALE_PROP,
-                                                        String.valueOf(decimalType.getScale()))
-                                                .build())
-                                .build());
-                builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_DECIMAL_TYPE));
-                dependencies.add(CommonConstants.PROTOBUF_DECIMAL_LOCATION);
-                return builder.build();
+                return createDecimalField((DecimalType) logicalType, dependencies, builder);
             case ROW:
-                {
-                    // field name uniqueness should suffice for type naming. Each type is scoped to
-                    // the enclosing Row. If a Row is nested within a nested Row, those two won't
-                    // have collisions. Thus it is possible to have:
-                    // message A {
-                    //  b_Row b
-                    //  message b_Row {
-                    //    b_Row b
-                    //    message b_Row {
-                    //      int32 c;
-                    //    }
-                    //  }
-                    // }
-                    final String typeName = fieldName + "_Row";
-                    final DescriptorProto nestedRowDescriptor =
-                            fromRowType((RowType) logicalType, typeName, dependencies);
-                    nestedRows.add(nestedRowDescriptor);
-                    builder.setType(Type.TYPE_MESSAGE);
-                    builder.setTypeName(typeName);
-                    return builder.build();
-                }
+                return createMessageField(
+                        (RowType) logicalType, fieldName, nestedRows, dependencies, builder);
             case MAP:
-                {
-                    final MapType mapType = (MapType) logicalType;
-                    return createMapLikeField(
+                final MapType mapType = (MapType) logicalType;
+                if (mapType.isNullable()) {
+                    return wrapRepeatedType(
+                            mapType, fieldName, fieldIndex, nestedRows, dependencies);
+                } else {
+                    return createNotNullMapLikeField(
                             fieldName,
                             fieldIndex,
                             nestedRows,
                             dependencies,
                             mapType.getKeyType(),
-                            mapType.getValueType(),
-                            mapType.isNullable());
+                            mapType.getValueType());
                 }
             case ARRAY:
-                return fromRowField(
-                        ((ArrayType) logicalType).getElementType(),
-                        fieldName,
-                        fieldIndex,
-                        nestedRows,
-                        dependencies,
-                        true);
+                if (logicalType.isNullable()) {
+                    return wrapRepeatedType(
+                            logicalType, fieldName, fieldIndex, nestedRows, dependencies);
+                } else {
+                    return createRepeatedNotNull(
+                            fieldName,
+                            fieldIndex,
+                            nestedRows,
+                            dependencies,
+                            ((ArrayType) logicalType).getElementType());
+                }
             case MULTISET:
-                {
-                    final MultisetType multisetType = (MultisetType) logicalType;
-                    return createMapLikeField(
+                final MultisetType multisetType = (MultisetType) logicalType;
+                if (multisetType.isNullable()) {
+                    return wrapRepeatedType(
+                            multisetType, fieldName, fieldIndex, nestedRows, dependencies);
+                } else {
+                    return createNotNullMapLikeField(
                             fieldName,
                             fieldIndex,
                             nestedRows,
                             dependencies,
                             multisetType.getElementType(),
-                            new IntType(false),
-                            multisetType.isNullable());
+                            new IntType(false));
                 }
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
@@ -326,7 +299,51 @@ public class FlinkToProtoSchemaConverter {
         }
     }
 
-    private static FieldDescriptorProto createLengthLimitedType(
+    private static FieldDescriptorProto.Builder createDecimalField(
+            DecimalType decimalType,
+            Set<String> dependencies,
+            FieldDescriptorProto.Builder builder) {
+        builder.setType(Type.TYPE_MESSAGE);
+        final Map<String, String> params = new HashMap<>();
+        params.put(
+                CommonConstants.PROTOBUF_PRECISION_PROP,
+                String.valueOf(decimalType.getPrecision()));
+        params.put(CommonConstants.PROTOBUF_SCALE_PROP, String.valueOf(decimalType.getScale()));
+        addMetaParams(builder, params);
+
+        builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_DECIMAL_TYPE));
+        dependencies.add(CommonConstants.PROTOBUF_DECIMAL_LOCATION);
+        return builder;
+    }
+
+    private static FieldDescriptorProto.Builder createMessageField(
+            RowType logicalType,
+            String fieldName,
+            List<DescriptorProto> nestedRows,
+            Set<String> dependencies,
+            FieldDescriptorProto.Builder builder) {
+        // field name uniqueness should suffice for type naming. Each type is scoped to
+        // the enclosing Row. If a Row is nested within a nested Row, those two won't
+        // have collisions. Thus it is possible to have:
+        // message A {
+        //  b_Row b
+        //  message b_Row {
+        //    b_Row b
+        //    message b_Row {
+        //      int32 c;
+        //    }
+        //  }
+        // }
+        final String typeName = fieldName + "_Row";
+        final DescriptorProto nestedRowDescriptor =
+                fromRowType(logicalType, typeName, dependencies);
+        nestedRows.add(nestedRowDescriptor);
+        builder.setType(Type.TYPE_MESSAGE);
+        builder.setTypeName(typeName);
+        return builder;
+    }
+
+    private static FieldDescriptorProto.Builder createLengthLimitedType(
             FieldDescriptorProto.Builder builder, Type type, int minLength, int maxLength) {
         final Map<String, String> params = new HashMap<>();
         if (minLength == maxLength && minLength > 0) {
@@ -338,39 +355,25 @@ public class FlinkToProtoSchemaConverter {
         }
 
         if (!params.isEmpty()) {
-            builder.mergeOptions(
-                    FieldOptions.newBuilder()
-                            .setExtension(
-                                    MetaProto.fieldMeta,
-                                    Meta.newBuilder().putAllParams(params).build())
-                            .build());
+            addMetaParams(builder, params);
         }
 
         builder.setType(type);
-        return builder.build();
+        return builder;
     }
 
-    private static FieldDescriptorProto createTimeFieldDescriptor(
+    private static FieldDescriptorProto.Builder createTimeFieldDescriptor(
             int precision, Set<String> dependencies, FieldDescriptorProto.Builder builder) {
         builder.setType(Type.TYPE_MESSAGE);
         builder.setTypeName(makeItTopLevelScoped(CommonConstants.PROTOBUF_TIME_TYPE));
         if (precision != 9) {
-            builder.mergeOptions(
-                    FieldOptions.newBuilder()
-                            .setExtension(
-                                    MetaProto.fieldMeta,
-                                    Meta.newBuilder()
-                                            .putParams(
-                                                    CommonConstants.FLINK_PRECISION_PROP,
-                                                    String.valueOf(precision))
-                                            .build())
-                            .build());
+            addMetaParam(builder, CommonConstants.FLINK_PRECISION_PROP, String.valueOf(precision));
         }
         dependencies.add(CommonConstants.PROTOBUF_TIME_LOCATION);
-        return builder.build();
+        return builder;
     }
 
-    private static FieldDescriptorProto createTimestampFieldDescriptor(
+    private static FieldDescriptorProto.Builder createTimestampFieldDescriptor(
             int precision,
             LogicalTypeRoot typeRoot,
             Set<String> dependencies,
@@ -384,13 +387,9 @@ public class FlinkToProtoSchemaConverter {
         if (typeRoot == LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE) {
             params.put(CommonConstants.FLINK_TYPE_PROP, CommonConstants.FLINK_TYPE_TIMESTAMP);
         }
-        builder.mergeOptions(
-                FieldOptions.newBuilder()
-                        .setExtension(
-                                MetaProto.fieldMeta, Meta.newBuilder().putAllParams(params).build())
-                        .build());
+        addMetaParams(builder, params);
         dependencies.add(CommonConstants.PROTOBUF_TIMESTAMP_LOCATION);
-        return builder.build();
+        return builder;
     }
 
     private static String makeItTopLevelScoped(String type) {
@@ -401,14 +400,97 @@ public class FlinkToProtoSchemaConverter {
         return "." + type;
     }
 
-    private static FieldDescriptorProto createMapLikeField(
+    private static FieldDescriptorProto.Builder wrapRepeatedType(
+            LogicalType repeatedType,
+            String fieldName,
+            int fieldIndex,
+            List<DescriptorProto> nestedRows,
+            Set<String> dependencies) {
+        final FieldDescriptorProto.Builder builder = FieldDescriptorProto.newBuilder();
+        // Repeated keyword can not nest collections nor nullable types.
+        // Wrap into an artificial message with a Flink specific annotation.
+        final String typeName = fieldName + CommonConstants.FLINK_REPEATED_WRAPPER_SUFFIX;
+
+        nestedRows.add(
+                fromRowType(
+                        new RowType(
+                                false,
+                                Collections.singletonList(
+                                        new RowField(
+                                                CommonConstants.FLINK_WRAPPER_FIELD_NAME,
+                                                repeatedType.copy(false)))),
+                        typeName,
+                        dependencies));
+        addMetaParam(builder, CommonConstants.FLINK_WRAPPER, "true");
+        builder.setType(Type.TYPE_MESSAGE);
+        builder.setTypeName(typeName);
+        builder.setNumber(fieldIndex);
+        builder.setName(fieldName);
+        return builder;
+    }
+
+    private static FieldDescriptorProto.Builder createRepeatedNotNull(
+            String fieldName,
+            int fieldIndex,
+            List<DescriptorProto> nestedRows,
+            Set<String> dependencies,
+            LogicalType elementType) {
+        final FieldDescriptorProto.Builder builder;
+        if (elementType.is(LogicalTypeFamily.COLLECTION)
+                || elementType.is(LogicalTypeRoot.MAP)
+                || elementType.isNullable()) {
+            // Repeated keyword can not nest collections nor nullable types.
+            // Wrap into an artificial message with a Flink specific annotation.
+            final String typeName = fieldName + CommonConstants.FLINK_ELEMENT_WRAPPER_SUFFIX;
+
+            nestedRows.add(
+                    fromRowType(
+                            new RowType(
+                                    false,
+                                    Collections.singletonList(
+                                            new RowField(
+                                                    CommonConstants.FLINK_WRAPPER_FIELD_NAME,
+                                                    elementType))),
+                            typeName,
+                            dependencies));
+            builder = FieldDescriptorProto.newBuilder();
+            addMetaParam(builder, CommonConstants.FLINK_WRAPPER, "true");
+            builder.setType(Type.TYPE_MESSAGE);
+            builder.setTypeName(typeName);
+            builder.setNumber(fieldIndex);
+            builder.setName(fieldName);
+        } else {
+            builder = fromRowField(elementType, fieldName, fieldIndex, nestedRows, dependencies);
+        }
+
+        builder.setLabel(Label.LABEL_REPEATED);
+        // repeated fields can not be optional
+        builder.clearProto3Optional();
+        return builder;
+    }
+
+    private static void addMetaParam(
+            FieldDescriptorProto.Builder builder, String paramKey, String paramValue) {
+        addMetaParams(builder, Collections.singletonMap(paramKey, paramValue));
+    }
+
+    private static void addMetaParams(
+            FieldDescriptorProto.Builder builder, Map<String, String> params) {
+        builder.mergeOptions(
+                FieldOptions.newBuilder()
+                        .setExtension(
+                                MetaProto.fieldMeta, Meta.newBuilder().putAllParams(params).build())
+                        .build());
+    }
+
+    private static FieldDescriptorProto.Builder createNotNullMapLikeField(
             String fieldName,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies,
             LogicalType keyType,
-            LogicalType valueType,
-            boolean isNullable) {
+            LogicalType valueType) {
+
         final FieldDescriptorProto.Builder builder = FieldDescriptorProto.newBuilder();
         // Protobuf does not have a native support for a MAP type. It does represent a syntactic
         // sugar such as:
@@ -422,7 +504,7 @@ public class FlinkToProtoSchemaConverter {
         final DescriptorProto mapDescriptor =
                 fromRowType(
                         new RowType(
-                                isNullable,
+                                false, // repeated element can not be null
                                 Arrays.asList(
                                         new RowField(CommonConstants.KEY_FIELD, keyType),
                                         new RowField(CommonConstants.VALUE_FIELD, valueType))),
@@ -435,6 +517,6 @@ public class FlinkToProtoSchemaConverter {
         builder.setLabel(Label.LABEL_REPEATED);
         builder.setName(fieldName);
         builder.clearProto3Optional();
-        return builder.build();
+        return builder;
     }
 }

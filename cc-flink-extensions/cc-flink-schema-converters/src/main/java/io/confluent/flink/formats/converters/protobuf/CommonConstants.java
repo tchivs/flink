@@ -8,7 +8,7 @@ package io.confluent.flink.formats.converters.protobuf;
  * Common constants used for converting Protobuf schema. Those are Confluent Schema Registry
  * specific.
  */
-class CommonConstants {
+public class CommonConstants {
 
     static final String CONNECT_TYPE_PROP = "connect.type";
     static final String CONNECT_TYPE_INT8 = "int8";
@@ -47,6 +47,11 @@ class CommonConstants {
     static final String FLINK_TYPE_TIMESTAMP = "timestamp";
     static final String FLINK_MIN_LENGTH = "flink.minLength";
     static final String FLINK_MAX_LENGTH = "flink.maxLength";
+    static final String FLINK_NOT_NULL = "flink.notNull";
+    static final String FLINK_REPEATED_WRAPPER_SUFFIX = "RepeatedWrapper";
+    static final String FLINK_ELEMENT_WRAPPER_SUFFIX = "ElementWrapper";
+    public static final String FLINK_WRAPPER = "flink.wrapped";
+    public static final String FLINK_WRAPPER_FIELD_NAME = "value";
 
     private CommonConstants() {}
 }

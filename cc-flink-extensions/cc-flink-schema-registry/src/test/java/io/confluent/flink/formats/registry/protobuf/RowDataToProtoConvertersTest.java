@@ -20,6 +20,7 @@ import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
@@ -46,7 +47,9 @@ import com.google.protobuf.StringValue;
 import com.google.protobuf.Timestamp;
 import com.google.type.Date;
 import com.google.type.TimeOfDay;
+import io.confluent.flink.formats.converters.protobuf.CommonMappings;
 import io.confluent.flink.formats.registry.protobuf.RowDataToProtoConverters.RowDataToProtoConverter;
+import io.confluent.flink.formats.registry.protobuf.TestData.DataMapping;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import io.confluent.protobuf.type.utils.DecimalUtils;
 import org.junit.jupiter.api.Test;
@@ -630,5 +633,33 @@ public class RowDataToProtoConvertersTest {
                         .build();
 
         assertThat(converted).isEqualTo(message);
+    }
+
+    @Test
+    void testNullableArrays() {
+        LogicalType rowType = CommonMappings.NULLABLE_ARRAYS_CASE.getFlinkType();
+        Descriptor schema = CommonMappings.NULLABLE_ARRAYS_CASE.getProtoSchema();
+
+        final RowDataToProtoConverter converter =
+                RowDataToProtoConverters.createConverter((RowType) rowType, schema);
+
+        final DataMapping testData = TestData.createDataForNullableArraysCase();
+        final DynamicMessage converted = (DynamicMessage) converter.convert(testData.flink);
+
+        assertThat(converted).isEqualTo(testData.proto);
+    }
+
+    @Test
+    void testNullableCollections() {
+        LogicalType rowType = CommonMappings.NULLABLE_COLLECTIONS_CASE.getFlinkType();
+        Descriptor schema = CommonMappings.NULLABLE_COLLECTIONS_CASE.getProtoSchema();
+
+        final RowDataToProtoConverter converter =
+                RowDataToProtoConverters.createConverter((RowType) rowType, schema);
+
+        final DataMapping testData = TestData.createDataForNullableCollectionsCase();
+        final DynamicMessage converted = (DynamicMessage) converter.convert(testData.flink);
+
+        assertThat(converted).isEqualTo(testData.proto);
     }
 }
