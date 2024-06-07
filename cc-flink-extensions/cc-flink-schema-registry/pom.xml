@@ -207,6 +207,12 @@ under the License.
 
 		<!-- test dependencies -->
 		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>${schema.registry.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>io.confluent.flink</groupId>
 			<artifactId>cc-flink-schema-converters</artifactId>
 			<version>${project.version}</version>

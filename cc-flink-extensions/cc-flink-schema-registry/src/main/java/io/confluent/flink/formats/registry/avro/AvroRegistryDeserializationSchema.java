@@ -81,18 +81,12 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
         final ParsedSchema schema =
                 schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         final Schema avroSchema = (Schema) schema.rawSchema();
-        if (avroSchema.getType() == Type.RECORD) {
-            this.runtimeConverter = AvroToRowDataConverters.createConverter(avroSchema, rowType);
-        } else {
-            final AvroToRowDataConverter fieldConverter =
-                    AvroToRowDataConverters.createConverter(avroSchema, rowType.getTypeAt(0));
-            this.runtimeConverter =
-                    object -> {
-                        final GenericRowData rowData = new GenericRowData(1);
-                        rowData.setField(0, fieldConverter.convert(object));
-                        return rowData;
-                    };
-        }
+
+        this.runtimeConverter =
+                avroSchema.getType() == Type.RECORD || avroSchema.getType() == Type.UNION
+                        // RECORD and UNION get converted to ROW
+                        ? AvroToRowDataConverters.createConverter(avroSchema, rowType)
+                        : createSingleFieldConverter(avroSchema);
 
         this.datumReader =
                 new GenericDatumReader<>(
@@ -149,5 +143,15 @@ public class AvroRegistryDeserializationSchema implements DeserializationSchema<
     @Override
     public TypeInformation<RowData> getProducedType() {
         return producedType;
+    }
+
+    private AvroToRowDataConverter createSingleFieldConverter(Schema avroSchema) {
+        AvroToRowDataConverter fieldConverter =
+                AvroToRowDataConverters.createConverter(avroSchema, rowType.getTypeAt(0));
+        return object -> {
+            GenericRowData rowData = new GenericRowData(1);
+            rowData.setField(0, fieldConverter.convert(object));
+            return rowData;
+        };
     }
 }

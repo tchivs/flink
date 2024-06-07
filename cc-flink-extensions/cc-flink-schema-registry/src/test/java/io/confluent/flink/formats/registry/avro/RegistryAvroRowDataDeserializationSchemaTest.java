@@ -46,7 +46,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Tests for {@link AvroRegistrySerializationSchema}. */
+/** Tests for {@link AvroRegistryDeserializationSchema}. */
 @ExtendWith(TestLoggerExtension.class)
 class RegistryAvroRowDataDeserializationSchemaTest {
 
