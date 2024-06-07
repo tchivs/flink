@@ -61,7 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and/or {@link ProtoToRowDataConvertersTest}.
  */
 @ExtendWith(TestLoggerExtension.class)
-public class ProtoRegistrySerialisatiionDeserialisationTest {
+class ProtoRegistrySerialisatiionDeserialisationTest {
 
     private static final String SUBJECT = "test-subject";
 
