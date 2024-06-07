@@ -77,12 +77,17 @@ public class SqlAlterModelConverter {
         } else if (sqlAlterModel instanceof SqlAlterModelSet) {
             SqlAlterModelSet sqlAlterModelSet = (SqlAlterModelSet) sqlAlterModel;
             Map<String, String> changeModelOptions = getModelOptions(sqlAlterModelSet);
+            if (changeModelOptions.isEmpty()) {
+                return new NopOperation();
+            }
+            Map<String, String> newOptions = new HashMap<>(optionalCatalogModel.get().getOptions());
+            newOptions.putAll(changeModelOptions);
             return new AlterModelOptionsOperation(
                     modelIdentifier,
                     CatalogModel.of(
                             Schema.newBuilder().build(),
                             Schema.newBuilder().build(),
-                            changeModelOptions,
+                            newOptions,
                             null),
                     sqlAlterModel.ifModelExists());
         } else if (sqlAlterModel instanceof SqlAlterModelReset) {
