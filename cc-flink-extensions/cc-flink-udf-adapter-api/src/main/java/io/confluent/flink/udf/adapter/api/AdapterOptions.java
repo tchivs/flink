@@ -16,7 +16,7 @@ public class AdapterOptions {
     public static final ConfigOption<Integer> ADAPTER_PARALLELISM =
             ConfigOptions.key(ADAPTER_PREFIX + "parallelism")
                     .intType()
-                    .defaultValue(10)
+                    .defaultValue(1)
                     .withDescription("The parallelism to allow for.");
 
     public static final ConfigOption<Duration> ADAPTER_HANDLER_WAIT_TIMEOUT =
