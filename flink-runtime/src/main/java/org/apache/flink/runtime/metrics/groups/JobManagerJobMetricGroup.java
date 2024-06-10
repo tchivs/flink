@@ -129,7 +129,7 @@ public class JobManagerJobMetricGroup extends JobMetricGroup<JobManagerMetricGro
     // ------------------------------------------------------------------------
 
     @Override
-    protected Iterable<? extends ComponentMetricGroup> subComponents() {
+    protected Iterable<? extends ComponentMetricGroup<?>> subComponents() {
         return operators.values();
     }
 }
