@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests {@link io.confluent.flink.formats.registry.credentials.DPATCredentialProvider}. */
 @Confluent
-public class DPATCredentialProviderTest {
+class DPATCredentialProviderTest {
     private static final JobID JOB_ID = JobID.fromHexString("00000000000000000000000000000abc");
 
     private DPATCredentialProvider provider;

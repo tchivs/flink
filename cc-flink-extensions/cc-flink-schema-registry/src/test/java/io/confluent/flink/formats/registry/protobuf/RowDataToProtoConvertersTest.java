@@ -66,7 +66,7 @@ import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link RowDataToProtoConverters}. */
-public class RowDataToProtoConvertersTest {
+class RowDataToProtoConvertersTest {
 
     @Test
     void testPlainRow() {
