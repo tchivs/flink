@@ -20,29 +20,39 @@ package org.apache.flink.events;
 
 import org.apache.flink.annotation.Experimental;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Builder used to construct {@link Event}. See {@link Event#builder(Class)}. */
+/** Builder used to construct {@link Event}. See {@link Event#builder(Class, String)}. */
 @Experimental
 public class EventBuilder {
     private long observedTsMillis;
-    private String scope;
+    private String name;
+    private String classScope;
     private String body;
     private String severity;
     private final Map<String, Object> attributes;
 
-    public EventBuilder() {
+    public EventBuilder(String classScope, String name) {
+        this.classScope = classScope;
+        this.name = name;
         this.observedTsMillis = 0L;
-        this.scope = "";
         this.body = "";
         this.severity = "";
         this.attributes = new HashMap<>();
     }
 
+    public EventBuilder() {
+        this("", "");
+    }
+
     public EventBuilder(Class<?> classScope) {
-        this();
-        setScope(classScope.getCanonicalName());
+        this(classScope, "");
+    }
+
+    public EventBuilder(Class<?> classScope, String name) {
+        this(classScope.getCanonicalName(), name);
     }
 
     /** Sets the timestamp for when the event happened or was observed, in milliseconds. */
@@ -51,9 +61,15 @@ public class EventBuilder {
         return this;
     }
 
+    /** Sets the name of the event. */
+    public EventBuilder setName(String name) {
+        this.name = name;
+        return this;
+    }
+
     /** Sets the scope of the event, typically the fully qualified name of the emitting class. */
-    public EventBuilder setScope(String scope) {
-        this.scope = scope;
+    public EventBuilder setClassScope(String classScope) {
+        this.classScope = classScope;
         return this;
     }
 
@@ -87,11 +103,20 @@ public class EventBuilder {
         return this;
     }
 
+    public String getName() {
+        return name;
+    }
+
     /** Builds the specified instance. */
-    public Event build() {
+    public Event build(Map<String, String> additionalVariables) {
         if (observedTsMillis == 0L) {
             observedTsMillis = System.currentTimeMillis();
         }
-        return new SimpleEvent(observedTsMillis, scope, body, severity, attributes);
+        attributes.putAll(additionalVariables);
+        return new SimpleEvent(observedTsMillis, name, classScope, body, severity, attributes);
+    }
+
+    public Event build() {
+        return build(Collections.emptyMap());
     }
 }

@@ -29,15 +29,18 @@ import java.util.Map;
 @Experimental
 public interface Event {
 
-    static EventBuilder builder(Class<?> classScope) {
-        return new EventBuilder(classScope);
+    static EventBuilder builder(Class<?> classScope, String name) {
+        return new EventBuilder(classScope, name);
     }
 
     /** The timestamp for when the event happened or was observed, in milliseconds. */
     long getObservedTsMillis();
 
+    /** The name of the event. */
+    String getName();
+
     /** The scope of the event, typically the fully qualified name of the emitting class. */
-    String getScope();
+    String getClassScope();
 
     /** Textual description of the event. */
     String getBody();

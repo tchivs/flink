@@ -21,14 +21,17 @@ package org.apache.flink.traces;
 import org.apache.flink.annotation.Experimental;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Builder used to construct {@link Span}. See {@link Span#builder(Class, String)}. */
 @Experimental
 public class SpanBuilder {
     private final HashMap<String, Object> attributes = new HashMap<>();
-    private final List<Span> children = new ArrayList<>();
+    private final List<SpanBuilder> children = new ArrayList<>();
     private final Class<?> classScope;
     private final String name;
     private long startTsMillis;
@@ -47,21 +50,31 @@ public class SpanBuilder {
     }
 
     public Span build() {
+        return build(Collections.emptyMap());
+    }
+
+    public Span build(Map<String, String> additionalVariables) {
         long startTsMillisToBuild = startTsMillis;
         if (startTsMillisToBuild == 0) {
             startTsMillisToBuild = System.currentTimeMillis();
         }
+
         long endTsMillisToBuild = endTsMillis;
         if (endTsMillisToBuild == 0) {
             endTsMillisToBuild = startTsMillis;
         }
+
+        attributes.putAll(additionalVariables);
+
         return new SimpleSpan(
                 classScope.getCanonicalName(),
                 name,
                 startTsMillisToBuild,
                 endTsMillisToBuild,
                 attributes,
-                children);
+                children.stream()
+                        .map(childBuilder -> childBuilder.build(additionalVariables))
+                        .collect(Collectors.toList()));
     }
 
     /**
@@ -101,14 +114,18 @@ public class SpanBuilder {
     }
 
     /** Adds child spans (= nested). */
-    public SpanBuilder addChildren(List<Span> children) {
+    public SpanBuilder addChildren(List<SpanBuilder> children) {
         this.children.addAll(children);
         return this;
     }
 
     /** Adds child span (= nested). */
-    public SpanBuilder addChild(Span child) {
+    public SpanBuilder addChild(SpanBuilder child) {
         this.children.add(child);
         return this;
+    }
+
+    public String getName() {
+        return name;
     }
 }

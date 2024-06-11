@@ -12,12 +12,14 @@ import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.logs.export.LogRecordExporter;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +27,6 @@ import java.util.Map;
 import static io.confluent.flink.common.metrics.OpenTelemetryMetricReporterITCase.ExporterFactory;
 import static io.confluent.flink.common.metrics.OpenTelemetryMetricReporterITCase.TestExporter;
 import static io.confluent.flink.common.metrics.OpenTelemetryTraceReporter.ARG_EXPORTER_FACTORY_CLASS;
-import static io.confluent.flink.common.metrics.OpenTelemetryTraceReporter.ARG_SCOPE_VARIABLES_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link OpenTelemetryMetricReporter}. */
@@ -46,10 +47,6 @@ public class OpenTelemetryLogRecordReporterTest {
     @Test
     public void testReportLogRecord() {
         MetricConfig metricConfig = new MetricConfig();
-        String scopeKey1 = "scopeKey1";
-        String scopeKey2 = "scopeKey2";
-        String scopeValue1 = "scopeValue1";
-        String scopeValue2 = "scopeValue2";
         String scope = this.getClass().getCanonicalName();
         String attribute1Key = "foo";
         String attribute1Value = "bar";
@@ -57,15 +54,12 @@ public class OpenTelemetryLogRecordReporterTest {
         String severity = "INFO";
         long observedTimeMs = 123456L;
 
-        metricConfig.setProperty(
-                ARG_SCOPE_VARIABLES_ADDITIONAL,
-                String.format("%s: %s , %s : %s", scopeKey1, scopeValue1, scopeKey2, scopeValue2));
         metricConfig.setProperty(ARG_EXPORTER_FACTORY_CLASS, ExporterFactory.class.getName());
         TestLogRecordExporterFactory logRecordExporterFactory = new TestLogRecordExporterFactory();
         reporter.open(metricConfig, logRecordExporterFactory);
         try {
             reporter.notifyOfAddedEvent(
-                    Event.builder(this.getClass())
+                    Event.builder(this.getClass(), "eventName")
                             .setAttribute(attribute1Key, attribute1Value)
                             .setBody(body)
                             .setObservedTsMillis(observedTimeMs)
@@ -90,11 +84,9 @@ public class OpenTelemetryLogRecordReporterTest {
                 .asMap()
                 .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
 
-        Map<String, String> expectedAttributes = new HashMap<>();
-        expectedAttributes.put(scopeKey1, scopeValue1);
-        expectedAttributes.put(scopeKey2, scopeValue2);
-        expectedAttributes.put(attribute1Key, attribute1Value);
-        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expectedAttributes);
+        assertThat(attributes)
+                .containsExactlyInAnyOrderEntriesOf(
+                        Collections.singletonMap(attribute1Key, attribute1Value));
     }
 
     static class TestLogRecordExporterFactory implements LogRecordExporterFactory {
@@ -119,7 +111,7 @@ public class OpenTelemetryLogRecordReporterTest {
         }
 
         @Override
-        public CompletableResultCode export(Collection<LogRecordData> logRecords) {
+        public CompletableResultCode export(@NotNull Collection<LogRecordData> logRecords) {
             this.logRecords.addAll(logRecords);
             return CompletableResultCode.ofSuccess();
         }

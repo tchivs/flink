@@ -16,30 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.traces.slf4j;
+package org.apache.flink.runtime.metrics.util;
 
+import org.apache.flink.events.Event;
+import org.apache.flink.events.reporter.EventReporter;
+import org.apache.flink.events.reporter.EventReporterFactory;
 import org.apache.flink.metrics.MetricConfig;
-import org.apache.flink.traces.Span;
-import org.apache.flink.traces.reporter.TraceReporter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Properties;
 
-/**
- * {@link TraceReporter} that exports {@link org.apache.flink.traces.Span Spans} via SLF4J {@link
- * Logger}.
- */
-public class Slf4jTraceReporter implements TraceReporter {
-    private static final Logger LOG = LoggerFactory.getLogger(Slf4jTraceReporter.class);
+/** Test implementation of {@link EventReporter}. */
+public class TestEventReporter implements EventReporter, EventReporterFactory {
 
     @Override
-    public void open(MetricConfig metricConfig) {}
+    public void notifyOfAddedEvent(Event event) {}
+
+    @Override
+    public void open(MetricConfig config) {}
 
     @Override
     public void close() {}
 
     @Override
-    public void notifyOfAddedSpan(Span span) {
-        LOG.info("Reported span: {}", span);
+    public EventReporter createEventReporter(Properties properties) {
+        return this;
     }
 }

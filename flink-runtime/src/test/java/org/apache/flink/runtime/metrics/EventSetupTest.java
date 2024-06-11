@@ -20,13 +20,13 @@ package org.apache.flink.runtime.metrics;
 
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.MetricOptions;
+import org.apache.flink.configuration.EventOptions;
+import org.apache.flink.events.reporter.EventReporter;
+import org.apache.flink.events.reporter.EventReporterFactory;
 import org.apache.flink.metrics.MetricConfig;
-import org.apache.flink.metrics.reporter.MetricReporter;
-import org.apache.flink.metrics.reporter.MetricReporterFactory;
 import org.apache.flink.runtime.metrics.filter.DefaultReporterFilters;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
-import org.apache.flink.runtime.metrics.util.TestReporter;
+import org.apache.flink.runtime.metrics.util.TestEventReporter;
 import org.apache.flink.testutils.junit.extensions.ContextClassLoaderExtension;
 import org.apache.flink.util.TestLoggerExtension;
 
@@ -47,28 +47,28 @@ import static org.junit.Assert.assertEquals;
 
 /** Tests for the {@link ReporterSetup}. */
 @ExtendWith(TestLoggerExtension.class)
-class ReporterSetupTest {
+class EventSetupTest {
 
     @RegisterExtension
     static final ContextClassLoaderExtension CONTEXT_CLASS_LOADER_EXTENSION =
             ContextClassLoaderExtension.builder()
                     .withServiceEntry(
-                            MetricReporterFactory.class,
-                            TestReporter1.class.getName(),
-                            TestReporter2.class.getName(),
-                            TestReporter11.class.getName(),
-                            TestReporter12.class.getName(),
-                            TestReporter13.class.getName(),
-                            TestReporterFactory.class.getName(),
+                            EventReporterFactory.class,
+                            TestEventReporter1.class.getName(),
+                            TestEventReporter2.class.getName(),
+                            TestEventReporter11.class.getName(),
+                            TestEventReporter12.class.getName(),
+                            TestEventReporter13.class.getName(),
+                            TestEventReporterFactory.class.getName(),
                             FailingFactory.class.getName(),
                             ConfigExposingReporterFactory.class.getName())
                     .build();
 
     /** TestReporter1 class only for type differentiation. */
-    public static class TestReporter1 extends TestReporter {}
+    public static class TestEventReporter1 extends TestEventReporter {}
 
     /** TestReporter2 class only for type differentiation. */
-    public static class TestReporter2 extends TestReporter {}
+    public static class TestEventReporter2 extends TestEventReporter {}
 
     /** Verifies that a reporter can be configured with all it's arguments being forwarded. */
     @Test
@@ -77,14 +77,14 @@ class ReporterSetupTest {
 
         configureReporter1(config);
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup reporterSetup = reporterSetups.get(0);
-        assertReporter1Configured(reporterSetup);
+        final EventReporterSetup reporterSetup = reporterSetups.get(0);
+        assertEventReporter1Configured(reporterSetup);
     }
 
     /**
@@ -97,19 +97,19 @@ class ReporterSetupTest {
         configureReporter1(config);
         configureReporter2(config);
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         Assert.assertEquals(2, reporterSetups.size());
 
-        final Optional<ReporterSetup> reporter1Config =
+        final Optional<EventReporterSetup> reporter1Config =
                 reporterSetups.stream().filter(c -> "reporter1".equals(c.getName())).findFirst();
 
         Assert.assertTrue(reporter1Config.isPresent());
-        assertReporter1Configured(reporter1Config.get());
+        assertEventReporter1Configured(reporter1Config.get());
 
-        final Optional<ReporterSetup> reporter2Config =
+        final Optional<EventReporterSetup> reporter2Config =
                 reporterSetups.stream().filter(c -> "reporter2".equals(c.getName())).findFirst();
 
         Assert.assertTrue(reporter2Config.isPresent());
@@ -117,7 +117,7 @@ class ReporterSetupTest {
     }
 
     /**
-     * Verifies that {@link MetricOptions#REPORTERS_LIST} is correctly used to filter configured
+     * Verifies that {@link EventOptions#REPORTERS_LIST} is correctly used to filter configured
      * reporters.
      */
     @Test
@@ -127,15 +127,15 @@ class ReporterSetupTest {
         configureReporter1(config);
         configureReporter2(config);
 
-        config.setString(MetricOptions.REPORTERS_LIST, "reporter2");
+        config.setString(EventOptions.REPORTERS_LIST, "reporter2");
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup setup = reporterSetups.get(0);
+        final EventReporterSetup setup = reporterSetups.get(0);
         assertReporter2Configured(setup);
     }
 
@@ -143,18 +143,17 @@ class ReporterSetupTest {
     void testReporterSetupSupplier() throws Exception {
         final Configuration config = new Configuration();
 
-        MetricOptions.forReporter(config, "reporter1")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter1.class.getName());
+        EventOptions.forReporter(config, "reporter1")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporter1.class.getName());
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         Assert.assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup reporterSetup = reporterSetups.get(0);
-        final MetricReporter metricReporter = reporterSetup.getReporter();
-        Assert.assertThat(metricReporter, instanceOf(TestReporter1.class));
+        final EventReporterSetup reporterSetup = reporterSetups.get(0);
+        Assert.assertThat(reporterSetup.getReporter(), instanceOf(TestEventReporter1.class));
     }
 
     /** Verifies that multiple reporters are instantiated correctly. */
@@ -162,26 +161,26 @@ class ReporterSetupTest {
     void testMultipleReporterInstantiation() throws Exception {
         Configuration config = new Configuration();
 
-        MetricOptions.forReporter(config, "test1")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter11.class.getName());
-        MetricOptions.forReporter(config, "test2")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter12.class.getName());
-        MetricOptions.forReporter(config, "test3")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter13.class.getName());
+        EventOptions.forReporter(config, "test1")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporter11.class.getName());
+        EventOptions.forReporter(config, "test2")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporter12.class.getName());
+        EventOptions.forReporter(config, "test3")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporter13.class.getName());
 
-        List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         assertEquals(3, reporterSetups.size());
 
-        Assert.assertTrue(TestReporter11.wasOpened);
-        Assert.assertTrue(TestReporter12.wasOpened);
-        Assert.assertTrue(TestReporter13.wasOpened);
+        Assert.assertTrue(TestEventReporter11.wasOpened);
+        Assert.assertTrue(TestEventReporter12.wasOpened);
+        Assert.assertTrue(TestEventReporter13.wasOpened);
     }
 
     /** Reporter that exposes whether open() was called. */
-    public static class TestReporter11 extends TestReporter {
+    public static class TestEventReporter11 extends TestEventReporter {
         public static boolean wasOpened = false;
 
         @Override
@@ -191,7 +190,7 @@ class ReporterSetupTest {
     }
 
     /** Reporter that exposes whether open() was called. */
-    public static class TestReporter12 extends TestReporter {
+    public static class TestEventReporter12 extends TestEventReporter {
         public static boolean wasOpened = false;
 
         @Override
@@ -201,7 +200,7 @@ class ReporterSetupTest {
     }
 
     /** Reporter that exposes whether open() was called. */
-    public static class TestReporter13 extends TestReporter {
+    public static class TestEventReporter13 extends TestEventReporter {
         public static boolean wasOpened = false;
 
         @Override
@@ -212,38 +211,42 @@ class ReporterSetupTest {
 
     private static void configureReporter1(Configuration config) {
         Configuration reporterConfig =
-                MetricOptions.forReporter(config, "reporter1")
-                        .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter1.class.getName());
+                EventOptions.forReporter(config, "reporter1")
+                        .set(
+                                EventOptions.REPORTER_FACTORY_CLASS,
+                                TestEventReporter1.class.getName());
         reporterConfig.setString("arg1", "value1");
         reporterConfig.setString("arg2", "value2");
     }
 
-    private static void assertReporter1Configured(ReporterSetup setup) {
+    private static void assertEventReporter1Configured(EventReporterSetup setup) {
         Assert.assertEquals("reporter1", setup.getName());
         Assert.assertEquals("value1", setup.getConfiguration().getString("arg1", ""));
         Assert.assertEquals("value2", setup.getConfiguration().getString("arg2", ""));
         Assert.assertEquals(
-                ReporterSetupTest.TestReporter1.class.getName(),
+                TestEventReporter1.class.getName(),
                 setup.getConfiguration()
-                        .getString(MetricOptions.REPORTER_FACTORY_CLASS.key(), null));
+                        .getString(EventOptions.REPORTER_FACTORY_CLASS.key(), null));
     }
 
     private static void configureReporter2(Configuration config) {
         Configuration reporterConfig =
-                MetricOptions.forReporter(config, "reporter2")
-                        .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporter2.class.getName());
+                EventOptions.forReporter(config, "reporter2")
+                        .set(
+                                EventOptions.REPORTER_FACTORY_CLASS,
+                                TestEventReporter2.class.getName());
         reporterConfig.setString("arg1", "value1");
         reporterConfig.setString("arg3", "value3");
     }
 
-    private static void assertReporter2Configured(ReporterSetup setup) {
+    private static void assertReporter2Configured(EventReporterSetup setup) {
         Assert.assertEquals("reporter2", setup.getName());
         Assert.assertEquals("value1", setup.getConfiguration().getString("arg1", null));
         Assert.assertEquals("value3", setup.getConfiguration().getString("arg3", null));
         Assert.assertEquals(
-                TestReporter2.class.getName(),
+                TestEventReporter2.class.getName(),
                 setup.getConfiguration()
-                        .getString(MetricOptions.REPORTER_FACTORY_CLASS.key(), null));
+                        .getString(EventOptions.REPORTER_FACTORY_CLASS.key(), null));
     }
 
     @Test
@@ -251,19 +254,19 @@ class ReporterSetupTest {
         final String excludedVariable1 = "foo";
         final String excludedVariable2 = "foo";
         final Configuration config = new Configuration();
-        MetricOptions.forReporter(config, "test")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporterFactory.class.getName())
+        EventOptions.forReporter(config, "test")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporterFactory.class.getName())
                 .set(
-                        MetricOptions.REPORTER_EXCLUDED_VARIABLES,
+                        EventOptions.REPORTER_EXCLUDED_VARIABLES,
                         excludedVariable1 + ";" + excludedVariable2);
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup reporterSetup = reporterSetups.get(0);
+        final EventReporterSetup reporterSetup = reporterSetups.get(0);
 
         assertThat(
                 reporterSetup.getExcludedVariables(),
@@ -276,18 +279,18 @@ class ReporterSetupTest {
     @Test
     void testFactoryParsing() throws Exception {
         final Configuration config = new Configuration();
-        MetricOptions.forReporter(config, "test")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporterFactory.class.getName());
+        EventOptions.forReporter(config, "test")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporterFactory.class.getName());
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup reporterSetup = reporterSetups.get(0);
+        final EventReporterSetup reporterSetup = reporterSetups.get(0);
 
-        assertEquals(TestReporterFactory.REPORTER, reporterSetup.getReporter());
+        assertEquals(TestEventReporterFactory.REPORTER, reporterSetup.getReporter());
     }
 
     /** Verifies that an error thrown by a factory does not affect the setup of other reporters. */
@@ -295,19 +298,19 @@ class ReporterSetupTest {
     void testFactoryFailureIsolation() throws Exception {
         final Configuration config = new Configuration();
         config.setString(
-                ConfigConstants.METRICS_REPORTER_PREFIX
+                ConfigConstants.EVENTS_REPORTER_PREFIX
                         + "test."
-                        + MetricOptions.REPORTER_FACTORY_CLASS.key(),
-                TestReporterFactory.class.getName());
+                        + EventOptions.REPORTER_FACTORY_CLASS.key(),
+                TestEventReporterFactory.class.getName());
         config.setString(
-                ConfigConstants.METRICS_REPORTER_PREFIX
+                ConfigConstants.EVENTS_REPORTER_PREFIX
                         + "fail."
-                        + MetricOptions.REPORTER_FACTORY_CLASS.key(),
+                        + EventOptions.REPORTER_FACTORY_CLASS.key(),
                 FailingFactory.class.getName());
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         assertEquals(1, reporterSetups.size());
     }
@@ -316,14 +319,14 @@ class ReporterSetupTest {
     void testFactoryArgumentForwarding() throws Exception {
         final Configuration config = new Configuration();
         config.setString(
-                ConfigConstants.METRICS_REPORTER_PREFIX
+                ConfigConstants.EVENTS_REPORTER_PREFIX
                         + "test."
-                        + MetricOptions.REPORTER_FACTORY_CLASS.key(),
+                        + EventOptions.REPORTER_FACTORY_CLASS.key(),
                 ConfigExposingReporterFactory.class.getName());
-        config.setString(ConfigConstants.METRICS_REPORTER_PREFIX + "test.arg", "hello");
+        config.setString(ConfigConstants.EVENTS_REPORTER_PREFIX + "test.arg", "hello");
 
-        ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                config, DefaultReporterFilters::metricsFromConfiguration, null);
+        ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         Properties passedConfig = ConfigExposingReporterFactory.lastConfig;
         assertEquals("hello", passedConfig.getProperty("arg"));
@@ -337,19 +340,19 @@ class ReporterSetupTest {
         final String tagValue2 = "buzz";
         final Configuration config = new Configuration();
 
-        MetricOptions.forReporter(config, "test")
-                .set(MetricOptions.REPORTER_FACTORY_CLASS, TestReporterFactory.class.getName())
+        EventOptions.forReporter(config, "test")
+                .set(EventOptions.REPORTER_FACTORY_CLASS, TestEventReporterFactory.class.getName())
                 .setString(
-                        MetricOptions.REPORTER_ADDITIONAL_VARIABLES.key(),
+                        EventOptions.REPORTER_ADDITIONAL_VARIABLES.key(),
                         String.join(",", tag1 + ":" + tagValue1, tag2 + ":" + tagValue2));
 
-        final List<ReporterSetup> reporterSetups =
-                ReporterSetupBuilder.METRIC_SETUP_BUILDER.fromConfiguration(
-                        config, DefaultReporterFilters::metricsFromConfiguration, null);
+        final List<EventReporterSetup> reporterSetups =
+                ReporterSetupBuilder.EVENT_SETUP_BUILDER.fromConfiguration(
+                        config, DefaultReporterFilters::eventsFromConfiguration, null);
 
         assertEquals(1, reporterSetups.size());
 
-        final ReporterSetup reporterSetup = reporterSetups.get(0);
+        final EventReporterSetup reporterSetup = reporterSetups.get(0);
 
         assertThat(
                 reporterSetup.getAdditionalVariables(),
@@ -361,33 +364,33 @@ class ReporterSetupTest {
     }
 
     /** Factory that exposed the last provided metric config. */
-    public static class ConfigExposingReporterFactory implements MetricReporterFactory {
+    public static class ConfigExposingReporterFactory implements EventReporterFactory {
 
         static Properties lastConfig = null;
 
         @Override
-        public MetricReporter createMetricReporter(Properties config) {
+        public EventReporter createEventReporter(Properties config) {
             lastConfig = config;
-            return new TestReporter();
+            return new TestEventReporter();
         }
     }
 
     /** Factory that returns a static reporter. */
-    public static class TestReporterFactory implements MetricReporterFactory {
+    public static class TestEventReporterFactory implements EventReporterFactory {
 
-        static final MetricReporter REPORTER = new TestReporter();
+        static final EventReporter REPORTER = new TestEventReporter();
 
         @Override
-        public MetricReporter createMetricReporter(Properties config) {
+        public EventReporter createEventReporter(Properties config) {
             return REPORTER;
         }
     }
 
     /** Factory that always throws an error. */
-    public static class FailingFactory implements MetricReporterFactory {
+    public static class FailingFactory implements EventReporterFactory {
 
         @Override
-        public MetricReporter createMetricReporter(Properties config) {
+        public EventReporter createEventReporter(Properties config) {
             throw new RuntimeException();
         }
     }

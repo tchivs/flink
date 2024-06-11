@@ -22,6 +22,7 @@ import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Meter;
+import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.MetricType;
 import org.apache.flink.metrics.util.TestCounter;
 import org.apache.flink.metrics.util.TestMeter;
@@ -38,7 +39,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Execution(ExecutionMode.CONCURRENT)
-class DefaultMetricFilterTest {
+class DefaultReporterFiltersTest {
 
     private static final Counter COUNTER = new TestCounter();
     private static final Meter METER = new TestMeter();
@@ -46,7 +47,7 @@ class DefaultMetricFilterTest {
 
     @Test
     void testConvertToPatternWithoutWildcards() {
-        final Pattern pattern = DefaultMetricFilter.convertToPattern("numRecordsIn");
+        final Pattern pattern = DefaultReporterFilters.convertToPattern("numRecordsIn");
         assertThat(pattern.toString()).isEqualTo("(numRecordsIn)");
         assertThat(pattern.matcher("numRecordsIn").matches()).isEqualTo(true);
         assertThat(pattern.matcher("numBytesOut").matches()).isEqualTo(false);
@@ -54,7 +55,7 @@ class DefaultMetricFilterTest {
 
     @Test
     void testConvertToPatternSingle() {
-        final Pattern pattern = DefaultMetricFilter.convertToPattern("numRecords*");
+        final Pattern pattern = DefaultReporterFilters.convertToPattern("numRecords*");
         assertThat(pattern.toString()).isEqualTo("(numRecords.*)");
         assertThat(pattern.matcher("numRecordsIn").matches()).isEqualTo(true);
         assertThat(pattern.matcher("numBytesOut").matches()).isEqualTo(false);
@@ -62,7 +63,7 @@ class DefaultMetricFilterTest {
 
     @Test
     void testConvertToPatternMultiple() {
-        final Pattern pattern = DefaultMetricFilter.convertToPattern("numRecords*,numBytes*");
+        final Pattern pattern = DefaultReporterFilters.convertToPattern("numRecords*,numBytes*");
         assertThat(pattern.toString()).isEqualTo("(numRecords.*|numBytes.*)");
         assertThat(pattern.matcher("numRecordsIn").matches()).isEqualTo(true);
         assertThat(pattern.matcher("numBytesOut").matches()).isEqualTo(true);
@@ -72,19 +73,19 @@ class DefaultMetricFilterTest {
 
     @Test
     void testParseMetricTypesSingle() {
-        final EnumSet<MetricType> types = DefaultMetricFilter.parseMetricTypes("meter");
+        final EnumSet<MetricType> types = DefaultReporterFilters.parseMetricTypes("meter");
         assertThat(types).containsExactly(MetricType.METER);
     }
 
     @Test
     void testParseMetricTypesMultiple() {
-        final EnumSet<MetricType> types = DefaultMetricFilter.parseMetricTypes("meter,counter");
+        final EnumSet<MetricType> types = DefaultReporterFilters.parseMetricTypes("meter,counter");
         assertThat(types).containsExactlyInAnyOrder(MetricType.METER, MetricType.COUNTER);
     }
 
     @Test
     void testParseMetricTypesCaseIgnored() {
-        final EnumSet<MetricType> types = DefaultMetricFilter.parseMetricTypes("meter,CoUnTeR");
+        final EnumSet<MetricType> types = DefaultReporterFilters.parseMetricTypes("meter,CoUnTeR");
         assertThat(types).containsExactlyInAnyOrder(MetricType.METER, MetricType.COUNTER);
     }
 
@@ -95,7 +96,8 @@ class DefaultMetricFilterTest {
                 MetricOptions.REPORTER_INCLUDES, Arrays.asList("include1:*:*", "include2.*:*:*"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Collections.emptyList());
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "name", "include1")).isEqualTo(true);
         assertThat(metricFilter.filter(COUNTER, "name", "include1.bar")).isEqualTo(false);
@@ -109,7 +111,8 @@ class DefaultMetricFilterTest {
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:name:*"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Collections.emptyList());
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "name", "bar")).isEqualTo(true);
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(false);
@@ -121,7 +124,8 @@ class DefaultMetricFilterTest {
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:*:counter"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Collections.emptyList());
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
         assertThat(metricFilter.filter(METER, "foo", "bar")).isEqualTo(false);
@@ -133,7 +137,8 @@ class DefaultMetricFilterTest {
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:*:*"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Arrays.asList("include1", "include2.*"));
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "name", "include1")).isEqualTo(false);
         assertThat(metricFilter.filter(COUNTER, "name", "include1.bar")).isEqualTo(true);
@@ -147,7 +152,8 @@ class DefaultMetricFilterTest {
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:*:*"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Arrays.asList("*:faa*", "*:foo"));
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "name", "bar")).isEqualTo(true);
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(false);
@@ -161,7 +167,8 @@ class DefaultMetricFilterTest {
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:*:*"));
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Arrays.asList("*:*:meter"));
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
         assertThat(metricFilter.filter(METER, "foo", "bar")).isEqualTo(false);
@@ -172,7 +179,8 @@ class DefaultMetricFilterTest {
         Configuration configuration = new Configuration();
         configuration.set(MetricOptions.REPORTER_EXCLUDES, Arrays.asList("*:*:meter"));
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "foo", "hello")).isEqualTo(true);
         assertThat(metricFilter.filter(METER, "foo", "hello")).isEqualTo(false);
@@ -183,7 +191,8 @@ class DefaultMetricFilterTest {
         Configuration configuration = new Configuration();
         configuration.set(MetricOptions.REPORTER_INCLUDES, Arrays.asList("*:*:*"));
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
     }
@@ -192,7 +201,8 @@ class DefaultMetricFilterTest {
     void testFromConfigurationAllDefault() {
         Configuration configuration = new Configuration();
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> metricFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
         assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
         assertThat(metricFilter.filter(METER, "foo", "bar")).isEqualTo(true);
@@ -206,10 +216,11 @@ class DefaultMetricFilterTest {
         configuration.setString(
                 MetricOptions.REPORTER_EXCLUDES.key(), "*:foo,bar:meter;*:foo,bar:gauge");
 
-        final MetricFilter metricFilter = DefaultMetricFilter.fromConfiguration(configuration);
+        final ReporterFilter<Metric> reporterFilter =
+                DefaultReporterFilters.metricsFromConfiguration(configuration);
 
-        assertThat(metricFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
-        assertThat(metricFilter.filter(METER, "foo", "bar")).isEqualTo(false);
-        assertThat(metricFilter.filter(GAUGE, "foo", "bar")).isEqualTo(false);
+        assertThat(reporterFilter.filter(COUNTER, "foo", "bar")).isEqualTo(true);
+        assertThat(reporterFilter.filter(METER, "foo", "bar")).isEqualTo(false);
+        assertThat(reporterFilter.filter(GAUGE, "foo", "bar")).isEqualTo(false);
     }
 }

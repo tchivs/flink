@@ -19,8 +19,6 @@ import io.opentelemetry.sdk.logs.export.LogRecordExporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -32,10 +30,6 @@ import java.util.function.BiConsumer;
 public class OpenTelemetryLogRecordReporter extends OpenTelemetryReporterBase
         implements EventReporter {
     private static final Logger LOG = LoggerFactory.getLogger(OpenTelemetryLogRecordReporter.class);
-
-    public static final String ARG_SCOPE_VARIABLES_ADDITIONAL = "scope.variables.additional";
-
-    private final Map<String, String> additionalScope = new HashMap<>();
     private LogRecordExporter logRecordExporter;
     private SdkLoggerProvider loggerProvider;
     private BatchLogRecordProcessor logRecordProcessor;
@@ -59,24 +53,6 @@ public class OpenTelemetryLogRecordReporter extends OpenTelemetryReporterBase
                         .addLogRecordProcessor(logRecordProcessor)
                         .setResource(resource)
                         .build();
-
-        String additionalScopeVariables =
-                metricConfig.getString(ARG_SCOPE_VARIABLES_ADDITIONAL, "");
-        for (String scope : additionalScopeVariables.split(",")) {
-            if (scope.length() == 0) {
-                continue;
-            }
-            String[] keyValue = scope.split(":");
-            if (keyValue.length != 2) {
-                LOG.warn(
-                        "unable to parse [{}] from config [{} = {}]",
-                        scope,
-                        ARG_SCOPE_VARIABLES_ADDITIONAL,
-                        additionalScopeVariables);
-                continue;
-            }
-            additionalScope.put(keyValue[0].trim(), keyValue[1].trim());
-        }
     }
 
     @Override
@@ -89,11 +65,10 @@ public class OpenTelemetryLogRecordReporter extends OpenTelemetryReporterBase
 
     @Override
     public void notifyOfAddedEvent(Event event) {
-        io.opentelemetry.api.logs.Logger logger = loggerProvider.get(event.getScope());
+        io.opentelemetry.api.logs.Logger logger = loggerProvider.get(event.getClassScope());
         LogRecordBuilder logRecordBuilder = logger.logRecordBuilder();
 
         event.getAttributes().forEach(setAttribute(logRecordBuilder));
-        additionalScope.forEach(setAttribute(logRecordBuilder));
 
         logRecordBuilder.setObservedTimestamp(event.getObservedTsMillis(), TimeUnit.MILLISECONDS);
 

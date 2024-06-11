@@ -27,19 +27,22 @@ import java.util.Map;
 public class SimpleEvent implements Event {
 
     private final long observedTsMillis;
-    private final String scope;
+    private final String name;
+    private final String classScope;
     private final String body;
     private final String severity;
     private final Map<String, Object> attributes;
 
     SimpleEvent(
             long observedTsMillis,
-            String scope,
+            String name,
+            String classScope,
             String body,
             String severity,
             Map<String, Object> attributes) {
         this.observedTsMillis = observedTsMillis;
-        this.scope = scope;
+        this.name = name;
+        this.classScope = classScope;
         this.body = body;
         this.severity = severity;
         this.attributes = attributes;
@@ -51,8 +54,13 @@ public class SimpleEvent implements Event {
     }
 
     @Override
-    public String getScope() {
-        return scope;
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public String getClassScope() {
+        return classScope;
     }
 
     @Override

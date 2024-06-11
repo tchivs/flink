@@ -63,7 +63,7 @@ public class AbstractMetricGroupTest extends TestLogger {
                 new MetricRegistryImpl(
                         MetricRegistryTestUtils.defaultMetricRegistryConfiguration());
 
-        AbstractMetricGroup group =
+        AbstractMetricGroup<?> group =
                 new AbstractMetricGroup<AbstractMetricGroup<?>>(registry, new String[0], null) {
                     @Override
                     protected QueryScopeInfo createQueryServiceMetricInfo(CharacterFilter filter) {

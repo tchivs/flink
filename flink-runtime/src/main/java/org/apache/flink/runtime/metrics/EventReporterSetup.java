@@ -17,19 +17,34 @@
 
 package org.apache.flink.runtime.metrics;
 
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.EventOptions;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.events.reporter.EventReporter;
 import org.apache.flink.metrics.MetricConfig;
+import org.apache.flink.runtime.metrics.filter.ReporterFilter;
 
 import java.util.Map;
 
 /** Setup for {@link org.apache.flink.events.reporter.EventReporter}. */
-public final class EventReporterSetup extends AbstractReporterSetup<EventReporter> {
+public final class EventReporterSetup extends AbstractReporterSetup<EventReporter, EventBuilder> {
 
     public EventReporterSetup(
             final String name,
             final MetricConfig configuration,
             EventReporter reporter,
+            ReporterFilter<EventBuilder> eventFilter,
             final Map<String, String> additionalVariables) {
-        super(name, configuration, reporter, additionalVariables);
+        super(name, configuration, reporter, eventFilter, additionalVariables);
+    }
+
+    @Override
+    protected ConfigOption<String> getDelimiterConfigOption() {
+        return EventOptions.REPORTER_SCOPE_DELIMITER;
+    }
+
+    @Override
+    protected ConfigOption<String> getExcludedVariablesConfigOption() {
+        return EventOptions.REPORTER_EXCLUDED_VARIABLES;
     }
 }

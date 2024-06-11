@@ -335,7 +335,7 @@ public class CheckpointStatsTracker {
         return snapshot;
     }
 
-    private Span createTaskSpan(
+    private SpanBuilder createTaskSpan(
             AbstractCheckpointStats checkpointStats,
             TaskStateStats taskStats,
             boolean addSubtaskSpans) {
@@ -363,7 +363,7 @@ public class CheckpointStatsTracker {
             addSubtaskSpans(checkpointStats, taskStats, taskSpanBuilder);
         }
 
-        return taskSpanBuilder.build();
+        return taskSpanBuilder;
     }
 
     // ------------------------------------------------------------------------
@@ -538,7 +538,7 @@ public class CheckpointStatsTracker {
                 subTaskSpanBuilder.setAttribute(metricName, metricValue);
             }
 
-            taskSpanBuilder.addChild(subTaskSpanBuilder.build());
+            taskSpanBuilder.addChild(subTaskSpanBuilder);
         }
     }
 

@@ -20,8 +20,6 @@ import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -32,10 +30,6 @@ import java.util.function.BiConsumer;
 @Confluent
 public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implements TraceReporter {
     private static final Logger LOG = LoggerFactory.getLogger(OpenTelemetryTraceReporter.class);
-
-    public static final String ARG_SCOPE_VARIABLES_ADDITIONAL = "scope.variables.additional";
-
-    private final Map<String, String> additionalScope = new HashMap<>();
     private SpanExporter spanExporter;
     private TracerProvider tracerProvider;
     private BatchSpanProcessor spanProcessor;
@@ -59,24 +53,6 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
                         .addSpanProcessor(spanProcessor)
                         .setResource(resource)
                         .build();
-
-        String additionalScopeVariables =
-                metricConfig.getString(ARG_SCOPE_VARIABLES_ADDITIONAL, "");
-        for (String scope : additionalScopeVariables.split(",")) {
-            if (scope.length() == 0) {
-                continue;
-            }
-            String[] keyValue = scope.split(":");
-            if (keyValue.length != 2) {
-                LOG.warn(
-                        "unable to parse [{}] from config [{} = {}]",
-                        scope,
-                        ARG_SCOPE_VARIABLES_ADDITIONAL,
-                        additionalScopeVariables);
-                continue;
-            }
-            additionalScope.put(keyValue[0].trim(), keyValue[1].trim());
-        }
     }
 
     @Override
@@ -87,17 +63,12 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
         spanExporter.close();
     }
 
-    @Override
-    public void notifyOfAddedSpan(Span span) {
-        notifyOfAddedSpanInternal(span, null);
-    }
-
     private void notifyOfAddedSpanInternal(Span span, io.opentelemetry.api.trace.Span parent) {
+
         Tracer tracer = tracerProvider.get(span.getScope());
         SpanBuilder spanBuilder = tracer.spanBuilder(span.getName());
 
         span.getAttributes().forEach(setAttribute(spanBuilder));
-        additionalScope.forEach(setAttribute(spanBuilder));
 
         if (parent == null) {
             // root span case
@@ -132,5 +103,10 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
                 LOG.warn("Unsupported attribute type [{}={}]", key, value);
             }
         };
+    }
+
+    @Override
+    public void notifyOfAddedSpan(org.apache.flink.traces.Span span) {
+        notifyOfAddedSpanInternal(span, null);
     }
 }
