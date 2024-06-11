@@ -35,21 +35,24 @@ import com.google.protobuf.Descriptors.Descriptor;
 import io.confluent.flink.formats.converters.protobuf.FlinkToProtoSchemaConverter;
 import io.confluent.flink.formats.converters.protobuf.ProtoToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.utils.MockInitializationContext;
+import io.confluent.flink.formats.registry.utils.TestKafkaSerializerConfig;
 import io.confluent.flink.formats.registry.utils.TestSchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaProvider;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaUtils;
+import io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,20 +64,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and/or {@link ProtoToRowDataConvertersTest}.
  */
 @ExtendWith(TestLoggerExtension.class)
-class ProtoRegistrySerialisatiionDeserialisationTest {
+class ProtoRegistrySerializationDeserializationTest {
+    private static final Map<String, String> KAFKA_SERIALIZER_CONFIG =
+            TestKafkaSerializerConfig.getProtobufProps();
 
     private static final String SUBJECT = "test-subject";
 
-    private static SchemaRegistryClient client;
+    private SchemaRegistryClient client;
+    private KafkaProtobufSerializer serializer;
 
-    @BeforeAll
-    static void beforeClass() {
-        client = new MockSchemaRegistryClient();
-    }
-
-    @AfterEach
-    void after() throws IOException, RestClientException {
-        client.deleteSubject(SUBJECT);
+    @BeforeEach
+    void setUp() {
+        client = new MockSchemaRegistryClient(List.of(new ProtobufSchemaProvider()));
+        serializer = new KafkaProtobufSerializer(client, KAFKA_SERIALIZER_CONFIG);
     }
 
     @Test
@@ -131,35 +133,50 @@ class ProtoRegistrySerialisatiionDeserialisationTest {
     }
 
     @Test
-    void test() throws Exception {
-        final byte[] data = {
-            0, 0, 1, -122, -94, 0, 10, 4, 83, 69, 76, 76, 16, -120, 6, 26, 4, 90, 66, 90, 88, 32,
-            107, 42, 6, 88, 89, 90, 55, 56, 57, 50, 6, 85, 115, 101, 114, 95, 53
-        };
-        final String schemaStr =
-                "syntax = \"proto3\";\n"
-                        + "package ksql;\n"
-                        + "\n"
-                        + "message StockTrade {\n"
-                        + "  string side = 1;\n"
-                        + "  int32 quantity = 2;\n"
-                        + "  string symbol = 3;\n"
-                        + "  int32 price = 4;\n"
-                        + "  string account = 5;\n"
-                        + "  string userid = 6;\n"
-                        + "}";
-
-        final ProtobufSchema protobufSchema = new ProtobufSchema(schemaStr);
-        final int schemaId = client.register(SUBJECT, protobufSchema, 0, 100002);
+    void testRoundTrip() throws Exception {
+        final ProtobufSchema stockTradeSchema =
+                new ProtobufSchema(
+                        "syntax = \"proto3\";\n"
+                                + "package ksql;\n"
+                                + "\n"
+                                + "message StockTrade {\n"
+                                + "  string side = 1;\n"
+                                + "  int32 quantity = 2;\n"
+                                + "  string symbol = 3;\n"
+                                + "  int32 price = 4;\n"
+                                + "  string account = 5;\n"
+                                + "  string userid = 6;\n"
+                                + "}");
+        final int schemaId = client.register(SUBJECT + "-value", stockTradeSchema, 0, 100002);
         final LogicalType flinkSchema =
-                ProtoToFlinkSchemaConverter.toFlinkSchema(protobufSchema.toDescriptor());
-        final DeserializationSchema<RowData> serializationSchema =
+                ProtoToFlinkSchemaConverter.toFlinkSchema(stockTradeSchema.toDescriptor());
+
+        // Create a StockTrade message
+        Object stockTrade =
+                ProtobufSchemaUtils.toObject(
+                        "{\n"
+                                + "\"side\":\"SELL\",\n"
+                                + "\"quantity\":776,\n"
+                                + "\"symbol\":\"ZBZX\",\n"
+                                + "\"price\":107,\n"
+                                + "\"account\":\"XYZ789\",\n"
+                                + "\"userid\":\"User_5\"\n"
+                                + "}",
+                        stockTradeSchema);
+
+        // Serialize the StockTrade message
+        byte[] serializedData = serializer.serialize(SUBJECT, stockTrade);
+
+        // Deserialize the message
+        final DeserializationSchema<RowData> deserializationSchema =
                 new ProtoRegistryDeserializationSchema(
                         new TestSchemaRegistryConfig(schemaId, client),
                         (RowType) flinkSchema,
                         InternalTypeInfo.of(flinkSchema));
-        serializationSchema.open(new MockInitializationContext());
-        final RowData deserialized = serializationSchema.deserialize(data);
+        deserializationSchema.open(new MockInitializationContext());
+        final RowData deserialized = deserializationSchema.deserialize(serializedData);
+
+        // Expected RowData
         final GenericRowData expected = new GenericRowData(6);
         expected.setField(0, StringData.fromString("SELL"));
         expected.setField(1, 776);
@@ -167,10 +184,11 @@ class ProtoRegistrySerialisatiionDeserialisationTest {
         expected.setField(3, 107);
         expected.setField(4, StringData.fromString("XYZ789"));
         expected.setField(5, StringData.fromString("User_5"));
+
         assertThat(deserialized).isEqualTo(expected);
     }
 
-    private static byte[] serialize(int schemaId, GenericRowData rowData, RowType flinkSchema)
+    private byte[] serialize(int schemaId, GenericRowData rowData, RowType flinkSchema)
             throws Exception {
 
         final SerializationSchema<RowData> serializationSchema =
@@ -180,8 +198,7 @@ class ProtoRegistrySerialisatiionDeserialisationTest {
         return serializationSchema.serialize(rowData);
     }
 
-    private static RowData deserialize(byte[] data, int schemaId, RowType flinkSchema)
-            throws Exception {
+    private RowData deserialize(byte[] data, int schemaId, RowType flinkSchema) throws Exception {
 
         final DeserializationSchema<RowData> serializationSchema =
                 new ProtoRegistryDeserializationSchema(

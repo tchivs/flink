@@ -10,10 +10,9 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.TestLoggerExtension;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-
 import io.confluent.flink.formats.converters.avro.AvroToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.utils.MockInitializationContext;
+import io.confluent.flink.formats.registry.utils.TestKafkaSerializerConfig;
 import io.confluent.flink.formats.registry.utils.TestSchemaRegistryConfig;
 import io.confluent.kafka.schemaregistry.ParsedSchema;
 import io.confluent.kafka.schemaregistry.avro.AvroSchema;
@@ -22,7 +21,6 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.entities.SchemaReference;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericRecord;
@@ -40,21 +38,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /* Test cases for {@link AvroRegistryDeserializationSchema} */
 @ExtendWith(TestLoggerExtension.class)
 class AvroRegistryDeserializationSchemaTest {
-    /**
-     * Kafka serializer properties that are used to serialize messages with multiple event types in
-     * the same topic. Follow the guide to avoid false positive tests for multiple event types:
-     * https://docs.confluent.io/cloud/current/sr/fundamentals/serdes-develop/serdes-avro.html#multiple-event-types-in-the-same-topic
-     */
-    private static final Map<String, String> KAFKA_AVRO_SERIALIZER_PROPS =
-            ImmutableMap.of(
-                    KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, "fake-url",
-                    // disable auto-registration of the event type, so that it does not override
-                    // the union as the latest schema in the subject.
-                    KafkaAvroSerializerConfig.AUTO_REGISTER_SCHEMAS, "false",
-                    // look up the latest schema version in the subject (which will be the
-                    // union) and use that for serialization. Otherwise, the serializer will
-                    // look for the event type in the subject and fail to find it.
-                    KafkaAvroSerializerConfig.USE_LATEST_VERSION, "true");
+
+    private static final Map<String, String> KAFKA_SERIALIZER_CONFIG =
+            TestKafkaSerializerConfig.getAvroProps();
 
     // --------------------------------------------------------------------------------------------
     // SCHEMAS TO REGISTER BEFORE EVERY TEST
@@ -118,7 +104,7 @@ class AvroRegistryDeserializationSchemaTest {
         client.register("pageView", new AvroSchema(pageViewSchema));
 
         // serializer for creating kafka messages from AVRO records
-        avroSerializer = new KafkaAvroSerializer(client, KAFKA_AVRO_SERIALIZER_PROPS);
+        avroSerializer = new KafkaAvroSerializer(client, KAFKA_SERIALIZER_CONFIG);
     }
 
     @Test
