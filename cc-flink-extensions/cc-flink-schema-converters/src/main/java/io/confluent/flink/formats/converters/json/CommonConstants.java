@@ -37,6 +37,7 @@ public class CommonConstants {
     // ====================================================
     public static final String FLINK_TYPE_PROP = "flink.type";
     public static final String FLINK_TYPE_TIMESTAMP = "timestamp";
+    public static final String FLINK_TYPE_MULTISET = "multiset";
     public static final String FLINK_PARAMETERS = "flink.parameters";
     public static final String FLINK_PRECISION = "precision";
     static final String FLINK_MIN_LENGTH = "flink.minLength";

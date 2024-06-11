@@ -52,11 +52,13 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT32;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT8;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_MAP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_TIMESTAMP;
 
@@ -276,15 +278,19 @@ public class FlinkToJsonSchemaConverter {
         final LogicalType keyType = logicalType.getElementType();
         final LogicalType valueType = new IntType(false);
 
-        return convertMapLikeType(rowName, keyType, valueType);
+        final Schema.Builder<?> builder = convertMapLikeType(rowName, keyType, valueType);
+        builder.unprocessedProperties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
+        return builder;
     }
 
     private static Schema.Builder<?> convertMapLikeType(
             String rowName, LogicalType keyType, LogicalType valueType) {
         if (keyType.is(LogicalTypeFamily.CHARACTER_STRING)) {
-            return ObjectSchema.builder()
-                    .schemaOfAdditionalProperties(fromFlinkSchema(valueType, rowName))
-                    .unprocessedProperties(Collections.singletonMap("connect.type", "map"));
+            final Builder builder =
+                    ObjectSchema.builder()
+                            .schemaOfAdditionalProperties(fromFlinkSchema(valueType, rowName));
+            builder.unprocessedProperties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
+            return builder;
         } else {
             return connectCustomMap(rowName, keyType, valueType);
         }
@@ -292,15 +298,18 @@ public class FlinkToJsonSchemaConverter {
 
     private static Schema.Builder<?> connectCustomMap(
             String rowName, LogicalType keyType, LogicalType valueType) {
-        return ArraySchema.builder()
-                .allItemSchema(
-                        ObjectSchema.builder()
-                                .addPropertySchema(
-                                        "key", fromFlinkSchema(keyType, rowName + "_key"))
-                                .addPropertySchema(
-                                        "value", fromFlinkSchema(valueType, rowName + "_value"))
-                                .build())
-                .unprocessedProperties(Collections.singletonMap("connect.type", "map"));
+        final ArraySchema.Builder builder =
+                ArraySchema.builder()
+                        .allItemSchema(
+                                ObjectSchema.builder()
+                                        .addPropertySchema(
+                                                "key", fromFlinkSchema(keyType, rowName + "_key"))
+                                        .addPropertySchema(
+                                                "value",
+                                                fromFlinkSchema(valueType, rowName + "_value"))
+                                        .build());
+        builder.unprocessedProperties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
+        return builder;
     }
 
     private static Schema.Builder<?> convertTime(TimeType logicalType) {

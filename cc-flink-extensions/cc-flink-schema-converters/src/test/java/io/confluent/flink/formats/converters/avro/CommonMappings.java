@@ -15,6 +15,7 @@ import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
@@ -132,6 +133,24 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.builder().array().items(SchemaBuilder.builder().longType()),
                         new ArrayType(false, new BigIntType(false))),
+                new TypeMapping(
+                        SchemaBuilder.array()
+                                .prop(
+                                        CommonConstants.FLINK_TYPE,
+                                        CommonConstants.FLINK_MULTISET_TYPE)
+                                .items(
+                                        CommonMappings.connectCustomMapType(
+                                                SchemaBuilder.builder().longType(),
+                                                SchemaBuilder.builder().intType())),
+                        new MultisetType(false, new BigIntType(false))),
+                new TypeMapping(
+                        SchemaBuilder.map()
+                                .prop(
+                                        CommonConstants.FLINK_TYPE,
+                                        CommonConstants.FLINK_MULTISET_TYPE)
+                                .values()
+                                .intType(),
+                        new MultisetType(false, new VarCharType(false, VarCharType.MAX_LENGTH))),
                 new TypeMapping(
                         SchemaBuilder.array()
                                 .items(

@@ -5,13 +5,10 @@
 package io.confluent.flink.formats.registry.protobuf;
 
 import org.apache.flink.table.data.DecimalData;
-import org.apache.flink.table.data.GenericArrayData;
-import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.data.binary.BinaryStringData;
-import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DateType;
@@ -20,8 +17,6 @@ import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
-import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
@@ -47,20 +42,22 @@ import com.google.protobuf.StringValue;
 import com.google.protobuf.Timestamp;
 import com.google.type.Date;
 import com.google.type.TimeOfDay;
-import io.confluent.flink.formats.converters.protobuf.CommonMappings;
 import io.confluent.flink.formats.registry.protobuf.RowDataToProtoConverters.RowDataToProtoConverter;
-import io.confluent.flink.formats.registry.protobuf.TestData.DataMapping;
+import io.confluent.flink.formats.registry.protobuf.TestData.TypeMappingWithData;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import io.confluent.protobuf.type.utils.DecimalUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -321,76 +318,6 @@ class RowDataToProtoConvertersTest {
     }
 
     @Test
-    void testCollections() {
-        final String schemaStr =
-                "syntax = \"proto3\";\n"
-                        + "package io.confluent.protobuf.generated;\n"
-                        + "\n"
-                        + "message Row {\n"
-                        + "  repeated int64 array = 1;\n"
-                        + "  repeated MapEntry map = 2;\n"
-                        + "\n"
-                        + "message MapEntry {\n"
-                        + "    optional string key = 1;\n"
-                        + "    optional int64 value = 2;\n"
-                        + "  }\n"
-                        + "}";
-
-        final RowType rowType =
-                new RowType(
-                        false,
-                        Arrays.asList(
-                                new RowField("array", new ArrayType(false, new BigIntType(false))),
-                                new RowField(
-                                        "map",
-                                        new MapType(
-                                                false,
-                                                new VarCharType(true, VarCharType.MAX_LENGTH),
-                                                new BigIntType(true)))));
-
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-
-        final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
-
-        final GenericRowData row = new GenericRowData(2);
-        row.setField(0, new GenericArrayData(new Long[] {42L, 422L, 4422L}));
-        final Map<BinaryStringData, Long> expectedMap = new HashMap<>();
-        expectedMap.put(BinaryStringData.fromString("ABC"), 123L);
-        expectedMap.put(BinaryStringData.fromString("DEF"), 420L);
-        row.setField(1, new GenericMapData(expectedMap));
-
-        final DynamicMessage converted = (DynamicMessage) converter.convert(row);
-
-        final Descriptor mapSchema =
-                schema.getNestedTypes().stream()
-                        .filter(descriptor -> descriptor.getName().equals("MapEntry"))
-                        .findFirst()
-                        .get();
-        final DynamicMessage message =
-                DynamicMessage.newBuilder(schema)
-                        .addRepeatedField(schema.findFieldByName("array"), 42L)
-                        .addRepeatedField(schema.findFieldByName("array"), 422L)
-                        .addRepeatedField(schema.findFieldByName("array"), 4422L)
-                        .addRepeatedField(
-                                schema.findFieldByName("map"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "ABC")
-                                        .setField(mapSchema.findFieldByName("value"), 123L)
-                                        .build())
-                        .addRepeatedField(
-                                schema.findFieldByName("map"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "DEF")
-                                        .setField(mapSchema.findFieldByName("value"), 420L)
-                                        .build())
-                        .build();
-
-        assertThat(converted).isEqualTo(message);
-    }
-
-    @Test
     void testNestedRow() {
         final String schemaStr =
                 "syntax = \"proto3\";\n"
@@ -635,31 +562,24 @@ class RowDataToProtoConvertersTest {
         assertThat(converted).isEqualTo(message);
     }
 
-    @Test
-    void testNullableArrays() {
-        LogicalType rowType = CommonMappings.NULLABLE_ARRAYS_CASE.getFlinkType();
-        Descriptor schema = CommonMappings.NULLABLE_ARRAYS_CASE.getProtoSchema();
-
-        final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter((RowType) rowType, schema);
-
-        final DataMapping testData = TestData.createDataForNullableArraysCase();
-        final DynamicMessage converted = (DynamicMessage) converter.convert(testData.flink);
-
-        assertThat(converted).isEqualTo(testData.proto);
+    static Stream<Arguments> collectionsTests() {
+        return Stream.of(
+                        TestData.createDataForNullableArraysCase(),
+                        TestData.createDataForNullableCollectionsCase(),
+                        TestData.createDataForMultisetCase(),
+                        TestData.createDataForMapCase())
+                .map(Arguments::of);
     }
 
-    @Test
-    void testNullableCollections() {
-        LogicalType rowType = CommonMappings.NULLABLE_COLLECTIONS_CASE.getFlinkType();
-        Descriptor schema = CommonMappings.NULLABLE_COLLECTIONS_CASE.getProtoSchema();
-
+    @ParameterizedTest
+    @MethodSource("collectionsTests")
+    void testCollections(TypeMappingWithData mapping) throws IOException {
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter((RowType) rowType, schema);
+                RowDataToProtoConverters.createConverter(
+                        (RowType) mapping.getFlinkSchema(), mapping.getProtoSchema());
 
-        final DataMapping testData = TestData.createDataForNullableCollectionsCase();
-        final DynamicMessage converted = (DynamicMessage) converter.convert(testData.flink);
+        final Object converted = converter.convert(mapping.getFlinkData());
 
-        assertThat(converted).isEqualTo(testData.proto);
+        assertThat(converted).isEqualTo(mapping.getProtoData());
     }
 }

@@ -7,7 +7,7 @@ package io.confluent.flink.formats.converters.avro;
 /**
  * Common constants used for converting AVRO schema. Those are Confluent Schema Registry specific.
  */
-class CommonConstants {
+public class CommonConstants {
 
     static final String CONNECT_TYPE_PROP = "connect.type";
     static final String KEY_FIELD = "key";
@@ -32,6 +32,8 @@ class CommonConstants {
     static final String FLINK_PRECISION = "flink.precision";
     static final String FLINK_MIN_LENGTH = "flink.minLength";
     static final String FLINK_MAX_LENGTH = "flink.maxLength";
+    public static final String FLINK_TYPE = "flink.type";
+    public static final String FLINK_MULTISET_TYPE = "multiset";
 
     private CommonConstants() {}
 }

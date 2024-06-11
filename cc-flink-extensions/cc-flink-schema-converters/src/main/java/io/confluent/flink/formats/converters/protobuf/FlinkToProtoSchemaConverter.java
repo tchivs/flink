@@ -272,19 +272,12 @@ public class FlinkToProtoSchemaConverter {
                             ((ArrayType) logicalType).getElementType());
                 }
             case MULTISET:
-                final MultisetType multisetType = (MultisetType) logicalType;
-                if (multisetType.isNullable()) {
-                    return wrapRepeatedType(
-                            multisetType, fieldName, fieldIndex, nestedRows, dependencies);
-                } else {
-                    return createNotNullMapLikeField(
-                            fieldName,
-                            fieldIndex,
-                            nestedRows,
-                            dependencies,
-                            multisetType.getElementType(),
-                            new IntType(false));
-                }
+                return createMultisetType(
+                        (MultisetType) logicalType,
+                        fieldName,
+                        fieldIndex,
+                        nestedRows,
+                        dependencies);
             case TIMESTAMP_WITH_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
             case INTERVAL_DAY_TIME:
@@ -297,6 +290,31 @@ public class FlinkToProtoSchemaConverter {
                 throw new ValidationException(
                         "Unsupported to derive Protobuf Schema for type " + logicalType);
         }
+    }
+
+    private static FieldDescriptorProto.Builder createMultisetType(
+            MultisetType logicalType,
+            String fieldName,
+            int fieldIndex,
+            List<DescriptorProto> nestedRows,
+            Set<String> dependencies) {
+        final MultisetType multisetType = logicalType;
+        final FieldDescriptorProto.Builder builder;
+        if (multisetType.isNullable()) {
+            builder =
+                    wrapRepeatedType(multisetType, fieldName, fieldIndex, nestedRows, dependencies);
+        } else {
+            builder =
+                    createNotNullMapLikeField(
+                            fieldName,
+                            fieldIndex,
+                            nestedRows,
+                            dependencies,
+                            multisetType.getElementType(),
+                            new IntType(false));
+        }
+        addMetaParam(builder, CommonConstants.FLINK_TYPE_PROP, CommonConstants.FLINK_TYPE_MULTISET);
+        return builder;
     }
 
     private static FieldDescriptorProto.Builder createDecimalField(

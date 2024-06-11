@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ShortNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import io.confluent.flink.formats.converters.json.JsonToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.json.JsonToRowDataConverters.JsonToRowDataConverter;
+import io.confluent.flink.formats.registry.json.TestData.TypeMappingWithData;
 import io.confluent.kafka.schemaregistry.json.JsonSchema;
 import io.confluent.kafka.schemaregistry.json.jackson.Jackson;
 import org.everit.json.schema.ArraySchema;
@@ -32,12 +33,16 @@ import org.everit.json.schema.NullSchema;
 import org.everit.json.schema.NumberSchema;
 import org.everit.json.schema.ObjectSchema;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT64;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
@@ -453,6 +458,23 @@ class JsonToRowDataConvertersTest {
         final TimestampData timestampData = TimestampData.fromEpochMillis(milliseconds);
         final Object result = converter.convert(LongNode.valueOf(milliseconds));
         assertThat(result).isEqualTo(timestampData);
+    }
+
+    static Stream<Arguments> multisetTests() {
+        return Stream.of(TestData.getMultisetOfBigints(), TestData.getMultisetOfStrings())
+                .map(Arguments::of);
+    }
+
+    @ParameterizedTest
+    @MethodSource("multisetTests")
+    void testMultiset(TypeMappingWithData mapping) throws Exception {
+        final JsonToRowDataConverter converter =
+                JsonToRowDataConverters.createConverter(
+                        mapping.getJsonSchema(), mapping.getFlinkSchema());
+
+        final Object result = converter.convert(mapping.getJsonData());
+
+        assertThat(result).isEqualTo(mapping.getFlinkData());
     }
 
     public static <K, V> Map<K, V> mapOf(K key1, V value1, K key2, V value2) {

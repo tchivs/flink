@@ -18,7 +18,9 @@ import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
@@ -39,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -344,7 +347,7 @@ public class ProtoToFlinkSchemaConverter {
     private static LogicalType convertRepeated(
             FieldDescriptor schema, CycleContext context, boolean isNullableType) {
         if (isMapDescriptor(schema)) {
-            return toMapSchema(schema.getMessageType(), isNullableType, context);
+            return toMapSchema(schema, isNullableType, context);
         } else {
             final boolean isArrayElementWrapped =
                     getMeta(schema)
@@ -412,12 +415,29 @@ public class ProtoToFlinkSchemaConverter {
     }
 
     private static LogicalType toMapSchema(
-            Descriptor descriptor, boolean isNullableType, CycleContext context) {
-        List<FieldDescriptor> fieldDescriptors = descriptor.getFields();
-        return new MapType(
-                isNullableType,
-                toFlinkSchema(fieldDescriptors.get(0), context),
-                toFlinkSchema(fieldDescriptors.get(1), context));
+            FieldDescriptor descriptor, boolean isNullableType, CycleContext context) {
+        List<FieldDescriptor> fieldDescriptors = descriptor.getMessageType().getFields();
+        final LogicalType keyType = toFlinkSchema(fieldDescriptors.get(0), context);
+        final LogicalType valueType = toFlinkSchema(fieldDescriptors.get(1), context);
+        final boolean isMultiset =
+                getMeta(descriptor)
+                        .map(
+                                m ->
+                                        Objects.equals(
+                                                CommonConstants.FLINK_TYPE_MULTISET,
+                                                m.getParamsOrDefault(
+                                                        CommonConstants.FLINK_TYPE_PROP, null)))
+                        .orElse(false);
+
+        if (isMultiset) {
+            if (!valueType.is(LogicalTypeRoot.INTEGER)) {
+                throw new ValidationException(
+                        "Unexpected value type for a MULTISET type: " + valueType);
+            }
+            return new MultisetType(isNullableType, keyType);
+        } else {
+            return new MapType(isNullableType, keyType, valueType);
+        }
     }
 
     private static boolean isMapDescriptor(FieldDescriptor fieldDescriptor) {

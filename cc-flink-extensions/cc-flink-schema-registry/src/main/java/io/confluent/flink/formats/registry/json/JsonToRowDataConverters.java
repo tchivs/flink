@@ -12,11 +12,13 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.TimestampType;
@@ -195,7 +197,15 @@ public class JsonToRowDataConverters {
             case ARRAY:
                 return createArrayConverter(readSchema, (ArrayType) targetType);
             case MAP:
-                return createMapConverter(readSchema, (MapType) targetType);
+                return createMapLikeConverter(
+                        readSchema,
+                        ((MapType) targetType).getKeyType(),
+                        ((MapType) targetType).getValueType());
+            case MULTISET:
+                return createMapLikeConverter(
+                        readSchema,
+                        ((MultisetType) targetType).getElementType(),
+                        new IntType(false));
             case ROW:
                 return createRowConverter(readSchema, (RowType) targetType);
             case NULL:
@@ -207,7 +217,6 @@ public class JsonToRowDataConverters {
                 };
             case RAW:
             case SYMBOL:
-            case MULTISET:
             case DISTINCT_TYPE:
             case STRUCTURED_TYPE:
             case INTERVAL_DAY_TIME:
@@ -323,9 +332,9 @@ public class JsonToRowDataConverters {
             case ARRAY:
                 return jsonNode.isArray();
             case MAP:
+            case MULTISET:
                 return jsonNode.isObject() || jsonNode.isArray();
             case ROW:
-            case MULTISET:
             case TIMESTAMP_WITH_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
             case INTERVAL_YEAR_MONTH:
@@ -371,10 +380,8 @@ public class JsonToRowDataConverters {
         };
     }
 
-    private static JsonToRowDataConverter createMapConverter(Schema readSchema, MapType mapType) {
-        final LogicalType keyType = mapType.getKeyType();
-        final LogicalType valueType = mapType.getValueType();
-
+    private static JsonToRowDataConverter createMapLikeConverter(
+            Schema readSchema, LogicalType keyType, LogicalType valueType) {
         if (keyType.is(LogicalTypeFamily.CHARACTER_STRING) && !keyType.isNullable()) {
             final ObjectSchema objectSchema = (ObjectSchema) readSchema;
             final JsonToRowDataConverter valueConverter =

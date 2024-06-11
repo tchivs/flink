@@ -16,6 +16,7 @@ import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 
+import io.confluent.flink.formats.converters.avro.CommonConstants;
 import io.confluent.flink.formats.converters.avro.CommonMappings;
 import io.confluent.flink.formats.converters.avro.CommonMappings.TypeMapping;
 import io.confluent.flink.formats.converters.avro.CommonMappings.TypeMappingWithData;
@@ -25,6 +26,7 @@ import org.apache.avro.Schema.Type;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaBuilder.FieldAssembler;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.avro.util.Utf8;
@@ -35,10 +37,11 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -255,6 +258,10 @@ public class UnionUtil {
                         generateFlinkFieldData(logicalType.getChildren().get(0), false),
                         generateFlinkFieldData(logicalType.getChildren().get(1), false));
                 return new GenericMapData(map);
+            case MULTISET:
+                final Map<Object, Object> multiset = new HashMap<>();
+                multiset.put(generateFlinkFieldData(logicalType.getChildren().get(0), false), 123);
+                return new GenericMapData(multiset);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return TimestampData.fromEpochMillis(10);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
@@ -325,13 +332,32 @@ public class UnionUtil {
             case STRING:
                 return new Utf8("");
             case ARRAY:
-                final List<Object> array =
-                        Arrays.asList(generateAvroFieldData(schema.getElementType()));
-                return new GenericData.Array(schema, array);
+                final Schema elementType = schema.getElementType();
+                if (Objects.equals(
+                        CommonConstants.FLINK_MULTISET_TYPE,
+                        schema.getProp(CommonConstants.FLINK_TYPE))) {
+                    final GenericRecordBuilder builder = new GenericRecordBuilder(elementType);
+                    builder.set("key", generateAvroFieldData(elementType.getField("key").schema()));
+                    builder.set("value", 123);
+                    final List<Record> records = Collections.singletonList(builder.build());
+                    return new GenericData.Array<>(schema, records);
+                } else {
+                    final List<Object> array =
+                            Collections.singletonList(generateAvroFieldData(elementType));
+                    return new GenericData.Array<>(schema, array);
+                }
             case MAP:
-                final Map<Object, Object> map = new HashMap<>();
-                map.put("", generateAvroFieldData(schema.getValueType()));
-                return map;
+                if (Objects.equals(
+                        CommonConstants.FLINK_MULTISET_TYPE,
+                        schema.getProp(CommonConstants.FLINK_TYPE))) {
+                    final Map<Object, Object> map = new HashMap<>();
+                    map.put("", 123);
+                    return map;
+                } else {
+                    final Map<Object, Object> map = new HashMap<>();
+                    map.put("", generateAvroFieldData(schema.getValueType()));
+                    return map;
+                }
             case ENUM:
                 return new GenericData.EnumSymbol(schema, "red");
             default:

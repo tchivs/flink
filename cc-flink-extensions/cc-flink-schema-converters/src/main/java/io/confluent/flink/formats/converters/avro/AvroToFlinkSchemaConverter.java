@@ -17,7 +17,9 @@ import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.NullType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
@@ -179,16 +181,21 @@ public class AvroToFlinkSchemaConverter {
                                 "Found map encoded as array of key-value pairs, but array "
                                         + "elements do not match the expected format.");
                     }
-                    return new MapType(
-                            isOptional,
+                    final boolean isMultisetType =
+                            Objects.equals(
+                                    CommonConstants.FLINK_MULTISET_TYPE,
+                                    schema.getProp(CommonConstants.FLINK_TYPE));
+                    final LogicalType keyType =
                             toFlinkSchemaWithCycleDetection(
                                     elemSchema.getField(CommonConstants.KEY_FIELD).schema(),
                                     false,
-                                    cycleContext),
+                                    cycleContext);
+                    final LogicalType valueType =
                             toFlinkSchemaWithCycleDetection(
                                     elemSchema.getField(CommonConstants.VALUE_FIELD).schema(),
                                     false,
-                                    cycleContext));
+                                    cycleContext);
+                    return createMapLikeType(isOptional, keyType, valueType, isMultisetType);
                 } else {
                     return new ArrayType(
                             isOptional,
@@ -197,12 +204,15 @@ public class AvroToFlinkSchemaConverter {
                 }
 
             case MAP:
-                return new MapType(
+                final boolean isMultisetType =
+                        Objects.equals(
+                                CommonConstants.FLINK_MULTISET_TYPE,
+                                schema.getProp(CommonConstants.FLINK_TYPE));
+                return createMapLikeType(
                         isOptional,
                         new VarCharType(false, VarCharType.MAX_LENGTH),
-                        toFlinkSchemaWithCycleDetection(
-                                schema.getValueType(), false, cycleContext));
-
+                        toFlinkSchemaWithCycleDetection(schema.getValueType(), false, cycleContext),
+                        isMultisetType);
             case RECORD:
                 {
                     final List<RowField> rowFields =
@@ -279,6 +289,22 @@ public class AvroToFlinkSchemaConverter {
                         "Couldn't translate unsupported Avro schema type "
                                 + schema.getType().getName()
                                 + ".");
+        }
+    }
+
+    private static LogicalType createMapLikeType(
+            boolean isOptional,
+            LogicalType keyType,
+            LogicalType valueType,
+            boolean isMultisetType) {
+        if (isMultisetType) {
+            if (!valueType.is(LogicalTypeRoot.INTEGER)) {
+                throw new ValidationException(
+                        "Unexpected value type for a MULTISET type: " + valueType);
+            }
+            return new MultisetType(isOptional, keyType);
+        } else {
+            return new MapType(isOptional, keyType, valueType);
         }
     }
 

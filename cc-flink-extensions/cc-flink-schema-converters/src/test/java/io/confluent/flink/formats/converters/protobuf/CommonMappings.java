@@ -17,6 +17,7 @@ import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
@@ -80,7 +81,8 @@ public final class CommonMappings {
                 NOT_NULL_MESSAGE_TYPES_CASE,
                 NESTED_ROW_NOT_NULL_CASE,
                 NULLABLE_ARRAYS_CASE,
-                NULLABLE_COLLECTIONS_CASE);
+                NULLABLE_COLLECTIONS_CASE,
+                MULTISET_CASE);
     }
 
     private static final TypeMapping NESTED_ROWS_CASE =
@@ -152,7 +154,8 @@ public final class CommonMappings {
                                                                                                     "a",
                                                                                                     new FloatType()))))))))));
 
-    private static final TypeMapping COLLECTIONS_CASE =
+    /** Verifies a map and an array. */
+    public static final TypeMapping COLLECTIONS_CASE =
             new TypeMapping(
                     "syntax = \"proto3\";\n"
                             + "package io.confluent.protobuf.generated;\n"
@@ -509,6 +512,37 @@ public final class CommonMappings {
                                                     false,
                                                     new BigIntType(false),
                                                     new ArrayType(true, new BigIntType(false)))))));
+
+    /** Tests multisets. */
+    public static final TypeMapping MULTISET_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package io.confluent.protobuf.generated;\n"
+                            + "\n"
+                            + "message Row {\n"
+                            + "  repeated MultisetEntry multiset = 1 [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.type\",\n"
+                            + "        value: \"multiset\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "\n"
+                            + "  message MultisetEntry {\n"
+                            + "    optional string key = 1;\n"
+                            + "    int32 value = 2;\n"
+                            + "  }\n"
+                            + "}",
+                    new RowType(
+                            false,
+                            Collections.singletonList(
+                                    new RowField(
+                                            "multiset",
+                                            new MultisetType(
+                                                    false,
+                                                    new VarCharType(
+                                                            true, VarCharType.MAX_LENGTH))))));
 
     private CommonMappings() {}
 }

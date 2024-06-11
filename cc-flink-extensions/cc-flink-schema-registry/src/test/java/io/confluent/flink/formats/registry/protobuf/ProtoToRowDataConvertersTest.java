@@ -5,18 +5,12 @@
 package io.confluent.flink.formats.registry.protobuf;
 
 import org.apache.flink.table.data.DecimalData;
-import org.apache.flink.table.data.GenericArrayData;
-import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.data.binary.BinaryStringData;
-import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.RowType.RowField;
-import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.table.utils.DateTimeUtils;
 import org.apache.flink.util.TestLoggerExtension;
 
@@ -28,22 +22,22 @@ import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Timestamp;
 import com.google.type.Date;
 import com.google.type.TimeOfDay;
-import io.confluent.flink.formats.converters.protobuf.CommonMappings;
 import io.confluent.flink.formats.converters.protobuf.ProtoToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.protobuf.ProtoToRowDataConverters.ProtoToRowDataConverter;
-import io.confluent.flink.formats.registry.protobuf.TestData.DataMapping;
+import io.confluent.flink.formats.registry.protobuf.TestData.TypeMappingWithData;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import io.confluent.protobuf.type.utils.DecimalUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -196,123 +190,6 @@ class ProtoToRowDataConvertersTest {
         final GenericRowData expected = new GenericRowData(2);
         expected.setField(0, 0);
         expected.setField(1, null);
-        assertThat(row).isEqualTo(expected);
-    }
-
-    @Test
-    void testCollections() throws Exception {
-        final String schemaStr =
-                "syntax = \"proto3\";\n"
-                        + "package io.confluent.protobuf.generated;\n"
-                        + "\n"
-                        + "message Row {\n"
-                        + "  repeated int64 array = 1;\n"
-                        + "  repeated MapEntry map = 2;\n"
-                        + "\n"
-                        + "message MapEntry {\n"
-                        + "    optional string key = 1;\n"
-                        + "    optional int64 value = 2;\n"
-                        + "  }\n"
-                        + "}";
-
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-        final Descriptor mapSchema =
-                schema.getNestedTypes().stream()
-                        .filter(descriptor -> descriptor.getName().equals("MapEntry"))
-                        .findFirst()
-                        .get();
-
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
-        final DynamicMessage message =
-                DynamicMessage.newBuilder(schema)
-                        .addRepeatedField(schema.findFieldByName("array"), 42L)
-                        .addRepeatedField(schema.findFieldByName("array"), 422L)
-                        .addRepeatedField(schema.findFieldByName("array"), 4422L)
-                        .addRepeatedField(
-                                schema.findFieldByName("map"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "ABC")
-                                        .setField(mapSchema.findFieldByName("value"), 123L)
-                                        .build())
-                        .addRepeatedField(
-                                schema.findFieldByName("map"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "DEF")
-                                        .setField(mapSchema.findFieldByName("value"), 420L)
-                                        .build())
-                        .build();
-        RowData row = (RowData) converter.convert(message);
-
-        final GenericRowData expected = new GenericRowData(2);
-        expected.setField(0, new GenericArrayData(new Long[] {42L, 422L, 4422L}));
-        final Map<BinaryStringData, Long> expectedMap = new HashMap<>();
-        expectedMap.put(BinaryStringData.fromString("ABC"), 123L);
-        expectedMap.put(BinaryStringData.fromString("DEF"), 420L);
-        expected.setField(1, new GenericMapData(expectedMap));
-        assertThat(row).isEqualTo(expected);
-    }
-
-    @Test
-    void testMultiset() throws Exception {
-        final String schemaStr =
-                "syntax = \"proto3\";\n"
-                        + "package io.confluent.protobuf.generated;\n"
-                        + "\n"
-                        + "message Row {\n"
-                        + "  repeated MapEntry multiset = 1;\n"
-                        + "\n"
-                        + "message MapEntry {\n"
-                        + "    optional string key = 1;\n"
-                        + "    int32 value = 2;\n"
-                        + "  }\n"
-                        + "}";
-
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-        final Descriptor mapSchema =
-                schema.getNestedTypes().stream()
-                        .filter(descriptor -> descriptor.getName().equals("MapEntry"))
-                        .findFirst()
-                        .get();
-
-        final RowType flinkSchema =
-                new RowType(
-                        false,
-                        Collections.singletonList(
-                                new RowField(
-                                        "multiset",
-                                        new MultisetType(
-                                                false,
-                                                new VarCharType(true, VarCharType.MAX_LENGTH)))));
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
-        final DynamicMessage message =
-                DynamicMessage.newBuilder(schema)
-                        .addRepeatedField(
-                                schema.findFieldByName("multiset"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "ABC")
-                                        .setField(mapSchema.findFieldByName("value"), 123)
-                                        .build())
-                        .addRepeatedField(
-                                schema.findFieldByName("multiset"),
-                                DynamicMessage.newBuilder(mapSchema)
-                                        .setField(mapSchema.findFieldByName("key"), "DEF")
-                                        .setField(mapSchema.findFieldByName("value"), 420)
-                                        .build())
-                        .build();
-        RowData row = (RowData) converter.convert(message);
-
-        final GenericRowData expected = new GenericRowData(1);
-        final Map<BinaryStringData, Integer> expectedMap = new HashMap<>();
-        expectedMap.put(BinaryStringData.fromString("ABC"), 123);
-        expectedMap.put(BinaryStringData.fromString("DEF"), 420);
-        expected.setField(0, new GenericMapData(expectedMap));
         assertThat(row).isEqualTo(expected);
     }
 
@@ -542,31 +419,24 @@ class ProtoToRowDataConvertersTest {
         assertThat(row).isEqualTo(expected);
     }
 
-    @Test
-    void testNullableArrays() throws IOException {
-        LogicalType rowType = CommonMappings.NULLABLE_ARRAYS_CASE.getFlinkType();
-        Descriptor schema = CommonMappings.NULLABLE_ARRAYS_CASE.getProtoSchema();
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, (RowType) rowType);
-
-        final DataMapping testData = TestData.createDataForNullableArraysCase();
-        final Object converted = converter.convert(testData.proto);
-
-        assertThat(converted).isEqualTo(testData.flink);
+    static Stream<Arguments> collectionsTests() {
+        return Stream.of(
+                        TestData.createDataForNullableArraysCase(),
+                        TestData.createDataForNullableCollectionsCase(),
+                        TestData.createDataForMultisetCase(),
+                        TestData.createDataForMapCase())
+                .map(Arguments::of);
     }
 
-    @Test
-    void testNullableCollections() throws IOException {
-        LogicalType rowType = CommonMappings.NULLABLE_COLLECTIONS_CASE.getFlinkType();
-        Descriptor schema = CommonMappings.NULLABLE_COLLECTIONS_CASE.getProtoSchema();
-
+    @ParameterizedTest
+    @MethodSource("collectionsTests")
+    void testCollections(TypeMappingWithData mapping) throws IOException {
         final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, (RowType) rowType);
+                ProtoToRowDataConverters.createConverter(
+                        mapping.getProtoSchema(), (RowType) mapping.getFlinkSchema());
 
-        final DataMapping testData = TestData.createDataForNullableCollectionsCase();
-        final Object converted = converter.convert(testData.proto);
+        final Object converted = converter.convert(mapping.getProtoData());
 
-        assertThat(converted).isEqualTo(testData.flink);
+        assertThat(converted).isEqualTo(mapping.getFlinkData());
     }
 }

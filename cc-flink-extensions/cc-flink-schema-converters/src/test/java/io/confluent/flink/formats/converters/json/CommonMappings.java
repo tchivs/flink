@@ -16,9 +16,9 @@ import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
-import org.apache.flink.table.types.logical.SmallIntType;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
@@ -48,10 +48,12 @@ import java.util.stream.Stream;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_BYTES;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_INT8;
+import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_MAP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 
 /** Common data to use in schema mapping tests. */
@@ -87,37 +89,6 @@ public final class CommonMappings {
                             Collections.singletonMap(
                                     CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_BYTES))
                     .build();
-    public static final ObjectSchema MAP_STRING_TINYINT_SCHEMA =
-            ObjectSchema.builder()
-                    .schemaOfAdditionalProperties(
-                            NumberSchema.builder()
-                                    .unprocessedProperties(
-                                            Collections.singletonMap("connect.type", "int8"))
-                                    .build())
-                    .unprocessedProperties(Collections.singletonMap("connect.type", "map"))
-                    .build();
-
-    public static final ArraySchema MAP_TINYINT_SMALLINT =
-            ArraySchema.builder()
-                    .allItemSchema(
-                            ObjectSchema.builder()
-                                    .addPropertySchema(
-                                            "key",
-                                            NumberSchema.builder()
-                                                    .unprocessedProperties(
-                                                            Collections.singletonMap(
-                                                                    "connect.type", "int8"))
-                                                    .build())
-                                    .addPropertySchema(
-                                            "value",
-                                            NumberSchema.builder()
-                                                    .unprocessedProperties(
-                                                            Collections.singletonMap(
-                                                                    "connect.type", "int16"))
-                                                    .build())
-                                    .build())
-                    .unprocessedProperties(Collections.singletonMap("connect.type", "map"))
-                    .build();
 
     /** A mapping between corresponding Avro and Flink types. */
     public static class TypeMapping {
@@ -145,9 +116,11 @@ public final class CommonMappings {
     }
 
     public static Stream<TypeMapping> get() {
-        return getPrimitiveTypes()
-                .flatMap(t -> Stream.of(t, toNullable(t)))
-                .flatMap(t -> Stream.of(t, toArrayType(t)));
+        return Stream.concat(
+                getPrimitiveTypes()
+                        .flatMap(t -> Stream.of(t, toNullable(t)))
+                        .flatMap(t -> Stream.of(t, toArrayType(t))),
+                getCollectionTypes());
     }
 
     private static Stream<TypeMapping> getPrimitiveTypes() {
@@ -165,21 +138,12 @@ public final class CommonMappings {
                 new TypeMapping(
                         createBinarySchema(BinaryType.MAX_LENGTH, BinaryType.MAX_LENGTH),
                         new BinaryType(false, BinaryType.MAX_LENGTH)),
-                new TypeMapping(
-                        MAP_STRING_TINYINT_SCHEMA,
-                        new MapType(
-                                false,
-                                new VarCharType(false, VarCharType.MAX_LENGTH),
-                                new TinyIntType(false))),
                 new TypeMapping(createTimeSchema(3), new TimeType(false, 3)),
                 new TypeMapping(createTimeSchema(2), new TimeType(false, 2)),
                 new TypeMapping(createTimestampLtzSchema(3), new LocalZonedTimestampType(false, 3)),
                 new TypeMapping(createTimestampLtzSchema(2), new LocalZonedTimestampType(false, 2)),
                 new TypeMapping(createTimestampSchema(3), new TimestampType(false, 3)),
                 new TypeMapping(createTimestampSchema(2), new TimestampType(false, 2)),
-                new TypeMapping(
-                        MAP_TINYINT_SMALLINT,
-                        new MapType(false, new TinyIntType(false), new SmallIntType(false))),
                 new TypeMapping(
                         recordSchema(),
                         new RowType(
@@ -195,6 +159,61 @@ public final class CommonMappings {
                                 false,
                                 Collections.singletonList(
                                         new RowField("decimal", new DecimalType(10, 2))))));
+    }
+
+    private static Stream<TypeMapping> getCollectionTypes() {
+        return Stream.of(
+                new TypeMapping(
+                        createArrayMapLikeSchema(INT64_SCHEMA, INT32_SCHEMA, true),
+                        new MultisetType(false, new BigIntType(false))),
+                new TypeMapping(
+                        createObjectMapLikeSchema(INT32_SCHEMA, true),
+                        new MultisetType(false, new VarCharType(false, VarCharType.MAX_LENGTH))),
+                new TypeMapping(
+                        createArrayMapLikeSchema(INT32_SCHEMA, INT64_SCHEMA, false),
+                        new MapType(false, new IntType(false), new BigIntType(false))),
+                new TypeMapping(
+                        createObjectMapLikeSchema(INT64_SCHEMA, false),
+                        new MapType(
+                                false,
+                                new VarCharType(false, VarCharType.MAX_LENGTH),
+                                new BigIntType(false))));
+    }
+
+    private static Schema createObjectMapLikeSchema(Schema valueSchema, boolean isMultiset) {
+        final ObjectSchema.Builder objectSchema = ObjectSchema.builder();
+
+        final Map<String, Object> properties = new HashMap<>();
+
+        properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
+        if (isMultiset) {
+            properties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
+        }
+
+        objectSchema.schemaOfAdditionalProperties(valueSchema);
+        objectSchema.unprocessedProperties(properties);
+        return objectSchema.build();
+    }
+
+    private static Schema createArrayMapLikeSchema(
+            Schema keySchema, Schema valueSchema, boolean isMultiset) {
+        final Map<String, Object> properties = new HashMap<>();
+
+        properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
+        if (isMultiset) {
+            properties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
+        }
+
+        final ArraySchema.Builder builder =
+                ArraySchema.builder()
+                        .allItemSchema(
+                                ObjectSchema.builder()
+                                        .addPropertySchema("key", keySchema)
+                                        .addPropertySchema("value", valueSchema)
+                                        .build());
+
+        builder.unprocessedProperties(properties);
+        return builder.build();
     }
 
     private static Schema createStringSchema(int minLength, int maxLength) {

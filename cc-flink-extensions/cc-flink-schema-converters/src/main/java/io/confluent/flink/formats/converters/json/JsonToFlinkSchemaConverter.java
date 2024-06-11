@@ -18,7 +18,9 @@ import org.apache.flink.table.types.logical.FloatType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.SmallIntType;
@@ -71,6 +73,8 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.KEY_FIELD;
 import static io.confluent.flink.formats.converters.json.CommonConstants.VALUE_FIELD;
 
@@ -258,16 +262,21 @@ public class JsonToFlinkSchemaConverter {
             String type = (String) arraySchema.getUnprocessedProperties().get(CONNECT_TYPE_PROP);
             if (CONNECT_TYPE_MAP.equals(type) && allItemSchema instanceof ObjectSchema) {
                 ObjectSchema objectSchema = (ObjectSchema) allItemSchema;
-                return new MapType(
-                        isOptional,
+                final boolean isMultiset =
+                        Objects.equals(
+                                FLINK_TYPE_MULTISET,
+                                arraySchema.getUnprocessedProperties().get(FLINK_TYPE_PROP));
+                final LogicalType keyType =
                         toFlinkSchemaWithCycleDetection(
                                 objectSchema.getPropertySchemas().get(KEY_FIELD),
                                 false,
-                                cycleContext),
+                                cycleContext);
+                final LogicalType valueType =
                         toFlinkSchemaWithCycleDetection(
                                 objectSchema.getPropertySchemas().get(VALUE_FIELD),
                                 false,
-                                cycleContext));
+                                cycleContext);
+                return createMapLikeType(isOptional, keyType, valueType, isMultiset);
             } else {
                 return new ArrayType(
                         isOptional,
@@ -277,46 +286,19 @@ public class JsonToFlinkSchemaConverter {
             ObjectSchema objectSchema = (ObjectSchema) schema;
             String type = (String) objectSchema.getUnprocessedProperties().get(CONNECT_TYPE_PROP);
             if (CONNECT_TYPE_MAP.equals(type)) {
-                return new MapType(
-                        isOptional,
-                        new VarCharType(false, VarCharType.MAX_LENGTH),
+                final boolean isMultiset =
+                        Objects.equals(
+                                FLINK_TYPE_MULTISET,
+                                objectSchema.getUnprocessedProperties().get(FLINK_TYPE_PROP));
+                final LogicalType valueType =
                         toFlinkSchemaWithCycleDetection(
                                 objectSchema.getSchemaOfAdditionalProperties(),
                                 false,
-                                cycleContext));
+                                cycleContext);
+                final VarCharType keyType = new VarCharType(false, VarCharType.MAX_LENGTH);
+                return createMapLikeType(isOptional, keyType, valueType, isMultiset);
             } else {
-                Map<String, Schema> properties = objectSchema.getPropertySchemas();
-                SortedMap<Integer, Entry<String, Schema>> sortedMap = new TreeMap<>();
-                for (Map.Entry<String, org.everit.json.schema.Schema> property :
-                        properties.entrySet()) {
-                    org.everit.json.schema.Schema subSchema = property.getValue();
-                    Integer index =
-                            (Integer) subSchema.getUnprocessedProperties().get(CONNECT_INDEX_PROP);
-                    if (index == null) {
-                        index = sortedMap.size();
-                    }
-                    sortedMap.put(index, property);
-                }
-                final List<RowField> rowFields =
-                        sortedMap.values().stream()
-                                .map(
-                                        property -> {
-                                            String subFieldName = property.getKey();
-                                            Schema subSchema = property.getValue();
-                                            boolean isFieldOptional =
-                                                    !objectSchema
-                                                            .getRequiredProperties()
-                                                            .contains(subFieldName);
-                                            return new RowField(
-                                                    subFieldName,
-                                                    toFlinkSchemaWithCycleDetection(
-                                                            subSchema,
-                                                            isFieldOptional,
-                                                            cycleContext),
-                                                    subSchema.getDescription());
-                                        })
-                                .collect(Collectors.toList());
-                return new RowType(isOptional, rowFields);
+                return convertRowType(isOptional, cycleContext, objectSchema);
             }
         } else if (schema instanceof ReferenceSchema) {
             return toFlinkSchemaWithCycleDetection(
@@ -325,6 +307,54 @@ public class JsonToFlinkSchemaConverter {
             throw new ValidationException(
                     "Unsupported JSON schema type " + schema.getClass().getName());
         }
+    }
+
+    private static LogicalType createMapLikeType(
+            boolean isOptional,
+            LogicalType keyType,
+            LogicalType valueType,
+            boolean isMultisetType) {
+        if (isMultisetType) {
+            if (!valueType.is(LogicalTypeRoot.INTEGER)) {
+                throw new ValidationException(
+                        "Unexpected value type for a MULTISET type: " + valueType);
+            }
+            return new MultisetType(isOptional, keyType);
+        } else {
+            return new MapType(isOptional, keyType, valueType);
+        }
+    }
+
+    private static RowType convertRowType(
+            boolean isOptional, CycleContext cycleContext, ObjectSchema objectSchema) {
+        Map<String, Schema> properties = objectSchema.getPropertySchemas();
+        SortedMap<Integer, Entry<String, Schema>> sortedMap = new TreeMap<>();
+        for (Entry<String, Schema> property : properties.entrySet()) {
+            Schema subSchema = property.getValue();
+            Integer index = (Integer) subSchema.getUnprocessedProperties().get(CONNECT_INDEX_PROP);
+            if (index == null) {
+                index = sortedMap.size();
+            }
+            sortedMap.put(index, property);
+        }
+        final List<RowField> rowFields =
+                sortedMap.values().stream()
+                        .map(
+                                property -> {
+                                    String subFieldName = property.getKey();
+                                    Schema subSchema = property.getValue();
+                                    boolean isFieldOptional =
+                                            !objectSchema
+                                                    .getRequiredProperties()
+                                                    .contains(subFieldName);
+                                    return new RowField(
+                                            subFieldName,
+                                            toFlinkSchemaWithCycleDetection(
+                                                    subSchema, isFieldOptional, cycleContext),
+                                            subSchema.getDescription());
+                                })
+                        .collect(Collectors.toList());
+        return new RowType(isOptional, rowFields);
     }
 
     private static LogicalType convertStringSchema(StringSchema schema, boolean isOptional) {

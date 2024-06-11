@@ -12,9 +12,11 @@ import org.apache.flink.table.data.MapData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 
@@ -209,6 +211,7 @@ public class RowDataToJsonConverters {
             case MAP:
                 return createMapConverter((MapType) type, targetSchema);
             case MULTISET:
+                return createMultisetConverter((MultisetType) type, targetSchema);
             case RAW:
             case INTERVAL_YEAR_MONTH: // long
             case INTERVAL_DAY_TIME: // long
@@ -386,15 +389,15 @@ public class RowDataToJsonConverters {
         };
     }
 
-    //  private static RowDataToAvroConverter createMultisetConverter(
-    //      MultisetType type, Schema targetSchema) {
-    //    final LogicalType keyType = type.getElementType();
-    //    final LogicalType valueType = new IntType(false);
-    //    final ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
-    //    final ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
-    //
-    //    return createMapConverter(targetSchema, keyType, valueType, valueGetter, keyGetter);
-    //  }
+    private static RowDataToJsonConverter createMultisetConverter(
+            MultisetType type, Schema targetSchema) {
+        final LogicalType keyType = type.getElementType();
+        final LogicalType valueType = new IntType(false);
+        final ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
+        final ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
+
+        return createMapConverter(targetSchema, keyType, valueType, valueGetter, keyGetter);
+    }
 
     private static RowDataToJsonConverter createMapConverter(MapType type, Schema targetSchema) {
         final LogicalType keyType = type.getKeyType();

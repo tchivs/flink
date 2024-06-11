@@ -178,7 +178,9 @@ public class FlinkToAvroSchemaConverter {
         final LogicalType keyType = logicalType.getElementType();
         final LogicalType valueType = new IntType(false);
 
-        return convertMapLikeType(rowName, keyType, valueType);
+        final Schema schema = convertMapLikeType(rowName, keyType, valueType);
+        schema.addProp(CommonConstants.FLINK_TYPE, CommonConstants.FLINK_MULTISET_TYPE);
+        return schema;
     }
 
     private static Schema convertMapLikeType(
