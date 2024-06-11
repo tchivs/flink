@@ -35,6 +35,9 @@ public class MLFunctionsModule implements Module {
                                 new MLEvaluateAllFunction(
                                         MLEvaluateAllFunction.NAME,
                                         new ModelVersions("", Collections.emptyMap())));
+                        put(
+                                MLMinMaxScalarFunction.NAME,
+                                new MLMinMaxScalarFunction(MLMinMaxScalarFunction.NAME));
                     }
                 };
     }
