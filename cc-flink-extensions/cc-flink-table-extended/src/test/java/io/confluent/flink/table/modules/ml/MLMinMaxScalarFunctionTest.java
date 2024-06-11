@@ -86,8 +86,8 @@ public class MLMinMaxScalarFunctionTest {
     }
 
     @Test
-    void testMLEvaluateClassificationModel() throws Exception {
-        // We need to register the temp function first
+    void testMLMinMaxScalarForIntValues() throws Exception {
+        // Registering temp function
         final String functionName = "ml_catalog.db.ML_MIN_MAX_SCALAR";
         tableEnv.createTemporaryFunction(functionName, new MLMinMaxScalarFunction(functionName));
         final TableResult mlqueryResult1 =
