@@ -21,11 +21,9 @@ import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
-
-import io.confluent.flink.table.service.ServiceTasks;
-
 import org.apache.flink.types.Row;
 
+import io.confluent.flink.table.service.ServiceTasks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -56,8 +54,7 @@ public class MLMinMaxScalarFunctionTest {
         final Map<String, String> options = new HashMap<>();
         options.put("connector", "test_source");
         options.put("version", "12");
-        final ResolvedSchema tableSchema =
-                ResolvedSchema.of(f1, f2);
+        final ResolvedSchema tableSchema = ResolvedSchema.of(f1, f2);
         final CatalogBaseTable testTable =
                 new ResolvedCatalogTable(
                         CatalogTable.of(
@@ -92,7 +89,7 @@ public class MLMinMaxScalarFunctionTest {
         tableEnv.createTemporaryFunction(functionName, new MLMinMaxScalarFunction(functionName));
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ml_catalog.db.ML_MIN_MAX_SCALAR(1,1,5) AS scaled_value FROM ml_catalog.db.my_table\n;");
+                        "SELECT ml_catalog.db.ML_MIN_MAX_SCALAR(NULL , 10, 10) AS scaled_value FROM ml_catalog.db.my_table\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo(0.2);
     }

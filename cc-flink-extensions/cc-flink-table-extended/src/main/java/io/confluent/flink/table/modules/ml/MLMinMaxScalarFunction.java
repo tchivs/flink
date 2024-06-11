@@ -27,9 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * A scalar function for performing Min-Max scaling on numerical values.
- */
+/** A scalar function for performing Min-Max scaling on numerical values. */
 public class MLMinMaxScalarFunction extends ScalarFunction {
     /** The name of the function. */
     public static final String NAME = "ML_MIN_MAX_SCALAR";
@@ -38,11 +36,12 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
     /** Supported data types for function arguments. */
     public static final DataType[] DATA_TYPE_VALUES =
             new DataType[] {
-                    DataTypes.DOUBLE(),
-                    DataTypes.INT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.FLOAT(),
-                    DataTypes.SMALLINT()
+                DataTypes.DOUBLE(),
+                DataTypes.INT(),
+                DataTypes.BIGINT(),
+                DataTypes.FLOAT(),
+                DataTypes.SMALLINT(),
+                DataTypes.NULL()
             };
     /** Set of supported data types for function arguments. */
     public static final Set<DataType> DATA_TYPE_SET =
@@ -66,10 +65,6 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
     public Double eval(Object... args) {
         if (Objects.isNull(args[0])) {
             return null;
-        }
-        if (Objects.isNull(args[1]) || Objects.isNull(args[2])) {
-            throw new FlinkRuntimeException(
-                    "Invalid Input : dataMin and dataMax value cannot be null");
         }
         Object value = args[0];
         Object dataMin = args[1];
@@ -158,21 +153,47 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
                             }
 
                             @Override
-                            public Optional<List<DataType>> inferInputTypes(CallContext callContext, boolean throwOnFailure) {
+                            public Optional<List<DataType>> inferInputTypes(
+                                    CallContext callContext, boolean throwOnFailure) {
                                 List<DataType> argsDataTypes = callContext.getArgumentDataTypes();
-                                for (DataType argDataType : argsDataTypes) {
-                                    if (argDataType instanceof AtomicDataType && !argDataType.getLogicalType()
-                                            .isNullable()) {
-                                        argDataType = argDataType.nullable(); // Convert non-nullable data type to nullable
+                                for (int i = 0; i < argsDataTypes.size(); i++) {
+                                    DataType argDataType = argsDataTypes.get(i);
+
+                                    // Convert non-nullable data type to nullable if necessary
+                                    if (argDataType instanceof AtomicDataType
+                                            && !argDataType.getLogicalType().isNullable()) {
+                                        argDataType = argDataType.nullable();
                                     }
-                                    if (!DATA_TYPE_SET.contains(argDataType)) {
+
+                                    // Check if the data type is supported
+                                    if (!DATA_TYPE_SET.contains(argDataType)
+                                            && !argDataType.toString().startsWith("DECIMAL")) {
+                                        String errorMessage =
+                                                "Unsupported data type: " + argDataType;
                                         if (throwOnFailure) {
-                                            throw new ValidationException("Unsupported data type: " + argDataType);
+                                            throw new ValidationException(errorMessage);
                                         } else {
-                                            return Optional.empty(); // Return empty Optional if validation fails
+                                            return Optional
+                                                    .empty(); // Return empty Optional if validation
+                                            // fails
+                                        }
+                                    }
+
+                                    // Check if dataMin and dataMax value are null
+                                    if (i > 0 && argDataType.equals(DataTypes.NULL())) {
+                                        String errorMessage =
+                                                "Unsupported data type: dataMin and dataMax value cannot be null";
+                                        if (throwOnFailure) {
+                                            throw new ValidationException(errorMessage);
+                                        } else {
+                                            return Optional
+                                                    .empty(); // Return empty Optional if validation
+                                            // fails
                                         }
                                     }
                                 }
+
+                                // If all checks pass, return the list of argument data types
                                 return Optional.of(argsDataTypes);
                             }
 
