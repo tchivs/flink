@@ -45,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link JsonToFlinkSchemaConverter}. */
 @ExtendWith(TestLoggerExtension.class)
-public class JsonToFlinkSchemaConverterTest {
+class JsonToFlinkSchemaConverterTest {
 
     public static Stream<Arguments> typesToCheck() throws IOException {
         return Stream.concat(

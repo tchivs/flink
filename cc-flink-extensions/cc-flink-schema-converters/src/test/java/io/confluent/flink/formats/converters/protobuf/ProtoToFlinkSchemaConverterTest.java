@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link ProtoToFlinkSchemaConverter}. */
 @ExtendWith(TestLoggerExtension.class)
-public class ProtoToFlinkSchemaConverterTest {
+class ProtoToFlinkSchemaConverterTest {
 
     public static Stream<Arguments> typesToCheck() {
         return Stream.concat(CommonMappings.get(), Stream.of(WRAPPERS_CASE, CUSTOM_SCHEMA_CASE))

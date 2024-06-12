@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link AvroToFlinkSchemaConverter}. */
 @ExtendWith(TestLoggerExtension.class)
-public class AvroToFlinkSchemaConverterTest {
+class AvroToFlinkSchemaConverterTest {
 
     private static Stream<Arguments> typesToCheck() {
         return Stream.concat(
