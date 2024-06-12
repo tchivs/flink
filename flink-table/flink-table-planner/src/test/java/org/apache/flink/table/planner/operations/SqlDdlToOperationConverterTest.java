@@ -385,18 +385,12 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
             assertThat(alterModelRenameOperation.getNewModelIdentifier())
                     .isEqualTo(expectedNewIdentifier);
         }
-        // test alter model properties with empty key
-        assertThat(parse("alter model if exists cat1.db1.m1 set ()"))
-                .isInstanceOf(NopOperation.class);
-
         // test alter model properties with existing key: 'k1'
         operation =
                 parse("alter model if exists cat1.db1.m1 set ('k1' = 'v1_altered', 'K2' = 'V2')");
         Map<String, String> expectedModelProperties = new HashMap<>();
         expectedModelProperties.put("K1", "v1_altered");
         expectedModelProperties.put("K2", "V2");
-        properties.put("K1", "v1_altered");
-        properties.put("K2", "V2");
 
         assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
         AlterModelOptionsOperation alterModelPropertiesOperation =
@@ -408,8 +402,8 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
 
         // test alter model properties without keys
         operation = parse("alter model if exists cat1.db1.m1 set ('k3' = 'v3')");
+        expectedModelProperties.clear();
         expectedModelProperties.put("K3", "v3");
-        properties.put("K3", "v3");
 
         assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
         alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
@@ -424,8 +418,7 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
         alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
         assertThat(alterModelPropertiesOperation.getModelIdentifier())
                 .isEqualTo(expectedIdentifier);
-        expectedModelProperties.remove("K1");
-        properties.remove("K1");
+        expectedModelProperties.clear();
         assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
                 .isEqualTo(expectedModelProperties);
 
