@@ -76,7 +76,7 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
         if (Objects.isNull(args[0])) {
             return null;
         }
-        if (args[1] instanceof Long && args[2] instanceof Long) {
+        if (args[0] instanceof Long && args[1] instanceof Long && args[2] instanceof Long) {
             return getStandardizedValue(
                     getLongValue(args[0]), getLongValue(args[1]), getLongValue(args[2]));
         }
