@@ -241,7 +241,7 @@ public class RowDataToJsonConverters {
             final CombinedSchema combinedSchema = (CombinedSchema) targetSchema;
             if (combinedSchema.getCriterion() == CombinedSchema.ALL_CRITERION) {
                 final Schema transformedSchema =
-                        CombinedSchemaUtils.transformedSchema(combinedSchema);
+                        CombinedSchemaUtils.simplifyAllOfSchema(combinedSchema);
                 return createRowConverter(rowType, transformedSchema);
             } else if (combinedSchema.getCriterion() == CombinedSchema.ONE_CRITERION
                     || combinedSchema.getCriterion() == CombinedSchema.ANY_CRITERION) {

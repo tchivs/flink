@@ -6,6 +6,7 @@ package io.confluent.flink.formats.converters.json;
 
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -16,9 +17,11 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.confluent.flink.formats.converters.json.CommonMappings.TypeMapping;
+import io.confluent.flink.formats.converters.utils.SchemaUtils;
 import org.everit.json.schema.CombinedSchema;
 import org.everit.json.schema.NumberSchema;
 import org.everit.json.schema.ObjectSchema;
+import org.everit.json.schema.Schema;
 import org.everit.json.schema.StringSchema;
 import org.everit.json.schema.loader.SchemaLoader;
 import org.jetbrains.annotations.NotNull;
@@ -53,7 +56,10 @@ class JsonToFlinkSchemaConverterTest {
                         Stream.of(
                                 unionDifferentStruct(),
                                 combinedSchemaAllOfRef(),
-                                complexAuditLoggingSchema()))
+                                combinedSchemaAllOfIndexing(),
+                                oneOfOrdering(),
+                                complexAuditLoggingSchema(),
+                                mixedObjectIndexing()))
                 .map(Arguments::of);
     }
 
@@ -124,6 +130,28 @@ class JsonToFlinkSchemaConverterTest {
                         "JSON tuples (i.e. arrays that contain items of different types) are not supported");
     }
 
+    static TypeMapping mixedObjectIndexing() {
+        final String schemaStr =
+                SchemaUtils.readSchemaFromResource("schema/json/mixed-indexing.json");
+        Schema schema =
+                SchemaLoader.load(new JSONObject(new JSONTokener(new StringReader(schemaStr))));
+
+        return new TypeMapping(
+                schema,
+                new RowType(
+                        false,
+                        Arrays.asList(
+                                new RowField("upcId", new DoubleType(false)), // manually indexed
+                                new RowField("storeId", new BigIntType(false)), // manually indexed
+                                new RowField(
+                                        "ilcPrimary",
+                                        new VarCharType(true, VarCharType.MAX_LENGTH)),
+                                new RowField("ilcs", new VarCharType(true, VarCharType.MAX_LENGTH)),
+                                new RowField(
+                                        "productId",
+                                        new VarCharType(false, VarCharType.MAX_LENGTH)))));
+    }
+
     static TypeMapping unionDifferentStruct() {
         final Map<String, Object> numberSchemaProps = new HashMap<>();
         numberSchemaProps.put("connect.index", 0);
@@ -181,49 +209,7 @@ class JsonToFlinkSchemaConverterTest {
     }
 
     static TypeMapping combinedSchemaAllOfRef() {
-        String schemaStr =
-                "{\n"
-                        + "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n"
-                        + "  \"allOf\": [\n"
-                        + "    { \"$ref\": \"#/definitions/MessageBase\" },\n"
-                        + "    { \"$ref\": \"#/definitions/MessageBase2\" }\n"
-                        + "  ],\n"
-                        + "\n"
-                        + "  \"title\": \"IdentifyUserMessage\",\n"
-                        + "  \"description\": \"An IdentifyUser message\",\n"
-                        + "  \"type\": \"object\",\n"
-                        + "\n"
-                        + "  \"properties\": {\n"
-                        + "    \"prevUserId\": {\n"
-                        + "      \"type\": \"string\"\n"
-                        + "    },\n"
-                        + "\n"
-                        + "    \"newUserId\": {\n"
-                        + "      \"type\": \"string\"\n"
-                        + "    }\n"
-                        + "  },\n"
-                        + "\n"
-                        + "  \"definitions\": {\n"
-                        + "    \"MessageBase\": {\n"
-                        + "      \"properties\": {\n"
-                        + "        \"id\": {\n"
-                        + "          \"type\": \"string\"\n"
-                        + "        },\n"
-                        + "\n"
-                        + "        \"type\": {\n"
-                        + "          \"type\": \"string\"\n"
-                        + "        }\n"
-                        + "      }\n"
-                        + "    },\n"
-                        + "    \"MessageBase2\": {\n"
-                        + "      \"properties\": {\n"
-                        + "        \"id2\": {\n"
-                        + "          \"type\": \"string\"\n"
-                        + "        }\n"
-                        + "      }\n"
-                        + "    }\n"
-                        + "  }\n"
-                        + "}";
+        String schemaStr = SchemaUtils.readSchemaFromResource("schema/json/all-of-ref.json");
         JSONObject rawSchema = new JSONObject(new JSONTokener(new StringReader(schemaStr)));
         final VarCharType stringType = new VarCharType(VarCharType.MAX_LENGTH);
         return new TypeMapping(
@@ -232,10 +218,54 @@ class JsonToFlinkSchemaConverterTest {
                         false,
                         Arrays.asList(
                                 new RowField("id", stringType),
-                                new RowField("type", stringType),
                                 new RowField("id2", stringType),
                                 new RowField("newUserId", stringType),
-                                new RowField("prevUserId", stringType))));
+                                new RowField("prevUserId", stringType),
+                                new RowField("type", stringType))));
+    }
+
+    /**
+     * This is tests the same schema as in {@link #combinedSchemaAllOfRef()} but with custom
+     * ordering using {@code connect.index}.
+     */
+    static TypeMapping combinedSchemaAllOfIndexing() {
+        String schemaStr = SchemaUtils.readSchemaFromResource("schema/json/all-of-indexing.json");
+        JSONObject rawSchema = new JSONObject(new JSONTokener(new StringReader(schemaStr)));
+        final VarCharType stringType = new VarCharType(VarCharType.MAX_LENGTH);
+        return new TypeMapping(
+                SchemaLoader.load(rawSchema),
+                new RowType(
+                        false,
+                        Arrays.asList(
+                                new RowField("prevUserId", stringType),
+                                new RowField("id", stringType),
+                                new RowField("type", stringType),
+                                new RowField("id2", stringType),
+                                new RowField("newUserId", stringType))));
+    }
+
+    static TypeMapping oneOfOrdering() {
+        String schemaStr = SchemaUtils.readSchemaFromResource("schema/json/one-of-ordering.json");
+        JSONObject rawSchema = new JSONObject(new JSONTokener(new StringReader(schemaStr)));
+        final VarCharType stringType = new VarCharType(VarCharType.MAX_LENGTH);
+        return new TypeMapping(
+                SchemaLoader.load(rawSchema),
+                new RowType(
+                        false,
+                        Arrays.asList(
+                                new RowField(
+                                        "connect_union_field_0",
+                                        new RowType(
+                                                true,
+                                                Arrays.asList(
+                                                        new RowField("id", stringType),
+                                                        new RowField("type", stringType)))),
+                                new RowField(
+                                        "connect_union_field_1",
+                                        new RowType(
+                                                true,
+                                                Collections.singletonList(
+                                                        new RowField("id2", stringType)))))));
     }
 
     static TypeMapping complexAuditLoggingSchema() throws IOException {
@@ -246,13 +276,13 @@ class JsonToFlinkSchemaConverterTest {
                 new RowType(
                         Arrays.asList(
                                 new RowField(
+                                        "clientAddress",
+                                        new ArrayType(addressType),
+                                        "Network address of the remote client."),
+                                new RowField(
                                         "clientId",
                                         stringType,
                                         "A client-provided identifier, logged for correlation, as a courtesy to the client."),
-                                new RowField(
-                                        "requestId",
-                                        new ArrayType(true, stringType.copy(false)),
-                                        "Uniquely identifies a client request."),
                                 new RowField(
                                         "clientTraceId",
                                         stringType,
@@ -262,9 +292,9 @@ class JsonToFlinkSchemaConverterTest {
                                         stringType,
                                         "Uniquely identifies an authenticated connection. Only present for successfully authenticated connections."),
                                 new RowField(
-                                        "clientAddress",
-                                        new ArrayType(addressType),
-                                        "Network address of the remote client.")));
+                                        "requestId",
+                                        new ArrayType(true, stringType.copy(false)),
+                                        "Uniquely identifies a client request.")));
         final RowType emptyRowType = new RowType(Collections.emptyList());
         final RowType resultType =
                 new RowType(
@@ -296,26 +326,6 @@ class JsonToFlinkSchemaConverterTest {
                 new RowType(
                         Arrays.asList(
                                 new RowField(
-                                        "idTokenCredentials",
-                                        new RowType(
-                                                Arrays.asList(
-                                                        new RowField(
-                                                                "audience",
-                                                                new ArrayType(
-                                                                        stringType.copy(false))),
-                                                        new RowField(
-                                                                "subject",
-                                                                stringType,
-                                                                "Identifies the principal."),
-                                                        new RowField(
-                                                                "type",
-                                                                stringType,
-                                                                "The type of the Id Token Credential. JWT for the foreseeable future."),
-                                                        new RowField(
-                                                                "issuer",
-                                                                stringType,
-                                                                "Who signed the token.")))),
-                                new RowField(
                                         "certificateCredentials",
                                         new RowType(
                                                 Collections.singletonList(
@@ -324,17 +334,9 @@ class JsonToFlinkSchemaConverterTest {
                                                                 new RowType(
                                                                         Arrays.asList(
                                                                                 new RowField(
-                                                                                        "st",
-                                                                                        stringType,
-                                                                                        "State or province"),
-                                                                                new RowField(
                                                                                         "c",
                                                                                         stringType,
                                                                                         "Country"),
-                                                                                new RowField(
-                                                                                        "ou",
-                                                                                        stringType,
-                                                                                        "Organizational unit"),
                                                                                 new RowField(
                                                                                         "cn",
                                                                                         stringType,
@@ -346,9 +348,16 @@ class JsonToFlinkSchemaConverterTest {
                                                                                 new RowField(
                                                                                         "o",
                                                                                         stringType,
-                                                                                        "Organization"))),
+                                                                                        "Organization"),
+                                                                                new RowField(
+                                                                                        "ou",
+                                                                                        stringType,
+                                                                                        "Organizational unit"),
+                                                                                new RowField(
+                                                                                        "st",
+                                                                                        stringType,
+                                                                                        "State or province"))),
                                                                 "The principal identified by this certificate.")))),
-                                new RowField("mechanism", stringType),
                                 new RowField(
                                         "idSecretCredentials",
                                         new RowType(
@@ -356,48 +365,71 @@ class JsonToFlinkSchemaConverterTest {
                                                         new RowField(
                                                                 "credentialId",
                                                                 stringType,
-                                                                "Identifies the credential"))))));
+                                                                "Identifies the credential")))),
+                                new RowField(
+                                        "idTokenCredentials",
+                                        new RowType(
+                                                Arrays.asList(
+                                                        new RowField(
+                                                                "audience",
+                                                                new ArrayType(
+                                                                        stringType.copy(false))),
+                                                        new RowField(
+                                                                "issuer",
+                                                                stringType,
+                                                                "Who signed the token."),
+                                                        new RowField(
+                                                                "subject",
+                                                                stringType,
+                                                                "Identifies the principal."),
+                                                        new RowField(
+                                                                "type",
+                                                                stringType,
+                                                                "The type of the Id Token Credential. JWT for the foreseeable future.")))),
+                                new RowField("mechanism", stringType)));
         final RowType authenticationType =
                 new RowType(
                         Arrays.asList(
-                                new RowField(
-                                        "principal",
-                                        principalType,
-                                        "Identifies the authenticated principal that is used for any authorization checks. Also identifies the authenticated principal that made the request, unless originalPrincipal is set."),
-                                new RowField(
-                                        "originalPrincipal",
-                                        principalType,
-                                        "If set, indicates the original principal that made the request. Used for situations where one principal can assume the identity of a different principal."),
-                                new RowField(
-                                        "result",
-                                        stringType,
-                                        "The result of authentication checks on the provided credentials."),
                                 new RowField("credentials", credentialsType),
+                                new RowField(
+                                        "errorMessage",
+                                        stringType,
+                                        "A short, human-readable description of the reason authentication failed."),
                                 new RowField(
                                         "identity",
                                         stringType,
                                         "Identity of the requester in the format."),
                                 new RowField(
-                                        "errorMessage",
+                                        "originalPrincipal",
+                                        principalType,
+                                        "If set, indicates the original principal that made the request. Used for situations where one principal can assume the identity of a different principal."),
+                                new RowField(
+                                        "principal",
+                                        principalType,
+                                        "Identifies the authenticated principal that is used for any authorization checks. Also identifies the authenticated principal that made the request, unless originalPrincipal is set."),
+                                new RowField(
+                                        "result",
                                         stringType,
-                                        "A short, human-readable description of the reason authentication failed.")));
+                                        "The result of authentication checks on the provided credentials.")));
         final RowType aclAuthorizationType =
                 new RowType(
                         Arrays.asList(
-                                new RowField("permissionType", stringType),
-                                new RowField("patternName", stringType),
-                                new RowField("host", stringType),
-                                new RowField("patternType", stringType),
                                 new RowField(
                                         "actingPrincipal",
                                         principalType,
                                         "The decisive principal used for authorization."),
+                                new RowField("host", stringType),
+                                new RowField("patternName", stringType),
+                                new RowField("patternType", stringType),
+                                new RowField("permissionType", stringType),
                                 new RowField("resourceType", stringType)));
         final RowType rbacAuthorizationType =
                 new RowType(
                         Arrays.asList(
-                                new RowField("role", stringType),
-                                new RowField("patternName", stringType),
+                                new RowField(
+                                        "actingPrincipal",
+                                        principalType,
+                                        "The decisive principal used for authorization."),
                                 new RowField(
                                         "cloudScope",
                                         new RowType(
@@ -408,30 +440,47 @@ class JsonToFlinkSchemaConverterTest {
                                                                         resourceWithTypeType.copy(
                                                                                 false))))),
                                         "The list of cloud resources involved in the scope of an action."),
-                                new RowField("patternType", stringType),
-                                new RowField(
-                                        "actingPrincipal",
-                                        principalType,
-                                        "The decisive principal used for authorization."),
                                 new RowField(
                                         "operation",
                                         stringType,
                                         "The operation which was assigned to the rbac role"),
-                                new RowField("resourceType", stringType)));
+                                new RowField("patternName", stringType),
+                                new RowField("patternType", stringType),
+                                new RowField("resourceType", stringType),
+                                new RowField("role", stringType)));
         final RowType authorizationType =
                 new RowType(
                         Arrays.asList(
-                                new RowField("result", stringType),
-                                new RowField("superUserAuthorization", new BooleanType()),
+                                new RowField(
+                                        "aclAuthorization",
+                                        aclAuthorizationType,
+                                        "An ACL rule that resulted in the authorization check being denied or allowed."),
                                 new RowField(
                                         "assignedPrincipals",
-                                        new ArrayType(principalType.copy(false))),
+                                        new ArrayType(principalType.copy(false)),
+                                        "The list of principals the user has access to, including user itself and identity pools"),
                                 new RowField("dryRun", new BooleanType()),
-                                new RowField("aclAuthorization", aclAuthorizationType),
-                                new RowField("resourceName", stringType),
-                                new RowField("rbacAuthorization", rbacAuthorizationType),
-                                new RowField("operation", stringType),
-                                new RowField("resourceType", stringType)));
+                                new RowField(
+                                        "operation",
+                                        stringType,
+                                        "The operation being checked for authorization"),
+                                new RowField(
+                                        "rbacAuthorization",
+                                        rbacAuthorizationType,
+                                        "A RBAC rule that resulted in the authorization check being allowed."),
+                                new RowField(
+                                        "resourceName",
+                                        stringType,
+                                        "the name of the resource being checked for authorization"),
+                                new RowField(
+                                        "resourceType",
+                                        stringType,
+                                        "the type of the resource being checked for authorization"),
+                                new RowField(
+                                        "result",
+                                        stringType,
+                                        "Whether the authorization was granted"),
+                                new RowField("superUserAuthorization", new BooleanType())));
         final LogicalType cloudResourceType =
                 new RowType(
                         false,
@@ -454,24 +503,9 @@ class JsonToFlinkSchemaConverterTest {
                         false,
                         Arrays.asList(
                                 new RowField(
-                                        "datacontenttype",
-                                        stringType,
-                                        "Content type of the data value. Adheres to RFC 2046 format."),
-                                new RowField(
                                         "data",
                                         new RowType(
                                                 Arrays.asList(
-                                                        new RowField(
-                                                                "requestMetadata",
-                                                                requestMetadataType),
-                                                        new RowField(
-                                                                "result",
-                                                                resultType,
-                                                                "Describes the result of the overall operation (i.e. success, failure, etc) along with any audit-worthy details. For example, this field contains the resource identifier of a newly created resource from a CREATE request."),
-                                                        new RowField(
-                                                                "request",
-                                                                requestType,
-                                                                "Describes additional audit-worthy details about the request."),
                                                         new RowField(
                                                                 "authenticationInfo",
                                                                 authenticationType,
@@ -489,22 +523,33 @@ class JsonToFlinkSchemaConverterTest {
                                                                 stringType,
                                                                 "The type of request being logged."),
                                                         new RowField(
+                                                                "request",
+                                                                requestType,
+                                                                "Describes additional audit-worthy details about the request."),
+                                                        new RowField(
+                                                                "requestMetadata",
+                                                                requestMetadataType),
+                                                        new RowField(
                                                                 "resourceName",
                                                                 stringType,
                                                                 "The resource identifier of the target of the request for compatibility with other request types. Will be deprecated in future."),
+                                                        new RowField(
+                                                                "result",
+                                                                resultType,
+                                                                "Describes the result of the overall operation (i.e. success, failure, etc) along with any audit-worthy details. For example, this field contains the resource identifier of a newly created resource from a CREATE request."),
                                                         new RowField(
                                                                 "serviceName",
                                                                 stringType,
                                                                 "The resource identifier of the service (the source) that received the request being logged."))),
                                         "Additional details about the audited occurrence."),
                                 new RowField(
-                                        "subject",
+                                        "datacontenttype",
                                         stringType,
-                                        "Identifies the resource that would be affected by the event."),
+                                        "Content type of the data value. Adheres to RFC 2046 format."),
                                 new RowField(
-                                        "specversion",
-                                        stringType.copy(false),
-                                        "The version of the CloudEvents specification which the event uses."),
+                                        "dataschema",
+                                        stringType,
+                                        "Identifies the schema that data adheres to. Currently unused."),
                                 new RowField(
                                         "id",
                                         stringType.copy(false),
@@ -514,17 +559,21 @@ class JsonToFlinkSchemaConverterTest {
                                         stringType.copy(false),
                                         "Identifies the context in which an event happened."),
                                 new RowField(
+                                        "specversion",
+                                        stringType.copy(false),
+                                        "The version of the CloudEvents specification which the event uses."),
+                                new RowField(
+                                        "subject",
+                                        stringType,
+                                        "Identifies the resource that would be affected by the event."),
+                                new RowField(
                                         "time",
                                         stringType,
                                         "Timestamp of when the occurrence happened. Adheres to RFC 3339."),
                                 new RowField(
                                         "type",
                                         stringType.copy(false),
-                                        "Describes the type of event."),
-                                new RowField(
-                                        "dataschema",
-                                        stringType,
-                                        "Identifies the schema that data adheres to. Currently unused."))));
+                                        "Describes the type of event."))));
     }
 
     @NotNull
@@ -544,10 +593,6 @@ class JsonToFlinkSchemaConverterTest {
                 new RowType(
                         Arrays.asList(
                                 new RowField(
-                                        "subject",
-                                        stringType,
-                                        "Identity of the requesting party, known to the IdP."),
-                                new RowField(
                                         "namespace",
                                         new ArrayType(
                                                 new RowType(
@@ -555,16 +600,20 @@ class JsonToFlinkSchemaConverterTest {
                                                         Arrays.asList(
                                                                 new RowField("id", stringType),
                                                                 new RowField(
-                                                                        "type", stringType)))))));
+                                                                        "type", stringType))))),
+                                new RowField(
+                                        "subject",
+                                        stringType,
+                                        "Identity of the requesting party, known to the IdP.")));
         return new RowType(
                 Arrays.asList(
-                        new RowField("identityPool", resourceType),
-                        new RowField("confluentServiceAccount", resourceType),
-                        new RowField("externalAccount", externalAccountType),
                         new RowField("confluentInternal", stringType),
-                        new RowField("email", stringType),
+                        new RowField("confluentServiceAccount", resourceType),
                         new RowField("confluentUser", resourceType),
-                        new RowField("group", resourceType)));
+                        new RowField("email", stringType, "Email address of the principal."),
+                        new RowField("externalAccount", externalAccountType),
+                        new RowField("group", resourceType),
+                        new RowField("identityPool", resourceType)));
     }
 
     @NotNull
@@ -577,7 +626,7 @@ class JsonToFlinkSchemaConverterTest {
         return new RowType(
                 false,
                 Arrays.asList(
-                        new RowField("port", new DoubleType(), "Port number, if known."),
-                        new RowField("ip", ipType, "IPv4 or IPv6 address.")));
+                        new RowField("ip", ipType, "IPv4 or IPv6 address."),
+                        new RowField("port", new DoubleType(), "Port number, if known.")));
     }
 }

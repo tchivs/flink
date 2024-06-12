@@ -43,6 +43,7 @@ import org.everit.json.schema.StringSchema;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,9 +51,9 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_PARAMETERS;
@@ -235,6 +236,9 @@ public class JsonToFlinkSchemaConverter {
             int index = 0;
             boolean isOptionalRow = isOptional;
             final List<RowField> fields = new ArrayList<>();
+
+            // For oneOf we use the order in which the schemas are provided in the oneOf
+            // declaration
             for (Schema subSchema : combinedSchema.getSubschemas()) {
                 if (subSchema instanceof NullSchema) {
                     isOptionalRow = true;
@@ -328,17 +332,22 @@ public class JsonToFlinkSchemaConverter {
     private static RowType convertRowType(
             boolean isOptional, CycleContext cycleContext, ObjectSchema objectSchema) {
         Map<String, Schema> properties = objectSchema.getPropertySchemas();
-        SortedMap<Integer, Entry<String, Schema>> sortedMap = new TreeMap<>();
-        for (Entry<String, Schema> property : properties.entrySet()) {
-            Schema subSchema = property.getValue();
-            Integer index = (Integer) subSchema.getUnprocessedProperties().get(CONNECT_INDEX_PROP);
-            if (index == null) {
-                index = sortedMap.size();
-            }
-            sortedMap.put(index, property);
-        }
+        // we want to use a deterministic, explainable order, first we sort based on
+        // the connect.index property, if not available we sort alphabetically. First we put
+        // properties with index defined. Properties without an index are put last.
+        // see resources/schema/json/mixed-indexing.json
+        final Comparator<Entry<String, Schema>> indexComparator =
+                Comparator.comparing(
+                        e -> {
+                            final Object index =
+                                    e.getValue().getUnprocessedProperties().get(CONNECT_INDEX_PROP);
+                            return index != null ? (Integer) index : null;
+                        },
+                        Comparator.nullsLast(Comparator.comparing(Function.identity())));
+        final Stream<Entry<String, Schema>> sortedFields =
+                properties.entrySet().stream().sorted(indexComparator.thenComparing(Entry::getKey));
         final List<RowField> rowFields =
-                sortedMap.values().stream()
+                sortedFields
                         .map(
                                 property -> {
                                     String subFieldName = property.getKey();
@@ -422,7 +431,7 @@ public class JsonToFlinkSchemaConverter {
     private static LogicalType fromAllOfSchema(
             CombinedSchema combinedSchema, boolean isOptional, CycleContext cycleContext) {
         return toFlinkSchemaWithCycleDetection(
-                CombinedSchemaUtils.transformedSchema(combinedSchema), isOptional, cycleContext);
+                CombinedSchemaUtils.simplifyAllOfSchema(combinedSchema), isOptional, cycleContext);
     }
 
     private static final class CycleContext {

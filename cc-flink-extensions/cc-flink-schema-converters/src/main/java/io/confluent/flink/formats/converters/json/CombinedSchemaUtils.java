@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_INDEX_PROP;
-
 /**
  * Utility class for sharing methods needed for handling {@link CombinedSchema} both when converting
  * schemas and data.
@@ -33,7 +31,7 @@ public class CombinedSchemaUtils {
      * Transforms a combinedSchema to a simpler schema that directly corresponds to Flink's {@link
      * org.apache.flink.table.types.logical.LogicalType}.
      */
-    public static Schema transformedSchema(CombinedSchema combinedSchema) {
+    public static Schema simplifyAllOfSchema(CombinedSchema combinedSchema) {
         ConstSchema constSchema = null;
         EnumSchema enumSchema = null;
         NumberSchema numberSchema = null;
@@ -57,19 +55,14 @@ public class CombinedSchemaUtils {
                     subSchema, properties, required, new HashSet<>());
         }
         if (!properties.isEmpty()) {
+            // We combine all properties from all objects/types into a single
+            // ObjectSchema. The order of fields in the final RowType follows the
+            // rules for fields ordering of an ObjectSchema for such a simplified
+            // schema. Therefore `connect.index` of all nested properties will be taken into
+            // account first and then properties are sorted alphabetically.
+            // see resources/schema/json/all-of-indexing.json
             final Builder builder = ObjectSchema.builder();
-            int idx = 0;
-            for (Map.Entry<String, Schema> property : properties.entrySet()) {
-                // when adding properties to ObjectSchema we lose the order, that's why we need
-                // the CONNECT_INDEX_PROP shenanigans
-                final String fieldName = property.getKey();
-                final Schema schema = property.getValue();
-                final ReferenceSchema.Builder referenceBuilder = ReferenceSchema.builder();
-                referenceBuilder.unprocessedProperties.put(CONNECT_INDEX_PROP, idx++);
-                final ReferenceSchema referenceSchema = referenceBuilder.build();
-                referenceSchema.setReferredSchema(schema);
-                builder.addPropertySchema(fieldName, referenceSchema);
-            }
+            properties.forEach(builder::addPropertySchema);
             required.entrySet().stream()
                     .filter(Entry::getValue)
                     .forEach(e -> builder.addRequiredProperty(e.getKey()));
