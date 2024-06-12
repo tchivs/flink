@@ -76,109 +76,57 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
         if (Objects.isNull(args[0])) {
             return null;
         }
-        Object value = args[0];
-        Object dataMin = args[1];
-        Object dataMax = args[2];
-        if (value instanceof Number && dataMin instanceof Number && dataMax instanceof Number) {
-            if (value instanceof Long || dataMin instanceof Long || dataMax instanceof Long) {
-                return getStandardizedValue(
-                        ((Number) args[0]).longValue(),
-                        ((Number) args[1]).longValue(),
-                        ((Number) args[2]).longValue());
-            }
+        if (args[1] instanceof Long && args[2] instanceof Long) {
             return getStandardizedValue(
-                    ((Number) args[0]).doubleValue(),
-                    ((Number) args[1]).doubleValue(),
-                    ((Number) args[2]).doubleValue());
-        } else if (value instanceof LocalDateTime
-                && dataMin instanceof LocalDateTime
-                && dataMax instanceof LocalDateTime) {
-            return getStandardizedValue(
-                    ((LocalDateTime) args[0]).toInstant(ZoneOffset.UTC).getEpochSecond(),
-                    ((LocalDateTime) args[1]).toInstant(ZoneOffset.UTC).getEpochSecond(),
-                    ((LocalDateTime) args[2]).toInstant(ZoneOffset.UTC).getEpochSecond());
-        } else if (value instanceof LocalDate
-                && dataMin instanceof LocalDate
-                && dataMax instanceof LocalDate) {
-            return getStandardizedValue(
-                    ((LocalDate) args[0]).toEpochDay(),
-                    ((LocalDate) args[1]).toEpochDay(),
-                    ((LocalDate) args[2]).toEpochDay());
-        } else if (value instanceof LocalTime
-                && dataMin instanceof LocalTime
-                && dataMax instanceof LocalTime) {
-            return getStandardizedValue(
-                    ((LocalTime) args[0]).toNanoOfDay(),
-                    ((LocalTime) args[1]).toNanoOfDay(),
-                    ((LocalTime) args[2]).toNanoOfDay());
-        } else if (value instanceof Instant
-                && dataMin instanceof Instant
-                && dataMax instanceof Instant) {
-            return getStandardizedValue(
-                    ((Instant) args[0]).toEpochMilli(),
-                    ((Instant) args[1]).toEpochMilli(),
-                    ((Instant) args[2]).toEpochMilli());
-        } else if (value instanceof ZonedDateTime
-                && dataMin instanceof ZonedDateTime
-                && dataMax instanceof ZonedDateTime) {
-            return getStandardizedValue(
-                    ((ZonedDateTime) args[0]).toInstant().toEpochMilli(),
-                    ((ZonedDateTime) args[1]).toInstant().toEpochMilli(),
-                    ((ZonedDateTime) args[2]).toInstant().toEpochMilli());
-        } else if (value instanceof Period
-                && dataMin instanceof Period
-                && dataMax instanceof Period) {
-            return getStandardizedValue(
-                    ((Number) ((Period) args[0]).getDays()).doubleValue(),
-                    ((Number) ((Period) args[1]).getDays()).doubleValue(),
-                    ((Number) ((Period) args[2]).getDays()).doubleValue());
-        } else if (value instanceof Duration
-                && dataMin instanceof Duration
-                && dataMax instanceof Duration) {
-            return getStandardizedValue(
-                    ((Duration) args[0]).toMillis(),
-                    ((Duration) args[1]).toMillis(),
-                    ((Duration) args[2]).toMillis());
-        } else {
-            throw new FlinkRuntimeException(
-                    "Invalid Inputs: arguments should either be numerical value or Time value");
+                    getLongValue(args[0]), getLongValue(args[1]), getLongValue(args[2]));
         }
+        return getStandardizedValue(
+                getDoubleValue(args[0]), getDoubleValue(args[1]), getDoubleValue(args[2]));
     }
 
-    /**
-     * Calculates the standardized value using the Min-Max scaling formula for double values.
-     *
-     * @param value the input value
-     * @param dataMin the minimum value of the data
-     * @param dataMax the maximum value of the data
-     * @return the standardized value
-     */
     private Double getStandardizedValue(Double value, Double dataMin, Double dataMax) {
-        if (dataMax < dataMin || value < dataMin || value > dataMax) {
-            throw new ValidationException(
-                    "dataMax value has to be greater than or equal to dataMin and Value has to be between dataMin and DataMax inclusive");
+        if (dataMax < dataMin) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The max argument to %s function has to be greater than or equal to min argument",
+                            NAME));
+        }
+        if (dataMin.isNaN() || dataMin.isInfinite() || dataMax.isNaN() || dataMax.isInfinite()) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The min and max arguments to %s function cannot be NaN or Infinite value",
+                            NAME));
+        }
+        if (value.isInfinite() || value.isNaN()) {
+            return value;
+        }
+        if (value > dataMax) {
+            return 1.0;
+        }
+        if (value < dataMin) {
+            return 0.0;
         }
         double range = dataMax - dataMin;
         range = range == 0.0 ? 1.0 : range;
         return (value - dataMin) / range;
     }
 
-    /**
-     * Calculates the standardized value using the Min-Max scaling formula for long values.
-     *
-     * @param value the input value
-     * @param dataMin the minimum value of the data
-     * @param dataMax the maximum value of the data
-     * @return the standardized value
-     */
     private Double getStandardizedValue(Long value, Long dataMin, Long dataMax) {
         if (dataMax < dataMin) {
-            throw new ValidationException(
-                    "dataMax value has to be greater than or equal to dataMin");
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The max argument to %s function has to be greater than or equal to min argument",
+                            NAME));
+        }
+        if (value > dataMax) {
+            return 1.0;
+        }
+        if (value < dataMin) {
+            return 0.0;
         }
         long range = dataMax - dataMin;
         range = range == 0L ? 1L : range;
-        return (double) (value - dataMin) / range;
+        return ((double) (value - dataMin)) / range;
     }
 
     /**
@@ -250,8 +198,9 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
                                                                             .toString()
                                                                             .startsWith(
                                                                                     "INTERVAL")) {
-                                                                return "Unsupported data type: "
-                                                                        + argDataType;
+                                                                return String.format(
+                                                                        "%s datatype is not supported as argument to %s function. Please refer documentation for supported datatypes",
+                                                                        argDataType, NAME);
                                                             }
 
                                                             // Check if dataMin and dataMax value
@@ -259,7 +208,9 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
                                                             if (i > 0
                                                                     && argDataType.equals(
                                                                             DataTypes.NULL())) {
-                                                                return "Unsupported data type: dataMin and dataMax value cannot be null";
+                                                                return String.format(
+                                                                        "The min and max arguments to %s function cannot be null",
+                                                                        NAME);
                                                             }
 
                                                             return null; // Return null if no error
@@ -300,5 +251,46 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
     @Override
     public String toString() {
         return String.format("MLMinMaxScalarFunction {functionName=%s}", functionName);
+    }
+
+    private Double getDoubleValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        return convertToNumberTypedValue(value).doubleValue();
+    }
+
+    private Long getLongValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return convertToNumberTypedValue(value).longValue();
+    }
+
+    private Number convertToNumberTypedValue(Object value) {
+        if (value instanceof LocalDateTime) {
+            return ((LocalDateTime) value).toInstant(ZoneOffset.UTC).getEpochSecond();
+        }
+        if (value instanceof LocalDate) {
+            return ((LocalDate) value).toEpochDay();
+        }
+        if (value instanceof LocalTime) {
+            return ((LocalTime) value).toNanoOfDay();
+        }
+        if (value instanceof Instant) {
+            return ((Instant) value).toEpochMilli();
+        }
+        if (value instanceof ZonedDateTime) {
+            return ((ZonedDateTime) value).toInstant().toEpochMilli();
+        }
+        if (value instanceof Period) {
+            return ((Period) value).getDays();
+        }
+        if (value instanceof Duration) {
+            return ((Duration) value).toMillis();
+        } else {
+            throw new FlinkRuntimeException(
+                    String.format("Unsupported datatype passed as argument to %s function", NAME));
+        }
     }
 }

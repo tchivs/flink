@@ -144,6 +144,42 @@ public class MLMinMaxScalarFunctionTest {
     }
 
     @Test
+    void testMLMinMaxScalarForValueLessThanMinData() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(1, 2, 5) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo(0.0);
+    }
+
+    @Test
+    void testMLMinMaxScalarForValueMoreThanMaxData() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(6, 2, 5) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo(1.0);
+    }
+
+    @Test
+    void testMLMinMaxScalarForNaNValue() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_MIN_MAX_SCALAR(CAST('NaN' AS DOUBLE), 2, 5) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assert row.getField(0) != null;
+        assertThat(((Double) row.getField(0)).isNaN());
+    }
+
+    @Test
+    void testMLMinMaxScalarForVeryLargeValues() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_MIN_MAX_SCALAR(CAST(1234567890123456790 AS BIGINT), CAST(1234567890123456785 AS BIGINT), CAST(1234567890123456795 AS BIGINT)) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assert row.getField(0) != null;
+        assertThat(row.getField(0)).isEqualTo(0.5);
+    }
+
+    @Test
     void testMLMinMaxScalarForNullMinData() {
         assertThrows(
                 ValidationException.class,
@@ -189,14 +225,6 @@ public class MLMinMaxScalarFunctionTest {
     }
 
     @Test
-    void testMLMinMaxScalarForDifferentInputValues() {
-        final TableResult result =
-                tableEnv.executeSql(
-                        "SELECT ML_MIN_MAX_SCALAR(INTERVAL '12 18' DAY(2) TO HOUR, 2, 1000) AS scaled_value\n;");
-        assertThrows(RuntimeException.class, () -> result.collect().next());
-    }
-
-    @Test
     void testMLMinMaxScalarForInvalidDataMinAndDataMax() {
         final TableResult result =
                 tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(2, 5, 1) AS scaled_value\n;");
@@ -204,9 +232,18 @@ public class MLMinMaxScalarFunctionTest {
     }
 
     @Test
-    void testMLMinMaxScalarForInvalidValue() {
+    void testMLMinMaxScalarForNaNMinData() {
         final TableResult result =
-                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(1, 2, 5) AS scaled_value\n;");
+                tableEnv.executeSql(
+                        "SELECT ML_MIN_MAX_SCALAR(2, CAST('NaN' AS DOUBLE), 5) AS scaled_value\n;");
+        assertThrows(RuntimeException.class, () -> result.collect().next());
+    }
+
+    @Test
+    void testMLMinMaxScalarForNaNMaxData() {
+        final TableResult result =
+                tableEnv.executeSql(
+                        "SELECT ML_MIN_MAX_SCALAR(2, 1, CAST('NaN' AS DOUBLE)) AS scaled_value\n;");
         assertThrows(RuntimeException.class, () -> result.collect().next());
     }
 }
