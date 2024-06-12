@@ -16,9 +16,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertThrows;
 
-/**
- * Unit tests for the {@link MLMinMaxScalarFunction} class.
- */
+/** Unit tests for the {@link MLMinMaxScalarFunction} class. */
 public class MLMinMaxScalarFunctionTest {
 
     private TableEnvironment tableEnv;
@@ -201,16 +199,14 @@ public class MLMinMaxScalarFunctionTest {
     @Test
     void testMLMinMaxScalarForInvalidDataMinAndDataMax() {
         final TableResult result =
-                tableEnv.executeSql(
-                        "SELECT ML_MIN_MAX_SCALAR(2, 5, 1) AS scaled_value\n;");
+                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(2, 5, 1) AS scaled_value\n;");
         assertThrows(RuntimeException.class, () -> result.collect().next());
     }
 
     @Test
     void testMLMinMaxScalarForInvalidValue() {
         final TableResult result =
-                tableEnv.executeSql(
-                        "SELECT ML_MIN_MAX_SCALAR(1, 2, 5) AS scaled_value\n;");
+                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALAR(1, 2, 5) AS scaled_value\n;");
         assertThrows(RuntimeException.class, () -> result.collect().next());
     }
 }

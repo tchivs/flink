@@ -154,7 +154,7 @@ public class MLMinMaxScalarFunction extends ScalarFunction {
      * @return the standardized value
      */
     private Double getStandardizedValue(Double value, Double dataMin, Double dataMax) {
-        if (dataMax < dataMin || value<dataMin || value>dataMax) {
+        if (dataMax < dataMin || value < dataMin || value > dataMax) {
             throw new ValidationException(
                     "dataMax value has to be greater than or equal to dataMin and Value has to be between dataMin and DataMax inclusive");
         }
