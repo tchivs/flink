@@ -358,14 +358,6 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
         ObjectIdentifier modelIdentifier = ObjectIdentifier.of("cat1", "db1", "m1");
         catalogManager.createModel(catalogModel, modelIdentifier, true);
 
-        // test alter model with ignoring non existed model error
-        Operation operation = parse("alter model if exists cat1.db1.bad reset ('k1')");
-        assertThat(operation).isInstanceOf(NopOperation.class);
-
-        // test alter model with non existed model error
-        assertThatThrownBy(() -> parse("alter model cat1.db1.bad reset ('k1')"))
-                .hasMessageContaining("Model with identifier `cat1`.`db1`.`bad` doesn't exist");
-
         final String[] renameModelSqls =
                 new String[] {
                     "alter model cat1.db1.m1 rename to m2",
@@ -376,7 +368,7 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
         final ObjectIdentifier expectedNewIdentifier = ObjectIdentifier.of("cat1", "db1", "m2");
         // test rename table converter
         for (String renameModelSql : renameModelSqls) {
-            operation = parse(renameModelSql);
+            Operation operation = parse(renameModelSql);
             assertThat(operation).isInstanceOf(AlterModelRenameOperation.class);
             final AlterModelRenameOperation alterModelRenameOperation =
                     (AlterModelRenameOperation) operation;
@@ -386,7 +378,7 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
                     .isEqualTo(expectedNewIdentifier);
         }
         // test alter model properties with existing key: 'k1'
-        operation =
+        Operation operation =
                 parse("alter model if exists cat1.db1.m1 set ('k1' = 'v1_altered', 'K2' = 'V2')");
         Map<String, String> expectedModelProperties = new HashMap<>();
         expectedModelProperties.put("K1", "v1_altered");
@@ -411,21 +403,6 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
                 .isEqualTo(expectedIdentifier);
         assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
                 .isEqualTo(expectedModelProperties);
-
-        // test alter model reset properties with existing key: 'k1'
-        operation = parse("alter model if exists cat1.db1.m1 reset ('k1')");
-        assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
-        alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
-        assertThat(alterModelPropertiesOperation.getModelIdentifier())
-                .isEqualTo(expectedIdentifier);
-        expectedModelProperties.clear();
-        assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
-                .isEqualTo(expectedModelProperties);
-
-        // test alter model reset properties empty key not supported
-        assertThatThrownBy(() -> parse("alter model if exists cat1.db1.m1 reset ()"))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("ALTER MODEL RESET does not support empty key");
     }
 
     @Test

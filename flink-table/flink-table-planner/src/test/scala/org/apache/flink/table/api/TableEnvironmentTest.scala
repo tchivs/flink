@@ -2701,7 +2701,7 @@ class TableEnvironmentTest {
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
       .isInstanceOf(classOf[ValidationException])
       .hasMessageContaining(
-        "Model with identifier `default_catalog`.`default_database`.`M1` doesn't exist")
+        "Could not execute AlterModel in path `default_catalog`.`default_database`.`M1`")
   }
 
   @Test
@@ -2747,9 +2747,9 @@ class TableEnvironmentTest {
         |ALTER MODEL M1 RENAME TO M2
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ValidationException])
+      .isInstanceOf(classOf[ModelException])
       .hasMessageContaining(
-        "Model with identifier `default_catalog`.`default_database`.`M1` doesn't exist")
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
   }
 
   @Test
@@ -2759,60 +2759,6 @@ class TableEnvironmentTest {
         |ALTER MODEL IF EXISTS M1 RENAME TO M2
         |""".stripMargin
     tableEnv.executeSql(alterDDL)
-  }
-
-  @Test
-  def testAlterModelReset(): Unit = {
-    val sourceDDL =
-      """
-        |CREATE MODEL M1
-        |  INPUT(f0 char(10), f1 varchar(10))
-        |  OUTPUT(f2 string)
-        |with (
-        |  'task' = 'clustering',
-        |  'provider' = 'openai',
-        |  'openai.endpoint' = 'some-endpoint'
-        |)
-      """.stripMargin
-    tableEnv.executeSql(sourceDDL)
-
-    tableEnv.executeSql("ALTER MODEL M1 RESET ('task')");
-  }
-
-  @Test
-  def testAlterModelResetNonExist(): Unit = {
-    assertThatThrownBy(() => tableEnv.executeSql("ALTER MODEL M1 RESET ('task')"))
-      .isInstanceOf(classOf[ValidationException])
-      .hasMessageContaining(
-        "Model with identifier `default_catalog`.`default_database`.`M1` doesn't exist")
-  }
-
-  @Test
-  def testAlterModelResetWithIfExists(): Unit = {
-    tableEnv.executeSql("ALTER MODEL IF EXISTS M1 RESET ('task')");
-  }
-
-  @Test
-  def testAlterModelRestEmptyOptionKey(): Unit = {
-    val sourceDDL =
-      """
-        |CREATE MODEL M1
-        |  INPUT(f0 char(10), f1 varchar(10))
-        |  OUTPUT(f2 string)
-        |with (
-        |  'task' = 'clustering',
-        |  'provider' = 'openai',
-        |  'openai.endpoint' = 'some-endpoint'
-        |)
-      """.stripMargin
-    tableEnv.executeSql(sourceDDL)
-
-    assertThatThrownBy(
-      () =>
-        tableEnv
-          .executeSql("ALTER MODEL M1 RESET ()"))
-      .isInstanceOf(classOf[ValidationException])
-      .hasMessageContaining("ALTER MODEL RESET does not support empty key");
   }
 
   @Test
@@ -2950,9 +2896,9 @@ class TableEnvironmentTest {
         |ALTER MODEL M1 RENAME TO M2
         |""".stripMargin
     assertThatThrownBy(() => tableEnv.executeSql(alterDDL))
-      .isInstanceOf(classOf[ValidationException])
+      .isInstanceOf(classOf[ModelException])
       .hasMessageContaining(
-        "Model with identifier `default_catalog`.`default_database`.`M1` doesn't exist")
+        "Could not execute ALTER MODEL default_catalog.default_database.M1 RENAME TO default_catalog.default_database.M2")
   }
 
   @Test
