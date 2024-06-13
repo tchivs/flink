@@ -10,6 +10,7 @@ import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
@@ -237,6 +238,7 @@ public class UnionUtil {
             case DECIMAL:
                 return DecimalData.fromBigDecimal(new BigDecimal("100.001"), 6, 3);
             case BINARY:
+                return new byte[((BinaryType) logicalType).getLength()];
             case VARBINARY:
                 return new byte[] {0, 1};
             case ROW:
@@ -322,6 +324,8 @@ public class UnionUtil {
                 return true;
             case FLOAT:
                 return 1.0f;
+            case FIXED:
+                return new GenericData.Fixed(schema, new byte[schema.getFixedSize()]);
             case BYTES:
                 if (avroLogicalType != null
                         && avroLogicalType.getName().equals(LogicalTypes.decimal(6).getName())) {

@@ -6,6 +6,7 @@ package io.confluent.flink.formats.converters.avro;
 
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
@@ -114,6 +115,20 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.builder().bytesType(),
                         new VarBinaryType(false, VarBinaryType.MAX_LENGTH)),
+                new TypeMapping(
+                        SchemaBuilder.builder()
+                                .bytesBuilder()
+                                .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
+                                .endBytes(),
+                        new VarBinaryType(false, 123)),
+                new TypeMapping(
+                        SchemaBuilder.builder()
+                                // that depends on the field name, here it is equal to the
+                                // top row, because we test individual types
+                                .fixed("row")
+                                .namespace("io.confluent")
+                                .size(123),
+                        new BinaryType(false, 123)),
                 new TypeMapping(
                         SchemaBuilder.builder().stringType(),
                         new VarCharType(false, VarCharType.MAX_LENGTH)),

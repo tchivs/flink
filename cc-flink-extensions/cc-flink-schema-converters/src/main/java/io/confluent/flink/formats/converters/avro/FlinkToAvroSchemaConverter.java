@@ -96,8 +96,9 @@ public class FlinkToAvroSchemaConverter {
                     return stringType;
                 }
             case BINARY:
+                return convertBinary((BinaryType) logicalType, rowName);
             case VARBINARY:
-                return convertBinary(logicalType, rowName);
+                return convertVarBinary((VarBinaryType) logicalType);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertLocalTimestamp((LocalZonedTimestampType) logicalType);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
@@ -269,22 +270,17 @@ public class FlinkToAvroSchemaConverter {
         return avroLogicalType.addToSchema(longBuilder.endLong());
     }
 
-    private static Schema convertBinary(LogicalType logicalType, String rowName) {
-        final int length;
-        if (logicalType instanceof BinaryType) {
-            length = ((BinaryType) logicalType).getLength();
-        } else if (logicalType instanceof VarBinaryType) {
-            length = ((VarBinaryType) logicalType).getLength();
-        } else {
-            throw new IllegalStateException("Unexpected logical type: " + logicalType);
+    private static Schema convertVarBinary(VarBinaryType varBinaryType) {
+        final Schema bytesType = SchemaBuilder.builder().bytesType();
+        if (varBinaryType.getLength() < VarCharType.MAX_LENGTH) {
+            bytesType.addProp(CommonConstants.FLINK_MAX_LENGTH, varBinaryType.getLength());
         }
+        return bytesType;
+    }
 
-        // max length is the same both for BINARY and VARBINARY
-        if (length == VarBinaryType.MAX_LENGTH) {
-            return SchemaBuilder.builder().bytesType();
-        } else {
-            return SchemaBuilder.fixed(rowName).size(length);
-        }
+    private static Schema convertBinary(BinaryType binaryType, String rowName) {
+        final int length = binaryType.getLength();
+        return SchemaBuilder.fixed(rowName).size(length);
     }
 
     /** Returns schema with nullable true. */

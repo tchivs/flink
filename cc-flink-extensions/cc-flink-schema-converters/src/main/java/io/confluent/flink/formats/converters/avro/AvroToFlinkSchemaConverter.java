@@ -8,6 +8,7 @@ import org.apache.flink.annotation.Confluent;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.BigIntType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.BooleanType;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DateType;
@@ -113,9 +114,14 @@ public class AvroToFlinkSchemaConverter {
                     }
                     return new DecimalType(isOptional, precision, scale);
                 } else if (schema.getType() == Schema.Type.FIXED) {
-                    return new VarBinaryType(isOptional, schema.getFixedSize());
+                    return new BinaryType(isOptional, schema.getFixedSize());
                 } else {
-                    return new VarBinaryType(isOptional, VarBinaryType.MAX_LENGTH);
+                    final int propertyMaxLength =
+                            Optional.ofNullable(
+                                            schema.getObjectProp(CommonConstants.FLINK_MAX_LENGTH))
+                                    .map(i -> (Integer) i)
+                                    .orElse(VarCharType.MAX_LENGTH);
+                    return new VarBinaryType(isOptional, propertyMaxLength);
                 }
             case DOUBLE:
                 return new DoubleType(isOptional);
