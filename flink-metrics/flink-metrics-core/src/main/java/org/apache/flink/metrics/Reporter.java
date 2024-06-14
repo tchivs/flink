@@ -17,7 +17,10 @@
 
 package org.apache.flink.metrics;
 
+import org.apache.flink.annotation.Public;
+
 /** Parent interface to all reporters, defining their common lifecycle. */
+@Public
 public interface Reporter {
     // ------------------------------------------------------------------------
     //  life cycle

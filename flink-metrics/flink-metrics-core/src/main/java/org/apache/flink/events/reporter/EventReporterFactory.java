@@ -27,7 +27,7 @@ import java.util.Properties;
  *
  * <p>Event reporters that can be instantiated with a factory automatically qualify for being loaded
  * as a plugin, so long as the reporter jar is self-contained (excluding Flink dependencies) and
- * contains a {@code META-INF/services/org.apache.flink.traces.reporter.SpanReporterFactory} file
+ * contains a {@code META-INF/services/org.apache.flink.events.reporter.EventReporterFactory} file
  * containing the qualified class name of the factory.
  */
 @Experimental
