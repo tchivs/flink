@@ -21,11 +21,11 @@ package org.apache.flink.table.planner.operations;
 import org.apache.flink.sql.parser.ddl.SqlAlterModel;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelRename;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelSet;
-import org.apache.flink.sql.parser.ddl.SqlTableOption;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.ModelChange;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.operations.Operation;
@@ -34,9 +34,9 @@ import org.apache.flink.table.operations.ddl.AlterModelRenameOperation;
 
 import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /** Helper class for converting {@link SqlAlterModel} to {@link AlterModelOptionsOperation}. */
 public class SqlAlterModelConverter {
@@ -61,13 +61,17 @@ public class SqlAlterModelConverter {
                     modelIdentifier, newModelIdentifier, sqlAlterModel.ifModelExists());
         } else if (sqlAlterModel instanceof SqlAlterModelSet) {
             SqlAlterModelSet sqlAlterModelSet = (SqlAlterModelSet) sqlAlterModel;
-            Map<String, String> changeModelOptions = getModelOptions(sqlAlterModelSet);
+            Map<String, String> changeModelOptions = sqlAlterModelSet.getModelOptions();
+            List<ModelChange> modelChanges = new ArrayList<>();
+            changeModelOptions.forEach(
+                    (key, value) -> modelChanges.add(ModelChange.set(key, value)));
             return new AlterModelOptionsOperation(
                     modelIdentifier,
                     CatalogModel.of(
                             Schema.newBuilder().build(),
                             Schema.newBuilder().build(),
                             changeModelOptions,
+                            modelChanges,
                             null),
                     sqlAlterModel.ifModelExists());
         } else {
@@ -76,20 +80,5 @@ public class SqlAlterModelConverter {
                             "[%s] needs to implement",
                             sqlAlterModel.toSqlString(CalciteSqlDialect.DEFAULT)));
         }
-    }
-
-    private Map<String, String> getModelOptions(SqlAlterModelSet sqlAlterModelSet) {
-        Map<String, String> options = new HashMap<>();
-        sqlAlterModelSet
-                .getModelOptionList()
-                .getList()
-                .forEach(
-                        p ->
-                                options.put(
-                                        ((SqlTableOption) Objects.requireNonNull(p))
-                                                .getKeyString()
-                                                .toUpperCase(),
-                                        ((SqlTableOption) p).getValueString()));
-        return options;
     }
 }

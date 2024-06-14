@@ -22,6 +22,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.util.Preconditions;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -78,6 +79,11 @@ public final class DefaultResolvedCatalogModel implements ResolvedCatalogModel, 
     @Override
     public Map<String, String> getOptions() {
         return origin.getOptions();
+    }
+
+    @Override
+    public List<ModelChange> getModelChanges() {
+        return origin.getModelChanges();
     }
 
     @Override

@@ -31,7 +31,7 @@ public interface ModelChange {
      * <p>It is equal to the following statement:
      *
      * <pre>
-     *
+     *     ALTER MODEL &lt;model_name&gt; SET (key=value);
      * </pre>
      *
      * @param key the option name to set.
@@ -42,10 +42,31 @@ public interface ModelChange {
         return new SetOption(key, value);
     }
 
+    /**
+     * A model change to reset the model option.
+     *
+     * <p>It is equal to the following statement:
+     *
+     * <pre>
+     *     ALTER MODEL &lt;model_name&gt; RESET (key)
+     * </pre>
+     *
+     * @param key the option name to set.
+     * @return a ModelChange represents the modification.
+     */
     static ResetOption reset(String key) {
         return new ResetOption(key);
     }
 
+    /**
+     * A model change to set the model option.
+     *
+     * <p>It is equal to the following statement:
+     *
+     * <pre>
+     *    ALTER TABLE &lt;model_name&gt; SET (key=value);
+     * </pre>
+     */
     @PublicEvolving
     class SetOption implements ModelChange {
         private final String key;
@@ -56,12 +77,10 @@ public interface ModelChange {
             this.value = value;
         }
 
-        /** Returns the Option key to set. */
         public String getKey() {
             return key;
         }
 
-        /** Returns the Option value to set. */
         public String getValue() {
             return value;
         }
@@ -89,6 +108,15 @@ public interface ModelChange {
         }
     }
 
+    /**
+     * A model change to reset the model option.
+     *
+     * <p>It is equal to the following statement:
+     *
+     * <pre>
+     *    ALTER TABLE &lt;model_name&gt; RESET (key);
+     * </pre>
+     */
     @PublicEvolving
     class ResetOption implements ModelChange {
         private final String key;

@@ -27,7 +27,10 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.util.ImmutableNullableList;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -49,8 +52,18 @@ public class SqlAlterModelSet extends SqlAlterModel {
                 requireNonNull(modelOptionList, "modelOptionList should not be null");
     }
 
-    public SqlNodeList getModelOptionList() {
-        return modelOptionList;
+    public Map<String, String> getModelOptions() {
+        Map<String, String> options = new HashMap<>();
+        modelOptionList
+                .getList()
+                .forEach(
+                        p ->
+                                options.put(
+                                        ((SqlTableOption) Objects.requireNonNull(p))
+                                                .getKeyString()
+                                                .toUpperCase(),
+                                        ((SqlTableOption) p).getValueString()));
+        return options;
     }
 
     @Override
