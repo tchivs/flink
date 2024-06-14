@@ -16,6 +16,7 @@ import org.apache.flink.table.utils.EncodingUtils;
 import io.confluent.flink.table.catalog.CatalogInfo;
 import io.confluent.flink.table.catalog.ConfluentCatalog;
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
+import io.confluent.flink.table.catalog.ConfluentCatalogView;
 import io.confluent.flink.table.catalog.ConfluentSystemCatalog;
 import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.connectors.InfoSchemaTableFactory;
@@ -472,7 +473,7 @@ public class InfoSchemaTables {
 
         final String view = sql.toString();
 
-        return CatalogView.of(table.schema, "SYSTEM", view, view, Collections.emptyMap());
+        return new ConfluentCatalogView(table.schema, "SYSTEM", view, view);
     }
 
     private static ConfluentCatalogTable getTable(InfoSchemaTable table) {

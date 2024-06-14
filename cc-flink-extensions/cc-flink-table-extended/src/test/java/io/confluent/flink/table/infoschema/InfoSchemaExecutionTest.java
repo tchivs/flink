@@ -20,6 +20,7 @@ import org.apache.flink.table.data.StringData;
 import io.confluent.flink.table.catalog.CatalogInfo;
 import io.confluent.flink.table.catalog.ConfluentCatalog;
 import io.confluent.flink.table.catalog.ConfluentCatalogTable;
+import io.confluent.flink.table.catalog.ConfluentCatalogView;
 import io.confluent.flink.table.catalog.ConfluentSystemCatalog;
 import io.confluent.flink.table.catalog.DatabaseInfo;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
@@ -535,7 +536,13 @@ public class InfoSchemaExecutionTest {
 
             final CatalogBaseTable baseTable = super.getTable(tablePath);
             if (baseTable.getTableKind() == CatalogBaseTable.TableKind.VIEW) {
-                return baseTable;
+                // Make sure we always return ConfluentCatalogView
+                final CatalogView view = (CatalogView) baseTable;
+                return new ConfluentCatalogView(
+                        view.getUnresolvedSchema(),
+                        view.getComment(),
+                        view.getOriginalQuery(),
+                        view.getExpandedQuery());
             }
             // Make sure we always return ConfluentCatalogTable
             final CatalogTable table = (CatalogTable) baseTable;
