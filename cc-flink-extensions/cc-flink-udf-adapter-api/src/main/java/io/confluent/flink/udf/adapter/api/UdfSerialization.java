@@ -10,6 +10,7 @@ import com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 /** Defines serialization apis used by UDFs. */
 public interface UdfSerialization {
@@ -53,6 +54,18 @@ public interface UdfSerialization {
      * @throws IOException on deserialization error.
      */
     Object deserializeReturnValue(ByteString serializedReturnValue) throws IOException;
+
+    /** Batch version of {@code serializeArguments}. */
+    ByteString serializeBatchArguments(List<Object[]> argBatch) throws IOException;
+
+    /** Batch version of {@code deserializeArguments}. */
+    List<Object[]> deserializeBatchArguments(ByteBuffer serialized) throws IOException;
+
+    /** Batch version of {@code serializeReturnValue}. */
+    ByteString serializeBatchReturnValue(List<Object> returnValues) throws IOException;
+
+    /** Batch version of {@code deserializeReturnValue}. */
+    List<Object> deserializeBatchReturnValue(ByteString serializedReturnValues) throws IOException;
 
     /**
      * Serializes the given {@link RemoteUdfSpec} into a {@link ByteString} to send the specs from

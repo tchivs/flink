@@ -22,6 +22,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static io.confluent.flink.udf.adapter.api.AdapterOptions.ADAPTER_HANDLER_BATCH_ENABLED;
+
 /**
  * Generic proxy that forwards calls to the {@link ScalarFunction} specified in the payload as
  * "functionClassName".
@@ -34,6 +36,8 @@ public class ScalarFunctionHandler implements RequestHandler {
             new LinkedBlockingQueue<>();
     private long waitTimeoutMs;
 
+    private boolean batchEnabled;
+
     public ScalarFunctionHandler() {}
 
     @Override
@@ -44,6 +48,7 @@ public class ScalarFunctionHandler implements RequestHandler {
             Configuration configuration = open.getConfiguration();
             waitTimeoutMs =
                     configuration.get(AdapterOptions.ADAPTER_HANDLER_WAIT_TIMEOUT).toMillis();
+            batchEnabled = configuration.get(ADAPTER_HANDLER_BATCH_ENABLED);
             int parallelism = configuration.get(AdapterOptions.ADAPTER_PARALLELISM);
             for (int i = 0; i < parallelism; i++) {
                 String instanceId = UUID.randomUUID().toString();
@@ -69,7 +74,7 @@ public class ScalarFunctionHandler implements RequestHandler {
             if (callAdapter == null) {
                 throw new RuntimeException("Can't get an adapter in time");
             }
-            return callAdapter.call(payload);
+            return batchEnabled ? callAdapter.callBatch(payload) : callAdapter.call(payload);
         } catch (Throwable t) {
             final String errorMsg =
                     String.format(

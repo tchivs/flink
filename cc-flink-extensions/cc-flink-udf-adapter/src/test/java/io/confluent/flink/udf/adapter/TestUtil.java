@@ -96,6 +96,18 @@ public class TestUtil {
                                 DUMMY_CONTEXT)));
     }
 
+    public static List<Object> testInvokeBatch(
+            ScalarFunctionHandler function,
+            List<Object[]> args,
+            RemoteUdfSerialization serialization)
+            throws Throwable {
+        return serialization.deserializeBatchReturnValue(
+                UnsafeByteOperations.unsafeWrap(
+                        function.handleRequest(
+                                serialization.serializeBatchArguments(args).toByteArray(),
+                                DUMMY_CONTEXT)));
+    }
+
     public static RemoteUdfSerialization createSerializers(ScalarFunctionHandler function)
             throws RequestInvocationException {
         return new RemoteUdfSerialization(

@@ -85,6 +85,24 @@ public class RemoteUdfModule implements Module {
                     .defaultValue(false)
                     .withDescription("Whether the async version of udfs are enabled");
 
+    public static final ConfigOption<Boolean> CONFLUENT_REMOTE_UDF_BATCH_ENABLED =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "batch.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether the batch version of udfs are enabled");
+
+    public static final ConfigOption<Integer> CONFLUENT_REMOTE_UDF_BATCH_SIZE =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "batch.size")
+                    .intType()
+                    .defaultValue(500)
+                    .withDescription("The size of a batch for udf requests.");
+
+    public static final ConfigOption<Duration> CONFLUENT_REMOTE_UDF_BATCH_WAIT_TIME_MS =
+            ConfigOptions.key(CONFLUENT_REMOTE_UDF_PREFIX + "batch.wait.time")
+                    .durationType()
+                    .defaultValue(Duration.ofMillis(500))
+                    .withDescription("The wait time for rows to batch");
+
     private final Map<String, FunctionDefinition> normalizedFunctions;
 
     public RemoteUdfModule() {

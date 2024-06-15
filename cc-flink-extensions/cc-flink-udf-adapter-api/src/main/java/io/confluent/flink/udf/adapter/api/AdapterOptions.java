@@ -24,4 +24,10 @@ public class AdapterOptions {
                     .durationType()
                     .defaultValue(Duration.ofMinutes(1))
                     .withDescription("How long to wait for a slot to be handled before giving up.");
+
+    public static final ConfigOption<Boolean> ADAPTER_HANDLER_BATCH_ENABLED =
+            ConfigOptions.key(ADAPTER_PREFIX + "batch.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether batch is enabled or not.");
 }

@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_ENABLED;
 
 /**
  * Class which parses configs to return a list of remote Udfs which can be used for planning. It's
@@ -102,6 +103,7 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
     @Override
     public FunctionKind getKind() {
         return config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)
+                        || config.get(CONFLUENT_REMOTE_UDF_BATCH_ENABLED)
                 ? FunctionKind.ASYNC_SCALAR
                 : FunctionKind.SCALAR;
     }
@@ -135,7 +137,9 @@ public class ConfiguredRemoteScalarFunction extends UserDefinedFunction
                             spec.getReturnType(typeFactory))) {
                 final RemoteUdfSpec remoteUdfSpec = spec.createRemoteUdfSpec(typeFactory);
 
-                if (config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)) {
+                if (config.get(CONFLUENT_REMOTE_UDF_BATCH_ENABLED)) {
+                    return BatchRemoteScalarFunction.create(config, remoteUdfSpec);
+                } else if (config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)) {
                     return AsyncRemoteScalarFunction.create(config, remoteUdfSpec);
                 } else {
                     return RemoteScalarFunction.create(config, remoteUdfSpec);

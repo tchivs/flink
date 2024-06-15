@@ -29,6 +29,7 @@ import static io.confluent.flink.udf.adapter.TestUtil.DUMMY_CONTEXT;
 import static io.confluent.flink.udf.adapter.TestUtil.createSerializedOpenPayload;
 import static io.confluent.flink.udf.adapter.TestUtil.createSerializers;
 import static io.confluent.flink.udf.adapter.TestUtil.testInvoke;
+import static io.confluent.flink.udf.adapter.TestUtil.testInvokeBatch;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -249,6 +250,43 @@ public class ScalarFunctionHandlerTest {
                                         serializers)
                                 .toString())
                 .isEqualTo("blah null");
+        functionHandler.close(new byte[0], DUMMY_CONTEXT);
+    }
+
+    @Test
+    public void testInvokeConcatFunctionWithBatch() throws Throwable {
+        configuration.set(AdapterOptions.ADAPTER_HANDLER_BATCH_ENABLED, true);
+        functionHandler.open(
+                createSerializedOpenPayload(
+                        "testOrg",
+                        "testEnv",
+                        "pluginUUID",
+                        "pluginVersionUUID",
+                        new VarCharType(Integer.MAX_VALUE),
+                        Arrays.asList(new VarCharType(), new VarCharType()),
+                        ConcatFunction.class.getName(),
+                        true,
+                        configuration),
+                DUMMY_CONTEXT);
+        RemoteUdfSerialization serializers = createSerializers(functionHandler);
+        assertThat(
+                        testInvokeBatch(
+                                functionHandler,
+                                Arrays.asList(
+                                        new Object[] {
+                                            StringData.fromString("a"), StringData.fromString("b")
+                                        },
+                                        new Object[] {
+                                            StringData.fromString("c"), StringData.fromString("d")
+                                        },
+                                        new Object[] {
+                                            StringData.fromString("e"), StringData.fromString("f")
+                                        }),
+                                serializers))
+                .containsExactly(
+                        StringData.fromString("ab"),
+                        StringData.fromString("cd"),
+                        StringData.fromString("ef"));
         functionHandler.close(new byte[0], DUMMY_CONTEXT);
     }
 

@@ -64,6 +64,10 @@ public class RemoteUdfMetrics {
         invocations.inc();
     }
 
+    public void invocation(long amt) {
+        invocations.inc(amt);
+    }
+
     public void invocationMs(long invocationMs) {
         lastInvocationMs.set(invocationMs);
     }
@@ -72,8 +76,16 @@ public class RemoteUdfMetrics {
         invocationSuccesses.inc();
     }
 
+    public void invocationSuccess(long amt) {
+        invocationSuccesses.inc(amt);
+    }
+
     public void invocationFailure() {
         invocationFailures.inc();
+    }
+
+    public void invocationFailure(long amt) {
+        invocationFailures.inc(amt);
     }
 
     public void instanceProvision() {

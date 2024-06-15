@@ -31,12 +31,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static io.confluent.flink.apiserver.client.model.ComputeV1FlinkUdfTaskStatus.PhaseEnum.RUNNING;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_ENABLED;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.createApiServerUdfTask;
 import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.generateUdfTaskFromSpec;
@@ -182,6 +184,37 @@ public class RemoteUdfRuntime implements AutoCloseable {
                 directExecutor());
     }
 
+    public List<Object> callRemoteUdfBatch(List<Object[]> batchArgs) throws Exception {
+        ByteString serializedArguments = udfSerialization.serializeBatchArguments(batchArgs);
+        metrics.bytesToUdf(serializedArguments.size());
+        InvokeFunctionRequest request =
+                InvokeFunctionRequest.newBuilder()
+                        .setFuncInstanceName(functionInstanceName)
+                        .setPayload(serializedArguments)
+                        .build();
+        // TRAFFIC-11799: Avoid transient connectivity issues for EA
+        InvokeFunctionResponse invokeResponse =
+                remoteUdfGatewayConnection
+                        .getCallWithRetry()
+                        .call(
+                                () ->
+                                        remoteUdfGatewayConnection
+                                                .getUdfGateway()
+                                                .withDeadlineAfter(
+                                                        remoteUdfGatewayConnection
+                                                                .getDeadlineSeconds(),
+                                                        TimeUnit.SECONDS)
+                                                .withCallCredentials(
+                                                        new UdfCallCredentials(
+                                                                credentialsCache, jobID))
+                                                .invokeFunction(request));
+
+        checkAndHandleError(invokeResponse);
+        ByteString serializedResult = invokeResponse.getPayload();
+        metrics.bytesFromUdf(serializedResult.size());
+        return udfSerialization.deserializeBatchReturnValue(serializedResult);
+    }
+
     /**
      * Opens the runtime. This includes opening a connection to the gateway.
      *
@@ -198,14 +231,7 @@ public class RemoteUdfRuntime implements AutoCloseable {
             KafkaCredentialsCache credentialsCache,
             JobID jobID)
             throws Exception {
-        final UdfSerialization udfSerialization =
-                config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)
-                        ? new ThreadLocalRemoteUdfSerialization(
-                                remoteUdfSpec.createReturnTypeSerializer(),
-                                remoteUdfSpec.createArgumentSerializers())
-                        : new RemoteUdfSerialization(
-                                remoteUdfSpec.createReturnTypeSerializer(),
-                                remoteUdfSpec.createArgumentSerializers());
+        final UdfSerialization udfSerialization = createUdfSerialization(config, remoteUdfSpec);
         final String jobName = config.getString(JOB_NAME);
         Preconditions.checkArgument(!jobName.isEmpty(), "Job Name must be set");
 
@@ -272,6 +298,24 @@ public class RemoteUdfRuntime implements AutoCloseable {
         IOUtils.closeQuietly(remoteUdfGatewayConnection);
         ApiServerUtils.deleteUdfTask(config, apiClient, udfTask);
         udfSerialization.close();
+    }
+
+    /** Creates a UdfSerialization based on the UDF implementation. */
+    private static UdfSerialization createUdfSerialization(
+            Configuration config, RemoteUdfSpec remoteUdfSpec) {
+        if (config.get(CONFLUENT_REMOTE_UDF_BATCH_ENABLED)) {
+            return new RemoteUdfSerialization(
+                    remoteUdfSpec.createReturnTypeSerializer(),
+                    remoteUdfSpec.createArgumentSerializers());
+        } else if (config.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)) {
+            return new ThreadLocalRemoteUdfSerialization(
+                    remoteUdfSpec.createReturnTypeSerializer(),
+                    remoteUdfSpec.createArgumentSerializers());
+        } else {
+            return new RemoteUdfSerialization(
+                    remoteUdfSpec.createReturnTypeSerializer(),
+                    remoteUdfSpec.createArgumentSerializers());
+        }
     }
 
     /** Checks the response for an error and throws an exception if there is one. */

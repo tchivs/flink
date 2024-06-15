@@ -15,6 +15,7 @@ import com.google.protobuf.UnsafeByteOperations;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Serialization support for communication between the TM and the remote UDF service. */
@@ -99,6 +100,62 @@ public class RemoteUdfSerialization implements UdfSerialization {
         // TODO: check if it's worth avoiding this buffer copy for performance
         dataInput.setBuffer(serializedReturnValue.toByteArray());
         return returnTypeSerializer.deserialize(dataInput);
+    }
+
+    /** Batch version of {@code serializeArguments}. */
+    @Override
+    public ByteString serializeBatchArguments(List<Object[]> argBatch) throws IOException {
+        dataOutput.clear();
+        dataOutput.writeInt(argBatch.size());
+        for (int j = 0; j < argBatch.size(); j++) {
+            Object[] args = argBatch.get(j);
+            Preconditions.checkArgument(argumentSerializers.size() == args.length);
+
+            for (int i = 0; i < args.length; ++i) {
+                argumentSerializers.get(i).serialize(args[i], dataOutput);
+            }
+        }
+        return outputToByteString();
+    }
+
+    /** Batch version of {@code deserializeArguments}. */
+    @Override
+    public List<Object[]> deserializeBatchArguments(ByteBuffer serialized) throws IOException {
+        dataInput.setBuffer(serialized);
+        int batchSize = dataInput.readInt();
+        List<Object[]> args = new ArrayList<>(batchSize);
+        for (int j = 0; j < batchSize; j++) {
+            Object[] output = new Object[argumentSerializers.size()];
+            for (int i = 0; i < argumentSerializers.size(); ++i) {
+                output[i] = argumentSerializers.get(i).deserialize(dataInput);
+            }
+            args.add(output);
+        }
+        return args;
+    }
+
+    /** Batch version of {@code serializeReturnValue}. */
+    @Override
+    public ByteString serializeBatchReturnValue(List<Object> returnValues) throws IOException {
+        dataOutput.clear();
+        dataOutput.writeInt(returnValues.size());
+        for (int j = 0; j < returnValues.size(); j++) {
+            returnTypeSerializer.serialize(returnValues.get(j), dataOutput);
+        }
+        return outputToByteString();
+    }
+
+    /** Batch version of {@code deserializeReturnValue}. */
+    @Override
+    public List<Object> deserializeBatchReturnValue(ByteString serializedReturnValues)
+            throws IOException {
+        dataInput.setBuffer(serializedReturnValues.toByteArray());
+        ArrayList<Object> result = new ArrayList<>();
+        int batchSize = dataInput.readInt();
+        for (int i = 0; i < batchSize; i++) {
+            result.add(returnTypeSerializer.deserialize(dataInput));
+        }
+        return result;
     }
 
     /**

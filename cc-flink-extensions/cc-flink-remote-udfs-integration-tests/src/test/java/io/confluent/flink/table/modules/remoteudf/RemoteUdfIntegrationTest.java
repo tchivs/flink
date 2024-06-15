@@ -80,11 +80,15 @@ import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVIS
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfMetrics.PROVISIONS_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_APISERVER;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_SIZE;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_WAIT_TIME_MS;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfRuntime.AUTH_METADATA;
 import static io.confluent.flink.table.modules.remoteudf.utils.ApiServerUtils.LABEL_JOB_ID;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -124,6 +128,8 @@ public class RemoteUdfIntegrationTest {
                         "remote1",
                         ImmutableList.of(new String[] {"INT", "STRING", "INT"}),
                         ImmutableList.of("STRING")),
+                new MockedFunctionWithTypes(
+                        "remote2", ImmutableList.of(new String[] {"INT"}), ImmutableList.of("INT")),
                 new MockedFunctionWithTypes(
                         "error",
                         ImmutableList.of(new String[] {"INT", "STRING", "INT"}),
@@ -171,7 +177,9 @@ public class RemoteUdfIntegrationTest {
                                     Thread.currentThread().getContextClassLoader());
                     RemoteUdfSpec udfSpec = open.getRemoteUdfSpec();
                     Configuration configuration = open.getConfiguration();
-                    testUdfGateway.registerUdfSpec(udfSpec);
+                    testUdfGateway.registerUdfSpec(
+                            udfSpec,
+                            configuration.get(AdapterOptions.ADAPTER_HANDLER_BATCH_ENABLED));
 
                     Assertions.assertEquals(
                             123, configuration.get(AdapterOptions.ADAPTER_PARALLELISM));
@@ -240,6 +248,7 @@ public class RemoteUdfIntegrationTest {
     private void testRemoteUdfGatewayInternal(
             boolean jss,
             boolean async,
+            boolean batch,
             String query,
             Consumer<List<Row>> responseValidation,
             Consumer<Map<String, Metric>> metricsValidation)
@@ -250,6 +259,7 @@ public class RemoteUdfIntegrationTest {
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
+        confMap.put(CONFLUENT_REMOTE_UDF_BATCH_ENABLED.key(), Boolean.toString(batch));
         confMap.put(AdapterOptions.ADAPTER_PARALLELISM.key(), Integer.toString(123));
         final TableEnvironment tEnv =
                 jss
@@ -284,6 +294,78 @@ public class RemoteUdfIntegrationTest {
         metricsValidation.accept(metrics);
     }
 
+    private void testRemoteUdfGatewayInternalBatch(boolean jss) throws Exception {
+        Map<String, String> confMap = new HashMap<>();
+        confMap.put(JOB_NAME.key(), TEST_JOB_NAME);
+        confMap.put(CONFLUENT_REMOTE_UDF_APISERVER.key(), apiServerContainer.getHostAddress());
+        confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
+        confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
+        confMap.put(CONFLUENT_REMOTE_UDF_BATCH_ENABLED.key(), Boolean.toString(true));
+        confMap.put(AdapterOptions.ADAPTER_PARALLELISM.key(), Integer.toString(123));
+        confMap.put(CONFLUENT_REMOTE_UDF_BATCH_SIZE.key(), "500");
+        confMap.put(CONFLUENT_REMOTE_UDF_BATCH_WAIT_TIME_MS.key(), "10000");
+        final TableEnvironment tEnv =
+                jss
+                        ? TestUtils.getJssTableEnvironment(
+                                TEST_ORG, TEST_ENV, confMap, testFunctionMeta)
+                        : TestUtils.getSqlServiceTableEnvironment(
+                                TEST_ORG, TEST_ENV, confMap, testFunctionMeta, true, false);
+        tEnv.getConfig().set(TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY, 500);
+        tEnv.executeSql(
+                "CREATE TABLE Source ("
+                        + "    f INT"
+                        + ") WITH ('connector' = 'datagen',"
+                        + " 'number-of-rows' = '10000',"
+                        + " 'fields.f.kind' = 'sequence',"
+                        + " 'fields.f.start' = '0',"
+                        + " 'fields.f.end' = '9999');");
+
+        TableResult result = tEnv.executeSql("SELECT cat1.db1.remote2(f) from Source;");
+
+        JobID jobID = result.getJobClient().get().getJobID();
+        createCredentialsFor(jobID);
+        final List<Row> results = new ArrayList<>();
+        try (CloseableIterator<Row> collect = result.collect()) {
+            collect.forEachRemaining(results::add);
+        }
+        Assertions.assertEquals(10000, results.size());
+        for (int i = 0; i < 20; i++) {
+            for (int j = 0; j < 500; j++) {
+                Row row = results.get(i * 500 + j);
+                Assertions.assertEquals(j, row.getField(0));
+            }
+        }
+
+        Collection<ComputeV1FlinkUdfTask> udfTasks =
+                ApiServerContainerUtils.listUdfTasksWithStatus(
+                        apiServerContainer, TEST_ORG, TEST_ENV, "Running");
+        Assertions.assertEquals(0, udfTasks.size());
+
+        Optional<MetricGroup> group =
+                REPORTER.findGroups(METRIC_NAME).stream()
+                        .filter(
+                                g ->
+                                        g.getAllVariables()
+                                                .get(ScopeFormat.SCOPE_JOB_ID)
+                                                .equals(jobID.toHexString()))
+                        .findFirst();
+        Assertions.assertTrue(group.isPresent());
+        Map<String, Metric> metrics = REPORTER.getMetricsByGroup(group.get());
+        Assertions.assertEquals(10000, getCounter(metrics, INVOCATION_NAME));
+        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(10000, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
+        Assertions.assertEquals(0, getCounter(metrics, INVOCATION_FAILURES_NAME));
+        Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(50080, getCounter(metrics, BYTES_TO_UDF_NAME));
+        Assertions.assertEquals(50080, getCounter(metrics, BYTES_FROM_UDF_NAME));
+    }
+
     private void validateSimpleResponse(final List<Row> results) {
         Assertions.assertEquals(1, results.size());
         Row row = results.get(0);
@@ -296,23 +378,23 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals("str:[null, null, 4]", row.getField(0));
     }
 
-    private void validateSimpleMetrics(Map<String, Metric> metrics) {
-        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
-        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
-        Assertions.assertEquals(0, getCounter(metrics, INVOCATION_FAILURES_NAME));
-        Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
-        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
-        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(19, getCounter(metrics, BYTES_TO_UDF_NAME));
-        Assertions.assertEquals(21, getCounter(metrics, BYTES_FROM_UDF_NAME));
+    private void validateStreamingSimpleMetrics(Map<String, Metric> metrics) {
+        validateSimpleMetrics(metrics, 19, 21);
     }
 
-    private void validateNullMetrics(Map<String, Metric> metrics) {
+    private void validateBatchSimpleMetrics(Map<String, Metric> metrics) {
+        validateSimpleMetrics(metrics, 23, 25);
+    }
+
+    private void validateStreamingNullMetrics(Map<String, Metric> metrics) {
+        validateSimpleMetrics(metrics, 7, 24);
+    }
+
+    private void validateBatchNullMetrics(Map<String, Metric> metrics) {
+        validateSimpleMetrics(metrics, 11, 28);
+    }
+
+    private void validateSimpleMetrics(Map<String, Metric> metrics, int toBytes, int fromBytes) {
         Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
         Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
         Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
@@ -324,8 +406,32 @@ public class RemoteUdfIntegrationTest {
         Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
         Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
         Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(7, getCounter(metrics, BYTES_TO_UDF_NAME));
-        Assertions.assertEquals(24, getCounter(metrics, BYTES_FROM_UDF_NAME));
+        Assertions.assertEquals(toBytes, getCounter(metrics, BYTES_TO_UDF_NAME));
+        Assertions.assertEquals(fromBytes, getCounter(metrics, BYTES_FROM_UDF_NAME));
+    }
+
+    private void validateStreamingErrorMetrics(Map<String, Metric> metrics) {
+        validateErrorMetrics(metrics, 19, 0);
+    }
+
+    private void validateBatchErrorMetrics(Map<String, Metric> metrics) {
+        validateErrorMetrics(metrics, 23, 0);
+    }
+
+    private void validateErrorMetrics(Map<String, Metric> metrics, int toBytes, int fromBytes) {
+        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
+        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(0, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
+        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_FAILURES_NAME));
+        Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
+        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
+        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
+        Assertions.assertEquals(toBytes, getCounter(metrics, BYTES_TO_UDF_NAME));
+        Assertions.assertEquals(fromBytes, getCounter(metrics, BYTES_FROM_UDF_NAME));
     }
 
     private void createCredentialsFor(JobID jobID) {
@@ -338,9 +444,10 @@ public class RemoteUdfIntegrationTest {
         testRemoteUdfGatewayInternal(
                 false,
                 false,
+                false,
                 SIMPLE_QUERY,
                 this::validateSimpleResponse,
-                this::validateSimpleMetrics);
+                this::validateStreamingSimpleMetrics);
     }
 
     @Test
@@ -348,9 +455,10 @@ public class RemoteUdfIntegrationTest {
         testRemoteUdfGatewayInternal(
                 true,
                 false,
+                false,
                 SIMPLE_QUERY,
                 this::validateSimpleResponse,
-                this::validateSimpleMetrics);
+                this::validateStreamingSimpleMetrics);
     }
 
     @Test
@@ -358,9 +466,10 @@ public class RemoteUdfIntegrationTest {
         testRemoteUdfGatewayInternal(
                 false,
                 true,
+                false,
                 SIMPLE_QUERY,
                 this::validateSimpleResponse,
-                this::validateSimpleMetrics);
+                this::validateStreamingSimpleMetrics);
     }
 
     @Test
@@ -368,21 +477,70 @@ public class RemoteUdfIntegrationTest {
         testRemoteUdfGatewayInternal(
                 true,
                 true,
+                false,
                 SIMPLE_QUERY,
                 this::validateSimpleResponse,
-                this::validateSimpleMetrics);
+                this::validateStreamingSimpleMetrics);
+    }
+
+    @Test
+    public void testRemoteUdfGatewayBatch() throws Exception {
+        testRemoteUdfGatewayInternal(
+                false,
+                false,
+                true,
+                SIMPLE_QUERY,
+                this::validateSimpleResponse,
+                this::validateBatchSimpleMetrics);
+    }
+
+    @Test
+    public void testRemoteUdfGatewayBatch_jss() throws Exception {
+        testRemoteUdfGatewayInternal(
+                true,
+                false,
+                true,
+                SIMPLE_QUERY,
+                this::validateSimpleResponse,
+                this::validateBatchSimpleMetrics);
+    }
+
+    @Test
+    public void testRemoteUdfGateway_largeBatch() throws Exception {
+        testRemoteUdfGatewayInternalBatch(false);
     }
 
     @Test
     public void testRemoteUdfGateway_null() throws Exception {
         testRemoteUdfGatewayInternal(
-                false, false, NULL_QUERY, this::validateNullResponse, this::validateNullMetrics);
+                false,
+                false,
+                false,
+                NULL_QUERY,
+                this::validateNullResponse,
+                this::validateStreamingNullMetrics);
     }
 
     @Test
     public void testRemoteUdfGateway_AsyncNull() throws Exception {
         testRemoteUdfGatewayInternal(
-                false, true, NULL_QUERY, this::validateNullResponse, this::validateNullMetrics);
+                false,
+                true,
+                false,
+                NULL_QUERY,
+                this::validateNullResponse,
+                this::validateStreamingNullMetrics);
+    }
+
+    @Test
+    public void testRemoteUdfGateway_BatchNull() throws Exception {
+        testRemoteUdfGatewayInternal(
+                false,
+                false,
+                true,
+                NULL_QUERY,
+                this::validateNullResponse,
+                this::validateBatchNullMetrics);
     }
 
     @Test
@@ -407,21 +565,28 @@ public class RemoteUdfIntegrationTest {
 
     @Test
     public void testRemoteUdfGateway_error() {
-        testRemoteUdfGatewayError(false);
+        testRemoteUdfGatewayError(false, false, this::validateStreamingErrorMetrics);
     }
 
     @Test
     public void testRemoteUdfGatewayAsync_error() {
-        testRemoteUdfGatewayError(true);
+        testRemoteUdfGatewayError(true, false, this::validateStreamingErrorMetrics);
     }
 
-    private void testRemoteUdfGatewayError(boolean async) {
+    @Test
+    public void testRemoteUdfGatewayBatch_error() {
+        testRemoteUdfGatewayError(true, true, this::validateBatchErrorMetrics);
+    }
+
+    private void testRemoteUdfGatewayError(
+            boolean async, boolean batch, Consumer<Map<String, Metric>> metricsValidation) {
         Map<String, String> confMap = new HashMap<>();
         confMap.put(JOB_NAME.key(), TEST_JOB_NAME);
         confMap.put(CONFLUENT_REMOTE_UDF_APISERVER.key(), apiServerContainer.getHostAddress());
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_PLUGIN_ID.key(), "cpp-udf-shim");
         confMap.put(CONFLUENT_REMOTE_UDF_SHIM_VERSION_ID.key(), "ver-udf-shim-1");
         confMap.put(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED.key(), Boolean.toString(async));
+        confMap.put(CONFLUENT_REMOTE_UDF_BATCH_ENABLED.key(), Boolean.toString(batch));
         confMap.put(AdapterOptions.ADAPTER_PARALLELISM.key(), Integer.toString(123));
         final TableEnvironment tEnv =
                 TestUtils.getSqlServiceTableEnvironment(
@@ -441,19 +606,7 @@ public class RemoteUdfIntegrationTest {
                         .findFirst();
         Assertions.assertTrue(group.isPresent());
         Map<String, Metric> metrics = REPORTER.getMetricsByGroup(group.get());
-        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_NAME));
-        Assertions.assertTrue(getGauge(metrics, INVOCATION_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, INVOCATION_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(0, getCounter(metrics, INVOCATION_SUCCESSES_NAME));
-        Assertions.assertEquals(1, getCounter(metrics, INVOCATION_FAILURES_NAME));
-        Assertions.assertEquals(1, getCounter(metrics, PROVISIONS_NAME));
-        Assertions.assertTrue(getGauge(metrics, PROVISIONS_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, PROVISIONS_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(1, getCounter(metrics, DEPROVISIONS_NAME));
-        Assertions.assertTrue(getGauge(metrics, DEPROVISIONS_MS_NAME).isPresent());
-        Assertions.assertTrue((Long) getGauge(metrics, DEPROVISIONS_MS_NAME).get().getValue() > 0);
-        Assertions.assertEquals(19, getCounter(metrics, BYTES_TO_UDF_NAME));
-        Assertions.assertEquals(0, getCounter(metrics, BYTES_FROM_UDF_NAME));
+        metricsValidation.accept(metrics);
     }
 
     private void assertCause(String str, Throwable t) {

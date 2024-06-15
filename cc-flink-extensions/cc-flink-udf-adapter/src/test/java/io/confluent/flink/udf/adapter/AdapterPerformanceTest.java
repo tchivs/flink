@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static io.confluent.flink.udf.adapter.api.AdapterOptions.ADAPTER_HANDLER_BATCH_ENABLED;
+
 /**
  * Small performance test to compare the overhead of the adapter and serialization against a direct
  * call.
@@ -75,6 +77,67 @@ public class AdapterPerformanceTest {
                 in.setBuffer(retBytes);
                 Object resultObject = retTypeSerializer.deserialize(in);
                 sum += (Integer) resultObject;
+            }
+            handler.close(new byte[0], TestUtil.DUMMY_CONTEXT);
+            System.out.println(System.currentTimeMillis() - t);
+            System.out.println(sum);
+        }
+    }
+
+    @Test
+    public void testAdapterBatch() throws Throwable {
+        for (int k = 0; k < ITERATIONS; ++k) {
+            final String pluginUUID = UUID.randomUUID().toString();
+            final String pluginVersionUUID = UUID.randomUUID().toString();
+            final LogicalType retType = new IntType();
+            final List<LogicalType> argTypes = Arrays.asList(new IntType(), new IntType());
+            final String functionClass = SumScalarFunction.class.getName();
+            final TypeSerializer<Object> retTypeSerializer =
+                    NullableSerializer.wrapIfNullIsNotSupported(
+                            InternalSerializers.create(retType), false);
+            final List<TypeSerializer<Object>> argTypeSerializers =
+                    argTypes.stream()
+                            .map(InternalSerializers::create)
+                            .map(ts -> NullableSerializer.wrapIfNullIsNotSupported(ts, false))
+                            .collect(Collectors.toList());
+            int batchSize = 1000;
+
+            DataOutputSerializer out = new DataOutputSerializer(8);
+            Configuration configuration = new Configuration();
+            configuration.set(ADAPTER_HANDLER_BATCH_ENABLED, true);
+            TestUtil.writeSerializedOpenPayload(
+                    "testOrg",
+                    "testEnv",
+                    pluginUUID,
+                    pluginVersionUUID,
+                    retType,
+                    argTypes,
+                    functionClass,
+                    true,
+                    out,
+                    configuration);
+            byte[] openPayloadBytes = out.getCopyOfBuffer();
+            final ScalarFunctionHandler handler = new ScalarFunctionHandler();
+            handler.open(openPayloadBytes, TestUtil.DUMMY_CONTEXT);
+            int sum = 0;
+            DataInputDeserializer in = new DataInputDeserializer();
+            long t = System.currentTimeMillis();
+            for (int i = 0; i < CALLS; ) {
+                out.clear();
+                out.writeInt(batchSize);
+                for (int j = 0; j < batchSize && i < CALLS; ++i, ++j) {
+                    for (TypeSerializer<Object> argTypeSerializer : argTypeSerializers) {
+                        argTypeSerializer.serialize(i, out);
+                    }
+                }
+                byte[] retBytes =
+                        handler.handleRequest(out.getSharedBuffer(), TestUtil.DUMMY_CONTEXT);
+                in.setBuffer(retBytes);
+                int returnedBatchSize = in.readInt();
+                for (int j = 0; j < returnedBatchSize; ++j) {
+                    Object resultObject = retTypeSerializer.deserialize(in);
+                    sum += (Integer) resultObject;
+                }
             }
             handler.close(new byte[0], TestUtil.DUMMY_CONTEXT);
             System.out.println(System.currentTimeMillis() - t);

@@ -20,11 +20,14 @@ import io.grpc.stub.StreamObserver;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /** Mock implementation of the UDF gateway. */
 public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGatewayImplBase {
     private final AtomicReference<RemoteUdfSpec> testUdfSpecReference = new AtomicReference<>();
+    private boolean batch;
 
     @Override
     public void invokeFunction(
@@ -42,21 +45,53 @@ public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGate
             RemoteUdfSerialization serialization =
                     new RemoteUdfSerialization(
                             testUdfSpec.createReturnTypeSerializer(), argumentSerializers);
+
+            List<Object[]> argumentsBatch = null;
             Object[] args = new Object[argumentSerializers.size()];
-            serialization.deserializeArguments(request.getPayload().asReadOnlyByteBuffer(), args);
+            if (batch) {
+                argumentsBatch =
+                        serialization.deserializeBatchArguments(
+                                request.getPayload().asReadOnlyByteBuffer());
+            } else {
+                serialization.deserializeArguments(
+                        request.getPayload().asReadOnlyByteBuffer(), args);
+            }
             if (testUdfSpec
                     .getReturnType()
                     .getLogicalType()
                     .is(DataTypes.STRING().getLogicalType().getTypeRoot())) {
-                builder.setPayload(
-                        serialization.serializeReturnValue(
-                                BinaryStringData.fromString("str:" + Arrays.asList(args))));
+                if (batch) {
+                    List<Object> results =
+                            argumentsBatch.stream()
+                                    .map(
+                                            a ->
+                                                    BinaryStringData.fromString(
+                                                            "str:" + Arrays.asList(a)))
+                                    .collect(Collectors.toList());
+
+                    builder.setPayload(serialization.serializeBatchReturnValue(results));
+                } else {
+                    builder.setPayload(
+                            serialization.serializeReturnValue(
+                                    BinaryStringData.fromString("str:" + Arrays.asList(args))));
+                }
             } else if (testUdfSpec
                     .getReturnType()
                     .getLogicalType()
                     .is(DataTypes.INT().getLogicalType().getTypeRoot())) {
-                builder.setPayload(
-                        serialization.serializeReturnValue(TestUtils.EXPECTED_INT_RETURN_VALUE));
+                if (batch) {
+                    AtomicInteger i = new AtomicInteger(0);
+                    List<Object> results =
+                            argumentsBatch.stream()
+                                    .map(a -> i.getAndIncrement())
+                                    .collect(Collectors.toList());
+                    builder.setPayload(serialization.serializeBatchReturnValue(results));
+                } else {
+                    builder.setPayload(
+                            serialization.serializeReturnValue(
+                                    TestUtils.EXPECTED_INT_RETURN_VALUE));
+                }
+
             } else {
                 throw new Exception(
                         "Unknown return type " + testUdfSpec.getReturnType().getLogicalType());
@@ -68,7 +103,8 @@ public class MockedUdfGateway extends SecureComputeGatewayGrpc.SecureComputeGate
         responseObserver.onCompleted();
     }
 
-    public void registerUdfSpec(RemoteUdfSpec udfSpec) {
+    public void registerUdfSpec(RemoteUdfSpec udfSpec, boolean batch) {
+        this.batch = batch;
         testUdfSpecReference.set(udfSpec);
     }
 }

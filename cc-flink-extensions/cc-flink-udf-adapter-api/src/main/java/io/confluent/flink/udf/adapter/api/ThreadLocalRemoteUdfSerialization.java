@@ -57,6 +57,27 @@ public class ThreadLocalRemoteUdfSerialization implements UdfSerialization {
     }
 
     @Override
+    public ByteString serializeBatchArguments(List<Object[]> argBatch) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Object[]> deserializeBatchArguments(ByteBuffer serialized) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteString serializeBatchReturnValue(List<Object> returnValues) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Object> deserializeBatchReturnValue(ByteString serializedReturnValues)
+            throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public ByteString serializeRemoteUdfSpec(RemoteUdfSpec spec, Configuration configuration)
             throws IOException {
         RemoteUdfSerialization serialization = getUdfSerialization();

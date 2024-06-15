@@ -68,6 +68,7 @@ import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResult
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
 import io.confluent.flink.table.service.local.LocalExecution;
 import io.confluent.flink.table.service.summary.QuerySummary;
+import io.confluent.flink.udf.adapter.api.AdapterOptions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang3.StringUtils;
 
@@ -86,6 +87,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static io.confluent.flink.table.modules.remoteudf.BatchRemoteScalarFunction.QUEUE_CAPACITY_BATCH_FACTOR;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_ASYNC_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_ENABLED;
+import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_BATCH_SIZE;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.CONFLUENT_REMOTE_UDF_PREFIX;
 import static io.confluent.flink.table.modules.remoteudf.RemoteUdfModule.JOB_NAME;
 import static io.confluent.flink.table.modules.remoteudf.UdfUtil.FUNCTIONS_PREFIX;
@@ -99,6 +104,7 @@ import static org.apache.flink.table.api.config.ExecutionConfigOptions.IDLE_STAT
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_MAX_ATTEMPTS;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY;
+import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_RETRY_STRATEGY;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_ASYNC_SCALAR_TIMEOUT;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SINK_ROWTIME_INSERTER;
 import static org.apache.flink.table.api.config.ExecutionConfigOptions.TABLE_EXEC_SOURCE_IDLE_TIMEOUT;
@@ -259,20 +265,6 @@ class DefaultServiceTasks implements ServiceTasks {
         tableEnvironment.unloadModule("core");
         tableEnvironment.loadModule("core", CoreProxyModule.INSTANCE);
 
-        // Set these whether remote UDFs are enabled or not, since these configs are used by
-        // all async scalar functions.  Note: Currently only UDFs use async scalar functions.
-        config.set(
-                TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY,
-                privateConfig.get(CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY));
-        config.set(
-                TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY,
-                privateConfig.get(CONFLUENT_REMOTE_UDF_RETRY_DELAY));
-        config.set(
-                TABLE_EXEC_ASYNC_SCALAR_TIMEOUT, privateConfig.get(CONFLUENT_REMOTE_UDF_TIMEOUT));
-        config.set(
-                TABLE_EXEC_ASYNC_SCALAR_MAX_ATTEMPTS,
-                privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
-
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_ML_FUNCTIONS_ENABLED)) {
             tableEnvironment.loadModule("ml", new MLFunctionsModule());
@@ -293,6 +285,40 @@ class DefaultServiceTasks implements ServiceTasks {
             tableEnvironment.loadModule("remote-udf", new RemoteUdfModule());
             // Forward the target address of the remote gateway (or proxy) to the udf.
             Map<String, String> remoteUdfConfig = new HashMap<>();
+            if (privateConfig.get(CONFLUENT_REMOTE_UDF_BATCH_ENABLED)) {
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_BATCH_SIZE)
+                                * QUEUE_CAPACITY_BATCH_FACTOR);
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_RETRY_DELAY));
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_TIMEOUT,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_TIMEOUT));
+                // This uses internal retries, so no need to retry here
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_RETRY_STRATEGY,
+                        ExecutionConfigOptions.RetryStrategy.NO_RETRY);
+                remoteUdfConfig.put(AdapterOptions.ADAPTER_HANDLER_BATCH_ENABLED.key(), "true");
+                remoteUdfConfig.put(AdapterOptions.ADAPTER_PARALLELISM.key(), "1");
+            } else if (privateConfig.get(CONFLUENT_REMOTE_UDF_ASYNC_ENABLED)) {
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_BUFFER_CAPACITY,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY));
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_RETRY_DELAY,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_RETRY_DELAY));
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_TIMEOUT,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_TIMEOUT));
+                config.set(
+                        TABLE_EXEC_ASYNC_SCALAR_MAX_ATTEMPTS,
+                        privateConfig.get(CONFLUENT_REMOTE_UDF_MAX_ATTEMPTS));
+                remoteUdfConfig.put(
+                        AdapterOptions.ADAPTER_PARALLELISM.key(),
+                        Integer.toString(privateConfig.get(CONFLUENT_REMOTE_UDF_BUFFER_CAPACITY)));
+            }
             privateConfig
                     .toMap()
                     .forEach(

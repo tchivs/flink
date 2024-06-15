@@ -18,6 +18,7 @@ import io.confluent.flink.udf.adapter.api.OpenPayload;
 import io.confluent.flink.udf.adapter.api.RemoteUdfSpec;
 import io.confluent.flink.udf.adapter.codegen.ScalarFunctionAdapterGenerator;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -116,6 +117,28 @@ public class SerDeScalarFunctionCallAdapter {
 
         outputSerializer.clear();
         returnValueSerializer.serialize(returnValue, outputSerializer);
+        // TODO can we avoid the copy?
+        return outputSerializer.getCopyOfBuffer();
+    }
+
+    public byte[] callBatch(byte[] serializedArgs) throws Throwable {
+        inputDeserializer.setBuffer(serializedArgs);
+        List<Object> results = new ArrayList<>();
+        int batchSize = inputDeserializer.readInt();
+        for (int j = 0; j < batchSize; j++) {
+            for (int i = 0; i < argumentSerializers.size(); ++i) {
+                argsArray[i] = argumentSerializers.get(i).deserialize(inputDeserializer);
+            }
+            Object returnValue = callAdapter.call(argsArray);
+            results.add(returnValue);
+        }
+
+        outputSerializer.clear();
+        outputSerializer.writeInt(batchSize);
+        for (int j = 0; j < batchSize; j++) {
+            returnValueSerializer.serialize(results.get(j), outputSerializer);
+        }
+
         // TODO can we avoid the copy?
         return outputSerializer.getCopyOfBuffer();
     }
