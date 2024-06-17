@@ -22,6 +22,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.core.failure.TestingFailureEnricher;
+import org.apache.flink.events.Event;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.execution.SuppressRestartsException;
@@ -75,7 +77,10 @@ class ExecutionFailureHandlerTest {
 
     private TestingFailureEnricher testingFailureEnricher;
 
+    private final boolean reportEventsAsSpans = TraceOptions.REPORT_EVENTS_AS_SPANS.defaultValue();
+
     private List<Span> spanCollector;
+    private List<Event> eventCollector;
 
     @BeforeEach
     void setUp() {
@@ -87,8 +92,9 @@ class ExecutionFailureHandlerTest {
         testingFailureEnricher = new TestingFailureEnricher();
         backoffTimeStrategy = new TestRestartBackoffTimeStrategy(true, RESTART_DELAY_MS);
         spanCollector = new CopyOnWriteArrayList<>();
+        eventCollector = new CopyOnWriteArrayList<>();
         Configuration configuration = new Configuration();
-        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, reportEventsAsSpans);
         executionFailureHandler =
                 new ExecutionFailureHandler(
                         configuration,
@@ -103,6 +109,11 @@ class ExecutionFailureHandlerTest {
                             @Override
                             public void addSpan(SpanBuilder spanBuilder) {
                                 spanCollector.add(spanBuilder.build());
+                            }
+
+                            @Override
+                            public void addEvent(EventBuilder eventBuilder) {
+                                eventCollector.add(eventBuilder.build());
                             }
                         });
     }
@@ -133,7 +144,11 @@ class ExecutionFailureHandlerTest {
         assertThat(result.getFailureLabels().get())
                 .isEqualTo(testingFailureEnricher.getFailureLabels());
         assertThat(executionFailureHandler.getNumberOfRestarts()).isEqualTo(1);
-        checkMetrics(spanCollector, false, true);
+        if (reportEventsAsSpans) {
+            checkSpans(spanCollector, false, true);
+        } else {
+            checkEvents(eventCollector, false, true);
+        }
     }
 
     @Test
@@ -203,7 +218,11 @@ class ExecutionFailureHandlerTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(executionFailureHandler.getNumberOfRestarts()).isZero();
-        checkMetrics(spanCollector, false, false);
+        if (reportEventsAsSpans) {
+            checkSpans(spanCollector, false, false);
+        } else {
+            checkEvents(eventCollector, false, false);
+        }
     }
 
     /** Tests the case that the failure is non-recoverable type. */
@@ -242,7 +261,11 @@ class ExecutionFailureHandlerTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(executionFailureHandler.getNumberOfRestarts()).isZero();
-        checkMetrics(spanCollector, false, false);
+        if (reportEventsAsSpans) {
+            checkSpans(spanCollector, false, false);
+        } else {
+            checkEvents(eventCollector, false, false);
+        }
     }
 
     /** Tests the check for unrecoverable error. */
@@ -287,7 +310,11 @@ class ExecutionFailureHandlerTest {
         assertThat(testingFailureEnricher.getSeenThrowables()).containsExactly(error);
         assertThat(result.getFailureLabels().get())
                 .isEqualTo(testingFailureEnricher.getFailureLabels());
-        checkMetrics(spanCollector, true, true);
+        if (reportEventsAsSpans) {
+            checkSpans(spanCollector, true, true);
+        } else {
+            checkEvents(eventCollector, true, true);
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -316,13 +343,26 @@ class ExecutionFailureHandlerTest {
         }
     }
 
-    private void checkMetrics(List<Span> results, boolean global, boolean canRestart) {
+    private void checkSpans(List<Span> results, boolean global, boolean canRestart) {
         assertThat(results).isNotEmpty();
         for (Span span : results) {
             assertThat(span.getScope())
                     .isEqualTo(JobFailureMetricReporter.class.getCanonicalName());
             assertThat(span.getName()).isEqualTo("JobFailure");
             Map<String, Object> attributes = span.getAttributes();
+            assertThat(attributes).containsEntry("failureLabel.failKey", "failValue");
+            assertThat(attributes).containsEntry("canRestart", String.valueOf(canRestart));
+            assertThat(attributes).containsEntry("isGlobalFailure", String.valueOf(global));
+        }
+    }
+
+    private void checkEvents(List<Event> results, boolean global, boolean canRestart) {
+        assertThat(results).isNotEmpty();
+        for (Event event : results) {
+            assertThat(event.getClassScope())
+                    .isEqualTo(JobFailureMetricReporter.class.getCanonicalName());
+            assertThat(event.getName()).isEqualTo("JobFailure");
+            Map<String, Object> attributes = event.getAttributes();
             assertThat(attributes).containsEntry("failureLabel.failKey", "failValue");
             assertThat(attributes).containsEntry("canRestart", String.valueOf(canRestart));
             assertThat(attributes).containsEntry("isGlobalFailure", String.valueOf(global));

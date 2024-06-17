@@ -239,7 +239,6 @@ public class AdaptiveScheduler
     private final Duration slotIdleTimeout;
 
     private final JobFailureMetricReporter jobFailureMetricReporter;
-    private final boolean reportEventsAsSpans;
 
     public AdaptiveScheduler(
             JobGraph jobGraph,
@@ -343,8 +342,10 @@ public class AdaptiveScheduler
         this.slotIdleTimeout =
                 Duration.ofMillis(configuration.get(JobManagerOptions.SLOT_IDLE_TIMEOUT));
 
-        this.jobFailureMetricReporter = new JobFailureMetricReporter(jobManagerJobMetricGroup);
-        this.reportEventsAsSpans = configuration.get(TraceOptions.REPORT_EVENTS_AS_SPANS);
+        this.jobFailureMetricReporter =
+                new JobFailureMetricReporter(
+                        jobManagerJobMetricGroup,
+                        configuration.get(TraceOptions.REPORT_EVENTS_AS_SPANS));
     }
 
     private static void assertPreconditions(JobGraph jobGraph) throws RuntimeException {
@@ -1243,13 +1244,11 @@ public class AdaptiveScheduler
     public FailureResult howToHandleFailure(
             Throwable failure, CompletableFuture<Map<String, String>> failureLabels) {
         FailureResult failureResult = determineFailureResult(failure, failureLabels);
-        if (reportEventsAsSpans) {
-            // TODO: replace with reporting as event once events are supported.
-            // Add reporting as callback for when the failure labeling is completed.
-            failureLabels.thenAcceptAsync(
-                    (labels) -> jobFailureMetricReporter.reportJobFailure(failureResult, labels),
-                    componentMainThreadExecutor);
-        }
+        // Add reporting as callback for when the failure labeling is completed.
+        failureLabels.thenAcceptAsync(
+                (labels) -> jobFailureMetricReporter.reportJobFailure(failureResult, labels),
+                componentMainThreadExecutor);
+
         return failureResult;
     }
 

@@ -29,6 +29,8 @@ import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.core.failure.TestingFailureEnricher;
 import org.apache.flink.core.testutils.FlinkAssertions;
+import org.apache.flink.events.Event;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.checkpoint.CheckpointFailureReason;
@@ -177,6 +179,8 @@ public class AdaptiveSchedulerTest {
                     TEST_EXECUTOR_RESOURCE.getExecutor());
 
     private final ClassLoader classLoader = ClassLoader.getSystemClassLoader();
+
+    private final boolean reportEventsAsSpan = TraceOptions.REPORT_EVENTS_AS_SPANS.defaultValue();
 
     @Test
     void testInitialState() throws Exception {
@@ -1405,10 +1409,11 @@ public class AdaptiveSchedulerTest {
     @Test
     void testHowToHandleFailureRejectedByStrategy() throws Exception {
         final Configuration configuration = new Configuration();
-        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, reportEventsAsSpan);
         final List<Span> spanCollector = new ArrayList<>(1);
+        final List<Event> eventCollector = new ArrayList<>(1);
         final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
-                createTestMetricGroup(spanCollector);
+                createTestMetricGroup(spanCollector, eventCollector);
 
         final AdaptiveScheduler scheduler =
                 new AdaptiveSchedulerBuilder(
@@ -1429,16 +1434,21 @@ public class AdaptiveSchedulerTest {
 
         assertThat(spanCollector).isEmpty();
         mainThreadExecutor.trigger();
-        checkMetrics(spanCollector, false);
+        if (reportEventsAsSpan) {
+            checkSpans(spanCollector, false);
+        } else {
+            checkEvents(eventCollector, false);
+        }
     }
 
     @Test
     void testHowToHandleFailureAllowedByStrategy() throws Exception {
         final Configuration configuration = new Configuration();
-        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, reportEventsAsSpan);
         final List<Span> spanCollector = new ArrayList<>(1);
+        final List<Event> eventCollector = new ArrayList<>(1);
         final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
-                createTestMetricGroup(spanCollector);
+                createTestMetricGroup(spanCollector, eventCollector);
         final TestRestartBackoffTimeStrategy restartBackoffTimeStrategy =
                 new TestRestartBackoffTimeStrategy(true, 1234);
 
@@ -1461,16 +1471,21 @@ public class AdaptiveSchedulerTest {
 
         assertThat(spanCollector).isEmpty();
         mainThreadExecutor.trigger();
-        checkMetrics(spanCollector, true);
+        if (reportEventsAsSpan) {
+            checkSpans(spanCollector, true);
+        } else {
+            checkEvents(eventCollector, true);
+        }
     }
 
     @Test
     void testHowToHandleFailureUnrecoverableFailure() throws Exception {
         final Configuration configuration = new Configuration();
-        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, Boolean.TRUE);
+        configuration.set(TraceOptions.REPORT_EVENTS_AS_SPANS, reportEventsAsSpan);
         final List<Span> spanCollector = new ArrayList<>(1);
+        final List<Event> eventCollector = new ArrayList<>(1);
         final UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup testMetricGroup =
-                createTestMetricGroup(spanCollector);
+                createTestMetricGroup(spanCollector, eventCollector);
 
         final AdaptiveScheduler scheduler =
                 new AdaptiveSchedulerBuilder(
@@ -1491,7 +1506,11 @@ public class AdaptiveSchedulerTest {
 
         assertThat(spanCollector).isEmpty();
         mainThreadExecutor.trigger();
-        checkMetrics(spanCollector, false);
+        if (reportEventsAsSpan) {
+            checkSpans(spanCollector, false);
+        } else {
+            checkEvents(eventCollector, false);
+        }
     }
 
     @Test
@@ -2575,19 +2594,36 @@ public class AdaptiveSchedulerTest {
     }
 
     private static UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup
-            createTestMetricGroup(List<Span> output) {
+            createTestMetricGroup(List<Span> spans, List<Event> events) {
         return new UnregisteredMetricGroups.UnregisteredJobManagerJobMetricGroup() {
             @Override
             public void addSpan(SpanBuilder spanBuilder) {
-                output.add(spanBuilder.build());
+                spans.add(spanBuilder.build());
+            }
+
+            @Override
+            public void addEvent(EventBuilder eventBuilder) {
+                events.add(eventBuilder.build());
             }
         };
     }
 
-    private static void checkMetrics(List<Span> results, boolean canRestart) {
+    private static void checkSpans(List<Span> results, boolean canRestart) {
         assertThat(results).isNotEmpty();
         for (Span span : results) {
             assertThat(span.getScope())
+                    .isEqualTo(JobFailureMetricReporter.class.getCanonicalName());
+            assertThat(span.getName()).isEqualTo("JobFailure");
+            Map<String, Object> attributes = span.getAttributes();
+            assertThat(attributes).containsEntry("failureLabel.failKey", "failValue");
+            assertThat(attributes).containsEntry("canRestart", String.valueOf(canRestart));
+        }
+    }
+
+    private static void checkEvents(List<Event> results, boolean canRestart) {
+        assertThat(results).isNotEmpty();
+        for (Event span : results) {
+            assertThat(span.getClassScope())
                     .isEqualTo(JobFailureMetricReporter.class.getCanonicalName());
             assertThat(span.getName()).isEqualTo("JobFailure");
             Map<String, Object> attributes = span.getAttributes();

@@ -18,10 +18,11 @@
 
 package org.apache.flink.runtime.scheduler.adaptive;
 
+import org.apache.flink.AttributeBuilder;
+import org.apache.flink.events.Event;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.executiongraph.failover.flip1.FailureHandlingResult;
 import org.apache.flink.traces.Span;
-import org.apache.flink.traces.SpanBuilder;
 import org.apache.flink.util.Preconditions;
 
 import java.util.Map;
@@ -30,11 +31,17 @@ import java.util.Map;
 public class JobFailureMetricReporter {
 
     public static final String FAILURE_LABEL_ATTRIBUTE_PREFIX = "failureLabel.";
+    public static final String EVENT_NAME = "JobFailure";
+    public static final String RESTART_KEY = "canRestart";
+    public static final String GLOBAL_KEY = "isGlobalFailure";
 
     private final MetricGroup metricGroup;
 
-    public JobFailureMetricReporter(MetricGroup metricGroup) {
+    private final boolean reportAsFailureAsSpan;
+
+    public JobFailureMetricReporter(MetricGroup metricGroup, boolean reportAsFailureAsSpan) {
         this.metricGroup = Preconditions.checkNotNull(metricGroup);
+        this.reportAsFailureAsSpan = reportAsFailureAsSpan;
     }
 
     public void reportJobFailure(
@@ -60,25 +67,62 @@ public class JobFailureMetricReporter {
             Boolean canRestart,
             Boolean isGlobal,
             Map<String, String> failureLabels) {
-        // Add base attributes
-        SpanBuilder spanBuilder =
-                Span.builder(JobFailureMetricReporter.class, "JobFailure")
-                        .setStartTsMillis(timestamp)
-                        .setEndTsMillis(timestamp);
+        if (reportAsFailureAsSpan) {
+            reportJobFailureAsSpan(timestamp, canRestart, isGlobal, failureLabels);
+        } else {
+            reportJobFailureAsEvent(timestamp, canRestart, isGlobal, failureLabels);
+        }
+    }
 
+    private void reportJobFailureAsSpan(
+            long timestamp,
+            Boolean canRestart,
+            Boolean isGlobal,
+            Map<String, String> failureLabels) {
+        metricGroup.addSpan(
+                addFailureAttributes(
+                        Span.builder(JobFailureMetricReporter.class, EVENT_NAME)
+                                .setStartTsMillis(timestamp)
+                                .setEndTsMillis(timestamp),
+                        canRestart,
+                        isGlobal,
+                        failureLabels));
+    }
+
+    private void reportJobFailureAsEvent(
+            long timestamp,
+            Boolean canRestart,
+            Boolean isGlobal,
+            Map<String, String> failureLabels) {
+        metricGroup.addEvent(
+                addFailureAttributes(
+                        Event.builder(JobFailureMetricReporter.class, EVENT_NAME)
+                                .setObservedTsMillis(timestamp)
+                                .setSeverity("INFO"),
+                        canRestart,
+                        isGlobal,
+                        failureLabels));
+    }
+
+    private <T extends AttributeBuilder> T addFailureAttributes(
+            T attributeBuilder,
+            Boolean canRestart,
+            Boolean isGlobal,
+            Map<String, String> failureLabels) {
         if (canRestart != null) {
-            spanBuilder.setAttribute("canRestart", String.valueOf(canRestart));
+            attributeBuilder.setAttribute(RESTART_KEY, String.valueOf(canRestart));
         }
 
         if (isGlobal != null) {
-            spanBuilder.setAttribute("isGlobalFailure", String.valueOf(isGlobal));
+            attributeBuilder.setAttribute(GLOBAL_KEY, String.valueOf(isGlobal));
         }
 
         // Add all failure labels
         for (Map.Entry<String, String> entry : failureLabels.entrySet()) {
-            spanBuilder.setAttribute(
+            attributeBuilder.setAttribute(
                     FAILURE_LABEL_ATTRIBUTE_PREFIX + entry.getKey(), entry.getValue());
         }
-        metricGroup.addSpan(spanBuilder);
+
+        return attributeBuilder;
     }
 }
