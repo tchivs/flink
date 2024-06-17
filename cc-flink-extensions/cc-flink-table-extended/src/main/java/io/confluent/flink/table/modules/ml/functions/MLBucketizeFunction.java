@@ -30,9 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-/**
- * A scaler function that assigns a numerical expression to a bucket.
- */
+/** A scaler function that assigns a numerical expression to a bucket. */
 public class MLBucketizeFunction extends ScalarFunction {
     /** The name of the function. */
     public static final String NAME = "ML_BUCKETIZE";
@@ -55,10 +53,8 @@ public class MLBucketizeFunction extends ScalarFunction {
     /**
      * Evaluates the input arguments and returns the corresponding bucket name.
      *
-     * @param args the input arguments where:
-     *             - args[0] is the input value,
-     *             - args[1] is an array representing the bucket splits,
-     *             - args[2] (optional) is an array of bucket names.
+     * @param args the input arguments where: - args[0] is the input value, - args[1] is an array
+     *     representing the bucket splits, - args[2] (optional) is an array of bucket names.
      * @return the bucket name as a string.
      */
     public String eval(Object... args) {
@@ -170,15 +166,9 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                         i -> {
                                                             DataType argDataType =
                                                                     argumentDataTypes.get(i);
-                                                            if (argDataType
-                                                                            instanceof
-                                                                            AtomicDataType
-                                                                    && !argDataType
-                                                                            .getLogicalType()
-                                                                            .isNullable()) {
-                                                                argDataType =
-                                                                        argDataType.nullable();
-                                                            }
+                                                            argDataType =
+                                                                    getNullableDataType(
+                                                                            argDataType);
                                                             switch (i) {
                                                                 case (0):
                                                                     if (!DATA_TYPE_SET.contains(
@@ -204,8 +194,13 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                                     if (argDataType
                                                                             .toString()
                                                                             .startsWith("ARRAY")) {
-                                                                        DataType childDataType = getNullableDataType(
-                                                                                argDataType);
+                                                                        DataType childDataType =
+                                                                                argDataType
+                                                                                        .getChildren()
+                                                                                        .get(0);
+                                                                        childDataType =
+                                                                                getNullableDataType(
+                                                                                        childDataType);
                                                                         if (!DATA_TYPE_SET.contains(
                                                                                         childDataType)
                                                                                 && !childDataType
@@ -235,8 +230,13 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                                     if (argDataType
                                                                             .toString()
                                                                             .startsWith("ARRAY")) {
-                                                                        DataType childDataType = getNullableDataType(
-                                                                                argDataType);
+                                                                        DataType childDataType =
+                                                                                argDataType
+                                                                                        .getChildren()
+                                                                                        .get(0);
+                                                                        childDataType =
+                                                                                getNullableDataType(
+                                                                                        childDataType);
                                                                         if (!childDataType.equals(
                                                                                         DataTypes
                                                                                                 .STRING())
@@ -282,21 +282,11 @@ public class MLBucketizeFunction extends ScalarFunction {
                             }
 
                             private DataType getNullableDataType(DataType argDataType) {
-                                DataType childDataType =
-                                        argDataType
-                                                .getChildren()
-                                                .get(0);
-                                if (childDataType
-                                                instanceof
-                                                AtomicDataType
-                                        && !childDataType
-                                                .getLogicalType()
-                                                .isNullable()) {
-                                    childDataType =
-                                            childDataType
-                                                    .nullable();
+                                if (argDataType instanceof AtomicDataType
+                                        && !argDataType.getLogicalType().isNullable()) {
+                                    argDataType = argDataType.nullable();
                                 }
-                                return childDataType;
+                                return argDataType;
                             }
 
                             @Override
@@ -365,7 +355,9 @@ public class MLBucketizeFunction extends ScalarFunction {
 
     private <T extends Comparable<T>> boolean isArraySorted(T[] splitBuckets) {
         for (int i = 0; i < splitBuckets.length - 1; ++i) {
-            if (splitBuckets[i].compareTo(splitBuckets[i + 1]) > 0) return false;
+            if (splitBuckets[i].compareTo(splitBuckets[i + 1]) > 0) {
+                return false;
+            }
         }
         return true;
     }

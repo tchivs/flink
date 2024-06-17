@@ -32,7 +32,7 @@ public class MlFunctionsUtil {
      * @return a set of supported data types.
      */
     public static Set<DataType> getBaseDataTypes() {
-        final DataType[] DATA_TYPE_VALUES =
+        final DataType[] dataTypesValues =
                 new DataType[] {
                     DataTypes.DOUBLE(),
                     DataTypes.INT(),
@@ -43,7 +43,7 @@ public class MlFunctionsUtil {
                     DataTypes.DATE()
                 };
         /** Set of base data types for function arguments. */
-        return new HashSet<>(Arrays.asList(DATA_TYPE_VALUES));
+        return new HashSet<>(Arrays.asList(dataTypesValues));
     }
 
     /**

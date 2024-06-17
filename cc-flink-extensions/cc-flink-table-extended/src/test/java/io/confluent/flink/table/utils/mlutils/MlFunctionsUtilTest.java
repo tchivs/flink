@@ -20,7 +20,8 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertThrows;
 
 /** Unit tests for the {@link MlFunctionsUtil} class. */
 class MlFunctionsUtilTest {
@@ -28,98 +29,98 @@ class MlFunctionsUtilTest {
     @Test
     void testGetBaseDataTypes() {
         Set<DataType> baseDataTypes = MlFunctionsUtil.getBaseDataTypes();
-        assertTrue(baseDataTypes.contains(DataTypes.DOUBLE()));
-        assertTrue(baseDataTypes.contains(DataTypes.INT()));
-        assertTrue(baseDataTypes.contains(DataTypes.BIGINT()));
-        assertTrue(baseDataTypes.contains(DataTypes.FLOAT()));
-        assertTrue(baseDataTypes.contains(DataTypes.SMALLINT()));
-        assertTrue(baseDataTypes.contains(DataTypes.NULL()));
-        assertTrue(baseDataTypes.contains(DataTypes.DATE()));
+        assertThat(baseDataTypes.contains(DataTypes.DOUBLE())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.INT())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.BIGINT())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.FLOAT())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.SMALLINT())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.NULL())).isTrue();
+        assertThat(baseDataTypes.contains(DataTypes.DATE())).isTrue();
     }
 
     @Test
     void testGetDoubleValue_Null() {
-        assertNull(MlFunctionsUtil.getDoubleValue(null, "test"));
+        assertThat(MlFunctionsUtil.getDoubleValue(null, "test")).isNull();
     }
 
     @Test
     void testGetDoubleValue_Number() {
-        assertEquals(42.0, MlFunctionsUtil.getDoubleValue(42, "test"));
-        assertEquals(42.5, MlFunctionsUtil.getDoubleValue(42.5, "test"));
+        assertThat(MlFunctionsUtil.getDoubleValue(42, "test")).isEqualTo(42.0);
+        assertThat(MlFunctionsUtil.getDoubleValue(42.5, "test")).isEqualTo(42.5);
     }
 
     @Test
     void testGetDoubleValue_UnsupportedType() {
         LocalDateTime now = LocalDateTime.now();
         double expectedValue = now.toInstant(ZoneOffset.UTC).getEpochSecond();
-        assertEquals(expectedValue, MlFunctionsUtil.getDoubleValue(now, "test"));
+        assertThat(MlFunctionsUtil.getDoubleValue(now, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testGetLongValue_Null() {
-        assertNull(MlFunctionsUtil.getLongValue(null, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(null, "test")).isNull();
     }
 
     @Test
     void testGetLongValue_Number() {
-        assertEquals(42L, MlFunctionsUtil.getLongValue(42, "test"));
-        assertEquals(42L, MlFunctionsUtil.getLongValue(42L, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(42, "test")).isEqualTo(42L);
+        assertThat(MlFunctionsUtil.getLongValue(42L, "test")).isEqualTo(42L);
     }
 
     @Test
     void testGetLongValue_UnsupportedType() {
         LocalDateTime now = LocalDateTime.now();
         long expectedValue = now.toInstant(ZoneOffset.UTC).getEpochSecond();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(now, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(now, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_LocalDateTime() {
         LocalDateTime now = LocalDateTime.now();
         long expectedValue = now.toInstant(ZoneOffset.UTC).getEpochSecond();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(now, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(now, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_LocalDate() {
         LocalDate today = LocalDate.now();
         long expectedValue = today.toEpochDay();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(today, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(today, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_LocalTime() {
         LocalTime time = LocalTime.now();
         long expectedValue = time.toNanoOfDay();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(time, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(time, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_Instant() {
         Instant instant = Instant.now();
         long expectedValue = instant.toEpochMilli();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(instant, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(instant, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_ZonedDateTime() {
         ZonedDateTime zonedDateTime = ZonedDateTime.now();
         long expectedValue = zonedDateTime.toInstant().toEpochMilli();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(zonedDateTime, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(zonedDateTime, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_Period() {
         Period period = Period.ofDays(5);
         int expectedValue = period.getDays();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(period, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(period, "test")).isEqualTo(expectedValue);
     }
 
     @Test
     void testConvertToNumberTypedValue_Duration() {
         Duration duration = Duration.ofHours(5);
         long expectedValue = duration.toMillis();
-        assertEquals(expectedValue, MlFunctionsUtil.getLongValue(duration, "test"));
+        assertThat(MlFunctionsUtil.getLongValue(duration, "test")).isEqualTo(expectedValue);
     }
 
     @Test
