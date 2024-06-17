@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Confluent Inc.
+ */
+
 package io.confluent.flink.table.modules.ml.functions;
 
 import org.apache.flink.table.api.DataTypes;
@@ -51,30 +55,37 @@ public class MLBucketizeFunction extends ScalarFunction {
     /**
      * Evaluates the input arguments and returns the corresponding bucket name.
      *
-     * @param args the input arguments.
+     * @param args the input arguments where:
+     *             - args[0] is the input value,
+     *             - args[1] is an array representing the bucket splits,
+     *             - args[2] (optional) is an array of bucket names.
      * @return the bucket name as a string.
      */
     public String eval(Object... args) {
-        Object value = args[0];
-        Object splitBuckets = args[1];
-        Optional<String[]> bucketNames = Optional.empty();
-        if (args.length == 3) {
-            bucketNames = Optional.of((String[]) args[2]);
-        }
-        if (value instanceof Long && splitBuckets instanceof Long[]) {
-            Long[] splitBucketsLong = castToNumberArray(splitBuckets, Long.class);
-            bucketNames.ifPresent(names -> validateBucketNames(splitBucketsLong, names));
-            return mapLongValueToBucket(
-                    MlFunctionsUtil.getLongValue(value, NAME),
-                    splitBucketsLong,
-                    bucketNames.orElse(new String[0]));
-        } else {
-            Double[] splitBucketsDouble = castToNumberArray(splitBuckets, Double.class);
-            bucketNames.ifPresent(names -> validateBucketNames(splitBucketsDouble, names));
-            return mapDoubleValuesToBucket(
-                    MlFunctionsUtil.getDoubleValue(value, NAME),
-                    splitBucketsDouble,
-                    bucketNames.orElse(new String[0]));
+        try {
+            Object value = args[0];
+            Object splitBuckets = args[1];
+            Optional<String[]> bucketNames = Optional.empty();
+            if (args.length == 3) {
+                bucketNames = Optional.of((String[]) args[2]);
+            }
+            if (value instanceof Long && splitBuckets instanceof Long[]) {
+                Long[] splitBucketsLong = castToNumberArray(splitBuckets, Long.class);
+                bucketNames.ifPresent(names -> validateBucketNames(splitBucketsLong, names));
+                return mapLongValueToBucket(
+                        MlFunctionsUtil.getLongValue(value, NAME),
+                        splitBucketsLong,
+                        bucketNames.orElse(new String[0]));
+            } else {
+                Double[] splitBucketsDouble = castToNumberArray(splitBuckets, Double.class);
+                bucketNames.ifPresent(names -> validateBucketNames(splitBucketsDouble, names));
+                return mapDoubleValuesToBucket(
+                        MlFunctionsUtil.getDoubleValue(value, NAME),
+                        splitBucketsDouble,
+                        bucketNames.orElse(new String[0]));
+            }
+        } catch (Throwable t) {
+            throw new FlinkRuntimeException(t);
         }
     }
 
@@ -193,20 +204,8 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                                     if (argDataType
                                                                             .toString()
                                                                             .startsWith("ARRAY")) {
-                                                                        DataType childDataType =
-                                                                                argDataType
-                                                                                        .getChildren()
-                                                                                        .get(0);
-                                                                        if (childDataType
-                                                                                        instanceof
-                                                                                        AtomicDataType
-                                                                                && !childDataType
-                                                                                        .getLogicalType()
-                                                                                        .isNullable()) {
-                                                                            childDataType =
-                                                                                    childDataType
-                                                                                            .nullable();
-                                                                        }
+                                                                        DataType childDataType = getNullableDataType(
+                                                                                argDataType);
                                                                         if (!DATA_TYPE_SET.contains(
                                                                                         childDataType)
                                                                                 && !childDataType
@@ -236,20 +235,8 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                                     if (argDataType
                                                                             .toString()
                                                                             .startsWith("ARRAY")) {
-                                                                        DataType childDataType =
-                                                                                argDataType
-                                                                                        .getChildren()
-                                                                                        .get(0);
-                                                                        if (childDataType
-                                                                                        instanceof
-                                                                                        AtomicDataType
-                                                                                && !childDataType
-                                                                                        .getLogicalType()
-                                                                                        .isNullable()) {
-                                                                            childDataType =
-                                                                                    childDataType
-                                                                                            .nullable();
-                                                                        }
+                                                                        DataType childDataType = getNullableDataType(
+                                                                                argDataType);
                                                                         if (!childDataType.equals(
                                                                                         DataTypes
                                                                                                 .STRING())
@@ -292,6 +279,24 @@ public class MLBucketizeFunction extends ScalarFunction {
                                     }
                                 }
                                 return Optional.of(argumentDataTypes);
+                            }
+
+                            private DataType getNullableDataType(DataType argDataType) {
+                                DataType childDataType =
+                                        argDataType
+                                                .getChildren()
+                                                .get(0);
+                                if (childDataType
+                                                instanceof
+                                                AtomicDataType
+                                        && !childDataType
+                                                .getLogicalType()
+                                                .isNullable()) {
+                                    childDataType =
+                                            childDataType
+                                                    .nullable();
+                                }
+                                return childDataType;
                             }
 
                             @Override

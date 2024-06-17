@@ -4,11 +4,10 @@
 
 package io.confluent.flink.table.modules.ml;
 
-import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
-
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
+import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalarFunction;
 
 import java.util.Collections;

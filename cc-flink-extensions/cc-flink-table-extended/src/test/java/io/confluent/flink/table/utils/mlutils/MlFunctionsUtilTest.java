@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Confluent Inc.
+ */
+
 package io.confluent.flink.table.utils.mlutils;
 
 import org.apache.flink.table.api.DataTypes;
