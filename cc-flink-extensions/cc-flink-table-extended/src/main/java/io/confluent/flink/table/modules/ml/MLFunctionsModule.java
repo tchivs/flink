@@ -4,6 +4,8 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
+
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
@@ -40,6 +42,9 @@ public class MLFunctionsModule implements Module {
                         put(
                                 MLMinMaxScalarFunction.NAME,
                                 new MLMinMaxScalarFunction(MLMinMaxScalarFunction.NAME));
+                        put(
+                                MLBucketizeFunction.NAME,
+                                new MLBucketizeFunction(MLBucketizeFunction.NAME));
                     }
                 };
     }
