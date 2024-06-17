@@ -18,9 +18,12 @@
 
 package org.apache.flink.runtime.checkpoint;
 
+import org.apache.flink.AttributeBuilder;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.TraceOptions;
+import org.apache.flink.events.Event;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.MetricGroup;
@@ -150,6 +153,8 @@ public class CheckpointStatsTracker {
                             SubtaskStateStats::getPersistedData));
     private final TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel;
 
+    private final boolean reportCheckpointEvents;
+
     /**
      * Creates a new checkpoint stats tracker.
      *
@@ -162,13 +167,15 @@ public class CheckpointStatsTracker {
             int numRememberedCheckpoints,
             MetricGroup metricGroup,
             JobID jobID,
-            TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel) {
+            TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel,
+            boolean reportCheckpointEvents) {
         this(
                 numRememberedCheckpoints,
                 metricGroup,
                 jobID,
                 Integer.MAX_VALUE,
-                checkpointSpanDetailLevel);
+                checkpointSpanDetailLevel,
+                reportCheckpointEvents);
     }
 
     /**
@@ -214,13 +221,15 @@ public class CheckpointStatsTracker {
             MetricGroup metricGroup,
             JobID jobID,
             int totalNumberOfSubTasks,
-            TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel) {
+            TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel,
+            boolean reportCheckpointEvents) {
         checkArgument(numRememberedCheckpoints >= 0, "Negative number of remembered checkpoints");
         this.history = new CheckpointStatsHistory(numRememberedCheckpoints);
         this.jobID = jobID;
         this.metricGroup = metricGroup;
         this.totalNumberOfSubTasks = totalNumberOfSubTasks;
         this.checkpointSpanDetailLevel = checkpointSpanDetailLevel;
+        this.reportCheckpointEvents = reportCheckpointEvents;
 
         // Latest snapshot is empty
         latestSnapshot =
@@ -478,20 +487,25 @@ public class CheckpointStatsTracker {
 
     private void logCheckpointStatistics(AbstractCheckpointStats checkpointStats) {
         try {
+            if (reportCheckpointEvents) {
+                // Create event
+                EventBuilder eventBuilder =
+                        Event.builder(CheckpointStatsTracker.class, "Checkpoint")
+                                .setObservedTsMillis(checkpointStats.getLatestAckTimestamp())
+                                .setSeverity("INFO");
+                addCommonCheckpointStatsAttributes(eventBuilder, checkpointStats);
+                metricGroup.addEvent(eventBuilder);
+            }
 
             // Create span with top level metrics
             SpanBuilder spanBuilder =
                     Span.builder(CheckpointStatsTracker.class, "Checkpoint")
                             .setStartTsMillis(checkpointStats.getTriggerTimestamp())
-                            .setEndTsMillis(checkpointStats.getLatestAckTimestamp())
-                            .setAttribute("checkpointId", checkpointStats.getCheckpointId())
-                            .setAttribute("fullSize", checkpointStats.getStateSize())
-                            .setAttribute("checkpointedSize", checkpointStats.getCheckpointedSize())
-                            .setAttribute("checkpointStatus", checkpointStats.getStatus().name());
+                            .setEndTsMillis(checkpointStats.getLatestAckTimestamp());
 
+            addCommonCheckpointStatsAttributes(spanBuilder, checkpointStats);
             // Add max/sum aggregations for breakdown metrics
             addCheckpointAggregationStats(checkpointStats, spanBuilder);
-
             metricGroup.addSpan(spanBuilder);
 
             if (LOG.isDebugEnabled()) {
@@ -509,6 +523,15 @@ public class CheckpointStatsTracker {
         } catch (Exception ex) {
             LOG.warn("Fail to log CheckpointStatistics", ex);
         }
+    }
+
+    private void addCommonCheckpointStatsAttributes(
+            AttributeBuilder attributeBuilder, AbstractCheckpointStats checkpointStats) {
+        attributeBuilder
+                .setAttribute("checkpointId", checkpointStats.getCheckpointId())
+                .setAttribute("fullSize", checkpointStats.getStateSize())
+                .setAttribute("checkpointedSize", checkpointStats.getCheckpointedSize())
+                .setAttribute("checkpointStatus", checkpointStats.getStatus().name());
     }
 
     private void addSubtaskSpans(

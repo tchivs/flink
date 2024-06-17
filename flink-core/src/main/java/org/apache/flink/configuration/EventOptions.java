@@ -199,5 +199,12 @@ public class EventOptions {
                                     .linebreak()
                                     .build());
 
+    public static final ConfigOption<Boolean> REPORT_CHECKPOINT_EVENTS =
+            key("events.report-checkpoint-events")
+                    .booleanType()
+                    .defaultValue(Boolean.TRUE)
+                    .withDescription(
+                            "Whether completed and fail checkpoints are reported as events.");
+
     private EventOptions() {}
 }

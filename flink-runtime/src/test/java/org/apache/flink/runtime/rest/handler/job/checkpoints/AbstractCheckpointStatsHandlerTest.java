@@ -68,7 +68,8 @@ public class AbstractCheckpointStatsHandlerTest extends TestLogger {
                     10,
                     UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup(),
                     new JobID(),
-                    TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                    TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                    true);
 
     @Test
     public void testRetrieveSnapshotFromCache() throws Exception {

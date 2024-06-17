@@ -201,7 +201,8 @@ public class TestingDefaultExecutionGraphBuilder {
                                 new UnregisteredMetricsGroup(),
                                 new JobID(),
                                 TraceOptions.CheckpointSpanDetailLevel
-                                        .SPANS_PER_CHECKPOINT_WITH_TASKS),
+                                        .SPANS_PER_CHECKPOINT_WITH_TASKS,
+                                true),
                 isDynamicGraph,
                 executionJobVertexFactory,
                 markPartitionFinishedStrategy,

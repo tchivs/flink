@@ -21,6 +21,8 @@ package org.apache.flink.runtime.checkpoint;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.TraceOptions;
 import org.apache.flink.core.execution.SavepointFormatType;
+import org.apache.flink.events.Event;
+import org.apache.flink.events.EventBuilder;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
@@ -76,7 +78,8 @@ public class CheckpointStatsTrackerTest {
                         0,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         PendingCheckpointStats pending =
                 tracker.reportPendingCheckpoint(
@@ -128,7 +131,8 @@ public class CheckpointStatsTrackerTest {
                         10,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         // Completed checkpoint
         PendingCheckpointStats completed1 =
@@ -261,7 +265,8 @@ public class CheckpointStatsTrackerTest {
                         10,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         CheckpointStatsSnapshot snapshot1 = tracker.createSnapshot();
 
@@ -327,14 +332,22 @@ public class CheckpointStatsTrackerTest {
     public void testSpanCreationTemplate(TraceOptions.CheckpointSpanDetailLevel detailLevel) {
         JobVertexID jobVertexID0 = new JobVertexID();
         JobVertexID jobVertexID1 = new JobVertexID();
-        final List<Span> reportedSpans = produceTestSpans(jobVertexID0, jobVertexID1, detailLevel);
+
+        final List<Span> reportedSpans = new ArrayList<>();
+        final List<Event> reportedEvents = new ArrayList<>();
+
+        produceTestSpans(jobVertexID0, jobVertexID1, detailLevel, reportedSpans, reportedEvents);
         assertThat(reportedSpans.size()).isEqualTo(1);
+        assertThat(reportedEvents.size()).isEqualTo(1);
 
         Map<String, Object> expected = new HashMap<>();
         expected.put("checkpointId", 42L);
         expected.put("checkpointedSize", 37L);
         expected.put("fullSize", 40L);
         expected.put("checkpointStatus", "COMPLETED");
+
+        assertThat(reportedEvents.get(0).getAttributes())
+                .containsExactlyInAnyOrderEntriesOf(expected);
 
         expected.put("maxCheckpointStartDelayMs", 29L);
         expected.put("maxPersistedDataBytes", 27L);
@@ -494,19 +507,25 @@ public class CheckpointStatsTrackerTest {
     private List<Span> produceTestSpans(
             JobVertexID jobVertexID0,
             JobVertexID jobVertexID1,
-            TraceOptions.CheckpointSpanDetailLevel detailLevel) {
-        final List<Span> reportedSpans = new ArrayList<>();
+            TraceOptions.CheckpointSpanDetailLevel detailLevel,
+            List<Span> reportedSpansOut,
+            List<Event> reportedEventsOut) {
 
         MetricGroup metricGroup =
                 new UnregisteredMetricsGroup() {
                     @Override
                     public void addSpan(SpanBuilder spanBuilder) {
-                        reportedSpans.add(spanBuilder.build());
+                        reportedSpansOut.add(spanBuilder.build());
+                    }
+
+                    @Override
+                    public void addEvent(EventBuilder eventBuilder) {
+                        reportedEventsOut.add(eventBuilder.build());
                     }
                 };
 
         CheckpointStatsTracker tracker =
-                new CheckpointStatsTracker(10, metricGroup, JobID.generate(), detailLevel);
+                new CheckpointStatsTracker(10, metricGroup, JobID.generate(), detailLevel, true);
 
         Map<JobVertexID, Integer> subtasksByVertex = CollectionUtil.newHashMapWithExpectedSize(2);
         subtasksByVertex.put(jobVertexID0, 2);
@@ -529,7 +548,7 @@ public class CheckpointStatsTrackerTest {
                 new SubtaskStateStats(0, 21, 22, 23, 4, 25, 26, 27, 8, 29, false, true));
         // Complete checkpoint => new snapshot
         tracker.reportCompletedCheckpoint(pending.toCompletedCheckpointStats(null));
-        return reportedSpans;
+        return reportedSpansOut;
     }
 
     @Test
@@ -550,7 +569,8 @@ public class CheckpointStatsTrackerTest {
                         metricGroup,
                         new JobID(),
                         2,
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         tracker.reportInitializationStartTs(100);
         tracker.reportRestoredCheckpoint(
@@ -645,7 +665,8 @@ public class CheckpointStatsTrackerTest {
                 0,
                 metricGroup,
                 new JobID(),
-                TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                true);
 
         // Make sure this test is adjusted when further metrics are added
         assertTrue(
@@ -699,7 +720,8 @@ public class CheckpointStatsTrackerTest {
                         0,
                         metricGroup,
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         // Make sure to adjust this test if metrics are added/removed
         assertEquals(12, registeredGauges.size());

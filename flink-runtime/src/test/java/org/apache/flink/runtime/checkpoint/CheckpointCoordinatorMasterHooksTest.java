@@ -505,7 +505,8 @@ class CheckpointCoordinatorMasterHooksTest {
                         1,
                         new DummyMetricGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS),
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true),
                 false);
     }
 

@@ -252,7 +252,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         CheckpointCoordinator coordinator =
                 new CheckpointCoordinatorBuilder()
                         .setTimer(manuallyTriggeredScheduledExecutor)
@@ -506,7 +507,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
                         .setTimer(manuallyTriggeredScheduledExecutor)
@@ -752,7 +754,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
                         .setCheckpointStatsTracker(statsTracker)
@@ -2024,7 +2027,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         // set up the coordinator and validate the initial state
         CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
@@ -2856,7 +2860,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         10,
                         new UnregisteredMetricsGroup(),
                         JobID.generate(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
                         .setCompletedCheckpointStore(store)
@@ -3178,7 +3183,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         CheckpointCoordinator checkpointCoordinator =
                 new CheckpointCoordinatorBuilder()
@@ -3232,7 +3238,8 @@ class CheckpointCoordinatorTest extends TestLogger {
                         Integer.MAX_VALUE,
                         new UnregisteredMetricsGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
 
         final String exceptionMsg = "Test store exception.";
         try (SharedStateRegistry sharedStateRegistry = new SharedStateRegistryImpl()) {

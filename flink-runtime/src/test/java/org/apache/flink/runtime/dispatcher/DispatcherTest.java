@@ -743,7 +743,8 @@ public class DispatcherTest extends AbstractDispatcherTest {
                         10,
                         UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup(),
                         new JobID(),
-                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS);
+                        TraceOptions.CheckpointSpanDetailLevel.SPANS_PER_CHECKPOINT_WITH_TASKS,
+                        true);
         checkpointStatsTracker.reportFailedCheckpointsWithoutInProgress();
         checkpointStatsTracker.reportFailedCheckpointsWithoutInProgress();
         return checkpointStatsTracker.createSnapshot();

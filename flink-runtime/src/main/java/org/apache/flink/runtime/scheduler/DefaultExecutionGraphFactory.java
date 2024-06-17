@@ -53,6 +53,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
+import static org.apache.flink.configuration.EventOptions.REPORT_CHECKPOINT_EVENTS;
 import static org.apache.flink.configuration.TraceOptions.CHECKPOINT_SPAN_DETAIL_LEVEL;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -128,6 +129,7 @@ public class DefaultExecutionGraphFactory implements ExecutionGraphFactory {
         this.jobMasterPartitionTracker = jobMasterPartitionTracker;
         TraceOptions.CheckpointSpanDetailLevel checkpointSpanDetailLevel =
                 configuration.get(CHECKPOINT_SPAN_DETAIL_LEVEL);
+        boolean reportCheckpointEvents = configuration.get(REPORT_CHECKPOINT_EVENTS);
 
         this.checkpointStatsTrackerFactory =
                 new CachingSupplier<>(
@@ -137,7 +139,8 @@ public class DefaultExecutionGraphFactory implements ExecutionGraphFactory {
                                                 WebOptions.CHECKPOINTS_HISTORY_SIZE),
                                         jobManagerJobMetricGroup,
                                         jobManagerJobMetricGroup.jobId(),
-                                        checkpointSpanDetailLevel));
+                                        checkpointSpanDetailLevel,
+                                        reportCheckpointEvents));
         this.isDynamicGraph = isDynamicGraph;
         this.executionJobVertexFactory = checkNotNull(executionJobVertexFactory);
         this.nonFinishedHybridPartitionShouldBeUnknown = nonFinishedHybridPartitionShouldBeUnknown;
