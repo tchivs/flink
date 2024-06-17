@@ -23,6 +23,7 @@ import org.apache.flink.table.api.Schema;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
 import java.util.Map;
 
 /** Interface for a model in a catalog. */
@@ -30,6 +31,9 @@ import java.util.Map;
 public interface CatalogModel {
     /** Returns a map of string-based model options. */
     Map<String, String> getOptions();
+
+    /** Returns a list of model changes. */
+    List<ModelChange> getModelChanges();
 
     /**
      * Get the unresolved input schema of the model.
@@ -71,8 +75,8 @@ public interface CatalogModel {
      *
      * @param inputSchema unresolved input schema
      * @param outputSchema unresolved output schema
-     * @param comment optional comment
      * @param modelOptions model options
+     * @param comment optional comment
      */
     static CatalogModel of(
             Schema inputSchema,
@@ -80,5 +84,24 @@ public interface CatalogModel {
             Map<String, String> modelOptions,
             @Nullable String comment) {
         return new DefaultCatalogModel(inputSchema, outputSchema, modelOptions, comment);
+    }
+
+    /**
+     * Creates a basic implementation of this interface.
+     *
+     * @param inputSchema unresolved input schema
+     * @param outputSchema unresolved output schema
+     * @param modelOptions model options
+     * @param modelChanges model changes
+     * @param comment optional comment
+     */
+    static CatalogModel of(
+            Schema inputSchema,
+            Schema outputSchema,
+            Map<String, String> modelOptions,
+            List<ModelChange> modelChanges,
+            @Nullable String comment) {
+        return new DefaultCatalogModel(
+                inputSchema, outputSchema, modelOptions, modelChanges, comment);
     }
 }

@@ -23,6 +23,8 @@ import org.apache.flink.table.api.Schema;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -32,6 +34,7 @@ public class DefaultCatalogModel implements CatalogModel {
     private final @Nullable Schema inputSchema;
     private final @Nullable Schema outputSchema;
     private final Map<String, String> modelOptions;
+    private final List<ModelChange> modelChanges;
     private final @Nullable String comment;
 
     public DefaultCatalogModel(
@@ -39,15 +42,30 @@ public class DefaultCatalogModel implements CatalogModel {
             Schema outputSchema,
             Map<String, String> modelOptions,
             @Nullable String comment) {
+        this(inputSchema, outputSchema, modelOptions, new ArrayList<>(), comment);
+    }
+
+    public DefaultCatalogModel(
+            Schema inputSchema,
+            Schema outputSchema,
+            Map<String, String> modelOptions,
+            List<ModelChange> modelChanges,
+            @Nullable String comment) {
         this.inputSchema = inputSchema;
         this.outputSchema = outputSchema;
         this.modelOptions = modelOptions;
+        this.modelChanges = modelChanges;
         this.comment = comment;
     }
 
     @Override
     public Map<String, String> getOptions() {
         return modelOptions;
+    }
+
+    @Override
+    public List<ModelChange> getModelChanges() {
+        return modelChanges;
     }
 
     @Override
@@ -68,7 +86,11 @@ public class DefaultCatalogModel implements CatalogModel {
     @Override
     public CatalogModel copy() {
         return new DefaultCatalogModel(
-                this.inputSchema, this.outputSchema, this.modelOptions, this.comment);
+                this.inputSchema,
+                this.outputSchema,
+                this.modelOptions,
+                this.modelChanges,
+                this.comment);
     }
 
     @Override
@@ -89,12 +111,13 @@ public class DefaultCatalogModel implements CatalogModel {
         return Objects.equals(inputSchema, that.inputSchema)
                 && Objects.equals(outputSchema, that.outputSchema)
                 && modelOptions.equals(that.modelOptions)
+                && modelChanges.equals(that.modelChanges)
                 && Objects.equals(comment, that.comment);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(inputSchema, outputSchema, modelOptions, comment);
+        return Objects.hash(inputSchema, outputSchema, modelOptions, modelChanges, comment);
     }
 
     @Override
@@ -106,6 +129,8 @@ public class DefaultCatalogModel implements CatalogModel {
                 + outputSchema
                 + ", modelOptions="
                 + modelOptions
+                + ", modelChanges="
+                + modelChanges
                 + ", comment="
                 + comment
                 + "}";

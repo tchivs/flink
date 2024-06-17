@@ -37,6 +37,7 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ContextResolvedTable;
 import org.apache.flink.table.catalog.FunctionLanguage;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
+import org.apache.flink.table.catalog.ModelChange;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
@@ -86,6 +87,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -391,11 +393,18 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
                 .isEqualTo(expectedIdentifier);
         assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
                 .isEqualTo(expectedModelProperties);
+        List<ModelChange> expectedModelChanges = new ArrayList<>();
+        expectedModelChanges.add(ModelChange.set("K1", "v1_altered"));
+        expectedModelChanges.add(ModelChange.set("K2", "V2"));
+        assertThat(alterModelPropertiesOperation.getCatalogModel().getModelChanges())
+                .isEqualTo(expectedModelChanges);
 
         // test alter model properties without keys
         operation = parse("alter model if exists cat1.db1.m1 set ('k3' = 'v3')");
         expectedModelProperties.clear();
         expectedModelProperties.put("K3", "v3");
+        expectedModelChanges.clear();
+        expectedModelChanges.add(ModelChange.set("K3", "v3"));
 
         assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
         alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
@@ -403,6 +412,8 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
                 .isEqualTo(expectedIdentifier);
         assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
                 .isEqualTo(expectedModelProperties);
+        assertThat(alterModelPropertiesOperation.getCatalogModel().getModelChanges())
+                .isEqualTo(expectedModelChanges);
     }
 
     @Test
