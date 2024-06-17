@@ -27,8 +27,7 @@ import java.util.Set;
 import java.util.stream.IntStream;
 
 /**
- * A scalar function that assigns a numerical expression to a bucket. The function supports both
- * double and long input types.
+ * A scaler function that assigns a numerical expression to a bucket.
  */
 public class MLBucketizeFunction extends ScalarFunction {
     /** The name of the function. */
@@ -64,14 +63,14 @@ public class MLBucketizeFunction extends ScalarFunction {
         }
         if (value instanceof Long && splitBuckets instanceof Long[]) {
             Long[] splitBucketsLong = castToNumberArray(splitBuckets, Long.class);
-            bucketNames.ifPresent(names -> validateBucketName(splitBucketsLong, names));
+            bucketNames.ifPresent(names -> validateBucketNames(splitBucketsLong, names));
             return mapLongValueToBucket(
                     MlFunctionsUtil.getLongValue(value, NAME),
                     splitBucketsLong,
                     bucketNames.orElse(new String[0]));
         } else {
             Double[] splitBucketsDouble = castToNumberArray(splitBuckets, Double.class);
-            bucketNames.ifPresent(names -> validateBucketName(splitBucketsDouble, names));
+            bucketNames.ifPresent(names -> validateBucketNames(splitBucketsDouble, names));
             return mapDoubleValuesToBucket(
                     MlFunctionsUtil.getDoubleValue(value, NAME),
                     splitBucketsDouble,
@@ -341,7 +340,7 @@ public class MLBucketizeFunction extends ScalarFunction {
         return numberList.toArray((T[]) Array.newInstance(targetType, 0));
     }
 
-    private <T extends Comparable<T>> void validateBucketName(
+    private <T extends Comparable<T>> void validateBucketNames(
             T[] splitBuckets, String[] bucketNames) {
         if (bucketNames.length != splitBuckets.length + 2) {
             throw new FlinkRuntimeException(
@@ -350,7 +349,7 @@ public class MLBucketizeFunction extends ScalarFunction {
                                     + "Please provide names for all bucket names excluding undefined buckets and including first name for undefined values",
                             NAME));
         }
-        if (!isSorted(splitBuckets)) {
+        if (!isArraySorted(splitBuckets)) {
             throw new FlinkRuntimeException(
                     String.format(
                             "Invalid order of buckets passed to the function %s. "
@@ -359,7 +358,7 @@ public class MLBucketizeFunction extends ScalarFunction {
         }
     }
 
-    private <T extends Comparable<T>> boolean isSorted(T[] splitBuckets) {
+    private <T extends Comparable<T>> boolean isArraySorted(T[] splitBuckets) {
         for (int i = 0; i < splitBuckets.length - 1; ++i) {
             if (splitBuckets[i].compareTo(splitBuckets[i + 1]) > 0) return false;
         }
