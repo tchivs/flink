@@ -51,8 +51,9 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_MAP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
-import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PROPERTY_CURRENT_VERSION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PROPERTY_VERSION;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 
@@ -187,6 +188,7 @@ public final class CommonMappings {
 
         properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
         if (isMultiset) {
+            properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
             properties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
         }
 
@@ -201,6 +203,7 @@ public final class CommonMappings {
 
         properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_MAP);
         if (isMultiset) {
+            properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
             properties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
         }
 
@@ -232,6 +235,7 @@ public final class CommonMappings {
             props.put(CommonConstants.FLINK_MIN_LENGTH, minLength);
         }
         props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
+        props.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
         props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES);
         return builder.unprocessedProperties(props).build();
     }
@@ -242,7 +246,8 @@ public final class CommonMappings {
         final Map<String, Object> properties = new HashMap<>();
         properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT32);
         if (precision != 3) {
-            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+            properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
+            properties.put(FLINK_PRECISION, precision);
         }
         return builder.unprocessedProperties(properties).build();
     }
@@ -251,9 +256,10 @@ public final class CommonMappings {
         Builder<NumberSchema> builder = NumberSchema.builder();
         final Map<String, Object> properties = new HashMap<>();
         properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64);
+        properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
         properties.put(FLINK_TYPE_PROP, CommonConstants.FLINK_TYPE_TIMESTAMP);
         if (precision != 3) {
-            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+            properties.put(FLINK_PRECISION, precision);
         }
         return builder.unprocessedProperties(properties).build();
     }
@@ -263,7 +269,8 @@ public final class CommonMappings {
         final Map<String, Object> properties = new HashMap<>();
         properties.put(CONNECT_TYPE_PROP, CommonConstants.CONNECT_TYPE_INT64);
         if (precision != 3) {
-            properties.put(FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+            properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
+            properties.put(FLINK_PRECISION, precision);
         }
         return builder.unprocessedProperties(properties).build();
     }

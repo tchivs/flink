@@ -27,6 +27,7 @@ import org.apache.flink.util.StringUtils;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.BytesBuilder;
 import org.apache.avro.SchemaBuilder.LongBuilder;
 
 import java.util.List;
@@ -81,6 +82,9 @@ public class FlinkToAvroSchemaConverter {
                 {
                     CharType charType = (CharType) logicalType;
                     final Schema stringType = SchemaBuilder.builder().stringType();
+                    stringType.addProp(
+                            CommonConstants.FLINK_PROPERTY_VERSION,
+                            CommonConstants.FLINK_PROPERTY_CURRENT_VERSION);
                     stringType.addProp(CommonConstants.FLINK_MIN_LENGTH, charType.getLength());
                     stringType.addProp(CommonConstants.FLINK_MAX_LENGTH, charType.getLength());
                     return stringType;
@@ -90,6 +94,9 @@ public class FlinkToAvroSchemaConverter {
                     VarCharType varCharType = (VarCharType) logicalType;
                     final Schema stringType = SchemaBuilder.builder().stringType();
                     if (varCharType.getLength() < VarCharType.MAX_LENGTH) {
+                        stringType.addProp(
+                                CommonConstants.FLINK_PROPERTY_VERSION,
+                                CommonConstants.FLINK_PROPERTY_CURRENT_VERSION);
                         stringType.addProp(
                                 CommonConstants.FLINK_MAX_LENGTH, varCharType.getLength());
                     }
@@ -180,6 +187,9 @@ public class FlinkToAvroSchemaConverter {
         final LogicalType valueType = new IntType(false);
 
         final Schema schema = convertMapLikeType(rowName, keyType, valueType);
+        schema.addProp(
+                CommonConstants.FLINK_PROPERTY_VERSION,
+                CommonConstants.FLINK_PROPERTY_CURRENT_VERSION);
         schema.addProp(CommonConstants.FLINK_TYPE, CommonConstants.FLINK_MULTISET_TYPE);
         return schema;
     }
@@ -218,6 +228,9 @@ public class FlinkToAvroSchemaConverter {
                     .addToSchema(
                             SchemaBuilder.builder()
                                     .intBuilder()
+                                    .prop(
+                                            CommonConstants.FLINK_PROPERTY_VERSION,
+                                            CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
                                     .prop(CommonConstants.FLINK_PRECISION, precision)
                                     .endInt());
         } else {
@@ -244,7 +257,12 @@ public class FlinkToAvroSchemaConverter {
         }
         LongBuilder<Schema> longBuilder = SchemaBuilder.builder().longBuilder();
         if (precision != 3 && precision != 6) {
-            longBuilder = longBuilder.prop(CommonConstants.FLINK_PRECISION, precision);
+            longBuilder =
+                    longBuilder
+                            .prop(
+                                    CommonConstants.FLINK_PROPERTY_VERSION,
+                                    CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
+                            .prop(CommonConstants.FLINK_PRECISION, precision);
         }
         return avroLogicalType.addToSchema(longBuilder.endLong());
     }
@@ -265,17 +283,26 @@ public class FlinkToAvroSchemaConverter {
         }
         LongBuilder<Schema> longBuilder = SchemaBuilder.builder().longBuilder();
         if (precision != 3 && precision != 6) {
-            longBuilder = longBuilder.prop(CommonConstants.FLINK_PRECISION, precision);
+            longBuilder =
+                    longBuilder
+                            .prop(
+                                    CommonConstants.FLINK_PROPERTY_VERSION,
+                                    CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
+                            .prop(CommonConstants.FLINK_PRECISION, precision);
         }
         return avroLogicalType.addToSchema(longBuilder.endLong());
     }
 
     private static Schema convertVarBinary(VarBinaryType varBinaryType) {
-        final Schema bytesType = SchemaBuilder.builder().bytesType();
+        final BytesBuilder<Schema> bytesBuilder = SchemaBuilder.builder().bytesBuilder();
         if (varBinaryType.getLength() < VarCharType.MAX_LENGTH) {
-            bytesType.addProp(CommonConstants.FLINK_MAX_LENGTH, varBinaryType.getLength());
+            bytesBuilder
+                    .prop(
+                            CommonConstants.FLINK_PROPERTY_VERSION,
+                            CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
+                    .prop(CommonConstants.FLINK_MAX_LENGTH, varBinaryType.getLength());
         }
-        return bytesType;
+        return bytesBuilder.endBytes();
     }
 
     private static Schema convertBinary(BinaryType binaryType, String rowName) {

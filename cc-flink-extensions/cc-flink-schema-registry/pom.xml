@@ -33,14 +33,9 @@ under the License.
 
 	<properties>
 		<!-- All of these deps are shaded, so we allow them to differ from others we use -->
-		<avro.registry.kafka.clients.version>7.5.0-203-ccs</avro.registry.kafka.clients.version>
+		<avro.registry.kafka.clients.version>7.8.0-100098-ccs</avro.registry.kafka.clients.version>
 		<registry.everit.version>1.14.2</registry.everit.version>
-		<protobuf.java.version>3.24.0</protobuf.java.version>
-		<confluent.common.utils.version>7.5.0-678</confluent.common.utils.version>
 		<shaded.prefix>io.confluent.flink.registry.shaded</shaded.prefix>
-		<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
-			 version. -->
-		<kotlin.version>1.7.0</kotlin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -49,11 +44,6 @@ under the License.
 				<groupId>org.apache.kafka</groupId>
 				<artifactId>kafka-clients</artifactId>
 				<version>${avro.registry.kafka.clients.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>io.confluent</groupId>
-				<artifactId>common-utils</artifactId>
-				<version>${confluent.common.utils.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.github.erosb</groupId>
@@ -69,27 +59,6 @@ under the License.
 				<groupId>com.google.protobuf</groupId>
 				<artifactId>protobuf-java</artifactId>
 				<version>${protobuf.java.version}</version>
-			</dependency>
-			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
-			 version. -->
-			<dependency>
-				<groupId>org.jetbrains.kotlin</groupId>
-				<artifactId>kotlin-stdlib-jdk8</artifactId>
-				<version>${kotlin.version}</version>
-			</dependency>
-			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
-			 version. -->
-			<dependency>
-				<groupId>org.jetbrains.kotlin</groupId>
-				<artifactId>kotlin-stdlib-common</artifactId>
-				<version>${kotlin.version}</version>
-			</dependency>
-			<!-- Pulled by kafka-protobuf-provider in multiple versions. Enforce a common
-			 version. -->
-			<dependency>
-				<groupId>org.jetbrains.kotlin</groupId>
-				<artifactId>kotlin-stdlib</artifactId>
-				<version>${kotlin.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

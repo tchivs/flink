@@ -56,8 +56,9 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
-import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PROPERTY_CURRENT_VERSION;
+import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PROPERTY_VERSION;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_TIMESTAMP;
@@ -247,9 +248,11 @@ public class FlinkToJsonSchemaConverter {
         final Map<String, Object> props = new HashMap<>();
         if (minLength == maxLength && minLength > 0) {
             // BINARY case
+            props.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
             props.put(CommonConstants.FLINK_MIN_LENGTH, minLength);
             props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
         } else if (maxLength < BinaryType.MAX_LENGTH) {
+            props.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
             props.put(CommonConstants.FLINK_MAX_LENGTH, maxLength);
         }
         props.put(CONNECT_TYPE_PROP, CONNECT_TYPE_BYTES);
@@ -279,6 +282,7 @@ public class FlinkToJsonSchemaConverter {
         final LogicalType valueType = new IntType(false);
 
         final Schema.Builder<?> builder = convertMapLikeType(rowName, keyType, valueType);
+        builder.unprocessedProperties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
         builder.unprocessedProperties.put(FLINK_TYPE_PROP, FLINK_TYPE_MULTISET);
         return builder;
     }
@@ -318,8 +322,8 @@ public class FlinkToJsonSchemaConverter {
             final Map<String, Object> properties = new HashMap<>();
             properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT32);
             if (precision != 3) {
-                properties.put(
-                        FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+                properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
+                properties.put(FLINK_PRECISION, precision);
             }
             return NumberSchema.builder()
                     .title(CONNECT_TYPE_TIME)
@@ -337,13 +341,14 @@ public class FlinkToJsonSchemaConverter {
             final Map<String, Object> properties = new HashMap<>();
             properties.put(CONNECT_TYPE_PROP, CONNECT_TYPE_INT64);
             if (precision != 3) {
-                properties.put(
-                        FLINK_PARAMETERS, Collections.singletonMap(FLINK_PRECISION, precision));
+                properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
+                properties.put(FLINK_PRECISION, precision);
             }
             Schema.Builder<NumberSchema> builder = NumberSchema.builder();
             if (typeRoot == LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE) {
                 builder = builder.title(CONNECT_TYPE_TIMESTAMP);
             } else {
+                properties.put(FLINK_PROPERTY_VERSION, FLINK_PROPERTY_CURRENT_VERSION);
                 properties.put(FLINK_TYPE_PROP, FLINK_TYPE_TIMESTAMP);
             }
             return builder.unprocessedProperties(properties);

@@ -21,12 +21,13 @@ Copyright 2023 Confluent Inc.
 
 	<properties>
 		<bouncycastle.version>1.73</bouncycastle.version>
-		<schema.registry.version>7.5.0-22</schema.registry.version>
+		<schema.registry.version>7.8.0-459</schema.registry.version>
 		<opentelemetry.version>1.30.1</opentelemetry.version>
 		<opentelemetry.proto.version>1.0.0-alpha</opentelemetry.proto.version>
 		<apiserver.version>0.2345.0</apiserver.version>
 		<okhttp.version>4.10.0</okhttp.version>
 		<secure-gateway-api.version>0.140.0</secure-gateway-api.version>
+		<protobuf.java.version>3.25.3</protobuf.java.version>
 	</properties>
 
 	<modules>

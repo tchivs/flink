@@ -494,10 +494,19 @@ public class FlinkToProtoSchemaConverter {
 
     private static void addMetaParams(
             FieldDescriptorProto.Builder builder, Map<String, String> params) {
+        if (params.isEmpty()) {
+            return;
+        }
+        final Map<String, String> extendedParams = new HashMap<>();
+        extendedParams.put(
+                CommonConstants.FLINK_PROPERTY_VERSION,
+                CommonConstants.FLINK_PROPERTY_CURRENT_VERSION);
+        extendedParams.putAll(params);
         builder.mergeOptions(
                 FieldOptions.newBuilder()
                         .setExtension(
-                                MetaProto.fieldMeta, Meta.newBuilder().putAllParams(params).build())
+                                MetaProto.fieldMeta,
+                                Meta.newBuilder().putAllParams(extendedParams).build())
                         .build());
     }
 

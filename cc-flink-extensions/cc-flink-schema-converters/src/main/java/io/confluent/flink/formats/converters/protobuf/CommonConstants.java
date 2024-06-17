@@ -51,6 +51,8 @@ public class CommonConstants {
     static final String FLINK_NOT_NULL = "flink.notNull";
     static final String FLINK_REPEATED_WRAPPER_SUFFIX = "RepeatedWrapper";
     static final String FLINK_ELEMENT_WRAPPER_SUFFIX = "ElementWrapper";
+    static final String FLINK_PROPERTY_VERSION = "flink.version";
+    static final String FLINK_PROPERTY_CURRENT_VERSION = "1";
     public static final String FLINK_WRAPPER = "flink.wrapped";
     public static final String FLINK_WRAPPER_FIELD_NAME = "value";
 

@@ -118,6 +118,9 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.builder()
                                 .bytesBuilder()
+                                .prop(
+                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                        CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
                                 .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
                                 .endBytes(),
                         new VarBinaryType(false, 123)),
@@ -135,12 +138,18 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.builder()
                                 .stringBuilder()
+                                .prop(
+                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                        CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
                                 .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
                                 .endString(),
                         new VarCharType(false, 123)),
                 new TypeMapping(
                         SchemaBuilder.builder()
                                 .stringBuilder()
+                                .prop(
+                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                        CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
                                 .prop(CommonConstants.FLINK_MIN_LENGTH, 123)
                                 .prop(CommonConstants.FLINK_MAX_LENGTH, 123)
                                 .endString(),
@@ -151,6 +160,9 @@ public final class CommonMappings {
                 new TypeMapping(
                         SchemaBuilder.array()
                                 .prop(
+                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                        CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
+                                .prop(
                                         CommonConstants.FLINK_TYPE,
                                         CommonConstants.FLINK_MULTISET_TYPE)
                                 .items(
@@ -160,6 +172,9 @@ public final class CommonMappings {
                         new MultisetType(false, new BigIntType(false))),
                 new TypeMapping(
                         SchemaBuilder.map()
+                                .prop(
+                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                        CommonConstants.FLINK_PROPERTY_CURRENT_VERSION)
                                 .prop(
                                         CommonConstants.FLINK_TYPE,
                                         CommonConstants.FLINK_MULTISET_TYPE)
@@ -190,6 +205,10 @@ public final class CommonMappings {
                                 .addToSchema(
                                         SchemaBuilder.builder()
                                                 .intBuilder()
+                                                .prop(
+                                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                                        CommonConstants
+                                                                .FLINK_PROPERTY_CURRENT_VERSION)
                                                 .prop(CommonConstants.FLINK_PRECISION, 2)
                                                 .endInt()),
                         new TimeType(false, 2)),
@@ -202,6 +221,10 @@ public final class CommonMappings {
                                 .addToSchema(
                                         SchemaBuilder.builder()
                                                 .longBuilder()
+                                                .prop(
+                                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                                        CommonConstants
+                                                                .FLINK_PROPERTY_CURRENT_VERSION)
                                                 .prop(CommonConstants.FLINK_PRECISION, 2)
                                                 .endLong()),
                         new LocalZonedTimestampType(false, 2)),
@@ -210,6 +233,10 @@ public final class CommonMappings {
                                 .addToSchema(
                                         SchemaBuilder.builder()
                                                 .longBuilder()
+                                                .prop(
+                                                        CommonConstants.FLINK_PROPERTY_VERSION,
+                                                        CommonConstants
+                                                                .FLINK_PROPERTY_CURRENT_VERSION)
                                                 .prop(CommonConstants.FLINK_PRECISION, 5)
                                                 .endLong()),
                         new LocalZonedTimestampType(false, 5)),

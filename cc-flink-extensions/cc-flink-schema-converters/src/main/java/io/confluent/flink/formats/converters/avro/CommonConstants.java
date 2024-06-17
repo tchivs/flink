@@ -32,6 +32,8 @@ public class CommonConstants {
     static final String FLINK_PRECISION = "flink.precision";
     static final String FLINK_MIN_LENGTH = "flink.minLength";
     static final String FLINK_MAX_LENGTH = "flink.maxLength";
+    static final String FLINK_PROPERTY_VERSION = "flink.version";
+    static final String FLINK_PROPERTY_CURRENT_VERSION = "1";
     public static final String FLINK_TYPE = "flink.type";
     public static final String FLINK_MULTISET_TYPE = "multiset";
 

@@ -31,10 +31,6 @@ under the License.
 
 	<name>Confluent Flink : Formats : Confluent schema converters</name>
 
-	<properties>
-		<protobuf.java.version>3.24.0</protobuf.java.version>
-	</properties>
-
 	<dependencyManagement>
 		<dependencies>
 			<!-- Pulled by kafka-protobuf-types and used explicitly. Enforce a common version. -->

@@ -10,6 +10,10 @@ message Row {
   .google.type.Date date = 1 [(confluent.field_meta) = {
     params: [
       {
+        key: "flink.version",
+        value: "1"
+      },
+      {
         key: "flink.notNull",
         value: "true"
       }
@@ -17,6 +21,10 @@ message Row {
   }];
   .confluent.type.Decimal decimal = 2 [(confluent.field_meta) = {
     params: [
+      {
+        key: "flink.version",
+        value: "1"
+      },
       {
         key: "flink.notNull",
         value: "true"
@@ -34,6 +42,10 @@ message Row {
   .google.protobuf.Timestamp timestamp_ltz = 3 [(confluent.field_meta) = {
     params: [
       {
+        key: "flink.version",
+        value: "1"
+      },
+      {
         key: "flink.notNull",
         value: "true"
       }
@@ -41,6 +53,10 @@ message Row {
   }];
   .google.protobuf.Timestamp timestamp = 4 [(confluent.field_meta) = {
     params: [
+      {
+        key: "flink.version",
+        value: "1"
+      },
       {
         key: "flink.notNull",
         value: "true"
@@ -53,6 +69,10 @@ message Row {
   }];
   .google.type.TimeOfDay time = 5 [(confluent.field_meta) = {
     params: [
+      {
+        key: "flink.version",
+        value: "1"
+      },
       {
         key: "flink.notNull",
         value: "true"

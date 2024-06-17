@@ -6,6 +6,10 @@ message Row {
       {
         key: "flink.wrapped",
         value: "true"
+      },
+      {
+        key: "flink.version",
+        value: "1"
       }
     ]
   }];
@@ -14,6 +18,10 @@ message Row {
       {
         key: "flink.wrapped",
         value: "true"
+      },
+      {
+        key: "flink.version",
+        value: "1"
       }
     ]
   }];
@@ -22,6 +30,10 @@ message Row {
       {
         key: "flink.wrapped",
         value: "true"
+      },
+      {
+        key: "flink.version",
+        value: "1"
       }
     ]
   }];
@@ -37,6 +49,10 @@ message Row {
         {
           key: "flink.wrapped",
           value: "true"
+        },
+        {
+          key: "flink.version",
+          value: "1"
         }
       ]
     }];

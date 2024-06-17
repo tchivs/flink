@@ -15,6 +15,7 @@ import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
+import com.google.protobuf.Descriptors.Descriptor;
 import io.confluent.flink.formats.converters.protobuf.CommonMappings.TypeMapping;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,16 @@ class ProtoToFlinkSchemaConverterTest {
     @MethodSource("typesToCheck")
     void testTypeMapping(TypeMapping mapping) {
         assertThat(ProtoToFlinkSchemaConverter.toFlinkSchema(mapping.getProtoSchema()))
+                .isEqualTo(mapping.getFlinkType());
+    }
+
+    @ParameterizedTest
+    @MethodSource("typesToCheck")
+    void testTypeMappingAfterNormalization(TypeMapping mapping) {
+        final Descriptor schema = mapping.getProtoSchema();
+        final String normalizedString = new ProtobufSchema(schema).normalize().canonicalString();
+        final Descriptor descriptor = new ProtobufSchema(normalizedString).toDescriptor();
+        assertThat(ProtoToFlinkSchemaConverter.toFlinkSchema(descriptor))
                 .isEqualTo(mapping.getFlinkType());
     }
 

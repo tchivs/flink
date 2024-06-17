@@ -72,7 +72,6 @@ import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_PROP;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIME;
 import static io.confluent.flink.formats.converters.json.CommonConstants.CONNECT_TYPE_TIMESTAMP;
-import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PARAMETERS;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_PRECISION;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_MULTISET;
 import static io.confluent.flink.formats.converters.json.CommonConstants.FLINK_TYPE_PROP;
@@ -409,11 +408,7 @@ public class JsonToFlinkSchemaConverter {
 
     @SuppressWarnings("unchecked")
     private static int getTimestampPrecision(Schema schema) {
-        Map<String, Object> params =
-                (Map<String, Object>)
-                        schema.getUnprocessedProperties()
-                                .getOrDefault(FLINK_PARAMETERS, Collections.emptyMap());
-        return (int) params.getOrDefault(FLINK_PRECISION, 3);
+        return (int) schema.getUnprocessedProperties().getOrDefault(FLINK_PRECISION, 3);
     }
 
     private static LogicalType fromInt32Type(boolean isOptional, Schema schema) {
