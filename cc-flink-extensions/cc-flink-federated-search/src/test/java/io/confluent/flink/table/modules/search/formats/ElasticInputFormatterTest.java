@@ -21,10 +21,15 @@ public class ElasticInputFormatterTest {
     @Test
     void testGetRequest() throws Exception {
         Schema inputSchema =
-                Schema.newBuilder().column("k", "INT").column("vectors", "ARRAY<FLOAT>").build();
+                Schema.newBuilder()
+                        .column("field", "STRING")
+                        .column("k", "BIGINT")
+                        .column("query_vector", "ARRAY<FLOAT>")
+                        .build();
+
         ElasticInputFormatter formatter =
                 new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams());
-        Object[] args = new Object[] {3, new float[] {0.1f, 0.2f, 0.3f, 0.4f}};
+        Object[] args = new Object[] {"image-vector", 3L, new float[] {0.1f, 0.2f, 0.3f, 0.4f}};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
                         "{\"field\":\"image-vector\",\"k\":3,\"query_vector\":[0.1,0.2,0.3,0.4]}");
@@ -34,44 +39,64 @@ public class ElasticInputFormatterTest {
     void testGetRequestWithFilter() throws Exception {
         Schema inputSchema =
                 Schema.newBuilder()
+                        .column("field", "STRING")
                         .column("k", "BIGINT")
-                        .column("vectors", "ARRAY<DOUBLE>")
+                        .column("query_vector", "ARRAY<DOUBLE>")
                         .build();
         ElasticInputFormatter formatter =
                 new ElasticInputFormatter(inputSchema.getColumns(), getFilterParams());
-        Object[] args = new Object[] {3L, new double[] {0.1, 0.2, 0.3, 0.4}};
+        Object[] args = new Object[] {"image-vector", 3L, new double[] {0.1, 0.2, 0.3, 0.4}};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
-                        "{\"field\":\"image-vector\",\"filter\":{\"term\":{\"file-type\":\"png\"}},\"similarity\":0.3,\"k\":3,\"query_vector\":[0.1,0.2,0.3,0.4]}");
+                        "{\"filter\":{\"term\":{\"file-type\":\"png\"}},\"similarity\":0.3,\"field\":\"image-vector\",\"k\":3,\"query_vector\":[0.1,0.2,0.3,0.4]}");
     }
 
     @Test
     void testGetRequestInvalidEmbedding() throws Exception {
         Schema inputSchema =
-                Schema.newBuilder().column("k", "BIGINT").column("vectors", "DOUBLE").build();
+                Schema.newBuilder()
+                        .column("field", "STRING")
+                        .column("k", "BIGINT")
+                        .column("query_vector", "DOUBLE")
+                        .build();
         assertThatThrownBy(
                         () -> new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams()))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Elastic vector input must be an array, got DOUBLE");
+                .hasMessageContaining("Elastic query_vector input must be an array, got DOUBLE");
     }
 
     @Test
     void testGetRequestInvalidTopK() throws Exception {
         Schema inputSchema =
                 Schema.newBuilder()
+                        .column("field", "STRING")
                         .column("k", "STRING")
-                        .column("vectors", "ARRAY<DOUBLE>")
+                        .column("query_vector", "ARRAY<FLOAT>")
                         .build();
         assertThatThrownBy(
                         () -> new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams()))
                 .isInstanceOf(FlinkRuntimeException.class)
-                .hasMessageContaining("Elastic topK input must be an integer, got STRING");
+                .hasMessageContaining("Elastic k input must be an integer, got STRING");
+    }
+
+    @Test
+    void testGetRequestInvalidField() throws Exception {
+        Schema inputSchema =
+                Schema.newBuilder()
+                        .column("field", "DOUBLE")
+                        .column("k", "BIGINT")
+                        .column("query_vector", "ARRAY<FLOAT>")
+                        .build();
+        assertThatThrownBy(
+                        () -> new ElasticInputFormatter(inputSchema.getColumns(), getBaseParams()))
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining("Elastic field input must be a string, got DOUBLE");
     }
 
     private static TextGenerationParams getBaseParams() {
         Map<String, String> modelOptions = new HashMap<>();
         modelOptions.put("PROVIDER", "Elastic");
-        modelOptions.put("ELASTIC.PARAMS.field", "image-vector");
+        modelOptions.put("ELASTIC.field", "image-vector");
         return new TextGenerationParams(modelOptions);
     }
 
@@ -79,7 +104,7 @@ public class ElasticInputFormatterTest {
         Map<String, String> modelOptions = new HashMap<>();
         modelOptions.put("PROVIDER", "ELASTIC");
         modelOptions.put("ELASTIC.PARAMS.filter.term.file-type", "png");
-        modelOptions.put("ELASTIC.PARAMS.field", "image-vector");
+        modelOptions.put("ELASTIC.field", "image-vector");
         modelOptions.put("ELASTIC.PARAMS.similarity", "0.3");
         return new TextGenerationParams(modelOptions);
     }
