@@ -4,8 +4,6 @@
 
 package io.confluent.flink.table.utils.mlutils;
 
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.junit.jupiter.api.Test;
@@ -18,25 +16,12 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertThrows;
 
 /** Unit tests for the {@link MlFunctionsUtil} class. */
 class MlFunctionsUtilTest {
-
-    @Test
-    void testGetBaseDataTypes() {
-        Set<DataType> baseDataTypes = MlFunctionsUtil.getBaseDataTypes();
-        assertThat(baseDataTypes.contains(DataTypes.DOUBLE())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.INT())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.BIGINT())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.FLOAT())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.SMALLINT())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.NULL())).isTrue();
-        assertThat(baseDataTypes.contains(DataTypes.DATE())).isTrue();
-    }
 
     @Test
     void testGetDoubleValue_Null() {

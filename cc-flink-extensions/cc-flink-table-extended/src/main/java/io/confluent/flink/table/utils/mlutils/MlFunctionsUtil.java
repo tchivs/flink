@@ -4,8 +4,6 @@
 
 package io.confluent.flink.table.utils.mlutils;
 
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import java.time.Duration;
@@ -16,35 +14,12 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Utility class for ML functions. Provides methods for type conversion and data type validation.
  */
 public class MlFunctionsUtil {
-
-    /**
-     * Returns a set of base data types supported by ML functions.
-     *
-     * @return a set of supported data types.
-     */
-    public static Set<DataType> getBaseDataTypes() {
-        final DataType[] dataTypesValues =
-                new DataType[] {
-                    DataTypes.DOUBLE(),
-                    DataTypes.INT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.FLOAT(),
-                    DataTypes.SMALLINT(),
-                    DataTypes.NULL(),
-                    DataTypes.DATE()
-                };
-        /** Set of base data types for function arguments. */
-        return new HashSet<>(Arrays.asList(dataTypesValues));
-    }
 
     /**
      * Converts the given value to a Double.

@@ -9,25 +9,23 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.functions.ScalarFunction;
-import org.apache.flink.table.types.AtomicDataType;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.ArgumentCount;
 import org.apache.flink.table.types.inference.CallContext;
 import org.apache.flink.table.types.inference.InputTypeStrategy;
 import org.apache.flink.table.types.inference.Signature;
 import org.apache.flink.table.types.inference.TypeInference;
+import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.utils.mlutils.MlFunctionsUtil;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.IntStream;
 
 /** A scaler function that assigns a numerical expression to a bucket. */
@@ -38,8 +36,6 @@ public class MLBucketizeFunction extends ScalarFunction {
     public final String functionName;
 
     private final String bucketNameInitial = "bin_";
-
-    private static final Set<DataType> DATA_TYPE_SET = MlFunctionsUtil.getBaseDataTypes();
 
     /**
      * Constructor for the MLBucketizeFunction class.
@@ -60,20 +56,20 @@ public class MLBucketizeFunction extends ScalarFunction {
     public String eval(Object... args) {
         try {
             Object value = args[0];
-            Object splitBuckets = args[1];
+            Object arraySplitPoints = args[1];
             Optional<String[]> bucketNames = Optional.empty();
             if (args.length == 3) {
-                bucketNames = Optional.of((String[]) args[2]);
+                bucketNames = Optional.of((castToArray(args[2], String.class)));
             }
-            if (value instanceof Long && splitBuckets instanceof Long[]) {
-                Long[] splitBucketsLong = castToNumberArray(splitBuckets, Long.class);
+            if (value instanceof Long && arraySplitPoints instanceof Long[]) {
+                Long[] splitBucketsLong = castToArray(arraySplitPoints, Long.class);
                 bucketNames.ifPresent(names -> validateBucketNames(splitBucketsLong, names));
                 return mapLongValueToBucket(
                         MlFunctionsUtil.getLongValue(value, NAME),
                         splitBucketsLong,
                         bucketNames.orElse(new String[0]));
             } else {
-                Double[] splitBucketsDouble = castToNumberArray(splitBuckets, Double.class);
+                Double[] splitBucketsDouble = castToArray(arraySplitPoints, Double.class);
                 bucketNames.ifPresent(names -> validateBucketNames(splitBucketsDouble, names));
                 return mapDoubleValuesToBucket(
                         MlFunctionsUtil.getDoubleValue(value, NAME),
@@ -86,7 +82,7 @@ public class MLBucketizeFunction extends ScalarFunction {
     }
 
     private String mapDoubleValuesToBucket(
-            Double value, Double[] splitBuckets, String[] bucketNames) {
+            Double value, Double[] arraySplitPoints, String[] bucketNames) {
         boolean isNamePresent = bucketNames.length > 0;
         if (Objects.isNull(value) || value.isNaN()) {
             return !isNamePresent ? bucketNameInitial + "NULL" : bucketNames[0];
@@ -95,31 +91,31 @@ public class MLBucketizeFunction extends ScalarFunction {
             return value < 0
                     ? !isNamePresent ? bucketNameInitial + 1 : bucketNames[1]
                     : !isNamePresent
-                            ? bucketNameInitial + (splitBuckets.length + 1)
+                            ? bucketNameInitial + (arraySplitPoints.length + 1)
                             : bucketNames[bucketNames.length - 1];
         }
-        return mapFiniteValueToBucket(value, splitBuckets, bucketNames);
+        return mapFiniteValueToBucket(value, arraySplitPoints, bucketNames);
     }
 
-    private String mapLongValueToBucket(Long value, Long[] splitBuckets, String[] bucketNames) {
+    private String mapLongValueToBucket(Long value, Long[] arraySplitPoints, String[] bucketNames) {
         boolean isNamePresent = bucketNames.length > 0;
         if (Objects.isNull(value)) {
             return !isNamePresent ? bucketNameInitial + "NULL" : bucketNames[0];
         }
-        return mapFiniteValueToBucket(value, splitBuckets, bucketNames);
+        return mapFiniteValueToBucket(value, arraySplitPoints, bucketNames);
     }
 
     private <T extends Comparable<T>> String mapFiniteValueToBucket(
-            T value, T[] splitBuckets, String[] bucketNames) {
-        Arrays.sort(splitBuckets);
+            T value, T[] arraySplitPoints, String[] bucketNames) {
+        validateSplitArrayOrder(arraySplitPoints);
         boolean isNamePresent = bucketNames.length > 0;
-        for (int i = 0; i < splitBuckets.length; i++) {
-            if (value.compareTo(splitBuckets[i]) < 0) {
+        for (int i = 0; i < arraySplitPoints.length; i++) {
+            if (value.compareTo(arraySplitPoints[i]) < 0) {
                 return !isNamePresent ? bucketNameInitial + (i + 1) : bucketNames[i + 1];
             }
         }
         return !isNamePresent
-                ? bucketNameInitial + (splitBuckets.length + 1)
+                ? bucketNameInitial + (arraySplitPoints.length + 1)
                 : bucketNames[bucketNames.length - 1];
     }
 
@@ -166,97 +162,95 @@ public class MLBucketizeFunction extends ScalarFunction {
                                                         i -> {
                                                             DataType argDataType =
                                                                     argumentDataTypes.get(i);
-                                                            argDataType =
-                                                                    getNullableDataType(
-                                                                            argDataType);
                                                             switch (i) {
                                                                 case (0):
-                                                                    if (!DATA_TYPE_SET.contains(
-                                                                                    argDataType)
+                                                                    if (!argDataType.equals(
+                                                                                    DataTypes
+                                                                                            .NULL())
                                                                             && !argDataType
-                                                                                    .toString()
-                                                                                    .startsWith(
-                                                                                            "DECIMAL")
-                                                                            && !argDataType
-                                                                                    .toString()
-                                                                                    .startsWith(
-                                                                                            "TIME")
-                                                                            && !argDataType
-                                                                                    .toString()
-                                                                                    .startsWith(
-                                                                                            "INTERVAL")) {
+                                                                                    .getLogicalType()
+                                                                                    .isAnyOf(
+                                                                                            LogicalTypeFamily
+                                                                                                    .NUMERIC,
+                                                                                            LogicalTypeFamily
+                                                                                                    .TIME,
+                                                                                            LogicalTypeFamily
+                                                                                                    .TIMESTAMP,
+                                                                                            LogicalTypeFamily
+                                                                                                    .DATETIME,
+                                                                                            LogicalTypeFamily
+                                                                                                    .INTERVAL)) {
                                                                         return String.format(
-                                                                                "The %s data type is not supported as the first argument to the %s function.",
+                                                                                "%s data type is not supported as the first argument to %s function.",
                                                                                 argDataType, NAME);
                                                                     }
                                                                     break;
                                                                 case (1):
                                                                     if (argDataType
-                                                                            .toString()
-                                                                            .startsWith("ARRAY")) {
+                                                                            .getConversionClass()
+                                                                            .isArray()) {
                                                                         DataType childDataType =
                                                                                 argDataType
                                                                                         .getChildren()
                                                                                         .get(0);
-                                                                        childDataType =
-                                                                                getNullableDataType(
-                                                                                        childDataType);
-                                                                        if (!DATA_TYPE_SET.contains(
-                                                                                        childDataType)
+                                                                        if (!argDataType.equals(
+                                                                                        DataTypes
+                                                                                                .NULL())
                                                                                 && !childDataType
-                                                                                        .toString()
-                                                                                        .startsWith(
-                                                                                                "DECIMAL")
-                                                                                && !childDataType
-                                                                                        .toString()
-                                                                                        .startsWith(
-                                                                                                "TIME")
-                                                                                && !childDataType
-                                                                                        .toString()
-                                                                                        .startsWith(
-                                                                                                "INTERVAL")) {
+                                                                                        .getLogicalType()
+                                                                                        .isAnyOf(
+                                                                                                LogicalTypeFamily
+                                                                                                        .NUMERIC,
+                                                                                                LogicalTypeFamily
+                                                                                                        .TIME,
+                                                                                                LogicalTypeFamily
+                                                                                                        .TIMESTAMP,
+                                                                                                LogicalTypeFamily
+                                                                                                        .DATETIME,
+                                                                                                LogicalTypeFamily
+                                                                                                        .INTERVAL)) {
                                                                             return String.format(
-                                                                                    "Arrays of type %s are not supported as the second argument to the %s function.",
+                                                                                    "Array of type %s is not supported as the second argument to %s function.",
                                                                                     childDataType,
                                                                                     NAME);
                                                                         }
                                                                     } else {
                                                                         return String.format(
-                                                                                "The second argument to the %s function must be of ARRAY data type.",
+                                                                                "The second argument to the %s function must be as ARRAY.",
                                                                                 NAME);
                                                                     }
                                                                     break;
                                                                 case (2):
                                                                     if (argDataType
-                                                                            .toString()
-                                                                            .startsWith("ARRAY")) {
+                                                                            .getConversionClass()
+                                                                            .isArray()) {
                                                                         DataType childDataType =
                                                                                 argDataType
                                                                                         .getChildren()
                                                                                         .get(0);
-                                                                        childDataType =
-                                                                                getNullableDataType(
-                                                                                        childDataType);
-                                                                        if (!childDataType.equals(
-                                                                                        DataTypes
-                                                                                                .STRING())
-                                                                                && !childDataType
-                                                                                        .toString()
-                                                                                        .startsWith(
-                                                                                                "CHAR")
-                                                                                && !childDataType
-                                                                                        .toString()
-                                                                                        .startsWith(
-                                                                                                "VARCHAR")) {
+                                                                        if (!childDataType
+                                                                                .getLogicalType()
+                                                                                .isAnyOf(
+                                                                                        LogicalTypeFamily
+                                                                                                .NUMERIC,
+                                                                                        LogicalTypeFamily
+                                                                                                .TIME,
+                                                                                        LogicalTypeFamily
+                                                                                                .TIMESTAMP,
+                                                                                        LogicalTypeFamily
+                                                                                                .DATETIME,
+                                                                                        LogicalTypeFamily
+                                                                                                .INTERVAL,
+                                                                                        LogicalTypeFamily
+                                                                                                .CHARACTER_STRING)) {
                                                                             return String.format(
-                                                                                    "Arrays of type %s are not supported as the third argument to the %s function. "
-                                                                                            + "Please provide Array of type STRING with valid names.",
+                                                                                    "Array of type %s is not supported as the third argument to %s function. ",
                                                                                     childDataType,
                                                                                     NAME);
                                                                         }
                                                                     } else {
                                                                         return String.format(
-                                                                                "The third argument to the %s function must be of ARRAY data type.",
+                                                                                "Third argument to %s function must be as ARRAY.",
                                                                                 NAME);
                                                                     }
                                                                     break;
@@ -281,14 +275,6 @@ public class MLBucketizeFunction extends ScalarFunction {
                                 return Optional.of(argumentDataTypes);
                             }
 
-                            private DataType getNullableDataType(DataType argDataType) {
-                                if (argDataType instanceof AtomicDataType
-                                        && !argDataType.getLogicalType().isNullable()) {
-                                    argDataType = argDataType.nullable();
-                                }
-                                return argDataType;
-                            }
-
                             @Override
                             public List<Signature> getExpectedSignatures(
                                     FunctionDefinition definition) {
@@ -309,53 +295,76 @@ public class MLBucketizeFunction extends ScalarFunction {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends Number> T[] castToNumberArray(Object arrayObject, Class<T> targetType) {
+    private <T> T[] castToArray(Object arrayObject, Class<T> targetType) {
         int length = Array.getLength(arrayObject);
-        List<T> numberList = new ArrayList<>();
+        List<T> typedList = new ArrayList<>();
+
         for (int i = 0; i < length; i++) {
-            if (Objects.isNull(Array.get(arrayObject, i))) {
-                continue;
-            }
             Object element = Array.get(arrayObject, i);
-            if (targetType.equals(Double.class)) {
-                Double doubleValue = MlFunctionsUtil.getDoubleValue(element, NAME);
-                if (doubleValue.isNaN()) {
-                    continue;
-                }
-                numberList.add((T) doubleValue);
-            } else if (targetType.equals(Long.class)) {
-                numberList.add((T) MlFunctionsUtil.getLongValue(element, NAME));
-            } else {
-                throw new FlinkRuntimeException(
-                        String.format(
-                                "The %s function does not support arrays of type %s as arguments.",
-                                NAME, targetType.getSimpleName()));
+            T typedElement = castElement(element, targetType);
+
+            if (shouldAddElement(typedElement, typedList, targetType)) {
+                typedList.add(typedElement);
             }
         }
-        return numberList.toArray((T[]) Array.newInstance(targetType, 0));
+
+        return typedList.toArray((T[]) Array.newInstance(targetType, 0));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T castElement(Object element, Class<T> targetType) {
+        if (targetType.equals(Double.class)) {
+            return (T) MlFunctionsUtil.getDoubleValue(element, NAME);
+        } else if (targetType.equals(Long.class)) {
+            return (T) MlFunctionsUtil.getLongValue(element, NAME);
+        } else if (targetType.equals(String.class)) {
+            return (T) (element == null ? null : String.valueOf(element));
+        } else {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "%s function does not support array of type %s as arguments.",
+                            NAME, targetType.getSimpleName()));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> boolean shouldAddElement(T element, List<T> typedList, Class<T> targetType) {
+        if (Objects.nonNull(element) && targetType.equals(Double.class)) {
+            Double doubleValue = (Double) element;
+            return !doubleValue.isNaN() && isLastElementUnEqual((T) doubleValue, typedList);
+        } else if (Objects.nonNull(element) && targetType.equals(Long.class)) {
+            return isLastElementUnEqual(element, typedList);
+        } else return targetType.equals(String.class);
+    }
+
+    private <T> boolean isLastElementUnEqual(T element, List<T> typedList) {
+        return typedList.isEmpty() || !Objects.equals(element, typedList.get(typedList.size() - 1));
     }
 
     private <T extends Comparable<T>> void validateBucketNames(
-            T[] splitBuckets, String[] bucketNames) {
-        if (bucketNames.length != splitBuckets.length + 2) {
+            T[] arraySplitPoints, String[] bucketNames) {
+        if (bucketNames.length != arraySplitPoints.length + 2) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "Invalid number of bucket names passed to the function %s. "
-                                    + "Please provide names for all bucket names excluding undefined buckets and including first name for undefined values",
-                            NAME));
+                            "Expecting %s bucket names, %s names were passed to %s function. "
+                                    + "The first bucket name is for undefined values, followed by a name for each unique split",
+                            arraySplitPoints.length + 2, bucketNames.length, NAME));
         }
-        if (!isArraySorted(splitBuckets)) {
+    }
+
+    private <T extends Comparable<T>> void validateSplitArrayOrder(T[] arraySplitPoints) {
+        if (!isArraySorted(arraySplitPoints)) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "Invalid order of buckets passed to the function %s. "
-                                    + "Buckets must be sorted in ascending order when passed with bucket names.",
+                            "Invalid order of buckets split passed to the function %s. "
+                                    + "arraySplitPoints must be sorted in ascending order.",
                             NAME));
         }
     }
 
-    private <T extends Comparable<T>> boolean isArraySorted(T[] splitBuckets) {
-        for (int i = 0; i < splitBuckets.length - 1; ++i) {
-            if (splitBuckets[i].compareTo(splitBuckets[i + 1]) > 0) {
+    private <T extends Comparable<T>> boolean isArraySorted(T[] arraySplitPoints) {
+        for (int i = 0; i < arraySplitPoints.length - 1; ++i) {
+            if (arraySplitPoints[i].compareTo(arraySplitPoints[i + 1]) > 0) {
                 return false;
             }
         }

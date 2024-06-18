@@ -48,6 +48,60 @@ public class MLBucketizeFunctionTest {
     }
 
     @Test
+    void testBucketizeWithIntegerBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1, 4, 7], ARRAY[null,1,2,3,4]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("2");
+    }
+
+    @Test
+    void testBucketizeWithTimeStampBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1, 7], ARRAY[null,TIMESTAMP '2024-06-01 12:00:01', TIMESTAMP '2024-06-01 12:10:01', TIMESTAMP '2024-06-01 12:20:01']) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("2024-06-01T12:10:01");
+    }
+
+    @Test
+    void testBucketizeWithIntervalBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 21' DAY(2) TO HOUR]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("PT309H");
+    }
+
+    @Test
+    void testBucketizeWithInstantBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("2024-06-15T15:00:30Z");
+    }
+
+    @Test
+    void testBucketizeWithLongBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null AS BIGINT), CAST(1234567890123456799 AS BIGINT), CAST(1234567890123456799 AS BIGINT)]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("1234567890123456799");
+    }
+
+    @Test
+    void testBucketizeWithDoubleBucketNames() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql(
+                        "SELECT ML_BUCKETIZE(0, ARRAY[1], ARRAY[CAST('NaN' AS DOUBLE), CAST(0.99 AS DOUBLE), CAST(1.0 AS DOUBLE)]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("0.99");
+    }
+
+    @Test
     void testBucketizeWithBucketNamesWithNull() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
@@ -206,6 +260,14 @@ public class MLBucketizeFunctionTest {
     }
 
     @Test
+    void testBucketizeForDuplicateValues() {
+        final TableResult mlqueryResult1 =
+                tableEnv.executeSql("SELECT ML_BUCKETIZE(2, ARRAY[1, 4, 4, 7]) AS scaled_value\n;");
+        Row row = mlqueryResult1.collect().next();
+        assertThat(row.getField(0)).isEqualTo("bin_2");
+    }
+
+    @Test
     void testMLBucketizeScalarForStringValue() {
         assertThrows(
                 ValidationException.class,
@@ -224,21 +286,19 @@ public class MLBucketizeFunctionTest {
     }
 
     @Test
-    void testMLBucketizeInvalidBucketNameDataType() {
-        assertThrows(
-                ValidationException.class,
-                () ->
-                        tableEnv.executeSql(
-                                "SELECT ML_BUCKETIZE(1, ARRAY[0, 1], ARRAY[0, 1]) AS scaled_value\n;"));
-    }
-
-    @Test
     void testMLBucketizeNonArraySecondArgument() {
         assertThrows(
                 ValidationException.class,
                 () ->
                         tableEnv.executeSql(
                                 "SELECT ML_BUCKETIZE(1, 1, ARRAY['b1', 'b2']) AS scaled_value\n;"));
+    }
+
+    @Test
+    void testBucketizeForEmptySplitBucketArray() {
+        assertThrows(
+                ValidationException.class,
+                () -> tableEnv.executeSql("SELECT ML_BUCKETIZE(4, ARRAY[]) AS scaled_value\n;"));
     }
 
     @Test
@@ -263,6 +323,13 @@ public class MLBucketizeFunctionTest {
         final TableResult result =
                 tableEnv.executeSql(
                         "SELECT ML_BUCKETIZE(1, ARRAY[NULL, 1], ARRAY['b_null', 'b1', 'b2', 'b3']) AS scaled_value\n;");
+        assertThrows(RuntimeException.class, () -> result.collect().next());
+    }
+
+    @Test
+    void testMLBucketizeForUnsortedSplitBucketArray() {
+        final TableResult result =
+                tableEnv.executeSql("SELECT ML_BUCKETIZE(1, ARRAY[2, 1]) AS scaled_value\n;");
         assertThrows(RuntimeException.class, () -> result.collect().next());
     }
 }
