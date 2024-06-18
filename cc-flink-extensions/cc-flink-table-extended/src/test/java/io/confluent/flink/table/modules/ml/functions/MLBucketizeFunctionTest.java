@@ -13,6 +13,8 @@ import org.apache.flink.types.Row;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -28,6 +30,7 @@ public class MLBucketizeFunctionTest {
         // Registering temp function
         final String functionName = "ML_BUCKETIZE";
         tableEnv.createTemporaryFunction(functionName, new MLBucketizeFunction(functionName));
+        tableEnv.getConfig().setLocalTimeZone(ZoneId.of("UTC"));
     }
 
     @Test
@@ -80,7 +83,7 @@ public class MLBucketizeFunctionTest {
                 tableEnv.executeSql(
                         "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
-        assertThat(row.getField(0)).isEqualTo("2024-06-15T15:00:30Z");
+        assertThat(row.getField(0)).isEqualTo("2024-06-15T10:00:30Z");
     }
 
     @Test
