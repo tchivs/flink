@@ -334,7 +334,9 @@ public class MLBucketizeFunction extends ScalarFunction {
             return !doubleValue.isNaN() && isLastElementUnEqual((T) doubleValue, typedList);
         } else if (Objects.nonNull(element) && targetType.equals(Long.class)) {
             return isLastElementUnEqual(element, typedList);
-        } else return targetType.equals(String.class);
+        } else {
+            return targetType.equals(String.class);
+        }
     }
 
     private <T> boolean isLastElementUnEqual(T element, List<T> typedList) {
