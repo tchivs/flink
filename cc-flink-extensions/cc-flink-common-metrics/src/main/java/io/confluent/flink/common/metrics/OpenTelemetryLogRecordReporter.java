@@ -86,6 +86,7 @@ public class OpenTelemetryLogRecordReporter extends OpenTelemetryReporterBase
 
     private static BiConsumer<String, Object> setAttribute(LogRecordBuilder logRecordBuilder) {
         return (key, value) -> {
+            key = VariableNameUtil.getVariableName(key);
             if (value instanceof String) {
                 logRecordBuilder.setAttribute(AttributeKey.stringKey(key), (String) value);
             } else if (value instanceof Long) {

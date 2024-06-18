@@ -7,6 +7,7 @@ package io.confluent.flink.common.metrics;
 import org.apache.flink.metrics.MetricConfig;
 import org.apache.flink.traces.Span;
 import org.apache.flink.traces.SpanBuilder;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -52,6 +53,8 @@ public class OpenTelemetryTraceReporterTest {
 
         String attribute1KeyRoot = "foo";
         String attribute1ValueRoot = "bar";
+        String attribute2KeyRoot = "<variable>";
+        String attribute2ValueRoot = "value";
 
         String attribute1KeyL1N1 = "foo_1_1";
         String attribute1ValueL1N1 = "bar_1_1";
@@ -88,6 +91,7 @@ public class OpenTelemetryTraceReporterTest {
             SpanBuilder rootSpan =
                     Span.builder(this.getClass(), "root")
                             .setAttribute(attribute1KeyRoot, attribute1ValueRoot)
+                            .setAttribute(attribute2KeyRoot, attribute2ValueRoot)
                             .setStartTsMillis(42)
                             .setEndTsMillis(64)
                             .addChildren(Arrays.asList(childL1N1, childL1N2));
@@ -108,9 +112,12 @@ public class OpenTelemetryTraceReporterTest {
                 .asMap()
                 .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
 
-        assertThat(attributes)
-                .containsExactlyInAnyOrderEntriesOf(
-                        Collections.singletonMap(attribute1KeyRoot, attribute1ValueRoot));
+        Map<String, String> expected = CollectionUtil.newHashMapWithExpectedSize(2);
+        expected.put(attribute1KeyRoot, attribute1ValueRoot);
+        expected.put(
+                attribute2KeyRoot.substring(1, attribute2KeyRoot.length() - 1),
+                attribute2ValueRoot);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expected);
         assertThat(spanDataRoot.getParentSpanId()).isEqualTo("0000000000000000");
 
         SpanData spanDataL1N2 = spanExporterFactory.getSpans().get(2);

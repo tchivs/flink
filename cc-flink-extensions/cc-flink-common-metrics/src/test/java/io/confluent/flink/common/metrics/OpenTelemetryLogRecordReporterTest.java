@@ -6,6 +6,7 @@ package io.confluent.flink.common.metrics;
 
 import org.apache.flink.events.Event;
 import org.apache.flink.metrics.MetricConfig;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.TestLoggerExtension;
 
 import io.opentelemetry.api.logs.Severity;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +50,8 @@ public class OpenTelemetryLogRecordReporterTest {
         String scope = this.getClass().getCanonicalName();
         String attribute1Key = "foo";
         String attribute1Value = "bar";
+        String attribute2Key = "<variable>";
+        String attribute2Value = "value";
         String body = "Test!";
         String severity = "INFO";
         long observedTimeMs = 123456L;
@@ -61,6 +63,7 @@ public class OpenTelemetryLogRecordReporterTest {
             reporter.notifyOfAddedEvent(
                     Event.builder(this.getClass(), "eventName")
                             .setAttribute(attribute1Key, attribute1Value)
+                            .setAttribute(attribute2Key, attribute2Value)
                             .setBody(body)
                             .setObservedTsMillis(observedTimeMs)
                             .setSeverity(severity)
@@ -84,9 +87,10 @@ public class OpenTelemetryLogRecordReporterTest {
                 .asMap()
                 .forEach((key, value) -> attributes.put(key.getKey(), value.toString()));
 
-        assertThat(attributes)
-                .containsExactlyInAnyOrderEntriesOf(
-                        Collections.singletonMap(attribute1Key, attribute1Value));
+        Map<String, String> expected = CollectionUtil.newHashMapWithExpectedSize(2);
+        expected.put(attribute1Key, attribute1Value);
+        expected.put(attribute2Key.substring(1, attribute2Key.length() - 1), attribute2Value);
+        assertThat(attributes).containsExactlyInAnyOrderEntriesOf(expected);
     }
 
     static class TestLogRecordExporterFactory implements LogRecordExporterFactory {

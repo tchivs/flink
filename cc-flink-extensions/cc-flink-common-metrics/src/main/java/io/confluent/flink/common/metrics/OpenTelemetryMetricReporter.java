@@ -136,7 +136,8 @@ public class OpenTelemetryMetricReporter extends OpenTelemetryReporterBase
                 group.getAllVariables().entrySet().stream()
                         .collect(
                                 ImmutableMap.toImmutableMap(
-                                        e -> getVariableName(e.getKey()), Entry::getValue));
+                                        e -> VariableNameUtil.getVariableName(e.getKey()),
+                                        Entry::getValue));
         Map<String, String> confluentVariables = ConfluentAdapter.adaptVariables(name, variables);
         final String confluentMetricName = ConfluentAdapter.adaptMetricName(name);
         MetricMetadata metricMetadata = new MetricMetadata(confluentMetricName, confluentVariables);
@@ -281,13 +282,5 @@ public class OpenTelemetryMetricReporter extends OpenTelemetryReporterBase
                     metricData.size(),
                     exporter.getClass().getName());
         }
-    }
-
-    /** Removes leading and trailing angle brackets. */
-    private String getVariableName(String str) {
-        if (str.startsWith("<") && str.endsWith(">")) {
-            return str.substring(1, str.length() - 1);
-        }
-        return str;
     }
 }

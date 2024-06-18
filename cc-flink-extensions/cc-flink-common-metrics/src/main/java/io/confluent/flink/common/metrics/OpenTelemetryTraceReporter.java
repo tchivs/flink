@@ -93,6 +93,7 @@ public class OpenTelemetryTraceReporter extends OpenTelemetryReporterBase implem
 
     private static BiConsumer<String, Object> setAttribute(SpanBuilder spanBuilder) {
         return (key, value) -> {
+            key = VariableNameUtil.getVariableName(key);
             if (value instanceof String) {
                 spanBuilder.setAttribute(key, (String) value);
             } else if (value instanceof Long) {
