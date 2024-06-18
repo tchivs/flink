@@ -22,8 +22,8 @@ import org.apache.flink.AttributeBuilder;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.TraceOptions;
-import org.apache.flink.events.Event;
 import org.apache.flink.events.EventBuilder;
+import org.apache.flink.events.Events;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.MetricGroup;
@@ -490,7 +490,7 @@ public class CheckpointStatsTracker {
             if (reportCheckpointEvents) {
                 // Create event
                 EventBuilder eventBuilder =
-                        Event.builder(CheckpointStatsTracker.class, "Checkpoint")
+                        Events.Checkpoint.builder(CheckpointStatsTracker.class)
                                 .setObservedTsMillis(checkpointStats.getLatestAckTimestamp())
                                 .setSeverity("INFO");
                 addCommonCheckpointStatsAttributes(eventBuilder, checkpointStats);

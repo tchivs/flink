@@ -27,6 +27,7 @@ import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.core.execution.CheckpointType;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.failure.FailureEnricher;
+import org.apache.flink.events.Event;
 import org.apache.flink.queryablestate.KvStateID;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.blob.BlobWriter;
@@ -354,16 +355,33 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId>
         this.shuffleMaster = checkNotNull(shuffleMaster);
 
         this.jobManagerJobMetricGroup = jobMetricGroupFactory.create(jobGraph);
+
         this.jobStatusListener = new JobManagerJobStatusListener();
 
         this.failureEnrichers = checkNotNull(failureEnrichers);
+
+        JobStatusListener schedulerListener = jobStatusListener;
+        if (jobMasterConfiguration
+                .getConfiguration()
+                .get(JobManagerOptions.REPORT_STATUS_CHANGES_AS_EVENTS)) {
+            schedulerListener =
+                    JobStatusListener.combine(
+                            schedulerListener,
+                            (jobId, newJobStatus, timestamp) ->
+                                    jobManagerJobMetricGroup.addEvent(
+                                            Event.builder(JobMaster.class, "JobStatusChanged")
+                                                    .setObservedTsMillis(timestamp)
+                                                    .setSeverity("INFO")
+                                                    .setAttribute(
+                                                            "newJobStatus", newJobStatus.name())));
+        }
 
         this.schedulerNG =
                 createScheduler(
                         slotPoolServiceSchedulerFactory,
                         executionDeploymentTracker,
                         jobManagerJobMetricGroup,
-                        jobStatusListener);
+                        schedulerListener);
 
         this.heartbeatServices = checkNotNull(heartbeatServices);
         this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
@@ -1107,7 +1125,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId>
         }
     }
 
-    private void jobStatusChanged(final JobStatus newJobStatus) {
+    private void jobStatusChanged(final JobStatus newJobStatus, long timestamp) {
         validateRunsInMainThread();
         if (newJobStatus.isGloballyTerminalState()) {
             CompletableFuture<Void> partitionPromoteFuture;
@@ -1453,7 +1471,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId>
 
             if (running) {
                 // run in rpc thread to avoid concurrency
-                runAsync(() -> jobStatusChanged(newJobStatus));
+                runAsync(() -> jobStatusChanged(newJobStatus, timestamp));
             }
         }
 

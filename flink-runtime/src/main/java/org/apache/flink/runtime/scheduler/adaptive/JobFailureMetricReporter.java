@@ -19,7 +19,7 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.AttributeBuilder;
-import org.apache.flink.events.Event;
+import org.apache.flink.events.Events;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.executiongraph.failover.flip1.FailureHandlingResult;
 import org.apache.flink.traces.Span;
@@ -31,7 +31,6 @@ import java.util.Map;
 public class JobFailureMetricReporter {
 
     public static final String FAILURE_LABEL_ATTRIBUTE_PREFIX = "failureLabel.";
-    public static final String EVENT_NAME = "JobFailure";
     public static final String RESTART_KEY = "canRestart";
     public static final String GLOBAL_KEY = "isGlobalFailure";
 
@@ -81,7 +80,7 @@ public class JobFailureMetricReporter {
             Map<String, String> failureLabels) {
         metricGroup.addSpan(
                 addFailureAttributes(
-                        Span.builder(JobFailureMetricReporter.class, EVENT_NAME)
+                        Span.builder(JobFailureMetricReporter.class, Events.JobFailure.name())
                                 .setStartTsMillis(timestamp)
                                 .setEndTsMillis(timestamp),
                         canRestart,
@@ -96,7 +95,7 @@ public class JobFailureMetricReporter {
             Map<String, String> failureLabels) {
         metricGroup.addEvent(
                 addFailureAttributes(
-                        Event.builder(JobFailureMetricReporter.class, EVENT_NAME)
+                        Events.JobFailure.builder(JobFailureMetricReporter.class)
                                 .setObservedTsMillis(timestamp)
                                 .setSeverity("INFO"),
                         canRestart,

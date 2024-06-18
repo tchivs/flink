@@ -323,6 +323,14 @@ public class JobManagerOptions {
                     .withDescription(
                             "Directory for JobManager to store the archives of completed jobs.");
 
+    /** Flog to activate event reporting for job status changes. */
+    @Documentation.Section(Documentation.Sections.ALL_JOB_MANAGER)
+    public static final ConfigOption<Boolean> REPORT_STATUS_CHANGES_AS_EVENTS =
+            key("jobmanager.events.job_status_changed")
+                    .booleanType()
+                    .defaultValue(Boolean.TRUE)
+                    .withDescription("Whether job status changes are reported as events.");
+
     /** The job store cache size in bytes which is used to keep completed jobs in memory. */
     @Documentation.Section(Documentation.Sections.ALL_JOB_MANAGER)
     public static final ConfigOption<Long> JOB_STORE_CACHE_SIZE =
