@@ -8,7 +8,7 @@ import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
 import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
-import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalarFunction;
+import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalerFunction;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,8 +39,8 @@ public class MLFunctionsModule implements Module {
                                         MLEvaluateAllFunction.NAME,
                                         new ModelVersions("", Collections.emptyMap())));
                         put(
-                                MLMinMaxScalarFunction.NAME,
-                                new MLMinMaxScalarFunction(MLMinMaxScalarFunction.NAME));
+                                MLMinMaxScalerFunction.NAME,
+                                new MLMinMaxScalerFunction(MLMinMaxScalerFunction.NAME));
                         put(
                                 MLBucketizeFunction.NAME,
                                 new MLBucketizeFunction(MLBucketizeFunction.NAME));
