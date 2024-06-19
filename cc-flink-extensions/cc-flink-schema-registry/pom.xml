@@ -177,6 +177,12 @@ under the License.
 		<!-- test dependencies -->
 		<dependency>
 			<groupId>io.confluent</groupId>
+			<artifactId>kafka-json-schema-serializer</artifactId>
+			<version>${schema.registry.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
 			<artifactId>kafka-protobuf-serializer</artifactId>
 			<version>${schema.registry.version}</version>
 			<scope>test</scope>

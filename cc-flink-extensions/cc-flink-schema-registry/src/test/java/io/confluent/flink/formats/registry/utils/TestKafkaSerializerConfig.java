@@ -6,6 +6,7 @@ package io.confluent.flink.formats.registry.utils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
+import io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializerConfig;
 import io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializerConfig;
 
 import java.util.Map;
@@ -38,6 +39,14 @@ public class TestKafkaSerializerConfig {
 
     public static Map<String, String> getAvroProps() {
         return DEFAULT_PROPS;
+    }
+
+    public static Map<String, String> getJsonProps() {
+        return ImmutableMap.<String, String>builder()
+                .putAll(DEFAULT_PROPS)
+                // fail if the payload is not valid for the given schema
+                .put(KafkaJsonSchemaSerializerConfig.FAIL_INVALID_SCHEMA, "true")
+                .build();
     }
 
     public static Map<String, String> getProtobufProps() {
