@@ -26,7 +26,6 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.MdcUtils;
 import org.apache.flink.util.TemporaryClassLoaderContext;
 import org.apache.flink.util.concurrent.FutureUtils;
-import org.apache.flink.util.function.BiFunctionWithException;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
@@ -62,8 +61,7 @@ public final class ConfluentJobSubmitHandler
 
     private final Configuration configuration;
     private final Executor executor;
-    private final BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
-            jobGraphGenerator;
+    private final JobGraphGenerator jobGraphGenerator;
     private final Function<Throwable, RestHandlerException> exceptionClassifier;
 
     private final Semaphore inProgressRequests;
@@ -93,8 +91,7 @@ public final class ConfluentJobSubmitHandler
             Map<String, String> headers,
             Configuration configuration,
             Executor executor,
-            BiFunctionWithException<String, Map<String, String>, JobGraph, Exception>
-                    jobGraphGenerator,
+            JobGraphGenerator jobGraphGenerator,
             Function<Throwable, RestHandlerException> exceptionClassifier) {
         super(leaderRetriever, timeout, headers, ConfluentJobSubmitHeaders.getInstance());
         this.configuration = configuration;
@@ -254,7 +251,8 @@ public final class ConfluentJobSubmitHandler
             Collection<String> arguments, Map<String, String> generatorConfiguration)
             throws Exception {
         try (TemporaryClassLoaderContext ignored = TemporaryClassLoaderContext.of(classLoader)) {
-            return jobGraphGenerator.apply(arguments.iterator().next(), generatorConfiguration);
+            return jobGraphGenerator.generateJobGraph(
+                    arguments.iterator().next(), generatorConfiguration);
         }
     }
 
@@ -268,5 +266,10 @@ public final class ConfluentJobSubmitHandler
         if (savepointPath != null) {
             jobGraph.setSavepointRestoreSettings(SavepointRestoreSettings.forPath(savepointPath));
         }
+    }
+
+    interface JobGraphGenerator {
+        JobGraph generateJobGraph(String compiledPlan, Map<String, String> configuration)
+                throws Exception;
     }
 }
