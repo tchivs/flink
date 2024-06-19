@@ -116,6 +116,7 @@ public final class ConfluentJobSubmitHandler
         try {
             generateJobGraph(
                     Collections.singleton(ResourceUtils.loadResource("/preload_plan.json")),
+                    "preload job",
                     Collections.emptyMap());
         } catch (Throwable e) {
             LOG.warn("Preloading failed with an exception.", e);
@@ -223,7 +224,10 @@ public final class ConfluentJobSubmitHandler
             generatorConfiguration.putAll(requestBody.configuration);
 
             JobGraph jobGraph =
-                    generateJobGraph(requestBody.generatorArguments, generatorConfiguration);
+                    generateJobGraph(
+                            requestBody.generatorArguments,
+                            requestBody.jobId,
+                            generatorConfiguration);
 
             adjustJobGraph(
                     jobGraph,
@@ -248,11 +252,13 @@ public final class ConfluentJobSubmitHandler
     }
 
     private JobGraph generateJobGraph(
-            Collection<String> arguments, Map<String, String> generatorConfiguration)
+            Collection<String> arguments,
+            String jobName,
+            Map<String, String> generatorConfiguration)
             throws Exception {
         try (TemporaryClassLoaderContext ignored = TemporaryClassLoaderContext.of(classLoader)) {
             return jobGraphGenerator.generateJobGraph(
-                    arguments.iterator().next(), generatorConfiguration);
+                    arguments.iterator().next(), jobName, generatorConfiguration);
         }
     }
 
@@ -269,7 +275,8 @@ public final class ConfluentJobSubmitHandler
     }
 
     interface JobGraphGenerator {
-        JobGraph generateJobGraph(String compiledPlan, Map<String, String> configuration)
+        JobGraph generateJobGraph(
+                String compiledPlan, String jobName, Map<String, String> configuration)
                 throws Exception;
     }
 }

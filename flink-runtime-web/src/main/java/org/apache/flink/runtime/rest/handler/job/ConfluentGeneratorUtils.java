@@ -9,6 +9,7 @@ import org.apache.flink.api.dag.Pipeline;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.client.deployment.executors.PipelineExecutorUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rest.handler.RestHandlerException;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -34,9 +35,10 @@ import static io.confluent.flink.table.service.ServiceTasksOptions.PRIVATE_USER_
 @Confluent
 class ConfluentGeneratorUtils {
 
-    static JobGraph generateJobGraph(String compiledPlan, Map<String, String> allOptions)
-            throws Exception {
+    static JobGraph generateJobGraph(
+            String compiledPlan, String jobName, Map<String, String> allOptions) throws Exception {
         final Configuration allConfig = Configuration.fromMap(allOptions);
+        allConfig.set(PipelineOptions.NAME, jobName);
         final ClassLoader loader = ConfluentJobSubmitHandler.class.getClassLoader();
 
         final TableEnvironmentImpl tableEnvironment =

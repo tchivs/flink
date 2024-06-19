@@ -106,6 +106,22 @@ class ConfluentJobSubmitHandlerTest {
     }
 
     @Test
+    void testSetJobName() throws Exception {
+        final JobID jobId = JobID.generate();
+
+        final HandlerRequest<ConfluentJobSubmitRequestBody> request =
+                createRequest(
+                        jobId.toHexString(),
+                        null,
+                        Collections.singleton(COMPILED_PLAN),
+                        Collections.emptyMap());
+
+        final JobGraph jobGraph = submitAndRetrieveJobGraph(request);
+
+        assertThat(jobGraph.getName()).isEqualTo(jobId.toHexString());
+    }
+
+    @Test
     void testSetJobConfigurationOnJobGraph() throws Exception {
         final Map<String, String> jobConfiguration = Collections.singletonMap("foo", "bar");
 
@@ -326,7 +342,7 @@ class ConfluentJobSubmitHandlerTest {
 
         testErrorHandling(
                 createHandler(
-                        (i1, i2) -> {
+                        (i1, i2, i3) -> {
                             ConfluentJobSubmitHandler.LOG.error("generation error");
                             throw generationFailure;
                         },
@@ -359,7 +375,7 @@ class ConfluentJobSubmitHandlerTest {
 
         testErrorHandling(
                 createHandler(
-                        (i1, i2) -> {
+                        (i1, i2, i3) -> {
                             throw generationFailure;
                         },
                         e -> {
