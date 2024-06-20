@@ -14,6 +14,7 @@ import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+import org.apache.kafka.common.errors.GroupAuthorizationException;
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
@@ -109,6 +110,7 @@ public class TypeFailureEnricher implements FailureEnricher {
         KAFKA_SASL_AUTH(17, "TODO"),
         KAFKA_SASL_AUTH_CLUSTER_NOT_FOUND(18, "TODO"),
         PEKKO_SERIALIZATION(19, "TODO"),
+        KAFKA_NOT_AUTHORIZED_TO_ACCESS_GROUP(20, "Kafka group read permissions have been removed."),
         ;
 
         /** Unique code for the error class. */
@@ -200,6 +202,14 @@ public class TypeFailureEnricher implements FailureEnricher {
                         Type.USER,
                         Handling.RECOVER,
                         ErrorClass.KAFKA_SASL_AUTH_CLUSTER_NOT_FOUND)),
+        forUserThrowable(
+                GroupAuthorizationException.class,
+                Classification.of(Type.SYSTEM, Handling.RECOVER, ErrorClass.UNKNOWN),
+                ConditionalClassification.of(
+                        t -> containsMessage(t, "Not authorized to access group"),
+                        Type.USER,
+                        Handling.RECOVER,
+                        ErrorClass.KAFKA_NOT_AUTHORIZED_TO_ACCESS_GROUP)),
         // Schema Registry exceptions.
         forUserThrowable(
                 RestClientException.class,
