@@ -12,7 +12,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
-import io.confluent.flink.table.modules.ml.providers.SearchSupportedProviders;
+import io.confluent.flink.table.modules.search.providers.SearchSupportedProviders;
 
 import java.util.HashMap;
 import java.util.Map;

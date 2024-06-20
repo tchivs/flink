@@ -14,7 +14,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.MappingIt
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.csv.CsvParser;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 
 import java.util.List;
@@ -32,10 +32,13 @@ public class CSVOutputParser implements OutputParser {
         outConverters = new DataSerializer.OutputDeserializer[outputColumns.size()];
         dataTypes = new LogicalType[outputColumns.size()];
         if (outputColumns.size() == 1
-                && MlUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
+                && RemoteRuntimeUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
                         == LogicalTypeRoot.ARRAY) {
             // We disallow nested arrays.
-            if (MlUtils.getLogicalType(outputColumns.get(0)).getChildren().get(0).getTypeRoot()
+            if (RemoteRuntimeUtils.getLogicalType(outputColumns.get(0))
+                            .getChildren()
+                            .get(0)
+                            .getTypeRoot()
                     == LogicalTypeRoot.ARRAY) {
                 throw new FlinkRuntimeException(
                         "Error creating ML Predict response parser: "
@@ -44,7 +47,7 @@ public class CSVOutputParser implements OutputParser {
             isSingleArray = true;
         }
         for (int i = 0; i < outputColumns.size(); i++) {
-            dataTypes[i] = MlUtils.getLogicalType(outputColumns.get(i));
+            dataTypes[i] = RemoteRuntimeUtils.getLogicalType(outputColumns.get(i));
             outConverters[i] = DataSerializer.getDeserializer(dataTypes[i]);
             // We only allow array types if the output is a single array.
             if (!isSingleArray && dataTypes[i].getTypeRoot() == LogicalTypeRoot.ARRAY) {
@@ -69,7 +72,7 @@ public class CSVOutputParser implements OutputParser {
 
     @Override
     public Row parse(Response response) {
-        final String responseString = MlUtils.getResponseString(response);
+        final String responseString = RemoteRuntimeUtils.getResponseString(response);
         MappingIterator<List<String>> it;
         try {
             it =

@@ -14,7 +14,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ public class TFServingInputFormatter implements InputFormatter {
         inputNames = new ArrayList<>(inputColumns.size());
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
-            LogicalType type = MlUtils.getLogicalType(inputColumns.get(i));
+            LogicalType type = RemoteRuntimeUtils.getLogicalType(inputColumns.get(i));
             inConverters[i] = createSerializer(type);
             // If the column type is binary, the name must end in "_bytes". We will add it if it
             // isn't there.

@@ -16,12 +16,12 @@ import io.confluent.flink.compute.credentials.InMemoryCredentialDecrypterImpl;
 import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
 import io.confluent.flink.table.modules.ml.RemoteModelOptions.EncryptionStrategy;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
-import io.confluent.flink.table.modules.ml.secrets.FlinkCredentialServiceSecretDecrypter;
-import io.confluent.flink.table.modules.ml.secrets.MeteredSecretDecrypter;
-import io.confluent.flink.table.modules.ml.secrets.PlainTextDecrypter;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypter;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.ml.ModelOptionsUtils;
+import io.confluent.flink.table.utils.secrets.FlinkCredentialServiceSecretDecrypter;
+import io.confluent.flink.table.utils.secrets.MeteredSecretDecrypter;
+import io.confluent.flink.table.utils.secrets.PlainTextDecrypter;
+import io.confluent.flink.table.utils.secrets.SecretDecrypter;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProvider;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.OAEPParameterSpec;

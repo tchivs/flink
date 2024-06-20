@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,7 +20,7 @@ public class TextOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         TextOutputParser parser = new TextOutputParser(outputSchema.getColumns());
         String response = "\"output-text\"";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[\"output-text\"]");
     }
 
@@ -29,7 +29,7 @@ public class TextOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         TextOutputParser parser = new TextOutputParser(outputSchema.getColumns());
         String response = "output-text\nmultiline";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text\nmultiline]");
     }
 

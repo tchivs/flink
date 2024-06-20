@@ -11,7 +11,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -144,7 +144,9 @@ public class OpenAIProviderTest extends ProviderTestBase {
                 new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response = "{\"choices\":[{\"text\":\"output-text\"}]}";
         assertThatThrownBy(
-                        () -> openAIProvider.getContentFromResponse(MlUtils.makeResponse(response)))
+                        () ->
+                                openAIProvider.getContentFromResponse(
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Expected object field /choices/0/message/content not found in json response");
@@ -157,7 +159,7 @@ public class OpenAIProviderTest extends ProviderTestBase {
                 new OpenAIProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         String response =
                 "{\"choices\":[{\"message\":{\"role\":\"user\",\"content\":\"output-text\"}}]}";
-        Row row = openAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row = openAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");

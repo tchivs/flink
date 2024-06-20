@@ -11,7 +11,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -81,7 +81,7 @@ public class GoogleAIProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 googleAIProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Expected object field /candidates/0/content/parts/0/text not found in json response");
@@ -95,7 +95,8 @@ public class GoogleAIProviderTest extends ProviderTestBase {
         // Response pull the text from json candidates[0].content.parts[0].text
         String response =
                 "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"output-text\"}]}}]}";
-        Row row = googleAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                googleAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");

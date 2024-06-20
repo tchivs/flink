@@ -6,7 +6,7 @@ package io.confluent.flink.table.modules.ml;
 
 import org.apache.flink.table.catalog.CatalogModel;
 
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.ml.ModelOptionsUtils;
 
 import java.util.HashMap;
 import java.util.Map;

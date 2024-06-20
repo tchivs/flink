@@ -11,7 +11,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -28,10 +28,11 @@ public class JsonArrayInputFormatter implements InputFormatter {
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
             inConverters[i] =
-                    DataSerializer.getSerializer(MlUtils.getLogicalType(inputColumns.get(i)));
+                    DataSerializer.getSerializer(
+                            RemoteRuntimeUtils.getLogicalType(inputColumns.get(i)));
         }
         if (inputColumns.size() == 1
-                && MlUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
+                && RemoteRuntimeUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
                         == LogicalTypeRoot.ARRAY) {
             isSingleArray = true;
         }

@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +23,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"BYTES\",\"shape\":[11],\"data\":[\"output-text\"]}]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -33,7 +33,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"INT32\",\"shape\":[2,2],\"data\":[[1,2],[3,4]]}]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2}, {3, 4}});
     }
@@ -44,7 +44,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"INT32\",\"shape\":[2,2],\"data\":[1,2,3,4]}]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2}, {3, 4}});
     }
@@ -56,7 +56,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"INT32\",\"shape\":[2,2,3],\"data\":[1,2,3,4,5,6,7,8,9,10,11,12]}]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0))
                 .isEqualTo(new Integer[][][] {{{1, 2, 3}, {4, 5, 6}}, {{7, 8, 9}, {10, 11, 12}}});
@@ -78,7 +78,7 @@ public class TritonOutputParserTest {
         byte[] responseBytes = new byte[jsonLength + dataBytes.length];
         System.arraycopy(response.getBytes(), 0, responseBytes, 0, jsonLength);
         System.arraycopy(dataBytes, 0, responseBytes, jsonLength, dataBytes.length);
-        Response httpResponse = MlUtils.makeResponse(responseBytes, headers);
+        Response httpResponse = RemoteRuntimeUtils.makeResponse(responseBytes, headers);
         Row row = parser.parse(httpResponse);
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2}, {3, 4}});
@@ -120,7 +120,7 @@ public class TritonOutputParserTest {
                         + "{\"name\":\"output13\",\"datatype\":\"BYTES\",\"shape\":[2],\"data\":[\"ZGg=\"]},"
                         + "{\"name\":\"output15\",\"datatype\":\"BYTES\",\"shape\":[2,2],\"data\":[\"ab\",\"cd\"]},"
                         + "{\"name\":\"output16\",\"datatype\":\"FP32\",\"shape\":[2],\"data\":[1.0,2.0]}]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(14);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
         assertThat(row.getField(1)).isEqualTo(1);
@@ -200,7 +200,7 @@ public class TritonOutputParserTest {
         byte[] responseBytes = new byte[jsonLength + dataBytes.length];
         System.arraycopy(response.getBytes(), 0, responseBytes, 0, jsonLength);
         System.arraycopy(dataBytes, 0, responseBytes, jsonLength, dataBytes.length);
-        Response httpResponse = MlUtils.makeResponse(responseBytes, headers);
+        Response httpResponse = RemoteRuntimeUtils.makeResponse(responseBytes, headers);
         Row row = parser.parse(httpResponse);
         assertThat(row.getArity()).isEqualTo(15);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -226,7 +226,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"UINT64\",\"shape\":[1],\"data\":[8000000000000000000]}]}";
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(response)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("ML Predict found incompatible datatype for output");
     }
@@ -237,7 +237,7 @@ public class TritonOutputParserTest {
         TritonOutputParser parser = new TritonOutputParser(outputSchema.getColumns());
         String response =
                 "{\"outputs\":[{\"name\":\"output\",\"datatype\":\"UINT64\",\"shape\":[1],\"data\":[9223372036854775809]}]}";
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(response)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "ML Predict could not convert json field to int64, possible overflow");
@@ -256,7 +256,7 @@ public class TritonOutputParserTest {
         byte[] responseBytes = new byte[jsonLength + dataBytes.length];
         System.arraycopy(response.getBytes(), 0, responseBytes, 0, jsonLength);
         System.arraycopy(dataBytes, 0, responseBytes, jsonLength, dataBytes.length);
-        Response httpResponse = MlUtils.makeResponse(responseBytes, headers);
+        Response httpResponse = RemoteRuntimeUtils.makeResponse(responseBytes, headers);
         assertThatThrownBy(() -> parser.parse(httpResponse))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
@@ -306,7 +306,7 @@ public class TritonOutputParserTest {
         byte[] responseBytes = new byte[jsonLength + dataBytes.length];
         System.arraycopy(response.getBytes(), 0, responseBytes, 0, jsonLength);
         System.arraycopy(dataBytes, 0, responseBytes, jsonLength, dataBytes.length);
-        Response httpResponse = MlUtils.makeResponse(responseBytes, headers);
+        Response httpResponse = RemoteRuntimeUtils.makeResponse(responseBytes, headers);
         Row row = parser.parse(httpResponse);
         assertThat(row.getArity()).isEqualTo(8);
         assertThat(row.getField(0)).isEqualTo(new Long[] {1L, 2L});
@@ -366,7 +366,7 @@ public class TritonOutputParserTest {
         byte[] responseBytes = new byte[jsonLength + dataBytes.length];
         System.arraycopy(response.getBytes(), 0, responseBytes, 0, jsonLength);
         System.arraycopy(dataBytes, 0, responseBytes, jsonLength, dataBytes.length);
-        Response httpResponse = MlUtils.makeResponse(responseBytes, headers);
+        Response httpResponse = RemoteRuntimeUtils.makeResponse(responseBytes, headers);
         Row row = parser.parse(httpResponse);
         assertThat(row.getArity()).isEqualTo(10);
         assertThat(row.getField(0)).isEqualTo(3.140625f);

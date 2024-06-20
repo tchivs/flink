@@ -23,9 +23,9 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import com.google.auth.oauth2.GoogleCredentials;
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
 import io.confluent.flink.table.modules.ml.providers.VertexAIProvider;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProviderImpl;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProvider;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProviderImpl;
 import okhttp3.Response;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -199,7 +199,8 @@ public class MLModelRuntimeTest {
         CatalogModel model = getAzureMLModel();
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
-        mockHttpClient.withResponse(MlUtils.makeResponse("{\"output\":\"output-text\"}"));
+        mockHttpClient.withResponse(
+                RemoteRuntimeUtils.makeResponse("{\"output\":\"output-text\"}"));
         Row results = runtime.run(new Object[] {"modelname", "input-text"});
         runtime.close();
         Assertions.assertThat(results.toString()).isEqualTo("+I[output-text]");
@@ -365,7 +366,7 @@ public class MLModelRuntimeTest {
                         new SecretDecrypterProviderImpl<>(model, ImmutableMap.of(), metrics));
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(vertexAIProvider, mockHttpClient, metrics, clock);
-        mockHttpClient.withResponse(MlUtils.makeResponse("parse-fail"));
+        mockHttpClient.withResponse(RemoteRuntimeUtils.makeResponse("parse-fail"));
 
         assertThatThrownBy(() -> runtime.run(new Object[] {"modelname", "input-text"}))
                 .isInstanceOf(FlinkRuntimeException.class)
@@ -398,7 +399,7 @@ public class MLModelRuntimeTest {
         CatalogModel model = getSagemakerModel();
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
-        mockHttpClient.withResponse(MlUtils.makeResponse("prep-fail"));
+        mockHttpClient.withResponse(RemoteRuntimeUtils.makeResponse("prep-fail"));
         Object notString = new NotString();
         assertThatThrownBy(() -> runtime.run(new Object[] {"modelname", notString}))
                 .isInstanceOf(FlinkRuntimeException.class)
@@ -426,7 +427,8 @@ public class MLModelRuntimeTest {
         CatalogModel model = getBedrockModel();
         MLModelRuntime runtime =
                 MLModelRuntime.mockOpen(model, configuration, mockHttpClient, metrics, clock);
-        mockHttpClient.withResponse(MlUtils.makeResponse("{\"output\":\"output-text\"}"));
+        mockHttpClient.withResponse(
+                RemoteRuntimeUtils.makeResponse("{\"output\":\"output-text\"}"));
         Row results = runtime.run(new Object[] {"modelname", "input-text"});
         runtime.close();
         Assertions.assertThat(results.toString()).isEqualTo("+I[output-text]");

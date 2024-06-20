@@ -11,7 +11,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 
 import java.io.IOException;
@@ -31,7 +31,7 @@ public class BinaryOutputParser implements OutputParser {
                             + outputColumns.size()
                             + " columns");
         }
-        LogicalType dataType = MlUtils.getLogicalType(outputColumns.get(0));
+        LogicalType dataType = RemoteRuntimeUtils.getLogicalType(outputColumns.get(0));
         if (dataType.getTypeRoot() == LogicalTypeRoot.ARRAY
                 && dataType.getChildren().get(0).getTypeRoot() == LogicalTypeRoot.ARRAY) {
             // We disallow nested arrays.
@@ -72,7 +72,7 @@ public class BinaryOutputParser implements OutputParser {
 
     @Override
     public Row parse(Response response) throws FlinkRuntimeException {
-        byte[] responseBytes = MlUtils.getResponseBytes(response);
+        byte[] responseBytes = RemoteRuntimeUtils.getResponseBytes(response);
         try {
             if (responseBytes.length < outConverter.bytesConsumed()) {
                 throw new FlinkRuntimeException(

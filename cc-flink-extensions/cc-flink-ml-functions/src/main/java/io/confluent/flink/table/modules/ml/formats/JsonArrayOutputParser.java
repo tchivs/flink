@@ -15,7 +15,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.MissingNode;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 
 import java.io.IOException;
@@ -37,7 +37,7 @@ public class JsonArrayOutputParser implements OutputParser {
         outConverters = new DataSerializer.OutputDeserializer[outputColumns.size()];
         dataTypes = new LogicalType[outputColumns.size()];
         for (int i = 0; i < outputColumns.size(); i++) {
-            dataTypes[i] = MlUtils.getLogicalType(outputColumns.get(i));
+            dataTypes[i] = RemoteRuntimeUtils.getLogicalType(outputColumns.get(i));
             outConverters[i] = DataSerializer.getDeserializer(dataTypes[i]);
         }
         if (outputColumns.size() == 1 && dataTypes[0].getTypeRoot() == LogicalTypeRoot.ARRAY) {
@@ -84,7 +84,7 @@ public class JsonArrayOutputParser implements OutputParser {
 
     @Override
     public Row parse(Response response) {
-        final String responseString = MlUtils.getResponseString(response);
+        final String responseString = RemoteRuntimeUtils.getResponseString(response);
         final JsonNode jsonNode;
         try {
             jsonNode = mapper.readTree(responseString);

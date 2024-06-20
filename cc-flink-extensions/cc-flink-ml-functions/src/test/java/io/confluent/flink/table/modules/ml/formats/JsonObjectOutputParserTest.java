@@ -16,7 +16,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -31,7 +31,7 @@ public class JsonObjectOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         JsonObjectOutputParser parser = new JsonObjectOutputParser(outputSchema.getColumns());
         String response = "{\"output\":\"output-text\"}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -40,23 +40,23 @@ public class JsonObjectOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
         JsonObjectOutputParser parser = new JsonObjectOutputParser(outputSchema.getColumns());
         String response = "{\"output\":[1,2,3]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
         // Array with one extra nesting level should work.
         response = "{\"output\":[[1,2,3]]}";
-        row = parser.parse(MlUtils.makeResponse(response));
+        row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
         // Array with two extra nesting levels should throw.
         final String tooDeep = "{\"output\":[[[1,2,3]]]}";
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(tooDeep)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(tooDeep)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Error deserializing ML Prediction response field: output: ML Predict attempted to deserialize an nested array of depth 1 from a json array of depth 3");
         // Non-array should throw.
         final String nonArray = "{\"output\":1}";
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(nonArray)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(nonArray)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Error deserializing ML Prediction response field: output: ML Predict attempted to deserialize an array from a non-array json object");
@@ -67,7 +67,7 @@ public class JsonObjectOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<ARRAY<INT>>").build();
         JsonObjectOutputParser parser = new JsonObjectOutputParser(outputSchema.getColumns());
         String response = "{\"output\":[[1,2,3],[4,5,6]]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2, 3}, {4, 5, 6}});
     }
@@ -78,7 +78,7 @@ public class JsonObjectOutputParserTest {
         JsonObjectOutputParser parser =
                 new JsonObjectOutputParser(outputSchema.getColumns(), "wrapper");
         String response = "{\"wrapper\":{\"output\":\"output-text\"}, \"output\":\"other-text\"}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -95,7 +95,7 @@ public class JsonObjectOutputParserTest {
         String response =
                 "{\"wrapper\":{\"wrong\":\"output-text\", \"recurse\":{\"output\":\"correct-text\"},"
                         + " \"output2\": 2, \"more\": {\"output3\": 3.0}}, \"output\":\"other-text\"}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(3);
         assertThat(row.getField(0).toString()).isEqualTo("correct-text");
         assertThat(row.getField(1)).isEqualTo(2);
@@ -108,7 +108,7 @@ public class JsonObjectOutputParserTest {
         JsonObjectOutputParser parser =
                 new JsonObjectOutputParser(outputSchema.getColumns(), "outputs");
         String response = "{\"outputs\":[[1,2,3]]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
     }
@@ -152,7 +152,7 @@ public class JsonObjectOutputParserTest {
                         + "\"output15\":[\"a\",\"b\"],"
                         + "\"output16\":[[1,2,3],[4,5,6]],"
                         + "\"output17\":{\"field1\":12,\"field2\":true}}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         DataType[] outputTypes =
                 new DataType[] {
                     DataTypes.STRING(),

@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -21,7 +21,7 @@ public class TFServingOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         TFServingOutputParser parser = new TFServingOutputParser(outputSchema.getColumns());
         String response = "{\"predictions\":[\"output-text\"]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -31,7 +31,7 @@ public class TFServingOutputParserTest {
         TFServingOutputParser parser =
                 new TFServingOutputParser(outputSchema.getColumns(), "something");
         String response = "{\"something\":[\"output-text\"]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -41,7 +41,7 @@ public class TFServingOutputParserTest {
         TFServingOutputParser parser =
                 new TFServingOutputParser(outputSchema.getColumns(), "something");
         String response = "{\"something\":[{\"output\":\"output-text\"}]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -73,7 +73,7 @@ public class TFServingOutputParserTest {
                         + "\"output11\":\"b\",\"output12\":\"Yw==\",\"output13\":\"ZA==\","
                         + "\"output14\":5.5,\"output15\":[\"a\",\"b\"],"
                         + "\"output17\":{\"field1\":12,\"field2\":true}}]}";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(15);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
         assertThat(row.getField(1)).isEqualTo(3);

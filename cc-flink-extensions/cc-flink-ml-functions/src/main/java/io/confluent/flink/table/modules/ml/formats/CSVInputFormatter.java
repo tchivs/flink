@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -23,9 +23,12 @@ public class CSVInputFormatter implements InputFormatter {
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         // Disallow all nested arrays and non-nested arrays unless it's a single array.
         for (int i = 0; i < inputColumns.size(); i++) {
-            if (MlUtils.getLogicalType(inputColumns.get(i)).getTypeRoot()
+            if (RemoteRuntimeUtils.getLogicalType(inputColumns.get(i)).getTypeRoot()
                     == LogicalTypeRoot.ARRAY) {
-                if (MlUtils.getLogicalType(inputColumns.get(i)).getChildren().get(0).getTypeRoot()
+                if (RemoteRuntimeUtils.getLogicalType(inputColumns.get(i))
+                                .getChildren()
+                                .get(0)
+                                .getTypeRoot()
                         == LogicalTypeRoot.ARRAY) {
                     throw new FlinkRuntimeException(
                             "Error creating ML Predict request formatter: "
@@ -39,7 +42,8 @@ public class CSVInputFormatter implements InputFormatter {
                 }
             }
             inConverters[i] =
-                    DataSerializer.getSerializer(MlUtils.getLogicalType(inputColumns.get(i)));
+                    DataSerializer.getSerializer(
+                            RemoteRuntimeUtils.getLogicalType(inputColumns.get(i)));
         }
     }
 

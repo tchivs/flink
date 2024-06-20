@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ public class JsonArrayOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
         String response = "[\"output-text\"]";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -32,7 +32,7 @@ public class JsonArrayOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
         JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
         String response = "1";
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(response)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("ML prediction response was not a JSON array");
     }
@@ -42,16 +42,16 @@ public class JsonArrayOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
         JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
         String response = "[1,2,3]";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
         response = "[[1,2,3]]";
-        row = parser.parse(MlUtils.makeResponse(response));
+        row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
         final String tooDeep = "[[[1,2,3]]]";
         // Too deep, should throw an exception
-        assertThatThrownBy(() -> parser.parse(MlUtils.makeResponse(tooDeep)))
+        assertThatThrownBy(() -> parser.parse(RemoteRuntimeUtils.makeResponse(tooDeep)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Error deserializing ML Prediction response: ML Predict attempted to deserialize an nested array of depth 1 from a json array of depth 3");
@@ -62,11 +62,11 @@ public class JsonArrayOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<ARRAY<INT>>").build();
         JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
         String response = "[[1,2,3],[4,5,6]]";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2, 3}, {4, 5, 6}});
         response = "[[[1,2,3],[4,5,6]]]";
-        row = parser.parse(MlUtils.makeResponse(response));
+        row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[][] {{1, 2, 3}, {4, 5, 6}});
     }
@@ -94,7 +94,7 @@ public class JsonArrayOutputParserTest {
         JsonArrayOutputParser parser = new JsonArrayOutputParser(outputSchema.getColumns());
         String response =
                 "[\"output-text-prompt\",1,2.0,3,4,true,5,6.0,\"a\",\"b\",\"Yw==\",\"ZA==\",7.1,[\"a\",\"b\"],{\"field1\":12,\"field2\":true}]";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(15);
         assertThat(row.getField(0).toString()).isEqualTo("output-text-prompt");
         assertThat(row.getField(1)).isEqualTo(1);

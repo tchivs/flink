@@ -15,7 +15,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -148,7 +148,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 azureMLProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("ML prediction response was not a JSON array");
     }
@@ -162,7 +162,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 azureMLProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("ML prediction response was not a JSON array");
     }
@@ -174,7 +174,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
                 new AzureMLProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "[\"output-text\"]";
-        Row row = azureMLProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row = azureMLProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -190,7 +190,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 azureMLProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining(
                         "Unexpected number of results from ML Predict. Expected 1 but got 0");
@@ -203,7 +203,7 @@ public class AzureMLProviderTest extends ProviderTestBase {
                 new AzureMLProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "[[\"foo\"]]";
-        Row row = azureMLProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row = azureMLProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         String[] output = (String[]) row.getField(0);

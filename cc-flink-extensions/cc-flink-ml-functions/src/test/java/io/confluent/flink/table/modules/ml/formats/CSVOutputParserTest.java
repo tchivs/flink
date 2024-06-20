@@ -7,7 +7,7 @@ package io.confluent.flink.table.modules.ml.formats;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -21,7 +21,7 @@ public class CSVOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         CSVOutputParser parser = new CSVOutputParser(outputSchema.getColumns());
         String response = "\"output-text\"";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[output-text]");
     }
 
@@ -30,7 +30,7 @@ public class CSVOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
         CSVOutputParser parser = new CSVOutputParser(outputSchema.getColumns());
         String response = "1,2,3";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
     }
@@ -56,7 +56,7 @@ public class CSVOutputParserTest {
         CSVOutputParser parser = new CSVOutputParser(outputSchema.getColumns());
         String response =
                 "\"output-text-prompt\",1,2.0,3,4,true,5,6.0,\"a\",\"b\",\"Yw==\",\"ZA==\",7.1";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(13);
         assertThat(row.getField(0).toString()).isEqualTo("output-text-prompt");
         assertThat(row.getField(1)).isEqualTo(1);

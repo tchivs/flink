@@ -10,9 +10,9 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.ml.MLFunctionMetrics;
 import io.confluent.flink.table.modules.ml.formats.MLFormatterUtil;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProviderImpl;
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.ml.ModelOptionsUtils;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProvider;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProviderImpl;
 
 import java.time.Clock;
 import java.util.Map;

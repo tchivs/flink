@@ -6,7 +6,7 @@ package io.confluent.flink.table.modules.ml.formats;
 
 import org.apache.flink.table.api.Schema;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,7 +19,7 @@ public class EmbeddingOutputParserTest {
         OutputParser parser =
                 new EmbeddingOutputParser(outputSchema.getColumns(), "Amazon Titan Embed");
         String response = "{\"embedding\":[[1.0, 2.0], [3.0, 4.0]]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[[[1.0, 2.0], [3.0, 4.0]]]");
     }
 
@@ -28,7 +28,7 @@ public class EmbeddingOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<FLOAT>").build();
         OutputParser parser = new EmbeddingOutputParser(outputSchema.getColumns(), "Cohere Embed");
         String response = "{\"embeddings\":[1.0, 2.0, 3.0, 4.0]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[[1.0, 2.0, 3.0, 4.0]]");
     }
 
@@ -37,7 +37,7 @@ public class EmbeddingOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<FLOAT>").build();
         OutputParser parser = new EmbeddingOutputParser(outputSchema.getColumns(), "OpenAI Embed");
         String response = "{\"data\":[{\"embedding\":[1.0, 2.0, 3.0, 4.0]}]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[[1.0, 2.0, 3.0, 4.0]]");
     }
 
@@ -47,7 +47,7 @@ public class EmbeddingOutputParserTest {
         OutputParser parser = new EmbeddingOutputParser(outputSchema.getColumns(), "Vertex Embed");
         String response =
                 "{\"predictions\":[{\"embeddings\":{\"values\":[[1.0, 2.0], [3.0, 4.0]]}}]}";
-        assertThat(parser.parse(MlUtils.makeResponse(response)).toString())
+        assertThat(parser.parse(RemoteRuntimeUtils.makeResponse(response)).toString())
                 .isEqualTo("+I[[[1.0, 2.0], [3.0, 4.0]]]");
     }
 }

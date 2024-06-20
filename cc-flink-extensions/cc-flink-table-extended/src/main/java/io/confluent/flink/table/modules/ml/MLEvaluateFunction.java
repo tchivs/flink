@@ -25,7 +25,7 @@ import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.ml.ModelOptionsUtils;
 
 import java.time.Clock;
 import java.util.ArrayList;

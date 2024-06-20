@@ -11,7 +11,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -27,7 +27,7 @@ public class TextInputFormatter implements InputFormatter {
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
             // We only accept character types for text input.
-            LogicalType logicalType = MlUtils.getLogicalType(inputColumns.get(i));
+            LogicalType logicalType = RemoteRuntimeUtils.getLogicalType(inputColumns.get(i));
             LogicalTypeRoot typeRoot = logicalType.getTypeRoot();
             if (typeRoot != LogicalTypeRoot.CHAR && typeRoot != LogicalTypeRoot.VARCHAR) {
                 throw new FlinkRuntimeException(

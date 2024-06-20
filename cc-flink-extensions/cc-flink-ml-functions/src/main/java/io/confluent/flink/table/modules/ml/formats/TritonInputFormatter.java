@@ -13,7 +13,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
@@ -47,9 +47,9 @@ public class TritonInputFormatter implements InputFormatter {
         logicalTypes = new ArrayList<>(inputColumns.size());
         Boolean hasBinaryInput = false;
         for (int i = 0; i < inputColumns.size(); i++) {
-            logicalTypes.add(MlUtils.getLogicalType(inputColumns.get(i)));
+            logicalTypes.add(RemoteRuntimeUtils.getLogicalType(inputColumns.get(i)));
             try {
-                tensorTypes.add(MlUtils.getTritonDataType(logicalTypes.get(i)));
+                tensorTypes.add(RemoteRuntimeUtils.getTritonDataType(logicalTypes.get(i)));
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Unsupported data type for Triton input tensor in ML Predict: "
@@ -58,7 +58,7 @@ public class TritonInputFormatter implements InputFormatter {
                                 + logicalTypes.get(i).toString());
             }
             inConverters[i] = DataSerializer.getSerializer(logicalTypes.get(i));
-            LogicalType leafType = MlUtils.getLeafType(logicalTypes.get(i));
+            LogicalType leafType = RemoteRuntimeUtils.getLeafType(logicalTypes.get(i));
             if (leafType.getTypeRoot().equals(LogicalTypeRoot.BINARY)
                     || leafType.getTypeRoot().equals(LogicalTypeRoot.VARBINARY)) {
                 hasBinaryInput = true;
@@ -67,7 +67,8 @@ public class TritonInputFormatter implements InputFormatter {
         mixedBinaryInput = hasBinaryInput;
         for (int i = 0; i < outputColumns.size(); i++) {
             LogicalType outputType =
-                    MlUtils.getLeafType(MlUtils.getLogicalType(outputColumns.get(i)));
+                    RemoteRuntimeUtils.getLeafType(
+                            RemoteRuntimeUtils.getLogicalType(outputColumns.get(i)));
             if (outputType.getTypeRoot().equals(LogicalTypeRoot.BINARY)
                     || outputType.getTypeRoot().equals(LogicalTypeRoot.VARBINARY)) {
                 requestBinaryOutput = true;
@@ -195,7 +196,7 @@ public class TritonInputFormatter implements InputFormatter {
                 shape.add(1);
             }
 
-            LogicalType leafType = MlUtils.getLeafType(logicalTypes.get(i));
+            LogicalType leafType = RemoteRuntimeUtils.getLeafType(logicalTypes.get(i));
             // Binary types get sent as binary data after the JSON.
             if (leafType.getTypeRoot().equals(LogicalTypeRoot.BINARY)
                     || leafType.getTypeRoot().equals(LogicalTypeRoot.VARBINARY)) {

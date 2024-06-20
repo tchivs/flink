@@ -11,8 +11,8 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
-import io.confluent.flink.table.utils.mlutils.ModelOptionsUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
+import io.confluent.flink.table.utils.ml.ModelOptionsUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -191,9 +191,9 @@ public class MLFormatterUtil {
             List<Schema.UnresolvedColumn> inputColumns, String format) {
         // We allow a single input column of type STRING.
         if (inputColumns.size() != 1
-                || (MlUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
+                || (RemoteRuntimeUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
                                 != LogicalTypeRoot.VARCHAR
-                        && MlUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
+                        && RemoteRuntimeUtils.getLogicalType(inputColumns.get(0)).getTypeRoot()
                                 != LogicalTypeRoot.CHAR)) {
             throw new FlinkRuntimeException(
                     format
@@ -209,7 +209,7 @@ public class MLFormatterUtil {
                     format
                             + " input format requires a single input column of type STRING, CHAR, or ARRAY<STRING>.");
         }
-        LogicalType type = MlUtils.getLogicalType(inputColumns.get(0));
+        LogicalType type = RemoteRuntimeUtils.getLogicalType(inputColumns.get(0));
         if (type.getTypeRoot() != LogicalTypeRoot.VARCHAR
                 && type.getTypeRoot() != LogicalTypeRoot.CHAR
                 && type.getTypeRoot() != LogicalTypeRoot.ARRAY) {
@@ -230,9 +230,9 @@ public class MLFormatterUtil {
             List<Schema.UnresolvedColumn> outputColumns, String format) {
         // We allow a single output column of type STRING/VARCHAR/CHAR.
         if (outputColumns.size() != 1
-                || (MlUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
+                || (RemoteRuntimeUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
                                 != org.apache.flink.table.types.logical.LogicalTypeRoot.VARCHAR
-                        && MlUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
+                        && RemoteRuntimeUtils.getLogicalType(outputColumns.get(0)).getTypeRoot()
                                 != org.apache.flink.table.types.logical.LogicalTypeRoot.CHAR)) {
             throw new FlinkRuntimeException(
                     format

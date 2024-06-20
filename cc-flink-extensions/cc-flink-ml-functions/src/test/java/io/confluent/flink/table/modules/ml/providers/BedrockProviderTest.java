@@ -11,7 +11,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -77,7 +77,7 @@ public class BedrockProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 bedrockProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Error parsing ML Predict response");
     }
@@ -91,7 +91,7 @@ public class BedrockProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 bedrockProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Error parsing ML Predict response");
     }
@@ -215,7 +215,7 @@ public class BedrockProviderTest extends ProviderTestBase {
                 new BedrockProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"results\":[{\"outputText\":\"output-text\"}]}";
-        Row row = bedrockProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row = bedrockProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");

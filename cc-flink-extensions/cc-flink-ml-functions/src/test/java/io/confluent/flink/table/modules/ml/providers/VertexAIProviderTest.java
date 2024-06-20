@@ -12,8 +12,8 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.modules.ml.secrets.SecretDecrypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
+import io.confluent.flink.table.utils.secrets.SecretDecrypterProvider;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Tests for VertexAIProvider. */
 public class VertexAIProviderTest extends ProviderTestBase {
 
-    /** Mock VertexAIProvider so we can mock out the google credentials. */
+    /** Mock VertexAIProvider so we can mock out the Google credentials. */
     private static class MockVertexAIProvider extends VertexAIProvider {
         public MockVertexAIProvider(
                 CatalogModel model, SecretDecrypterProvider secretDecrypterProvider) {
@@ -188,7 +188,7 @@ public class VertexAIProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 vertexAIProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("No '/predictions' field found in ML Predict response");
     }
@@ -203,7 +203,7 @@ public class VertexAIProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 vertexAIProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Model not found or something");
     }
@@ -216,7 +216,8 @@ public class VertexAIProviderTest extends ProviderTestBase {
                         model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[\"output-text\"]}";
-        Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                vertexAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -230,7 +231,8 @@ public class VertexAIProviderTest extends ProviderTestBase {
                         model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\"}]}";
-        Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                vertexAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -244,7 +246,8 @@ public class VertexAIProviderTest extends ProviderTestBase {
                         model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\",\"score\":0.9}]}";
-        Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                vertexAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -261,7 +264,7 @@ public class VertexAIProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 vertexAIProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Field output not found in remote ML Prediction");
     }
@@ -280,7 +283,8 @@ public class VertexAIProviderTest extends ProviderTestBase {
                         + "\"output11\":\"b\",\"output12\":\"Yg==\",\"output13\":\"Yg==\","
                         + "\"output14\":5.5,\"output15\":[1.0,2.0],"
                         + "\"output17\":{\"field1\":1,\"field2\":true}}]}";
-        Row row = vertexAIProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                vertexAIProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");

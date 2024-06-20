@@ -9,7 +9,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.util.List;
 
@@ -22,7 +22,7 @@ public class EmbeddingOutputParser extends JsonArrayOutputParser {
             throw new FlinkRuntimeException(
                     "Default Embedding output format requires a single output column.");
         }
-        LogicalType outputType = MlUtils.getLogicalType(outputColumns.get(0));
+        LogicalType outputType = RemoteRuntimeUtils.getLogicalType(outputColumns.get(0));
         if (!outputType.is(LogicalTypeRoot.ARRAY)) {
             throw new FlinkRuntimeException(
                     "Default Embedding output format requires an ARRAY<FLOAT> or ARRAY<ARRAY<FLOAT>> output column.");

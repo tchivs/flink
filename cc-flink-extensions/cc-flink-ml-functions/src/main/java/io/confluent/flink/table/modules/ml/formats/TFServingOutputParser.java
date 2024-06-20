@@ -15,7 +15,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.MissingNode;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 
 import java.io.IOException;
@@ -34,7 +34,7 @@ public class TFServingOutputParser implements OutputParser {
         outConverters = new DataSerializer.OutputDeserializer[outputColumns.size()];
         dataTypes = new LogicalType[outputColumns.size()];
         for (int i = 0; i < outputColumns.size(); i++) {
-            dataTypes[i] = MlUtils.getLogicalType(outputColumns.get(i));
+            dataTypes[i] = RemoteRuntimeUtils.getLogicalType(outputColumns.get(i));
             outConverters[i] = DataSerializer.getDeserializer(dataTypes[i]);
         }
         if (!topLevelNode.startsWith("/")) {
@@ -61,7 +61,7 @@ public class TFServingOutputParser implements OutputParser {
         // There is one prediction per input row. Unless we are batching, we will only have one
         // prediction. Models with single outputs don't include the name of the output, but
         // models with multiple outputs include the name of each output in the response.
-        final String responseString = MlUtils.getResponseString(response);
+        final String responseString = RemoteRuntimeUtils.getResponseString(response);
         final JsonNode jsonNode;
         try {
             jsonNode = mapper.readTree(responseString);

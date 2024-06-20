@@ -11,7 +11,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Response;
 
 import java.util.List;
@@ -29,7 +29,7 @@ public class TextOutputParser implements OutputParser {
                             + " columns");
         }
         this.outputColumn = outputColumns.get(0);
-        LogicalType logicalType = MlUtils.getLogicalType(outputColumn);
+        LogicalType logicalType = RemoteRuntimeUtils.getLogicalType(outputColumn);
         if (logicalType.getTypeRoot() != LogicalTypeRoot.CHAR
                 && logicalType.getTypeRoot() != LogicalTypeRoot.VARCHAR) {
             throw new FlinkRuntimeException(
@@ -45,7 +45,7 @@ public class TextOutputParser implements OutputParser {
 
     @Override
     public Row parse(Response response) {
-        final String responseString = MlUtils.getResponseString(response);
+        final String responseString = RemoteRuntimeUtils.getResponseString(response);
         return Row.of(StringData.fromString(responseString));
     }
 }

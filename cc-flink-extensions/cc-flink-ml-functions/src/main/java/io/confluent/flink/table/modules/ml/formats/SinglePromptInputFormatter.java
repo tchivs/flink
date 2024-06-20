@@ -12,7 +12,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.Arra
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.confluent.flink.table.modules.ml.providers.MLModelSupportedProviders;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -47,7 +47,8 @@ public class SinglePromptInputFormatter implements InputFormatter {
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
             inConverters[i] =
-                    DataSerializer.getSerializer(MlUtils.getLogicalType(inputColumns.get(i)));
+                    DataSerializer.getSerializer(
+                            RemoteRuntimeUtils.getLogicalType(inputColumns.get(i)));
         }
         formatter = getFormatter(modelName);
         staticNode = formatter.createStaticJson(params);

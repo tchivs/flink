@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ public class BinaryInputFormatter implements InputFormatter {
         this.inputColumns = inputColumns;
         inConverters = new DataSerializer.InputSerializer[inputColumns.size()];
         for (int i = 0; i < inputColumns.size(); i++) {
-            LogicalType logicalType = MlUtils.getLogicalType(inputColumns.get(i));
+            LogicalType logicalType = RemoteRuntimeUtils.getLogicalType(inputColumns.get(i));
             inConverters[i] = DataSerializer.getSerializer(logicalType);
         }
     }

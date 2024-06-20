@@ -13,7 +13,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.MediaType;
 import okhttp3.Response;
 
@@ -43,9 +43,9 @@ public class TritonOutputParser implements OutputParser {
         dataTypes = new LogicalType[outputColumns.size()];
         outputColumnIndex = new HashMap<>();
         for (int i = 0; i < outputColumns.size(); i++) {
-            dataTypes[i] = MlUtils.getLogicalType(outputColumns.get(i));
+            dataTypes[i] = RemoteRuntimeUtils.getLogicalType(outputColumns.get(i));
             // ROW and ARRAY<ROW> types are not supported.
-            if (MlUtils.getLeafType(dataTypes[i]).getTypeRoot() == LogicalTypeRoot.ROW) {
+            if (RemoteRuntimeUtils.getLeafType(dataTypes[i]).getTypeRoot() == LogicalTypeRoot.ROW) {
                 throw new FlinkRuntimeException(
                         "Error creating ML Predict response parser: "
                                 + "For Triton output, the ROW type is not supported.");
@@ -107,9 +107,9 @@ public class TritonOutputParser implements OutputParser {
     public Row parse(Response response) {
         int jsonLength = getJsonLength(response);
         if (jsonLength == response.body().contentLength()) {
-            return parseJson(MlUtils.getResponseString(response), null, 0);
+            return parseJson(RemoteRuntimeUtils.getResponseString(response), null, 0);
         }
-        byte[] responseBytes = MlUtils.getResponseBytes(response);
+        byte[] responseBytes = RemoteRuntimeUtils.getResponseBytes(response);
         String responseString = new String(responseBytes, 0, jsonLength, StandardCharsets.UTF_8);
         return parseJson(responseString, responseBytes, jsonLength);
     }
@@ -155,14 +155,14 @@ public class TritonOutputParser implements OutputParser {
             }
             final String datatype = output.get("datatype").asText();
             if (datatype == null
-                    || !MlUtils.isAcceptableTritonDataType(dataTypes[index], datatype)) {
+                    || !RemoteRuntimeUtils.isAcceptableTritonDataType(dataTypes[index], datatype)) {
                 throw new FlinkRuntimeException(
                         "ML Predict found incompatible datatype for output "
                                 + name
                                 + ": "
                                 + datatype
                                 + " (expected "
-                                + MlUtils.getTritonDataType(dataTypes[index])
+                                + RemoteRuntimeUtils.getTritonDataType(dataTypes[index])
                                 + ") to allow Flink type:"
                                 + dataTypes[index]);
             }
@@ -174,7 +174,7 @@ public class TritonOutputParser implements OutputParser {
             }
             // Check whether the shape is compatible with the output type.
             List<Integer> shapeList = jsonNodeToList(shape);
-            if (!MlUtils.isShapeCompatible(dataTypes[index], shapeList)) {
+            if (!RemoteRuntimeUtils.isShapeCompatible(dataTypes[index], shapeList)) {
                 throw new FlinkRuntimeException(
                         "ML Predict found incompatible shape for output " + name + ": " + shape);
             }

@@ -8,7 +8,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "ARRAY<INT>").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1\0\0\0\2\0\0\0\3\0\0\0";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new Integer[] {1, 2, 3});
     }
@@ -33,7 +33,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "BOOLEAN").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(true);
     }
@@ -43,7 +43,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "TINYINT").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo((byte) 1);
     }
@@ -53,7 +53,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "SMALLINT").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1\0";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo((short) 1);
     }
@@ -63,7 +63,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "INT").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1\0\0\0";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(1);
     }
@@ -73,7 +73,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "BIGINT").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\1\0\0\0\0\0\0\0";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(1L);
     }
@@ -83,7 +83,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "FLOAT").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\0\0\40\101";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(10.0f);
     }
@@ -93,7 +93,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "DOUBLE").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\0\0\0\0\0\0$@";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(10.0);
     }
@@ -103,7 +103,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "STRING").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "output-text";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
     }
@@ -113,7 +113,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "BYTES").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         byte[] bytes = "output-text".getBytes();
-        Row row = parser.parse(MlUtils.makeResponse(new String(bytes)));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(new String(bytes)));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo("output-text".getBytes());
     }
@@ -123,7 +123,7 @@ public class BinaryOutputParserTest {
         Schema outputSchema = Schema.newBuilder().column("output", "DECIMAL(2,1)").build();
         BinaryOutputParser parser = new BinaryOutputParser(outputSchema.getColumns());
         String response = "\71\0\0\0\0\0\0\0";
-        Row row = parser.parse(MlUtils.makeResponse(response));
+        Row row = parser.parse(RemoteRuntimeUtils.makeResponse(response));
         assertThat(row.getArity()).isEqualTo(1);
         assertThat(row.getField(0)).isEqualTo(new BigDecimal("5.7"));
     }

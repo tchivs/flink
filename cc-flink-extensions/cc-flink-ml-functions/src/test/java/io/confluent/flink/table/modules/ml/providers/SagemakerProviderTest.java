@@ -11,7 +11,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.confluent.flink.table.modules.TestUtils.MockSecretDecypterProvider;
-import io.confluent.flink.table.utils.mlutils.MlUtils;
+import io.confluent.flink.table.utils.RemoteRuntimeUtils;
 import okhttp3.Request;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -127,7 +127,7 @@ public class SagemakerProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 sagemakerProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("No '/predictions' field found in ML Predict response");
     }
@@ -141,7 +141,7 @@ public class SagemakerProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 sagemakerProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("No '/predictions' field found in ML Predict response.");
     }
@@ -153,7 +153,8 @@ public class SagemakerProviderTest extends ProviderTestBase {
                 new SagemakerProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[\"output-text\"]}";
-        Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                sagemakerProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -166,7 +167,8 @@ public class SagemakerProviderTest extends ProviderTestBase {
                 new SagemakerProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\"}]}";
-        Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                sagemakerProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -179,7 +181,8 @@ public class SagemakerProviderTest extends ProviderTestBase {
                 new SagemakerProvider(model, new MockSecretDecypterProvider(model, metrics, clock));
         // Response pull the text from json candidates[0].content.parts[0].text
         String response = "{\"predictions\":[{\"output\":\"output-text\",\"score\":0.9}]}";
-        Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                sagemakerProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
@@ -195,7 +198,7 @@ public class SagemakerProviderTest extends ProviderTestBase {
         assertThatThrownBy(
                         () ->
                                 sagemakerProvider.getContentFromResponse(
-                                        MlUtils.makeResponse(response)))
+                                        RemoteRuntimeUtils.makeResponse(response)))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasMessageContaining("Field output not found in remote ML Prediction response");
     }
@@ -213,7 +216,8 @@ public class SagemakerProviderTest extends ProviderTestBase {
                         + "\"output11\":\"b\",\"output12\":\"Yg==\",\"output13\":\"Yg==\","
                         + "\"output14\":5.5,\"output15\":[1.0,2.0],"
                         + "\"output17\":{\"field1\":1,\"field2\":true}}]}";
-        Row row = sagemakerProvider.getContentFromResponse(MlUtils.makeResponse(response));
+        Row row =
+                sagemakerProvider.getContentFromResponse(RemoteRuntimeUtils.makeResponse(response));
         // Check that the response is parsed correctly.
         assertThat(row.getKind()).isEqualTo(RowKind.INSERT);
         assertThat(row.getField(0).toString()).isEqualTo("output-text");
