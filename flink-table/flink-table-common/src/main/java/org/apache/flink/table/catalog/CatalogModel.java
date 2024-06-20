@@ -23,6 +23,8 @@ import org.apache.flink.table.api.Schema;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -83,7 +85,8 @@ public interface CatalogModel {
             Schema outputSchema,
             Map<String, String> modelOptions,
             @Nullable String comment) {
-        return new DefaultCatalogModel(inputSchema, outputSchema, modelOptions, comment);
+        return new DefaultCatalogModel(
+                inputSchema, outputSchema, modelOptions, new ArrayList<>(), comment);
     }
 
     /**
@@ -91,17 +94,15 @@ public interface CatalogModel {
      *
      * @param inputSchema unresolved input schema
      * @param outputSchema unresolved output schema
-     * @param modelOptions model options
      * @param modelChanges model changes
      * @param comment optional comment
      */
     static CatalogModel of(
             Schema inputSchema,
             Schema outputSchema,
-            Map<String, String> modelOptions,
             List<ModelChange> modelChanges,
             @Nullable String comment) {
         return new DefaultCatalogModel(
-                inputSchema, outputSchema, modelOptions, modelChanges, comment);
+                inputSchema, outputSchema, new HashMap<>(), modelChanges, comment);
     }
 }

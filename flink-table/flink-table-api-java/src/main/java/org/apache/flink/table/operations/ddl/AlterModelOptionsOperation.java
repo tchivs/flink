@@ -21,6 +21,7 @@ package org.apache.flink.table.operations.ddl;
 import org.apache.flink.table.api.internal.TableResultImpl;
 import org.apache.flink.table.api.internal.TableResultInternal;
 import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.ModelChange;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.operations.OperationUtils;
 
@@ -55,18 +56,13 @@ public class AlterModelOptionsOperation implements AlterOperation {
 
     @Override
     public String asSummaryString() {
-        String description =
-                catalogModel.getOptions().entrySet().stream()
-                        .map(
-                                entry ->
-                                        OperationUtils.formatParameter(
-                                                entry.getKey(), entry.getValue()))
-                        .collect(Collectors.joining(", "));
+        String changes =
+                catalogModel.getModelChanges().stream()
+                        .map(this::toString)
+                        .collect(Collectors.joining(",\n"));
         return String.format(
-                "ALTER %s MODEL %s SET (%s)",
-                ignoreIfNotExists ? "IF EXISTS " : "",
-                modelIdentifier.asSummaryString(),
-                description);
+                "ALTER MODEL %s%s\n%s",
+                ignoreIfNotExists ? "IF EXISTS " : "", modelIdentifier.asSummaryString(), changes);
     }
 
     @Override
@@ -74,5 +70,20 @@ public class AlterModelOptionsOperation implements AlterOperation {
         ctx.getCatalogManager()
                 .alterModel(getCatalogModel(), getModelIdentifier(), ignoreIfNotExists());
         return TableResultImpl.TABLE_RESULT_OK;
+    }
+
+    private String toString(ModelChange modelChange) {
+        if (modelChange instanceof ModelChange.SetOption) {
+            ModelChange.SetOption setOption = (ModelChange.SetOption) modelChange;
+            return String.format(
+                    "  SET (%s)",
+                    OperationUtils.formatParameter(setOption.getKey(), setOption.getValue()));
+        } else if (modelChange instanceof ModelChange.ResetOption) {
+            ModelChange.ResetOption resetOption = (ModelChange.ResetOption) modelChange;
+            return String.format("  RESET (%s)", resetOption.getKey());
+        } else {
+            throw new UnsupportedOperationException(
+                    String.format("Unknown model change: %s", modelChange));
+        }
     }
 }

@@ -2762,6 +2762,60 @@ class TableEnvironmentTest {
   }
 
   @Test
+  def testAlterModelReset(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    tableEnv.executeSql(sourceDDL)
+
+    tableEnv.executeSql("ALTER MODEL M1 RESET ('task')");
+  }
+
+  @Test
+  def testAlterModelResetNonExist(): Unit = {
+    assertThatThrownBy(() => tableEnv.executeSql("ALTER MODEL M1 RESET ('task')"))
+      .isInstanceOf(classOf[ValidationException])
+      .hasMessageContaining(
+        "Could not execute AlterModel in path `default_catalog`.`default_database`.`M1`")
+  }
+
+  @Test
+  def testAlterModelResetWithIfExists(): Unit = {
+    tableEnv.executeSql("ALTER MODEL IF EXISTS M1 RESET ('task')");
+  }
+
+  @Test
+  def testAlterModelRestEmptyOptionKey(): Unit = {
+    val sourceDDL =
+      """
+        |CREATE MODEL M1
+        |  INPUT(f0 char(10), f1 varchar(10))
+        |  OUTPUT(f2 string)
+        |with (
+        |  'task' = 'clustering',
+        |  'provider' = 'openai',
+        |  'openai.endpoint' = 'some-endpoint'
+        |)
+      """.stripMargin
+    tableEnv.executeSql(sourceDDL)
+
+    assertThatThrownBy(
+      () =>
+        tableEnv
+          .executeSql("ALTER MODEL M1 RESET ()"))
+      .isInstanceOf(classOf[ValidationException])
+      .hasMessageContaining("ALTER MODEL RESET does not support empty key");
+  }
+
+  @Test
   def testCreateModelMissingInput(): Unit = {
     val sourceDDL =
       """

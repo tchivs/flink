@@ -20,6 +20,7 @@ package org.apache.flink.table.planner.operations;
 
 import org.apache.flink.sql.parser.ddl.SqlAlterModel;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelRename;
+import org.apache.flink.sql.parser.ddl.SqlAlterModelReset;
 import org.apache.flink.sql.parser.ddl.SqlAlterModelSet;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.ValidationException;
@@ -37,6 +38,8 @@ import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Helper class for converting {@link SqlAlterModel} to {@link AlterModelOptionsOperation}. */
 public class SqlAlterModelConverter {
@@ -70,7 +73,22 @@ public class SqlAlterModelConverter {
                     CatalogModel.of(
                             Schema.newBuilder().build(),
                             Schema.newBuilder().build(),
-                            changeModelOptions,
+                            modelChanges,
+                            null),
+                    sqlAlterModel.ifModelExists());
+        } else if (sqlAlterModel instanceof SqlAlterModelReset) {
+            SqlAlterModelReset sqlAlterModelReset = (SqlAlterModelReset) sqlAlterModel;
+            Set<String> resetKeys = sqlAlterModelReset.getResetKeys();
+            if (resetKeys.isEmpty()) {
+                throw new ValidationException("ALTER MODEL RESET does not support empty key");
+            }
+            List<ModelChange> modelChanges =
+                    resetKeys.stream().map(ModelChange::reset).collect(Collectors.toList());
+            return new AlterModelOptionsOperation(
+                    modelIdentifier,
+                    CatalogModel.of(
+                            Schema.newBuilder().build(),
+                            Schema.newBuilder().build(),
                             modelChanges,
                             null),
                     sqlAlterModel.ifModelExists());

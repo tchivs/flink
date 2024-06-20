@@ -23,7 +23,6 @@ import org.apache.flink.table.api.Schema;
 
 import javax.annotation.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,14 +35,6 @@ public class DefaultCatalogModel implements CatalogModel {
     private final Map<String, String> modelOptions;
     private final List<ModelChange> modelChanges;
     private final @Nullable String comment;
-
-    public DefaultCatalogModel(
-            Schema inputSchema,
-            Schema outputSchema,
-            Map<String, String> modelOptions,
-            @Nullable String comment) {
-        this(inputSchema, outputSchema, modelOptions, new ArrayList<>(), comment);
-    }
 
     public DefaultCatalogModel(
             Schema inputSchema,
@@ -96,7 +87,11 @@ public class DefaultCatalogModel implements CatalogModel {
     @Override
     public CatalogModel copy(Map<String, String> newModelOptions) {
         return new DefaultCatalogModel(
-                this.inputSchema, this.outputSchema, newModelOptions, this.comment);
+                this.inputSchema,
+                this.outputSchema,
+                newModelOptions,
+                this.modelChanges,
+                this.comment);
     }
 
     @Override

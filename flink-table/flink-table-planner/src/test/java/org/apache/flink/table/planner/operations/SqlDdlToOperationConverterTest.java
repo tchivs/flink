@@ -379,20 +379,15 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
             assertThat(alterModelRenameOperation.getNewModelIdentifier())
                     .isEqualTo(expectedNewIdentifier);
         }
+
         // test alter model properties with existing key: 'k1'
         Operation operation =
                 parse("alter model if exists cat1.db1.m1 set ('k1' = 'v1_altered', 'K2' = 'V2')");
-        Map<String, String> expectedModelProperties = new HashMap<>();
-        expectedModelProperties.put("K1", "v1_altered");
-        expectedModelProperties.put("K2", "V2");
-
         assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
         AlterModelOptionsOperation alterModelPropertiesOperation =
                 (AlterModelOptionsOperation) operation;
         assertThat(alterModelPropertiesOperation.getModelIdentifier())
                 .isEqualTo(expectedIdentifier);
-        assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
-                .isEqualTo(expectedModelProperties);
         List<ModelChange> expectedModelChanges = new ArrayList<>();
         expectedModelChanges.add(ModelChange.set("K1", "v1_altered"));
         expectedModelChanges.add(ModelChange.set("K2", "V2"));
@@ -401,8 +396,6 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
 
         // test alter model properties without keys
         operation = parse("alter model if exists cat1.db1.m1 set ('k3' = 'v3')");
-        expectedModelProperties.clear();
-        expectedModelProperties.put("K3", "v3");
         expectedModelChanges.clear();
         expectedModelChanges.add(ModelChange.set("K3", "v3"));
 
@@ -410,10 +403,24 @@ public class SqlDdlToOperationConverterTest extends SqlNodeToOperationConversion
         alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
         assertThat(alterModelPropertiesOperation.getModelIdentifier())
                 .isEqualTo(expectedIdentifier);
-        assertThat(alterModelPropertiesOperation.getCatalogModel().getOptions())
-                .isEqualTo(expectedModelProperties);
         assertThat(alterModelPropertiesOperation.getCatalogModel().getModelChanges())
                 .isEqualTo(expectedModelChanges);
+
+        // test alter model reset properties with existing key: 'k1'
+        operation = parse("alter model if exists cat1.db1.m1 reset ('k1')");
+        assertThat(operation).isInstanceOf(AlterModelOptionsOperation.class);
+        alterModelPropertiesOperation = (AlterModelOptionsOperation) operation;
+        assertThat(alterModelPropertiesOperation.getModelIdentifier())
+                .isEqualTo(expectedIdentifier);
+        expectedModelChanges.clear();
+        expectedModelChanges.add(ModelChange.reset("K1"));
+        assertThat(alterModelPropertiesOperation.getCatalogModel().getModelChanges())
+                .isEqualTo(expectedModelChanges);
+
+        // test alter model reset properties empty key not supported
+        assertThatThrownBy(() -> parse("alter model if exists cat1.db1.m1 reset ()"))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("ALTER MODEL RESET does not support empty key");
     }
 
     @Test

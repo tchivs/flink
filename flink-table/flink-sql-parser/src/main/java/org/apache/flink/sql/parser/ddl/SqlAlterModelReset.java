@@ -57,7 +57,7 @@ public class SqlAlterModelReset extends SqlAlterModel {
 
     public Set<String> getResetKeys() {
         return optionKeyList.getList().stream()
-                .map(key -> ((NlsString) SqlLiteral.value(key)).getValue())
+                .map(key -> ((NlsString) SqlLiteral.value(key)).getValue().toUpperCase())
                 .collect(Collectors.toSet());
     }
 
