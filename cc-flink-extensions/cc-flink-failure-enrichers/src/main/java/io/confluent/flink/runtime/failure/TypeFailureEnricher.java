@@ -157,17 +157,12 @@ public class TypeFailureEnricher implements FailureEnricher {
                 SERIALIZE_MESSAGE,
                 Classification.of(Type.USER, Handling.RECOVER, ErrorClass.SERIALIZATION_GENERAL),
                 ConditionalClassification.of(
-                        t ->
-                                t.getMessage() != null
-                                        && (t.getMessage()
-                                                .contains(BROKEN_SERIALIZATION_ERROR_MESSAGE)),
+                        t -> containsMessage(t, BROKEN_SERIALIZATION_ERROR_MESSAGE),
                         Type.SYSTEM,
                         Handling.RECOVER,
                         ErrorClass.BROKEN_SERIALIZATION),
                 ConditionalClassification.of(
-                        t ->
-                                t.getMessage() != null
-                                        && (t.getMessage().contains(PEKKO_SERIALIZATION_ERROR)),
+                        t -> containsMessage(t, PEKKO_SERIALIZATION_ERROR),
                         Type.SYSTEM,
                         Handling.RECOVER,
                         ErrorClass.PEKKO_SERIALIZATION)),
@@ -175,10 +170,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                 TableException.class,
                 Classification.of(Type.USER, Handling.RECOVER, ErrorClass.TABLE_GENERAL),
                 ConditionalClassification.of(
-                        t ->
-                                t.getMessage() != null
-                                        && t.getMessage()
-                                                .contains("a null value is being written into it"),
+                        t -> containsMessage(t, "a null value is being written into it"),
                         Type.USER,
                         Handling.RECOVER,
                         ErrorClass.TABLE_NULL_IN_NOT_NULL)),
@@ -204,10 +196,7 @@ public class TypeFailureEnricher implements FailureEnricher {
                 SaslAuthenticationException.class,
                 Classification.of(Type.SYSTEM, Handling.RECOVER, ErrorClass.KAFKA_SASL_AUTH),
                 ConditionalClassification.of(
-                        t ->
-                                t.getMessage() != null
-                                        && t.getMessage()
-                                                .contains("logicalCluster: CLUSTER_NOT_FOUND"),
+                        t -> containsMessage(t, "logicalCluster: CLUSTER_NOT_FOUND"),
                         Type.USER,
                         Handling.RECOVER,
                         ErrorClass.KAFKA_SASL_AUTH_CLUSTER_NOT_FOUND)),
@@ -399,6 +388,10 @@ public class TypeFailureEnricher implements FailureEnricher {
         labels.put(KEY_MSG, FailureMessageUtil.buildMessage(cause));
         LOG.info("Processed failure labels: {}", labels);
         return CompletableFuture.completedFuture(Collections.unmodifiableMap(labels));
+    }
+
+    private static boolean containsMessage(Throwable t, String message) {
+        return t.getMessage() != null && t.getMessage().contains(message);
     }
 
     static class Classification {
