@@ -81,14 +81,14 @@ public class MLMaxAbsScalerFunction extends ScalarFunction {
         if (Objects.isNull(absMax) || absMax.isNaN()) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "The absMax argument to %s function cannot be NaN or NULL.", NAME));
+                            "The Absolute Maximum argument to %s function cannot be NaN or NULL.", NAME));
         }
         if (absMax.isInfinite()) {
             return 0.0;
         }
         // sets absMax to its absolute value if negative
         absMax = Math.abs(absMax);
-        return value > absMax ? 1.0 : (value < -absMax ? -1.0 : value / absMax);
+        return value > absMax ? 1.0 : (value < -absMax ? -1.0 : value / (absMax == 0.0 ? 1.0:absMax));
     }
 
     /**
@@ -156,7 +156,7 @@ public class MLMaxAbsScalerFunction extends ScalarFunction {
                                                                         "%s datatype is not supported as first argument to %s function. Please refer documentation for supported datatypes",
                                                                         argDataType, NAME);
                                                             }
-                                                            // Check if absMax value
+                                                            // Check if absolute Maximum value
                                                             // is null
                                                             if (i > 0
                                                                     && argDataType.equals(

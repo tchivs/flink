@@ -78,6 +78,14 @@ public class MLMinMaxScalerFunctionTest {
     }
 
     @Test
+    void testMLMinMaxScalerForZeroDataRangeAndDifferentValue() {
+        final TableResult mlqueryResult =
+                tableEnv.executeSql("SELECT ML_MIN_MAX_SCALER(6, 5, 5) AS scaled_value\n;");
+        Row row = mlqueryResult.collect().next();
+        assertThat(row.getField(0)).isEqualTo(1.0);
+    }
+
+    @Test
     void testMLMinMaxScalerForNullValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql("SELECT ML_MIN_MAX_SCALER(NULL, 1, 5) AS scaled_value\n;");

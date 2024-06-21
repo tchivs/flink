@@ -168,6 +168,30 @@ class MLMaxAbsScalerFunctionTest {
     }
 
     @Test
+    void testMaxAbsScalerForZeroAbsMax() {
+        final TableResult tableResult =
+                tableEnv.executeSql("SELECT ML_MAX_ABS_SCALER(0, 0) as scaled_value;\n");
+        Row row = tableResult.collect().next();
+        assertThat(row.getField(0)).isEqualTo(0.0);
+    }
+
+    @Test
+    void testMaxAbsScalerForZeroAbsMaxAndPositiveValue() {
+        final TableResult tableResult =
+                tableEnv.executeSql("SELECT ML_MAX_ABS_SCALER(0.3, 0) as scaled_value;\n");
+        Row row = tableResult.collect().next();
+        assertThat(row.getField(0)).isEqualTo(1.0);
+    }
+
+    @Test
+    void testMaxAbsScalerForZeroAbsMaxAndNegativeValue() {
+        final TableResult tableResult =
+                tableEnv.executeSql("SELECT ML_MAX_ABS_SCALER(-0.3, 0) as scaled_value;\n");
+        Row row = tableResult.collect().next();
+        assertThat(row.getField(0)).isEqualTo(-1.0);
+    }
+
+    @Test
     void testMLMaxAbsScalerForInfinityAbsMax() {
         final TableResult result =
                 tableEnv.executeSql(
@@ -201,7 +225,6 @@ class MLMaxAbsScalerFunctionTest {
                         "SELECT ML_MAX_ABS_SCALER(CAST(1234567890123456795 AS BIGINT)"
                                 + ", CAST(1234567890123456795 AS BIGINT)) AS scaled_value\n;");
         Row row = result.collect().next();
-        assert row.getField(0) != null;
         assertThat(row.getField(0)).isEqualTo(1.0);
     }
 
