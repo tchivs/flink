@@ -26,30 +26,32 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
 
-/** A scalar function for performing Min-Max scaling on numerical values. */
-public class MLMinMaxScalerFunction extends ScalarFunction {
+/**
+ * A ScalarFunction that implements the ML_MAX_ABS_SCALER function. This function scales the input
+ * value by the absolute maximum value provided.
+ */
+public class MLMaxAbsScalerFunction extends ScalarFunction {
     /** The name of the function. */
-    public static final String NAME = "ML_MIN_MAX_SCALER";
+    public static final String NAME = "ML_MAX_ABS_SCALER";
     /** The name of the function. */
     public final String functionName;
 
     /**
-     * Constructs a new {@code MLMinMaxScalarFunction} instance with the specified function name.
+     * Constructor for the MLMaxAbsScaleFunction class.
      *
-     * @param functionName the name of the function
+     * @param functionName the name of the function.
      */
-    public MLMinMaxScalerFunction(String functionName) {
+    public MLMaxAbsScalerFunction(String functionName) {
         this.functionName = functionName;
     }
 
     /**
-     * Scales the input value to [0, 1] using Min-Max scaling.
+     * Evaluates the function with the given arguments.
      *
-     * @param args input arguments where: - args[0] is the input value, - args[1] is the minimum
-     *     value of the feature, args[2] is the maximum value of the feature.
-     * @return the scaled value
+     * @param args the input arguments where: - args[0] is the input value, - args[1] is the
+     *     absolute maximum value of the feature.
+     * @return the scaled value as a Double.
      */
     public Double eval(Object... args) {
         try {
@@ -57,73 +59,43 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                 return null;
             }
             Object value = args[0];
-            Object min = args[1];
-            Object max = args[2];
-            if (value instanceof Long && min instanceof Long && max instanceof Long) {
-                return getStandardizedValue(
-                        getLongValue(value, NAME),
-                        getLongValue(min, NAME),
-                        getLongValue(max, NAME));
-            }
-            return getStandardizedValue(
-                    getDoubleValue(value, NAME),
-                    getDoubleValue(min, NAME),
-                    getDoubleValue(max, NAME));
+            Object absMax = args[1];
+            return getScaledValue(getDoubleValue(value, NAME), getDoubleValue(absMax, NAME));
         } catch (Throwable t) {
             throw new FlinkRuntimeException(t);
         }
     }
 
-    private Double getStandardizedValue(Double value, Double dataMin, Double dataMax) {
-        if (dataMax < dataMin) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "The max argument to %s function has to be greater than or equal to min argument",
-                            NAME));
-        }
-        if (dataMin.isNaN() || dataMin.isInfinite() || dataMax.isNaN() || dataMax.isInfinite()) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "The min and max arguments to %s function cannot be NaN or Infinite value",
-                            NAME));
-        }
-        if (value.isInfinite() || value.isNaN()) {
+    /**
+     * Scales the given value by the absolute maximum value.
+     *
+     * @param value the value to scale.
+     * @param absMax the absolute maximum value.
+     * @return the scaled value.
+     * @throws FlinkRuntimeException if absMax is NaN or null.
+     */
+    private Double getScaledValue(Double value, Double absMax) {
+        if (value.isNaN() || value.isInfinite()) {
             return value;
         }
-        if (value > dataMax) {
-            return 1.0;
-        }
-        if (value < dataMin) {
-            return 0.0;
-        }
-        double range = dataMax - dataMin;
-        range = range == 0.0 ? 1.0 : range;
-        return (value - dataMin) / range;
-    }
-
-    private Double getStandardizedValue(Long value, Long dataMin, Long dataMax) {
-        if (dataMax < dataMin) {
+        if (Objects.isNull(absMax) || absMax.isNaN()) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "The max argument to %s function has to be greater than or equal to min argument",
-                            NAME));
+                            "The absMax argument to %s function cannot be NaN or NULL.", NAME));
         }
-        if (value > dataMax) {
-            return 1.0;
-        }
-        if (value < dataMin) {
+        if (absMax.isInfinite()) {
             return 0.0;
         }
-        long range = dataMax - dataMin;
-        range = range == 0L ? 1L : range;
-        return ((double) (value - dataMin)) / range;
+        // sets absMax to its absolute value if negative
+        absMax = Math.abs(absMax);
+        return value > absMax ? 1.0 : (value < -absMax ? -1.0 : value / absMax);
     }
 
     /**
-     * Returns the type inference logic for this scalar function.
+     * Provides the type inference logic for this function.
      *
-     * @param typeFactory the data type factory
-     * @return the type inference
+     * @param typeFactory the DataTypeFactory instance.
+     * @return the TypeInference instance.
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
@@ -133,19 +105,20 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                             @Override
                             public ArgumentCount getArgumentCount() {
                                 return new ArgumentCount() {
+
                                     @Override
                                     public boolean isValidCount(int count) {
-                                        return count == 3;
+                                        return count == 2;
                                     }
 
                                     @Override
                                     public Optional<Integer> getMinCount() {
-                                        return Optional.of(3);
+                                        return Optional.of(2);
                                     }
 
                                     @Override
                                     public Optional<Integer> getMaxCount() {
-                                        return Optional.of(3);
+                                        return Optional.of(2);
                                     }
                                 };
                             }
@@ -153,16 +126,16 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                             @Override
                             public Optional<List<DataType>> inferInputTypes(
                                     CallContext callContext, boolean throwOnFailure) {
-                                List<DataType> argsDataTypes = callContext.getArgumentDataTypes();
-
+                                List<DataType> argumentDataTypes =
+                                        callContext.getArgumentDataTypes();
                                 // Use IntStream.range to create indices for elements in
-                                // argsDataTypes list
+                                // argsDataTypes list and returns errorMessage if any
                                 Optional<String> errorMessage =
-                                        IntStream.range(0, argsDataTypes.size())
+                                        IntStream.range(0, argumentDataTypes.size())
                                                 .mapToObj(
                                                         i -> {
                                                             DataType argDataType =
-                                                                    argsDataTypes.get(i);
+                                                                    argumentDataTypes.get(i);
                                                             // Check if the data type is supported
                                                             if (!argDataType.equals(
                                                                             DataTypes.NULL())
@@ -180,25 +153,22 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                                                                                     LogicalTypeFamily
                                                                                             .DATETIME)) {
                                                                 return String.format(
-                                                                        "%s datatype is not supported as argument to %s function. Please refer documentation for supported datatypes",
+                                                                        "%s datatype is not supported as first argument to %s function. Please refer documentation for supported datatypes",
                                                                         argDataType, NAME);
                                                             }
-
-                                                            // Check if dataMin and dataMax value
-                                                            // are null
+                                                            // Check if absMax value
+                                                            // is null
                                                             if (i > 0
                                                                     && argDataType.equals(
                                                                             DataTypes.NULL())) {
                                                                 return String.format(
-                                                                        "The min and max arguments to %s function cannot be NULL",
+                                                                        "Second argument to %s function cannot be NULL",
                                                                         NAME);
                                                             }
-
-                                                            return null; // Return null if no error
+                                                            return null;
                                                         })
-                                                .filter(Objects::nonNull) // Filter out null error
-                                                // messages
-                                                .findFirst(); // Find the first error message
+                                                .filter(Objects::nonNull)
+                                                .findFirst();
 
                                 if (errorMessage.isPresent()) {
                                     if (throwOnFailure) {
@@ -207,14 +177,14 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                                         return Optional.empty();
                                     }
                                 }
-                                return Optional.of(argsDataTypes);
+                                return Optional.of(argumentDataTypes);
                             }
 
                             @Override
                             public List<Signature> getExpectedSignatures(
                                     FunctionDefinition definition) {
                                 final List<Signature.Argument> arguments = new ArrayList<>();
-                                for (int i = 0; i < 3; i++) {
+                                for (int i = 0; i < 2; i++) {
                                     arguments.add(Signature.Argument.of("input" + i));
                                 }
                                 return Collections.singletonList(Signature.of(arguments));
@@ -222,15 +192,5 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
                         })
                 .outputTypeStrategy(callContext -> Optional.of(DataTypes.DOUBLE()))
                 .build();
-    }
-
-    /**
-     * Returns a string representation of this scalar function.
-     *
-     * @return a string representation of this scalar function
-     */
-    @Override
-    public String toString() {
-        return String.format("MLMinMaxScalarFunction {functionName=%s}", functionName);
     }
 }

@@ -140,8 +140,8 @@ public class MLMinMaxScalerFunctionTest {
     void testMLMinMaxScalerForPeriodValue() {
         final TableResult result =
                 tableEnv.executeSql(
-                        "SELECT ML_MIN_MAX_SCALER(INTERVAL '12 18' DAY(2) TO HOUR, "
-                                + "INTERVAL '10 18' DAY(2) TO HOUR, INTERVAL '20 18' DAY(2) TO HOUR) AS scaled_value\n;");
+                        "SELECT ML_MIN_MAX_SCALER(INTERVAL '11' YEAR, "
+                                + "INTERVAL '10' YEAR, INTERVAL '15' YEAR) AS scaled_value\n;");
         Row row = result.collect().next();
         assertThat(row.getField(0)).isEqualTo(0.2);
     }
@@ -176,7 +176,8 @@ public class MLMinMaxScalerFunctionTest {
     void testMLMinMaxScalerForVeryLargeValues() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_MIN_MAX_SCALER(CAST(1234567890123456790 AS BIGINT), CAST(1234567890123456785 AS BIGINT), CAST(1234567890123456795 AS BIGINT)) AS scaled_value\n;");
+                        "SELECT ML_MIN_MAX_SCALER(CAST(1234567890123456790 AS BIGINT)"
+                                + ", CAST(1234567890123456785 AS BIGINT), CAST(1234567890123456795 AS BIGINT)) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assert row.getField(0) != null;
         assertThat(row.getField(0)).isEqualTo(0.5);

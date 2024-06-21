@@ -80,7 +80,7 @@ public class MlFunctionsUtil {
             return ((ZonedDateTime) value).toInstant().toEpochMilli();
         }
         if (value instanceof Period) {
-            return ((Period) value).getDays();
+            return ((Period) value).toTotalMonths();
         }
         if (value instanceof Duration) {
             return ((Duration) value).toMillis();

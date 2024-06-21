@@ -8,6 +8,7 @@ import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
 import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
+import io.confluent.flink.table.modules.ml.functions.MLMaxAbsScalerFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalerFunction;
 
 import java.util.Collections;
@@ -44,6 +45,9 @@ public class MLFunctionsModule implements Module {
                         put(
                                 MLBucketizeFunction.NAME,
                                 new MLBucketizeFunction(MLBucketizeFunction.NAME));
+                        put(
+                                MLMaxAbsScalerFunction.NAME,
+                                new MLMaxAbsScalerFunction(MLMaxAbsScalerFunction.NAME));
                     }
                 };
     }
