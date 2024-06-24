@@ -10,6 +10,7 @@ import org.apache.flink.table.module.Module;
 import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMaxAbsScalerFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalerFunction;
+import io.confluent.flink.table.modules.ml.functions.MLStandardScalerFunction;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,6 +49,9 @@ public class MLFunctionsModule implements Module {
                         put(
                                 MLMaxAbsScalerFunction.NAME,
                                 new MLMaxAbsScalerFunction(MLMaxAbsScalerFunction.NAME));
+                        put(
+                                MLStandardScalerFunction.NAME,
+                                new MLStandardScalerFunction(MLStandardScalerFunction.NAME));
                     }
                 };
     }
