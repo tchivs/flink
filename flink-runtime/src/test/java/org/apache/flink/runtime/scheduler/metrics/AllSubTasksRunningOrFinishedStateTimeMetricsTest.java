@@ -17,15 +17,24 @@
 
 package org.apache.flink.runtime.scheduler.metrics;
 
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.events.Event;
 import org.apache.flink.events.EventBuilder;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.execution.ExecutionState;
-import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.executiongraph.DefaultExecutionGraph;
+import org.apache.flink.runtime.executiongraph.Execution;
+import org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils;
+import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.executiongraph.ExecutionVertex;
+import org.apache.flink.runtime.executiongraph.IntermediateResult;
+import org.apache.flink.runtime.executiongraph.TestingDefaultExecutionGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobType;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
+import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.runtime.scheduler.DefaultVertexParallelismInfo;
+import org.apache.flink.runtime.testtasks.NoOpInvokable;
+import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
 import org.apache.flink.util.clock.ManualClock;
 
 import org.junit.jupiter.api.Test;
@@ -33,13 +42,16 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
-import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionAttemptId;
 import static org.apache.flink.runtime.scheduler.metrics.StateTimeMetricTest.enable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for {@link AllSubTasksRunningOrFinishedStateTimeMetrics}. */
 class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
+    private static final Executor DIRECT_EXECUTOR = Runnable::run;
+    private static final Time TIMEOUT = Time.seconds(10);
 
     private static final MetricOptions.JobStatusMetricsSettings settings =
             enable(
@@ -65,21 +77,21 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
         final AllSubTasksRunningOrFinishedStateTimeMetrics metrics =
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(JobType.STREAMING, settings);
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId();
+        final Execution exec1 = newExecution();
 
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
     }
 
@@ -88,44 +100,41 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
         final AllSubTasksRunningOrFinishedStateTimeMetrics metrics =
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(JobType.STREAMING, settings);
 
-        final JobVertexID jobVertexID = new JobVertexID();
-        final ExecutionVertexID executionVertexID = new ExecutionVertexID(jobVertexID, 0);
+        Execution exec1 = newExecution();
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId(executionVertexID, 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELING);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.CANCELING, ExecutionState.CANCELED);
+        metrics.onStateUpdate(exec1, ExecutionState.CANCELING, ExecutionState.CANCELED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        final ExecutionAttemptID id2 = createExecutionAttemptId(executionVertexID, 1);
+        Execution exec2 = newAttempt(exec1);
 
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
     }
 
@@ -134,43 +143,39 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
         final AllSubTasksRunningOrFinishedStateTimeMetrics metrics =
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(JobType.STREAMING, settings);
 
-        final JobVertexID jobVertexID = new JobVertexID();
+        Execution exec1 = newExecution();
+        Execution exec2 = newExecution();
 
-        final ExecutionAttemptID id1 =
-                createExecutionAttemptId(new ExecutionVertexID(jobVertexID, 0), 0);
-        final ExecutionAttemptID id2 =
-                createExecutionAttemptId(new ExecutionVertexID(jobVertexID, 1), 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
         // Only signal running once both executions are in running state
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
         // Maintain value 1 as executions finish
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
     }
 
@@ -179,46 +184,42 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
         final AllSubTasksRunningOrFinishedStateTimeMetrics metrics =
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(JobType.STREAMING, settings);
 
-        final JobVertexID jobVertexID = new JobVertexID();
-        ExecutionVertexID executionVertexIDSubtask0 = new ExecutionVertexID(jobVertexID, 0);
+        Execution exec1 = newExecution();
+        Execution exec2 = newExecution();
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId(executionVertexIDSubtask0, 0);
-        final ExecutionAttemptID id2 =
-                createExecutionAttemptId(new ExecutionVertexID(jobVertexID, 1), 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
         // Only signal running once both executions are in running state
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
         // One subtask cancelling move the state to 0
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELING);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELING);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELED);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
 
-        final ExecutionAttemptID id1V2 = createExecutionAttemptId(executionVertexIDSubtask0, 1);
+        Execution id1V2 = newAttempt(exec1);
 
         metrics.onStateUpdate(id1V2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(metrics.getBinary()).isEqualTo(0L);
@@ -236,7 +237,7 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
         metrics.onStateUpdate(id1V2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
 
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(metrics.getBinary()).isEqualTo(1L);
     }
 
@@ -248,46 +249,43 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(
                         JobType.STREAMING, settings, clock);
 
-        final JobVertexID jobVertexID = new JobVertexID();
-        final ExecutionVertexID executionVertexID = new ExecutionVertexID(jobVertexID, 0);
+        Execution exec1 = newExecution();
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId(executionVertexID, 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(5L);
         clock.advanceTime(Duration.ofMillis(10));
         assertThat(metrics.getCurrentTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELING);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.CANCELING, ExecutionState.CANCELED);
+        metrics.onStateUpdate(exec1, ExecutionState.CANCELING, ExecutionState.CANCELED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
 
-        final ExecutionAttemptID id2 = createExecutionAttemptId(executionVertexID, 1);
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        Execution exec2 = newAttempt(exec1);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getCurrentTime()).isEqualTo(5L);
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         clock.advanceTime(Duration.ofMillis(10));
         assertThat(metrics.getCurrentTime()).isEqualTo(15L);
     }
@@ -300,46 +298,43 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
                 new AllSubTasksRunningOrFinishedStateTimeMetrics(
                         JobType.STREAMING, settings, clock);
 
-        final JobVertexID jobVertexID = new JobVertexID();
-        final ExecutionVertexID executionVertexID = new ExecutionVertexID(jobVertexID, 0);
+        Execution exec1 = newExecution();
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId(executionVertexID, 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(0L);
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(5L);
         clock.advanceTime(Duration.ofMillis(10));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELING);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id1, ExecutionState.CANCELING, ExecutionState.CANCELED);
+        metrics.onStateUpdate(exec1, ExecutionState.CANCELING, ExecutionState.CANCELED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
 
-        final ExecutionAttemptID id2 = createExecutionAttemptId(executionVertexID, 1);
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        Execution exec2 = newAttempt(exec1);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(15L);
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         clock.advanceTime(Duration.ofMillis(5));
         assertThat(metrics.getTotalTime()).isEqualTo(20L);
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         clock.advanceTime(Duration.ofMillis(10));
         assertThat(metrics.getTotalTime()).isEqualTo(30L);
     }
@@ -362,37 +357,62 @@ class AllSubTasksRunningOrFinishedStateTimeMetricsTest {
                     }
                 });
 
-        final JobVertexID jobVertexID = new JobVertexID();
-        final ExecutionVertexID executionVertexID = new ExecutionVertexID(jobVertexID, 0);
+        Execution exec1 = newExecution();
 
-        final ExecutionAttemptID id1 = createExecutionAttemptId(executionVertexID, 0);
-
-        metrics.onStateUpdate(id1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        metrics.onStateUpdate(exec1, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec1, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec1, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec1, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(events).hasSize(1);
         assertThat(events.remove(0).getAttributes()).containsEntry("allRunningOrFinished", "true");
-        metrics.onStateUpdate(id1, ExecutionState.RUNNING, ExecutionState.CANCELING);
+        metrics.onStateUpdate(exec1, ExecutionState.RUNNING, ExecutionState.CANCELING);
         assertThat(events).hasSize(1);
         assertThat(events.remove(0).getAttributes()).containsEntry("allRunningOrFinished", "false");
-        metrics.onStateUpdate(id1, ExecutionState.CANCELING, ExecutionState.CANCELED);
+        metrics.onStateUpdate(exec1, ExecutionState.CANCELING, ExecutionState.CANCELED);
         assertThat(events).isEmpty();
 
-        final ExecutionAttemptID id2 = createExecutionAttemptId(executionVertexID, 1);
-        metrics.onStateUpdate(id2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
+        Execution exec2 = newAttempt(exec1);
+        metrics.onStateUpdate(exec2, ExecutionState.CREATED, ExecutionState.SCHEDULED);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
+        metrics.onStateUpdate(exec2, ExecutionState.SCHEDULED, ExecutionState.DEPLOYING);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
+        metrics.onStateUpdate(exec2, ExecutionState.DEPLOYING, ExecutionState.INITIALIZING);
         assertThat(events).isEmpty();
-        metrics.onStateUpdate(id2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
+        metrics.onStateUpdate(exec2, ExecutionState.INITIALIZING, ExecutionState.RUNNING);
         assertThat(events).hasSize(1);
         assertThat(events.remove(0).getAttributes()).containsEntry("allRunningOrFinished", "true");
-        metrics.onStateUpdate(id2, ExecutionState.RUNNING, ExecutionState.FINISHED);
+        metrics.onStateUpdate(exec2, ExecutionState.RUNNING, ExecutionState.FINISHED);
         assertThat(events).isEmpty();
+    }
+
+    private static Execution newExecution() {
+        try {
+            JobVertex jv = ExecutionGraphTestUtils.createJobVertex("task1", 1, NoOpInvokable.class);
+            DefaultExecutionGraph eg =
+                    TestingDefaultExecutionGraphBuilder.newBuilder()
+                            .buildDynamicGraph(new DirectScheduledExecutorService());
+            ExecutionJobVertex ejv =
+                    new ExecutionJobVertex(
+                            eg,
+                            jv,
+                            new DefaultVertexParallelismInfo(1, 1, ignored -> Optional.empty()));
+            ExecutionVertex ev =
+                    new ExecutionVertex(ejv, 0, new IntermediateResult[0], TIMEOUT, 0L, 1, 0);
+            return new Execution(DIRECT_EXECUTOR, ev, 0, 0, TIMEOUT);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Execution newAttempt(Execution execution) {
+        return new Execution(
+                DIRECT_EXECUTOR,
+                execution.getVertex(),
+                execution.getAttemptNumber() + 1,
+                System.currentTimeMillis(),
+                TIMEOUT);
     }
 }

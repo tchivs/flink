@@ -49,6 +49,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.forwardgroup.ForwardGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.scheduler.ExecutionGraphFactory;
 import org.apache.flink.runtime.scheduler.ExecutionOperations;
 import org.apache.flink.runtime.scheduler.ExecutionSlotAllocatorFactory;
@@ -129,7 +130,8 @@ public class SpeculativeScheduler extends AdaptiveBatchScheduler
             final int defaultMaxParallelism,
             final BlocklistOperations blocklistOperations,
             final HybridPartitionDataConsumeConstraint hybridPartitionDataConsumeConstraint,
-            final Map<JobVertexID, ForwardGroup> forwardGroupsByJobVertexId)
+            final Map<JobVertexID, ForwardGroup> forwardGroupsByJobVertexId,
+            final FatalErrorHandler fatalErrorHandler)
             throws Exception {
 
         super(
@@ -159,7 +161,8 @@ public class SpeculativeScheduler extends AdaptiveBatchScheduler
                 vertexParallelismAndInputInfosDecider,
                 defaultMaxParallelism,
                 hybridPartitionDataConsumeConstraint,
-                forwardGroupsByJobVertexId);
+                forwardGroupsByJobVertexId,
+                fatalErrorHandler);
 
         this.maxConcurrentExecutions =
                 jobMasterConfiguration.getInteger(

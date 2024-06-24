@@ -22,7 +22,7 @@ import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.events.Events;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.execution.ExecutionState;
-import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.jobgraph.JobType;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.util.Preconditions;
@@ -107,9 +107,9 @@ public class AllSubTasksRunningOrFinishedStateTimeMetrics
 
     @Override
     public void onStateUpdate(
-            ExecutionAttemptID execution, ExecutionState previousState, ExecutionState newState) {
+            Execution execution, ExecutionState previousState, ExecutionState newState) {
 
-        ExecutionVertexID executionVertexId = execution.getExecutionVertexId();
+        ExecutionVertexID executionVertexId = execution.getAttemptId().getExecutionVertexId();
         if (newState == ExecutionState.RUNNING || newState == ExecutionState.FINISHED) {
             notRunningOrFinishedVertices.remove(executionVertexId);
         } else {

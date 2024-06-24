@@ -21,12 +21,14 @@ package org.apache.flink.runtime.scheduler;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionStateUpdateListener;
 import org.apache.flink.runtime.executiongraph.MarkPartitionFinishedStrategy;
 import org.apache.flink.runtime.executiongraph.VertexAttemptNumberStore;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 
 import org.slf4j.Logger;
 
@@ -49,6 +51,7 @@ public interface ExecutionGraphFactory {
      * @param executionStateUpdateListener listener for state transitions of the individual
      *     executions
      * @param log log to use for logging
+     * @param fatalErrorHandler handler for error occurring asynchronously
      * @return restored {@link ExecutionGraph}
      * @throws Exception if the {@link ExecutionGraph} could not be created and restored
      */
@@ -63,6 +66,8 @@ public interface ExecutionGraphFactory {
             VertexParallelismStore vertexParallelismStore,
             ExecutionStateUpdateListener executionStateUpdateListener,
             MarkPartitionFinishedStrategy markPartitionFinishedStrategy,
-            Logger log)
+            Logger log,
+            ComponentMainThreadExecutor mainThreadExecutor,
+            FatalErrorHandler fatalErrorHandler)
             throws Exception;
 }

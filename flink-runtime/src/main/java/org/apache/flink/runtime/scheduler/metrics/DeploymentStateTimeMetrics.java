@@ -21,6 +21,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.execution.ExecutionState;
+import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.jobgraph.JobType;
 import org.apache.flink.util.clock.Clock;
@@ -106,6 +107,11 @@ public class DeploymentStateTimeMetrics
     }
 
     @Override
+    public void onStateUpdate(
+            Execution execution, ExecutionState previousState, ExecutionState newState) {
+        onStateUpdate(execution.getAttemptId(), previousState, newState);
+    }
+
     public void onStateUpdate(
             ExecutionAttemptID execution, ExecutionState previousState, ExecutionState newState) {
         switch (newState) {

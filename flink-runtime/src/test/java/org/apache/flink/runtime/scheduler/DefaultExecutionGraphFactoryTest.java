@@ -30,9 +30,11 @@ import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointIDCounter;
 import org.apache.flink.runtime.checkpoint.StandaloneCompletedCheckpointStore;
 import org.apache.flink.runtime.checkpoint.SubTaskInitializationMetricsBuilder;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
 import org.apache.flink.runtime.executiongraph.DefaultVertexAttemptNumberStore;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
+import org.apache.flink.runtime.executiongraph.ExecutionStateUpdateListener;
 import org.apache.flink.runtime.io.network.partition.NoOpJobMasterPartitionTracker;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
@@ -42,6 +44,7 @@ import org.apache.flink.runtime.jobmaster.DefaultExecutionDeploymentTracker;
 import org.apache.flink.runtime.jobmaster.TestUtils;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
+import org.apache.flink.runtime.rpc.DirectlyFailingFatalErrorHandler;
 import org.apache.flink.runtime.shuffle.ShuffleTestUtils;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.testutils.TestingUtils;
@@ -96,9 +99,11 @@ public class DefaultExecutionGraphFactoryTest extends TestLogger {
                     0L,
                     new DefaultVertexAttemptNumberStore(),
                     SchedulerBase.computeVertexParallelismStore(jobGraphWithNewOperator),
-                    (execution, previousState, newState) -> {},
+                    ExecutionStateUpdateListener.NO_OP,
                     rp -> false,
-                    log);
+                    log,
+                    ComponentMainThreadExecutorServiceAdapter.forMainThread(),
+                    DirectlyFailingFatalErrorHandler.INSTANCE);
             fail("Expected ExecutionGraph creation to fail because of non restored state.");
         } catch (Exception e) {
             assertThat(
@@ -126,9 +131,11 @@ public class DefaultExecutionGraphFactoryTest extends TestLogger {
                 0L,
                 new DefaultVertexAttemptNumberStore(),
                 SchedulerBase.computeVertexParallelismStore(jobGraphWithNewOperator),
-                (execution, previousState, newState) -> {},
+                ExecutionStateUpdateListener.NO_OP,
                 rp -> false,
-                log);
+                log,
+                ComponentMainThreadExecutorServiceAdapter.forMainThread(),
+                DirectlyFailingFatalErrorHandler.INSTANCE);
 
         final CompletedCheckpoint savepoint = completedCheckpointStore.getLatestCheckpoint();
 
@@ -166,9 +173,11 @@ public class DefaultExecutionGraphFactoryTest extends TestLogger {
                         vertexId ->
                                 new DefaultVertexParallelismInfo(
                                         1, 1337, integer -> Optional.empty()),
-                        (execution, previousState, newState) -> {},
+                        ExecutionStateUpdateListener.NO_OP,
                         rp -> false,
-                        log);
+                        log,
+                        ComponentMainThreadExecutorServiceAdapter.forMainThread(),
+                        DirectlyFailingFatalErrorHandler.INSTANCE);
 
         CheckpointStatsTracker checkpointStatsTracker = executionGraph.getCheckpointStatsTracker();
         checkpointStatsTracker.reportInitializationStartTs(

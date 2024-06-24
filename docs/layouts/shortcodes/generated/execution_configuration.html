@@ -38,5 +38,11 @@
             <td><p>Enum</p></td>
             <td>Runtime execution mode of DataStream programs. Among other things, this controls task scheduling, network shuffle behavior, and time semantics.<br /><br />Possible values:<ul><li>"STREAMING"</li><li>"BATCH"</li><li>"AUTOMATIC"</li></ul></td>
         </tr>
+        <tr>
+            <td><h5>execution.task.initialization-timeout</h5></td>
+            <td style="word-wrap: break-word;">(none)</td>
+            <td>Duration</td>
+            <td>The timeout for initialization of every particular task. Any task that initializes for longer, will be failed. That is treated as a normal failure and causes job restart or termination, depending on the configured restart strategy. This might be helpful to bounce restarting tasks or to prevent Flink from holding forever any resources, e.g. Kafka transactions</td>
+        </tr>
     </tbody>
 </table>

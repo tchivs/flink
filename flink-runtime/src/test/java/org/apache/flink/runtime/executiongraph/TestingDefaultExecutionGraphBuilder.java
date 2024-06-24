@@ -75,7 +75,7 @@ public class TestingDefaultExecutionGraphBuilder {
     private ExecutionDeploymentListener executionDeploymentListener =
             NoOpExecutionDeploymentListener.get();
     private ExecutionStateUpdateListener executionStateUpdateListener =
-            (execution, previousState, newState) -> {};
+            ExecutionStateUpdateListener.NO_OP;
     private VertexParallelismStore vertexParallelismStore;
     private ExecutionJobVertex.Factory executionJobVertexFactory = new ExecutionJobVertex.Factory();
 

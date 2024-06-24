@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.scheduler;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.BatchExecutionOptions;
 import org.apache.flink.configuration.Configuration;
@@ -47,6 +48,8 @@ import org.apache.flink.runtime.jobgraph.forwardgroup.ForwardGroupComputeUtil;
 import org.apache.flink.runtime.jobmaster.DefaultExecutionDeploymentTracker;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
+import org.apache.flink.runtime.rpc.DirectlyFailingFatalErrorHandler;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.scheduler.adaptivebatch.AdaptiveBatchScheduler;
 import org.apache.flink.runtime.scheduler.adaptivebatch.SpeculativeScheduler;
 import org.apache.flink.runtime.scheduler.adaptivebatch.VertexParallelismAndInputInfosDecider;
@@ -78,6 +81,7 @@ public class DefaultSchedulerBuilder {
 
     private final JobGraph jobGraph;
     private final ComponentMainThreadExecutor mainThreadExecutor;
+    private final FatalErrorHandler fatalErrorHandler;
 
     private Executor ioExecutor;
     private ScheduledExecutorService futureExecutor;
@@ -118,6 +122,7 @@ public class DefaultSchedulerBuilder {
     private InputConsumableDecider.Factory inputConsumableDeciderFactory =
             AllFinishedInputConsumableDecider.Factory.INSTANCE;
 
+    @VisibleForTesting
     public DefaultSchedulerBuilder(
             JobGraph jobGraph,
             ComponentMainThreadExecutor mainThreadExecutor,
@@ -130,6 +135,7 @@ public class DefaultSchedulerBuilder {
                 new ScheduledExecutorServiceAdapter(generalExecutorService));
     }
 
+    @VisibleForTesting
     public DefaultSchedulerBuilder(
             JobGraph jobGraph,
             ComponentMainThreadExecutor mainThreadExecutor,
@@ -141,6 +147,7 @@ public class DefaultSchedulerBuilder {
         this.ioExecutor = ioExecutor;
         this.futureExecutor = futureExecutor;
         this.delayExecutor = delayExecutor;
+        this.fatalErrorHandler = DirectlyFailingFatalErrorHandler.INSTANCE;
     }
 
     public DefaultSchedulerBuilder setIoExecutor(Executor ioExecutor) {
@@ -316,7 +323,8 @@ public class DefaultSchedulerBuilder {
                 shuffleMaster,
                 rpcTimeout,
                 computeVertexParallelismStore(jobGraph),
-                executionDeployerFactory);
+                executionDeployerFactory,
+                fatalErrorHandler);
     }
 
     public AdaptiveBatchScheduler buildAdaptiveBatchJobScheduler() throws Exception {
@@ -348,7 +356,8 @@ public class DefaultSchedulerBuilder {
                 defaultMaxParallelism,
                 hybridPartitionDataConsumeConstraint,
                 ForwardGroupComputeUtil.computeForwardGroupsAndCheckParallelism(
-                        jobGraph.getVerticesSortedTopologicallyFromSources()));
+                        jobGraph.getVerticesSortedTopologicallyFromSources()),
+                fatalErrorHandler);
     }
 
     public SpeculativeScheduler buildSpeculativeScheduler() throws Exception {
@@ -381,7 +390,8 @@ public class DefaultSchedulerBuilder {
                 blocklistOperations,
                 HybridPartitionDataConsumeConstraint.ALL_PRODUCERS_FINISHED,
                 ForwardGroupComputeUtil.computeForwardGroupsAndCheckParallelism(
-                        jobGraph.getVerticesSortedTopologicallyFromSources()));
+                        jobGraph.getVerticesSortedTopologicallyFromSources()),
+                fatalErrorHandler);
     }
 
     private ExecutionGraphFactory createExecutionGraphFactory(boolean isDynamicGraph) {

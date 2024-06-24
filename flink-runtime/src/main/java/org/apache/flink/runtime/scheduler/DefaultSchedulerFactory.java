@@ -154,7 +154,8 @@ public class DefaultSchedulerFactory implements SchedulerNGFactory {
                 shuffleMaster,
                 rpcTimeout,
                 computeVertexParallelismStore(jobGraph),
-                new DefaultExecutionDeployer.Factory());
+                new DefaultExecutionDeployer.Factory(),
+                fatalErrorHandler);
     }
 
     @Override

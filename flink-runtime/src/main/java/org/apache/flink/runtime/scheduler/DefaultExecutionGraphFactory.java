@@ -28,6 +28,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.runtime.checkpoint.CheckpointStatsTracker;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
 import org.apache.flink.runtime.executiongraph.DefaultExecutionGraphBuilder;
 import org.apache.flink.runtime.executiongraph.ExecutionDeploymentListener;
@@ -41,7 +42,9 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 import org.apache.flink.runtime.jobmaster.ExecutionDeploymentTracker;
 import org.apache.flink.runtime.jobmaster.ExecutionDeploymentTrackerDeploymentListenerAdapter;
+import org.apache.flink.runtime.jobmaster.ExecutionInitializationTracker;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
 import org.apache.flink.util.function.CachingSupplier;
 
@@ -158,17 +161,23 @@ public class DefaultExecutionGraphFactory implements ExecutionGraphFactory {
             VertexParallelismStore vertexParallelismStore,
             ExecutionStateUpdateListener executionStateUpdateListener,
             MarkPartitionFinishedStrategy markPartitionFinishedStrategy,
-            Logger log)
+            Logger log,
+            ComponentMainThreadExecutor mainThreadExecutor,
+            FatalErrorHandler fatalErrorHandler)
             throws Exception {
         ExecutionDeploymentListener executionDeploymentListener =
                 new ExecutionDeploymentTrackerDeploymentListenerAdapter(executionDeploymentTracker);
         ExecutionStateUpdateListener combinedExecutionStateUpdateListener =
-                (execution, previousState, newState) -> {
-                    executionStateUpdateListener.onStateUpdate(execution, previousState, newState);
-                    if (newState.isTerminal()) {
-                        executionDeploymentTracker.stopTrackingDeploymentOf(execution);
-                    }
-                };
+                ExecutionStateUpdateListener.combine(
+                        executionStateUpdateListener,
+                        ExecutionInitializationTracker.forConfiguration(
+                                configuration, mainThreadExecutor, fatalErrorHandler),
+                        (execution, previousState, newState) -> {
+                            if (newState.isTerminal()) {
+                                executionDeploymentTracker.stopTrackingDeploymentOf(
+                                        execution.getAttemptId());
+                            }
+                        });
 
         int totalNumberOfSubTasks =
                 StreamSupport.stream(jobGraph.getVertices().spliterator(), false)

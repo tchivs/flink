@@ -218,7 +218,8 @@ public class AdaptiveBatchSchedulerFactory implements SchedulerNGFactory {
                     defaultMaxParallelism,
                     blocklistOperations,
                     hybridPartitionDataConsumeConstraint,
-                    forwardGroupsByJobVertexId);
+                    forwardGroupsByJobVertexId,
+                    fatalErrorHandler);
         } else {
             return new AdaptiveBatchScheduler(
                     log,
@@ -249,7 +250,8 @@ public class AdaptiveBatchSchedulerFactory implements SchedulerNGFactory {
                             defaultMaxParallelism, jobMasterConfiguration),
                     defaultMaxParallelism,
                     hybridPartitionDataConsumeConstraint,
-                    forwardGroupsByJobVertexId);
+                    forwardGroupsByJobVertexId,
+                    fatalErrorHandler);
         }
     }
 

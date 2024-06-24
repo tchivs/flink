@@ -57,6 +57,7 @@ import org.apache.flink.runtime.jobgraph.topology.DefaultLogicalResult;
 import org.apache.flink.runtime.jobgraph.topology.DefaultLogicalTopology;
 import org.apache.flink.runtime.jobgraph.topology.DefaultLogicalVertex;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.scheduler.DefaultExecutionDeployer;
 import org.apache.flink.runtime.scheduler.DefaultScheduler;
 import org.apache.flink.runtime.scheduler.ExecutionGraphFactory;
@@ -131,7 +132,8 @@ public class AdaptiveBatchScheduler extends DefaultScheduler {
             final VertexParallelismAndInputInfosDecider vertexParallelismAndInputInfosDecider,
             int defaultMaxParallelism,
             final HybridPartitionDataConsumeConstraint hybridPartitionDataConsumeConstraint,
-            final Map<JobVertexID, ForwardGroup> forwardGroupsByJobVertexId)
+            final Map<JobVertexID, ForwardGroup> forwardGroupsByJobVertexId,
+            final FatalErrorHandler fatalErrorHandler)
             throws Exception {
 
         super(
@@ -160,7 +162,8 @@ public class AdaptiveBatchScheduler extends DefaultScheduler {
                 rpcTimeout,
                 computeVertexParallelismStoreForDynamicGraph(
                         jobGraph.getVertices(), defaultMaxParallelism),
-                new DefaultExecutionDeployer.Factory());
+                new DefaultExecutionDeployer.Factory(),
+                fatalErrorHandler);
 
         this.logicalTopology = DefaultLogicalTopology.fromJobGraph(jobGraph);
 

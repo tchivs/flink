@@ -1620,8 +1620,7 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
             final Execution execution,
             ExecutionState previousState,
             final ExecutionState newExecutionState) {
-        executionStateUpdateListener.onStateUpdate(
-                execution.getAttemptId(), previousState, newExecutionState);
+        executionStateUpdateListener.onStateUpdate(execution, previousState, newExecutionState);
     }
 
     private void assertRunningInJobMasterMainThread() {

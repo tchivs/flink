@@ -86,6 +86,7 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinatorHolder
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.query.UnknownKvStateLocation;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.scheduler.exceptionhistory.FailureHandlingResultSnapshot;
 import org.apache.flink.runtime.scheduler.exceptionhistory.RootExceptionHistoryEntry;
 import org.apache.flink.runtime.scheduler.metrics.AllSubTasksRunningOrFinishedStateTimeMetrics;
@@ -186,7 +187,8 @@ public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling
             final ComponentMainThreadExecutor mainThreadExecutor,
             final JobStatusListener jobStatusListener,
             final ExecutionGraphFactory executionGraphFactory,
-            final VertexParallelismStore vertexParallelismStore)
+            final VertexParallelismStore vertexParallelismStore,
+            final FatalErrorHandler fatalErrorHandler)
             throws Exception {
 
         this.log = checkNotNull(log);
@@ -229,7 +231,8 @@ public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling
                         initializationTimestamp,
                         mainThreadExecutor,
                         jobStatusListener,
-                        vertexParallelismStore);
+                        vertexParallelismStore,
+                        fatalErrorHandler);
 
         this.schedulingTopology = executionGraph.getSchedulingTopology();
 
@@ -375,7 +378,8 @@ public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling
             long initializationTimestamp,
             ComponentMainThreadExecutor mainThreadExecutor,
             JobStatusListener jobStatusListener,
-            VertexParallelismStore vertexParallelismStore)
+            VertexParallelismStore vertexParallelismStore,
+            FatalErrorHandler fatalErrorHandler)
             throws Exception {
 
         final ExecutionStateUpdateListener combinedExecutionStateUpdateListener;
@@ -401,7 +405,9 @@ public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling
                         vertexParallelismStore,
                         combinedExecutionStateUpdateListener,
                         getMarkPartitionFinishedStrategy(),
-                        log);
+                        log,
+                        getMainThreadExecutor(),
+                        fatalErrorHandler);
 
         newExecutionGraph.setInternalTaskFailuresListener(
                 new UpdateSchedulerNgOnInternalFailuresListener(this));

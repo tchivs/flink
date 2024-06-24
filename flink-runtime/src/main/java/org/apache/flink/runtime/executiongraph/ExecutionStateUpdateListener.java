@@ -19,14 +19,22 @@ package org.apache.flink.runtime.executiongraph;
 
 import org.apache.flink.runtime.execution.ExecutionState;
 
-/** A listener that is called when an execution switched to a new state. */
-public interface ExecutionStateUpdateListener {
-    void onStateUpdate(
-            ExecutionAttemptID execution, ExecutionState previousState, ExecutionState newState);
+import javax.annotation.concurrent.NotThreadSafe;
 
-    static ExecutionStateUpdateListener combine(ExecutionStateUpdateListener... listeners) {
+/**
+ * A listener that is called when an execution switched to a new state. Should only be called from
+ * the {@link org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor
+ * ComponentMainThreadExecutor}
+ */
+@NotThreadSafe
+public interface ExecutionStateUpdateListener {
+    void onStateUpdate(Execution execution, ExecutionState previousState, ExecutionState newState);
+
+    ExecutionStateUpdateListener NO_OP = (execution, previousState, newState) -> {};
+
+    static ExecutionStateUpdateListener combine(ExecutionStateUpdateListener... lsnrs) {
         return (execution, previousState, newState) -> {
-            for (ExecutionStateUpdateListener listener : listeners) {
+            for (ExecutionStateUpdateListener listener : lsnrs) {
                 listener.onStateUpdate(execution, previousState, newState);
             }
         };

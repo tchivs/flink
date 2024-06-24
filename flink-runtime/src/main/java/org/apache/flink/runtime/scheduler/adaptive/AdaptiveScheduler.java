@@ -243,6 +243,8 @@ public class AdaptiveScheduler
 
     private final JobFailureMetricReporter jobFailureMetricReporter;
 
+    private final Configuration jobMasterConfiguration;
+
     public AdaptiveScheduler(
             JobGraph jobGraph,
             @Nullable JobResourceRequirements jobResourceRequirements,
@@ -355,6 +357,7 @@ public class AdaptiveScheduler
                 new JobFailureMetricReporter(
                         jobManagerJobMetricGroup,
                         configuration.get(TraceOptions.REPORT_EVENTS_AS_SPANS));
+        this.jobMasterConfiguration = configuration;
     }
 
     private static void assertPreconditions(JobGraph jobGraph) throws RuntimeException {
@@ -1218,7 +1221,9 @@ public class AdaptiveScheduler
                 // supports must be pipelined result partition, mark partition finish is
                 // no need.
                 rp -> false,
-                LOG);
+                LOG,
+                getMainThreadExecutor(),
+                fatalErrorHandler);
     }
 
     @Override

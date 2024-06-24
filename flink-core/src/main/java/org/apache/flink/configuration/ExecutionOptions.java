@@ -81,6 +81,17 @@ public class ExecutionOptions {
                                                     + "providing different spilling strategies.")
                                     .build());
 
+    public static final ConfigOption<Duration> TASK_INITIALIZATION_TIMEOUT =
+            ConfigOptions.key("execution.task.initialization-timeout")
+                    .durationType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The timeout for initialization of every particular task. "
+                                    + "Any task that initializes for longer, will be failed. "
+                                    + "That is treated as a normal failure and causes job restart or termination, depending on the configured restart strategy. "
+                                    + "This might be helpful to bounce restarting tasks or to prevent Flink from holding forever any resources, "
+                                    + "e.g. Kafka transactions");
+
     /**
      * Should be moved to {@code ExecutionCheckpointingOptions} along with {@code
      * ExecutionConfig#useSnapshotCompression}, which should be put into {@code CheckpointConfig}.
