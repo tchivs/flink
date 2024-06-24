@@ -63,7 +63,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeWithTimeStampBucketNames() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(2, ARRAY[1, 7], ARRAY[null,TIMESTAMP '2024-06-01 12:00:01', TIMESTAMP '2024-06-01 12:10:01', TIMESTAMP '2024-06-01 12:20:01']) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1, 7], ARRAY[null,TIMESTAMP '2024-06-01 12:00:01'"
+                                + ", TIMESTAMP '2024-06-01 12:10:01', TIMESTAMP '2024-06-01 12:20:01']) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("2024-06-01T12:10:01");
     }
@@ -72,7 +73,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeWithIntervalBucketNames() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 21' DAY(2) TO HOUR]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[INTERVAL '12 18' DAY(2) TO HOUR,"
+                                + " INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 21' DAY(2) TO HOUR]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("PT309H");
     }
@@ -81,7 +83,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeWithInstantBucketNames() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null as TIMESTAMP_LTZ),"
+                                + " CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("2024-06-15T10:00:30Z");
     }
@@ -90,7 +93,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeWithLongBucketNames() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null AS BIGINT), CAST(1234567890123456799 AS BIGINT), CAST(1234567890123456799 AS BIGINT)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(2, ARRAY[1], ARRAY[CAST(null AS BIGINT),"
+                                + " CAST(1234567890123456799 AS BIGINT), CAST(1234567890123456799 AS BIGINT)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("1234567890123456799");
     }
@@ -99,7 +103,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeWithDoubleBucketNames() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(0, ARRAY[1], ARRAY[CAST('NaN' AS DOUBLE), CAST(0.99 AS DOUBLE), CAST(1.0 AS DOUBLE)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(0, ARRAY[1], ARRAY[CAST('NaN' AS DOUBLE),"
+                                + " CAST(0.99 AS DOUBLE), CAST(1.0 AS DOUBLE)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("0.99");
     }
@@ -168,7 +173,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForLongValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(CAST('15' AS BIGINT), ARRAY[CAST('1' AS BIGINT), CAST('12' AS BIGINT)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(CAST('15' AS BIGINT), ARRAY[CAST('1' AS BIGINT),"
+                                + " CAST('12' AS BIGINT)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_3");
     }
@@ -177,7 +183,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForFloatValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(CAST('15' AS FLOAT), ARRAY[CAST('1' AS FLOAT), CAST('12' AS FLOAT)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(CAST('15' AS FLOAT), ARRAY[CAST('1' AS FLOAT),"
+                                + " CAST('12' AS FLOAT)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_3");
     }
@@ -186,7 +193,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForDuration() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(INTERVAL '12 18' DAY(2) TO HOUR, ARRAY[INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 21' DAY(2) TO HOUR]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(INTERVAL '12 18' DAY(2) TO HOUR,"
+                                + " ARRAY[INTERVAL '12 18' DAY(2) TO HOUR, INTERVAL '12 21' DAY(2) TO HOUR]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_2");
     }
@@ -195,7 +203,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForLocalDateTimeValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(TIMESTAMP '2024-05-01 12:00:00', ARRAY[TIMESTAMP '2024-06-01 12:00:00', TIMESTAMP '2024-06-02 12:00:00']) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(TIMESTAMP '2024-05-01 12:00:00',"
+                                + " ARRAY[TIMESTAMP '2024-06-01 12:00:00', TIMESTAMP '2024-06-02 12:00:00']) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_1");
     }
@@ -204,7 +213,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForLocalDateValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(DATE '2024-06-02', ARRAY[DATE '2024-06-01', DATE '2024-06-03']) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(DATE '2024-06-02', ARRAY[DATE '2024-06-01',"
+                                + " DATE '2024-06-03']) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_2");
     }
@@ -213,7 +223,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForInstantValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ), ARRAY[CAST('2024-06-15 10:00:00' as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(CAST('2024-06-15 10:00:30' as TIMESTAMP_LTZ), ARRAY[CAST('2024-06-15 10:00:00'"
+                                + " as TIMESTAMP_LTZ), CAST('2024-06-15 10:00:20' as TIMESTAMP_LTZ)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_3");
     }
@@ -222,7 +233,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForLocalPeriodValue() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(INTERVAL '12 11' DAY(2) TO HOUR, ARRAY[INTERVAL '12 12' DAY(2) TO HOUR, INTERVAL '12 20' DAY(2) TO HOUR]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(INTERVAL '12 11' DAY(2) TO HOUR,"
+                                + " ARRAY[INTERVAL '12 12' DAY(2) TO HOUR, INTERVAL '12 20' DAY(2) TO HOUR]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_1");
     }
@@ -240,7 +252,8 @@ public class MLBucketizeFunctionTest {
     void testBucketizeForVeryLargeValues() {
         final TableResult mlqueryResult1 =
                 tableEnv.executeSql(
-                        "SELECT ML_BUCKETIZE(CAST(1234567890123456799 AS BIGINT), ARRAY[CAST(1234567890123456791 AS BIGINT), CAST(1234567890123456799 AS BIGINT)]) AS scaled_value\n;");
+                        "SELECT ML_BUCKETIZE(CAST(1234567890123456799 AS BIGINT),"
+                                + " ARRAY[CAST(1234567890123456791 AS BIGINT), CAST(1234567890123456799 AS BIGINT)]) AS scaled_value\n;");
         Row row = mlqueryResult1.collect().next();
         assertThat(row.getField(0)).isEqualTo("bin_3");
     }

@@ -96,8 +96,8 @@ class MlFunctionsUtilTest {
 
     @Test
     void testConvertToNumberTypedValue_Period() {
-        Period period = Period.ofDays(5);
-        int expectedValue = period.getDays();
+        Period period = Period.ofMonths(5);
+        int expectedValue = period.getMonths();
         assertThat(MlFunctionsUtil.getLongValue(period, "test")).isEqualTo(expectedValue);
     }
 
