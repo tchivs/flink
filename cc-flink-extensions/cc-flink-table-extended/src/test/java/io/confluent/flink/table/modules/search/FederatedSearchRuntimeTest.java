@@ -36,8 +36,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Tests for VectorSearchRuntime. */
-public class VectorSearchRuntimeTest {
+/** Tests for FederatedSearchRuntime. */
+public class FederatedSearchRuntimeTest {
     MetricGroup metricGroup;
     MLFunctionMetrics metrics;
     Clock clock = new IncrementingClock(Instant.now(), ZoneId.systemDefault());
@@ -150,8 +150,9 @@ public class VectorSearchRuntimeTest {
     @Test
     void testRemoteHttpCallPinecone() throws Exception {
         CatalogTable table = getPineconeTable();
-        SearchRuntime runtime =
-                SearchRuntime.mockOpen(table, configuration, mockHttpClient, metrics, clock);
+        FederatedSearchRuntime runtime =
+                FederatedSearchRuntime.mockOpen(
+                        table, configuration, mockHttpClient, metrics, clock);
         mockHttpClient.withResponse(
                 RemoteRuntimeUtils.makeResponse(
                         "{\n"

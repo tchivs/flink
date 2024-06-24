@@ -26,14 +26,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** Class implementing SEARCH table function. */
-public class SearchFunction extends TableFunction<Object> {
-    public static final String NAME = "SEARCH";
+/** Class implementing FEDERATED_SEARCH table function. */
+public class FederatedSearchFunction extends TableFunction<Object> {
+    public static final String NAME = "FEDERATED_SEARCH";
     private transient CatalogTable table;
     private final Map<String, String> serializedTableProperties;
     private final Map<String, String> configuration;
     private final String functionName;
-    private transient SearchRuntime searchRuntime = null;
+    private transient FederatedSearchRuntime federatedSearchRuntime = null;
     private transient MLFunctionMetrics metrics;
 
     private static TypeInference getTypeInference(CatalogTable table, DataTypeFactory typeFactory) {
@@ -68,12 +68,12 @@ public class SearchFunction extends TableFunction<Object> {
                 .build();
     }
 
-    public SearchFunction(
+    public FederatedSearchFunction(
             final String functionName, final Map<String, String> serializedTableProperties) {
         this(functionName, serializedTableProperties, ImmutableMap.of());
     }
 
-    public SearchFunction(
+    public FederatedSearchFunction(
             final String functionName,
             final Map<String, String> serializedTableProperties,
             final Map<String, String> configuration) {
@@ -92,7 +92,7 @@ public class SearchFunction extends TableFunction<Object> {
 
     public void eval(Object... args) {
         try {
-            collect(searchRuntime.run(args));
+            collect(federatedSearchRuntime.run(args));
         } catch (Exception e) {
             throw new FlinkRuntimeException("ML model runtime error:", e);
         }
@@ -104,8 +104,8 @@ public class SearchFunction extends TableFunction<Object> {
         this.metrics =
                 new MLFunctionMetrics(
                         context.getMetricGroup(), MLFunctionMetrics.VECTOR_SEARCH_METRIC_NAME);
-        if (searchRuntime != null) {
-            searchRuntime.close();
+        if (federatedSearchRuntime != null) {
+            federatedSearchRuntime.close();
         }
         if (table == null) {
             if (serializedTableProperties == null) {
@@ -113,13 +113,14 @@ public class SearchFunction extends TableFunction<Object> {
             }
             table = deserialize(serializedTableProperties);
         }
-        this.searchRuntime = SearchRuntime.open(table, configuration, metrics, Clock.systemUTC());
+        this.federatedSearchRuntime =
+                FederatedSearchRuntime.open(table, configuration, metrics, Clock.systemUTC());
     }
 
     @Override
     public void close() throws Exception {
-        if (searchRuntime != null) {
-            searchRuntime.close();
+        if (federatedSearchRuntime != null) {
+            federatedSearchRuntime.close();
         }
         super.close();
     }

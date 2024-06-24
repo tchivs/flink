@@ -63,7 +63,7 @@ import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import io.confluent.flink.table.modules.remoteudf.UdfUtil;
-import io.confluent.flink.table.modules.search.SearchFunctionsModule;
+import io.confluent.flink.table.modules.search.FederatedSearchFunctionsModule;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
 import io.confluent.flink.table.service.local.LocalExecution;
@@ -272,7 +272,7 @@ class DefaultServiceTasks implements ServiceTasks {
 
         if (service == Service.JOB_SUBMISSION_SERVICE
                 || privateConfig.get(ServiceTasksOptions.CONFLUENT_FEDERATED_SEARCH_ENABLED)) {
-            tableEnvironment.loadModule("search", new SearchFunctionsModule());
+            tableEnvironment.loadModule("search", new FederatedSearchFunctionsModule());
         }
 
         if (service == Service.JOB_SUBMISSION_SERVICE

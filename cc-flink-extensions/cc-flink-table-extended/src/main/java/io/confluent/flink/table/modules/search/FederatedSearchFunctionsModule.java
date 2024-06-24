@@ -14,17 +14,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Module to provide Search built-in functions. */
-public class SearchFunctionsModule implements Module {
+/** Module to provide Federated_Search built-in functions. */
+public class FederatedSearchFunctionsModule implements Module {
     Map<String, FunctionDefinition> normalizedFunctions;
 
-    public SearchFunctionsModule() {
+    public FederatedSearchFunctionsModule() {
         this.normalizedFunctions =
                 new HashMap<String, FunctionDefinition>() {
                     {
                         put(
-                                SearchFunction.NAME,
-                                new SearchFunction(SearchFunction.NAME, Collections.emptyMap()));
+                                FederatedSearchFunction.NAME,
+                                new FederatedSearchFunction(
+                                        FederatedSearchFunction.NAME, Collections.emptyMap()));
                     }
                 };
     }

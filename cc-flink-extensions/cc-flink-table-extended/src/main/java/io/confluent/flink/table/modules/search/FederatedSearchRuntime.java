@@ -25,8 +25,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/** Class implementing VECTOR_SEARCH table function. */
-public class SearchRuntime implements AutoCloseable {
+/** Class implementing FEDERATED_SEARCH table function. */
+public class FederatedSearchRuntime implements AutoCloseable {
     private final transient OkHttpClient httpClient;
     private final SearchRuntimeProvider provider;
     private final transient MLFunctionMetrics metrics;
@@ -34,7 +34,7 @@ public class SearchRuntime implements AutoCloseable {
     // Clock is used to measure time for metrics. Mockable.
     private final Clock clock;
 
-    SearchRuntime(
+    FederatedSearchRuntime(
             CatalogTable table,
             Map<String, String> configuration,
             OkHttpClient httpClient,
@@ -47,7 +47,7 @@ public class SearchRuntime implements AutoCloseable {
         metrics.provision(provider.getMetricsName());
     }
 
-    private SearchRuntime(
+    private FederatedSearchRuntime(
             SearchRuntimeProvider provider,
             OkHttpClient httpClient,
             MLFunctionMetrics metrics,
@@ -64,7 +64,7 @@ public class SearchRuntime implements AutoCloseable {
         return SearchProviderSelector.pickProvider(table, configuration, metrics, clock);
     }
 
-    public static SearchRuntime open(
+    public static FederatedSearchRuntime open(
             CatalogTable table,
             Map<String, String> configuration,
             MLFunctionMetrics metrics,
@@ -83,28 +83,28 @@ public class SearchRuntime implements AutoCloseable {
                         .callTimeout(timeout, TimeUnit.MILLISECONDS)
                         .addInterceptor(new VectorSearchRetryInterceptor(maxRetries, maxRetryWait))
                         .build();
-        return new SearchRuntime(table, configuration, httpClient, metrics, clock);
+        return new FederatedSearchRuntime(table, configuration, httpClient, metrics, clock);
     }
 
     @VisibleForTesting
-    public static SearchRuntime mockOpen(
+    public static FederatedSearchRuntime mockOpen(
             CatalogTable table,
             Map<String, String> configuration,
             OkHttpClient httpClient,
             MLFunctionMetrics metrics,
             Clock clock) {
         // We don't add the retry interceptor in tests, as that would break the http mock.
-        return new SearchRuntime(table, configuration, httpClient, metrics, clock);
+        return new FederatedSearchRuntime(table, configuration, httpClient, metrics, clock);
     }
 
     @VisibleForTesting
-    public static SearchRuntime mockOpen(
+    public static FederatedSearchRuntime mockOpen(
             SearchRuntimeProvider provider,
             OkHttpClient httpClient,
             MLFunctionMetrics metrics,
             Clock clock) {
         // We don't add the retry interceptor in tests, as that would break the http mock.
-        return new SearchRuntime(provider, httpClient, metrics, clock);
+        return new FederatedSearchRuntime(provider, httpClient, metrics, clock);
     }
 
     /** Interceptor to retry requests on quota errors. */
