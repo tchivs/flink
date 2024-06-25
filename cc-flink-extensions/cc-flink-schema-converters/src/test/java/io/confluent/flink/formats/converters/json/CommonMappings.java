@@ -153,7 +153,8 @@ public final class CommonMappings {
                                         new RowField("int8", new TinyIntType(true)),
                                         new RowField(
                                                 "string",
-                                                new VarCharType(false, VarCharType.MAX_LENGTH))))),
+                                                new VarCharType(false, VarCharType.MAX_LENGTH),
+                                                "string field")))),
                 new TypeMapping(
                         decimalSchema(),
                         new RowType(
@@ -329,6 +330,7 @@ public final class CommonMappings {
         StringSchema stringSchema =
                 StringSchema.builder()
                         .unprocessedProperties(Collections.singletonMap(CONNECT_INDEX_PROP, 1))
+                        .description("string field")
                         .build();
         return ObjectSchema.builder()
                 .addPropertySchema("string", stringSchema)

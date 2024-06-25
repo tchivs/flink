@@ -18,6 +18,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
@@ -201,11 +202,12 @@ public class FlinkToJsonSchemaConverter {
                         .title(CONNECT_TYPE_DECIMAL);
             case ROW:
                 RowType rowType = (RowType) logicalType;
-                List<String> fieldNames = rowType.getFieldNames();
+                List<RowField> fields = rowType.getFields();
                 // we have to make sure the record name is different in a Schema
                 final Builder rowBuilder = ObjectSchema.builder();
                 for (int i = 0; i < rowType.getFieldCount(); i++) {
-                    String fieldName = fieldNames.get(i);
+                    RowField field = fields.get(i);
+                    final String fieldName = field.getName();
                     LogicalType fieldType = rowType.getTypeAt(i);
                     final Schema.Builder<?> fieldSchema =
                             fromFlinkSchemaBuilder(fieldType, rowName + "_" + fieldName);
@@ -213,6 +215,7 @@ public class FlinkToJsonSchemaConverter {
                             new HashMap<>(fieldSchema.unprocessedProperties);
                     extendedProps.put(CONNECT_INDEX_PROP, i);
                     fieldSchema.unprocessedProperties(extendedProps);
+                    fieldSchema.description(field.getDescription().orElse(null));
                     rowBuilder.addPropertySchema(fieldName, fieldSchema.build());
 
                     if (!fieldType.isNullable()) {

@@ -18,6 +18,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
@@ -30,7 +31,6 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaBuilder.BytesBuilder;
 import org.apache.avro.SchemaBuilder.LongBuilder;
 
-import java.util.List;
 import java.util.Objects;
 
 /** A converter from {@link LogicalType} to {@link Schema}. */
@@ -122,18 +122,18 @@ public class FlinkToAvroSchemaConverter {
                         .addToSchema(SchemaBuilder.builder().bytesType());
             case ROW:
                 RowType rowType = (RowType) logicalType;
-                List<String> fieldNames = rowType.getFieldNames();
                 // we have to make sure the record name is different in a Schema
                 SchemaBuilder.FieldAssembler<Schema> builder =
                         SchemaBuilder.builder().record(rowName).fields();
-                for (int i = 0; i < rowType.getFieldCount(); i++) {
-                    String fieldName = fieldNames.get(i);
+                for (RowField field : rowType.getFields()) {
+                    String fieldName = field.getName();
                     if (!validateName(fieldName)) {
                         throw getInvalidFieldNameException(fieldName);
                     }
-                    LogicalType fieldType = rowType.getTypeAt(i);
+                    LogicalType fieldType = field.getType();
                     SchemaBuilder.GenericDefault<Schema> fieldBuilder =
                             builder.name(fieldName)
+                                    .doc(field.getDescription().orElse(null))
                                     .type(fromFlinkSchema(fieldType, rowName + "_" + fieldName));
 
                     if (fieldType.isNullable()) {

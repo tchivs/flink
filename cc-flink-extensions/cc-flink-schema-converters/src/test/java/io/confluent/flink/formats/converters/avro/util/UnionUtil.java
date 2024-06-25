@@ -242,11 +242,13 @@ public class UnionUtil {
             case VARBINARY:
                 return new byte[] {0, 1};
             case ROW:
-                GenericRowData row = new GenericRowData(2);
-                GenericRowData field1 = new GenericRowData(2);
-                GenericRowData field2 = new GenericRowData(2);
-                field1.setField(0, generateFlinkFieldData(logicalType.getChildren().get(0), false));
-                field2.setField(1, generateFlinkFieldData(logicalType.getChildren().get(1), false));
+                final int arity = logicalType.getChildren().size();
+                GenericRowData row = new GenericRowData(arity);
+                for (int i = 0; i < arity; i++) {
+                    row.setField(
+                            i, generateFlinkFieldData(logicalType.getChildren().get(i), false));
+                }
+
                 return row;
             case ARRAY:
                 final Object[] array =

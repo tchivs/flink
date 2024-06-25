@@ -43,6 +43,8 @@ import io.confluent.protobuf.MetaProto;
 import io.confluent.protobuf.MetaProto.Meta;
 import io.confluent.protobuf.type.Decimal;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -145,9 +147,15 @@ public class FlinkToProtoSchemaConverter {
         final List<RowField> fields = logicalType.getFields();
         for (int i = 0; i < logicalType.getFieldCount(); i++) {
             final RowField field = fields.get(i);
-            builder.addField(
+            final FieldDescriptorProto.Builder fieldProtoBuilder =
                     fromRowField(
-                            field.getType(), field.getName(), i + 1, nestedRows, dependencies));
+                            field.getType(),
+                            field.getName(),
+                            field.getDescription().orElse(null),
+                            i + 1,
+                            nestedRows,
+                            dependencies);
+            builder.addField(fieldProtoBuilder.build());
         }
         builder.addAllNestedType(nestedRows);
         return builder.build();
@@ -156,6 +164,7 @@ public class FlinkToProtoSchemaConverter {
     private static FieldDescriptorProto.Builder fromRowField(
             LogicalType logicalType,
             String fieldName,
+            @Nullable String comment,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies) {
@@ -167,6 +176,8 @@ public class FlinkToProtoSchemaConverter {
         } else {
             builder.setProto3Optional(logicalType.isNullable());
         }
+
+        addComment(builder, comment);
 
         if (!logicalType.isNullable() && PROTO_MESSAGE_TYPES.contains(logicalType.getTypeRoot())) {
             addMetaParam(builder, CommonConstants.FLINK_NOT_NULL, "true");
@@ -249,10 +260,11 @@ public class FlinkToProtoSchemaConverter {
                 final MapType mapType = (MapType) logicalType;
                 if (mapType.isNullable()) {
                     return wrapRepeatedType(
-                            mapType, fieldName, fieldIndex, nestedRows, dependencies);
+                            mapType, fieldName, comment, fieldIndex, nestedRows, dependencies);
                 } else {
                     return createNotNullMapLikeField(
                             fieldName,
+                            comment,
                             fieldIndex,
                             nestedRows,
                             dependencies,
@@ -262,10 +274,11 @@ public class FlinkToProtoSchemaConverter {
             case ARRAY:
                 if (logicalType.isNullable()) {
                     return wrapRepeatedType(
-                            logicalType, fieldName, fieldIndex, nestedRows, dependencies);
+                            logicalType, fieldName, comment, fieldIndex, nestedRows, dependencies);
                 } else {
                     return createRepeatedNotNull(
                             fieldName,
+                            comment,
                             fieldIndex,
                             nestedRows,
                             dependencies,
@@ -275,6 +288,7 @@ public class FlinkToProtoSchemaConverter {
                 return createMultisetType(
                         (MultisetType) logicalType,
                         fieldName,
+                        comment,
                         fieldIndex,
                         nestedRows,
                         dependencies);
@@ -295,6 +309,7 @@ public class FlinkToProtoSchemaConverter {
     private static FieldDescriptorProto.Builder createMultisetType(
             MultisetType logicalType,
             String fieldName,
+            String fieldComment,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies) {
@@ -302,11 +317,18 @@ public class FlinkToProtoSchemaConverter {
         final FieldDescriptorProto.Builder builder;
         if (multisetType.isNullable()) {
             builder =
-                    wrapRepeatedType(multisetType, fieldName, fieldIndex, nestedRows, dependencies);
+                    wrapRepeatedType(
+                            multisetType,
+                            fieldName,
+                            fieldComment,
+                            fieldIndex,
+                            nestedRows,
+                            dependencies);
         } else {
             builder =
                     createNotNullMapLikeField(
                             fieldName,
+                            fieldComment,
                             fieldIndex,
                             nestedRows,
                             dependencies,
@@ -421,6 +443,7 @@ public class FlinkToProtoSchemaConverter {
     private static FieldDescriptorProto.Builder wrapRepeatedType(
             LogicalType repeatedType,
             String fieldName,
+            String comment,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies) {
@@ -440,6 +463,7 @@ public class FlinkToProtoSchemaConverter {
                         typeName,
                         dependencies));
         addMetaParam(builder, CommonConstants.FLINK_WRAPPER, "true");
+        addComment(builder, comment);
         builder.setType(Type.TYPE_MESSAGE);
         builder.setTypeName(typeName);
         builder.setNumber(fieldIndex);
@@ -449,6 +473,7 @@ public class FlinkToProtoSchemaConverter {
 
     private static FieldDescriptorProto.Builder createRepeatedNotNull(
             String fieldName,
+            String fieldComment,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies,
@@ -473,18 +498,32 @@ public class FlinkToProtoSchemaConverter {
                             dependencies));
             builder = FieldDescriptorProto.newBuilder();
             addMetaParam(builder, CommonConstants.FLINK_WRAPPER, "true");
+            addComment(builder, fieldComment);
             builder.setType(Type.TYPE_MESSAGE);
             builder.setTypeName(typeName);
             builder.setNumber(fieldIndex);
             builder.setName(fieldName);
         } else {
-            builder = fromRowField(elementType, fieldName, fieldIndex, nestedRows, dependencies);
+            builder =
+                    fromRowField(
+                            elementType,
+                            fieldName,
+                            fieldComment,
+                            fieldIndex,
+                            nestedRows,
+                            dependencies);
         }
 
         builder.setLabel(Label.LABEL_REPEATED);
         // repeated fields can not be optional
         builder.clearProto3Optional();
         return builder;
+    }
+
+    private static void addComment(FieldDescriptorProto.Builder builder, String fieldComment) {
+        if (fieldComment != null) {
+            builder.mergeOptions(createMetaForComment(fieldComment));
+        }
     }
 
     private static void addMetaParam(
@@ -512,6 +551,7 @@ public class FlinkToProtoSchemaConverter {
 
     private static FieldDescriptorProto.Builder createNotNullMapLikeField(
             String fieldName,
+            String comment,
             int fieldIndex,
             List<DescriptorProto> nestedRows,
             Set<String> dependencies,
@@ -537,6 +577,8 @@ public class FlinkToProtoSchemaConverter {
                                         new RowField(CommonConstants.VALUE_FIELD, valueType))),
                         typeName,
                         dependencies);
+        addComment(builder, comment);
+
         nestedRows.add(mapDescriptor);
         builder.setType(Type.TYPE_MESSAGE);
         builder.setTypeName(typeName);
@@ -545,5 +587,11 @@ public class FlinkToProtoSchemaConverter {
         builder.setName(fieldName);
         builder.clearProto3Optional();
         return builder;
+    }
+
+    private static FieldOptions createMetaForComment(String comment) {
+        return FieldOptions.newBuilder()
+                .setExtension(MetaProto.fieldMeta, Meta.newBuilder().setDoc(comment).build())
+                .build();
     }
 }

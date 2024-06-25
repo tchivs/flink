@@ -230,7 +230,8 @@ public class AvroToFlinkSchemaConverter {
                                                             toFlinkSchemaWithCycleDetection(
                                                                     field.schema(),
                                                                     false,
-                                                                    cycleContext)))
+                                                                    cycleContext),
+                                                            field.doc()))
                                     .collect(Collectors.toList());
                     return new RowType(isOptional, rowFields);
                 }

@@ -29,6 +29,7 @@ import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.flink.util.StringUtils;
 
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
@@ -128,9 +129,7 @@ public class ProtoToFlinkSchemaConverter {
                 // Already added field as oneof
                 continue;
             }
-            fields.add(
-                    new RowField(
-                            fieldDescriptor.getName(), toFlinkSchema(fieldDescriptor, context)));
+            fields.add(toRowField(context, fieldDescriptor));
         }
         fields.addAll(oneOfFields);
         return new RowType(isOptional, fields);
@@ -141,9 +140,21 @@ public class ProtoToFlinkSchemaConverter {
         List<FieldDescriptor> fieldDescriptors = oneOfDescriptor.getFields();
         final List<RowField> fields =
                 fieldDescriptors.stream()
-                        .map(field -> new RowField(field.getName(), toFlinkSchema(field, context)))
+                        .map(field -> toRowField(context, field))
                         .collect(Collectors.toList());
         return new RowType(true, fields);
+    }
+
+    private static RowField toRowField(CycleContext context, FieldDescriptor field) {
+        final String description;
+        if (field.getOptions().hasExtension(MetaProto.fieldMeta)) {
+            final Meta meta = field.getOptions().getExtension(MetaProto.fieldMeta);
+            final String doc = meta.getDoc();
+            description = StringUtils.isNullOrWhitespaceOnly(doc) ? null : doc;
+        } else {
+            description = null;
+        }
+        return new RowField(field.getName(), toFlinkSchema(field, context), description);
     }
 
     private static LogicalType toFlinkSchema(

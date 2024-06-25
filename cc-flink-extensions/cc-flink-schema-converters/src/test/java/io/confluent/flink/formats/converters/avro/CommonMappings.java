@@ -17,6 +17,8 @@ import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
 import org.apache.flink.table.types.logical.MultisetType;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.TimeType;
 import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.VarBinaryType;
@@ -107,6 +109,21 @@ public final class CommonMappings {
 
     public static List<TypeMapping> getNotNull() {
         return Arrays.asList(
+                new TypeMapping(
+                        SchemaBuilder.builder()
+                                .record("io.confluent.row")
+                                .fields()
+                                .name("f0")
+                                .doc("field comment")
+                                .type()
+                                .longType()
+                                .noDefault()
+                                .endRecord(),
+                        new RowType(
+                                false,
+                                Arrays.asList(
+                                        new RowField(
+                                                "f0", new BigIntType(false), "field comment")))),
                 new TypeMapping(SchemaBuilder.builder().doubleType(), new DoubleType(false)),
                 new TypeMapping(SchemaBuilder.builder().longType(), new BigIntType(false)),
                 new TypeMapping(SchemaBuilder.builder().intType(), new IntType(false)),

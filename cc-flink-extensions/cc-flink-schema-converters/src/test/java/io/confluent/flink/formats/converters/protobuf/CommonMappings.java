@@ -131,7 +131,9 @@ public final class CommonMappings {
                             + "  optional b_Row b = 1;\n"
                             + "\n"
                             + "  message b_Row {\n"
-                            + "    optional b_Row b = 1;\n"
+                            + "    optional b_Row b = 1 [(confluent.field_meta) = {\n"
+                            + "      doc: \"nested_b comment\"\n"
+                            + "    }];\n"
                             + "  \n"
                             + "    message b_Row {\n"
                             + "      optional float a = 1;\n"
@@ -152,7 +154,8 @@ public final class CommonMappings {
                                                                                     .singletonList(
                                                                                             new RowField(
                                                                                                     "a",
-                                                                                                    new FloatType()))))))))));
+                                                                                                    new FloatType()))),
+                                                                    "nested_b comment")))))));
 
     /** Verifies a map and an array. */
     public static final TypeMapping COLLECTIONS_CASE =
@@ -161,8 +164,12 @@ public final class CommonMappings {
                             + "package io.confluent.protobuf.generated;\n"
                             + "\n"
                             + "message Row {\n"
-                            + "  repeated int64 array = 1;\n"
-                            + "  repeated MapEntry map = 2;\n"
+                            + "  repeated int64 array = 1 [(confluent.field_meta) = {\n"
+                            + "    doc: \"array comment\"\n"
+                            + "  }];\n"
+                            + "  repeated MapEntry map = 2 [(confluent.field_meta) = {\n"
+                            + "    doc: \"map comment\"\n"
+                            + "  }];\n"
                             + "\n"
                             + "  message MapEntry {\n"
                             + "    optional string key = 1;\n"
@@ -173,13 +180,16 @@ public final class CommonMappings {
                             false,
                             Arrays.asList(
                                     new RowField(
-                                            "array", new ArrayType(false, new BigIntType(false))),
+                                            "array",
+                                            new ArrayType(false, new BigIntType(false)),
+                                            "array comment"),
                                     new RowField(
                                             "map",
                                             new MapType(
                                                     false,
                                                     new VarCharType(true, VarCharType.MAX_LENGTH),
-                                                    new BigIntType(true))))));
+                                                    new BigIntType(true)),
+                                            "map comment"))));
 
     private static final TypeMapping ALL_SIMPLE_TYPES_CASE =
             new TypeMapping(
@@ -190,27 +200,34 @@ public final class CommonMappings {
                                     new RowField("booleanNotNull", new BooleanType(false)),
                                     new RowField("boolean", new BooleanType(false)),
                                     new RowField("tinyIntNotNull", new TinyIntType(false)),
-                                    new RowField("tinyInt", new TinyIntType(true)),
-                                    new RowField("smallIntNotNull", new SmallIntType(false)),
-                                    new RowField("smallInt", new SmallIntType(true)),
-                                    new RowField("intNotNull", new IntType(false)),
-                                    new RowField("int", new IntType(true)),
-                                    new RowField("bigintNotNull", new BigIntType(false)),
-                                    new RowField("bigint", new BigIntType(true)),
-                                    new RowField("doubleNotNull", new DoubleType(false)),
-                                    new RowField("double", new DoubleType(true)),
-                                    new RowField("floatNotNull", new FloatType(false)),
-                                    new RowField("float", new FloatType(true)),
-                                    new RowField("date", new DateType(true)),
-                                    new RowField("decimal", new DecimalType(true, 5, 1)),
                                     new RowField(
-                                            "timestamp_ltz", new LocalZonedTimestampType(true, 9)),
+                                            "tinyInt", new TinyIntType(true), "tinyInt comment"),
+                                    new RowField("smallIntNotNull", new SmallIntType(false)),
+                                    new RowField(
+                                            "smallInt", new SmallIntType(true), "smallInt comment"),
+                                    new RowField("intNotNull", new IntType(false)),
+                                    new RowField("int", new IntType(true), "int comment"),
+                                    new RowField("bigintNotNull", new BigIntType(false)),
+                                    new RowField("bigint", new BigIntType(true), "bigint comment"),
+                                    new RowField("doubleNotNull", new DoubleType(false)),
+                                    new RowField("double", new DoubleType(true), "double comment"),
+                                    new RowField("floatNotNull", new FloatType(false)),
+                                    new RowField("float", new FloatType(true), "float comment"),
+                                    new RowField("date", new DateType(true), "date comment"),
+                                    new RowField(
+                                            "decimal",
+                                            new DecimalType(true, 5, 1),
+                                            "decimal comment"),
+                                    new RowField(
+                                            "timestamp_ltz",
+                                            new LocalZonedTimestampType(true, 9),
+                                            "timestamp comment"),
                                     new RowField(
                                             "timestamp_ltz_3",
                                             new LocalZonedTimestampType(true, 3)),
                                     new RowField("timestamp", new TimestampType(true, 9)),
                                     new RowField("timestamp_3", new TimestampType(true, 3)),
-                                    new RowField("time", new TimeType(true, 3)),
+                                    new RowField("time", new TimeType(true, 3), "time comment"),
                                     new RowField("time_2", new TimeType(true, 2)))));
 
     private static final TypeMapping STRING_TYPES_CASE =
@@ -221,7 +238,8 @@ public final class CommonMappings {
                             Arrays.asList(
                                     new RowField(
                                             "string",
-                                            new VarCharType(true, VarCharType.MAX_LENGTH)),
+                                            new VarCharType(true, VarCharType.MAX_LENGTH),
+                                            "string comment"),
                                     new RowField(
                                             "charMax", new CharType(true, CharType.MAX_LENGTH)),
                                     new RowField(
@@ -294,13 +312,16 @@ public final class CommonMappings {
                             Arrays.asList(
                                     new RowField(
                                             "arrayNullable",
-                                            new ArrayType(true, new BigIntType(false))),
+                                            new ArrayType(true, new BigIntType(false)),
+                                            "arrayNullable comment"),
                                     new RowField(
                                             "elementNullable",
-                                            new ArrayType(false, new BigIntType(true))),
+                                            new ArrayType(false, new BigIntType(true)),
+                                            "elementNullable comment"),
                                     new RowField(
                                             "arrayAndElementNullable",
-                                            new ArrayType(true, new BigIntType(true))))));
+                                            new ArrayType(true, new BigIntType(true)),
+                                            "arrayAndElementNullable comment"))));
 
     /** Mix of collections (arrays + maps) and nullability. */
     public static final TypeMapping NULLABLE_COLLECTIONS_CASE =
@@ -314,7 +335,8 @@ public final class CommonMappings {
                                             new MapType(
                                                     true,
                                                     new BigIntType(false),
-                                                    new BigIntType(false))),
+                                                    new BigIntType(false)),
+                                            "nullableMap comment"),
                                     new RowField(
                                             "arrayOfMaps",
                                             new ArrayType(
@@ -322,7 +344,8 @@ public final class CommonMappings {
                                                     new MapType(
                                                             false,
                                                             new BigIntType(false),
-                                                            new BigIntType(false)))),
+                                                            new BigIntType(false))),
+                                            "arrayOfMaps comment"),
                                     new RowField(
                                             "nullableArrayOfNullableMaps",
                                             new ArrayType(
@@ -330,13 +353,15 @@ public final class CommonMappings {
                                                     new MapType(
                                                             true,
                                                             new BigIntType(false),
-                                                            new BigIntType(false)))),
+                                                            new BigIntType(false))),
+                                            "nullableArrayOfNullableMaps comment"),
                                     new RowField(
                                             "mapOfNullableArrays",
                                             new MapType(
                                                     false,
                                                     new BigIntType(false),
-                                                    new ArrayType(true, new BigIntType(false)))))));
+                                                    new ArrayType(true, new BigIntType(false))),
+                                            "mapOfNullableArrays comment"))));
 
     /** Tests multisets. */
     public static final TypeMapping MULTISET_CASE =

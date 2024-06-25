@@ -22,6 +22,7 @@ message Row {
     ]
   }];
   optional int32 tinyInt = 4 [(confluent.field_meta) = {
+    doc: "tinyInt comment",
     params: [
       {
         key: "flink.version",
@@ -46,6 +47,7 @@ message Row {
     ]
   }];
   optional int32 smallInt = 6 [(confluent.field_meta) = {
+    doc: "smallInt comment",
     params: [
       {
         key: "flink.version",
@@ -58,15 +60,26 @@ message Row {
     ]
   }];
   int32 intNotNull = 7;
-  optional int32 int = 8;
+  optional int32 int = 8 [(confluent.field_meta) = {
+    doc: "int comment"
+  }];
   int64 bigintNotNull = 9;
-  optional int64 bigint = 10;
+  optional int64 bigint = 10 [(confluent.field_meta) = {
+    doc: "bigint comment"
+  }];
   double doubleNotNull = 11;
-  optional double double = 12;
+  optional double double = 12 [(confluent.field_meta) = {
+    doc: "double comment"
+  }];
   float floatNotNull = 13;
-  optional float float = 14;
-  optional .google.type.Date date = 15;
+  optional float float = 14 [(confluent.field_meta) = {
+    doc: "float comment"
+  }];
+  optional .google.type.Date date = 15 [(confluent.field_meta) = {
+    doc: "date comment"
+  }];
   optional .confluent.type.Decimal decimal = 16 [(confluent.field_meta) = {
+    doc: "decimal comment",
     params: [
       {
         value: "5",
@@ -82,7 +95,9 @@ message Row {
       }
     ]
   }];
-  optional .google.protobuf.Timestamp timestamp_ltz = 17;
+  optional .google.protobuf.Timestamp timestamp_ltz = 17 [(confluent.field_meta) = {
+    doc: "timestamp comment"
+  }];
   optional .google.protobuf.Timestamp timestamp_ltz_3 = 18 [(confluent.field_meta) = {
     params: [
       {
@@ -124,6 +139,7 @@ message Row {
     ]
   }];
   optional .google.type.TimeOfDay time = 21 [(confluent.field_meta) = {
+    doc: "time comment",
     params: [
       {
         key: "flink.precision",

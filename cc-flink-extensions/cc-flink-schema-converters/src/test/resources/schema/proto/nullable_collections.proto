@@ -2,6 +2,7 @@ syntax = "proto3";
 package io.confluent.protobuf.generated;
 message Row {
   nullableMapRepeatedWrapper nullableMap = 1 [(confluent.field_meta) = {
+    doc: "nullableMap comment",
     params: [
       {
         key: "flink.wrapped",
@@ -14,6 +15,7 @@ message Row {
     ]
   }];
   repeated arrayOfMapsElementWrapper arrayOfMaps = 2 [(confluent.field_meta) = {
+    doc: "arrayOfMaps comment",
     params: [
       {
         key: "flink.wrapped",
@@ -26,6 +28,7 @@ message Row {
     ]
   }];
   nullableArrayOfNullableMapsRepeatedWrapper nullableArrayOfNullableMaps = 3 [(confluent.field_meta) = {
+    doc: "nullableArrayOfNullableMaps comment",
     params: [
       {
         key: "flink.wrapped",
@@ -37,7 +40,9 @@ message Row {
       }
     ]
   }];
-  repeated MapofnullablearraysEntry mapOfNullableArrays = 4;
+  repeated MapofnullablearraysEntry mapOfNullableArrays = 4 [(confluent.field_meta) = {
+    doc: "mapOfNullableArrays comment"
+  }];
   message nullableMapRepeatedWrapper {
     repeated ValueEntry value = 1;
     message ValueEntry {

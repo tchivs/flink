@@ -2,6 +2,7 @@ syntax = "proto3";
 package io.confluent.protobuf.generated;
 message Row {
   arrayNullableRepeatedWrapper arrayNullable = 1 [(confluent.field_meta) = {
+    doc: "arrayNullable comment",
     params: [
       {
         key: "flink.wrapped",
@@ -14,6 +15,7 @@ message Row {
     ]
   }];
   repeated elementNullableElementWrapper elementNullable = 2 [(confluent.field_meta) = {
+    doc: "elementNullable comment",
     params: [
       {
         key: "flink.wrapped",
@@ -26,6 +28,7 @@ message Row {
     ]
   }];
   arrayAndElementNullableRepeatedWrapper arrayAndElementNullable = 3 [(confluent.field_meta) = {
+    doc: "arrayAndElementNullable comment",
     params: [
       {
         key: "flink.wrapped",

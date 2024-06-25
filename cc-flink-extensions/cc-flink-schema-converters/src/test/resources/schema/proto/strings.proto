@@ -2,7 +2,9 @@ syntax = "proto3";
 package io.confluent.protobuf.generated;
 
 message Row {
-  optional string string = 1;
+  optional string string = 1 [(confluent.field_meta) = {
+    doc: "string comment"
+  }];
   optional string charMax = 2 [(confluent.field_meta) = {
     params: [
       {
