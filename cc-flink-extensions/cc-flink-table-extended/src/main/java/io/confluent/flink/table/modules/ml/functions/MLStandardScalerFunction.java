@@ -28,7 +28,7 @@ import java.util.stream.IntStream;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
 
-/** A scalar function that performs standard scaling on input values. */
+/** Scalar function for standard scaling of values. */
 public class MLStandardScalerFunction extends ScalarFunction {
     /** The name of the function. */
     public static final String NAME = "ML_STANDARD_SCALER";
@@ -36,7 +36,7 @@ public class MLStandardScalerFunction extends ScalarFunction {
     public final String functionName;
 
     /**
-     * Constructor for the MLStandardScalerFunction.
+     * Constructor for MLStandardScalerFunction.
      *
      * @param functionName The name of the function.
      */
@@ -45,44 +45,62 @@ public class MLStandardScalerFunction extends ScalarFunction {
     }
 
     /**
-     * Evaluates the standard scaling function.
+     * Evaluates the scaling of a value using mean and standard deviation.
      *
-     * @param args input arguments where: - args[0] is the input value, - args[1] is the mean value
-     *     of the feature, args[2] is the standard deviation value of the feature, args[3] is
-     *     withCentering boolean value args[4] is withScaling boolean value.
+     * @param value The value to be scaled.
+     * @param mean The mean value.
+     * @param stdDev The standard deviation.
      * @return The scaled value.
      */
-    public Double eval(Object... args) {
-        try {
-            if (Objects.isNull(args[0])) {
-                return null;
-            }
-            Object value = args[0];
-            Object mean = args[1];
-            Object stdDev = args[2];
-            boolean withCentering = true;
-            boolean withScaling = true;
-            if (args.length >= 4) {
-                withCentering = (boolean) args[3];
-                withScaling = args.length == 5 ? (boolean) args[4] : withScaling;
-            }
-            if (value instanceof Long && mean instanceof Long) {
-                return getScaledValue(
-                        Objects.requireNonNull(getLongValue(value, NAME)),
-                        getLongValue(mean, NAME),
-                        getDoubleValue(stdDev, NAME),
-                        withCentering,
-                        withScaling);
-            }
-            return getScaledValue(
-                    Objects.requireNonNull(getDoubleValue(value, NAME)),
-                    getDoubleValue(mean, NAME),
-                    getDoubleValue(stdDev, NAME),
-                    withCentering,
-                    withScaling);
-        } catch (Throwable t) {
-            throw new FlinkRuntimeException(t);
+    public Double eval(Object value, Object mean, Object stdDev) {
+        return eval(value, mean, stdDev, true, true);
+    }
+
+    /**
+     * Evaluates the scaling of a value using mean and standard deviation with centering option.
+     *
+     * @param value The value to be scaled.
+     * @param mean The mean value.
+     * @param stdDev The standard deviation.
+     * @param withCentering Whether to center the data.
+     * @return The scaled value.
+     */
+    public Double eval(Object value, Object mean, Object stdDev, Object withCentering) {
+        return eval(value, mean, stdDev, withCentering, true);
+    }
+
+    /**
+     * Evaluates the scaling of a value using mean and standard deviation with centering and scaling
+     * options.
+     *
+     * @param value The value to be scaled.
+     * @param mean The mean value.
+     * @param stdDev The standard deviation.
+     * @param withCentering Whether to center the data.
+     * @param withScaling Whether to scale the data.
+     * @return The scaled value.
+     */
+    public Double eval(
+            Object value, Object mean, Object stdDev, Object withCentering, Object withScaling) {
+        if (Objects.isNull(value)) {
+            return null;
         }
+        boolean center = (boolean) withCentering;
+        boolean scale = (boolean) withScaling;
+        if (value instanceof Long && mean instanceof Long) {
+            return getScaledValue(
+                    getLongValue(value, NAME),
+                    getLongValue(mean, NAME),
+                    getDoubleValue(stdDev, NAME),
+                    center,
+                    scale);
+        }
+        return getScaledValue(
+                Objects.requireNonNull(getDoubleValue(value, NAME)),
+                getDoubleValue(mean, NAME),
+                getDoubleValue(stdDev, NAME),
+                center,
+                scale);
     }
 
     private Double getScaledValue(
@@ -96,9 +114,7 @@ public class MLStandardScalerFunction extends ScalarFunction {
         stdDev = validateStdDeviation(stdDev, withScaling);
         if (Objects.isNull(mean) || mean.isNaN() || mean.isInfinite()) {
             throw new FlinkRuntimeException(
-                    String.format(
-                            "The Mean argument to %s function cannot be NaN, NULL and Infinite",
-                            NAME));
+                    String.format("The Mean argument to %s function cannot be NaN or NULL", NAME));
         }
         return stdDev.isInfinite() ? 0.0 : (value - mean) / stdDev;
     }
@@ -132,10 +148,10 @@ public class MLStandardScalerFunction extends ScalarFunction {
     }
 
     /**
-     * Returns the type inference logic for this scalar function.
+     * Returns the type inference logic for the function.
      *
-     * @param typeFactory the data type factory
-     * @return the type inference
+     * @param typeFactory The factory for creating data types.
+     * @return The type inference logic.
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
@@ -147,7 +163,7 @@ public class MLStandardScalerFunction extends ScalarFunction {
                                 return new ArgumentCount() {
                                     @Override
                                     public boolean isValidCount(int count) {
-                                        return count > 2 && count < 6;
+                                        return count >= 3 && count <= 5;
                                     }
 
                                     @Override
