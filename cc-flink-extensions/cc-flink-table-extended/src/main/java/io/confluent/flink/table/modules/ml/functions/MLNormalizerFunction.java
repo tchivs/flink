@@ -14,81 +14,73 @@ import java.util.Objects;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForNormalizer;
 
-/**
- * A ScalarFunction that implements the ML_MAX_ABS_SCALER function. This function scales the input
- * value by the absolute maximum value provided.
- */
-public class MLMaxAbsScalerFunction extends ScalarFunction {
+/** Scalar function for normalizing values. */
+public class MLNormalizerFunction extends ScalarFunction {
     /** The name of the function. */
-    public static final String NAME = "ML_MAX_ABS_SCALER";
+    public static final String NAME = "ML_NORMALIZER";
     /** The name of the function. */
     public final String functionName;
 
     /**
-     * Constructor for the MLMaxAbsScaleFunction class.
+     * Constructor for MLNormalizerFunction.
      *
-     * @param functionName the name of the function.
+     * @param functionName The name of the function.
      */
-    public MLMaxAbsScalerFunction(String functionName) {
+    public MLNormalizerFunction(String functionName) {
         this.functionName = functionName;
     }
 
     /**
-     * Evaluates and returns a scaled double value based on the given value and absolute maximum
-     * value.
+     * Evaluates and returns a scaled double value based on the given value and normalization
+     * factor.
      *
      * @param value the value to be scaled; can be of any type that can be converted to a double
-     * @param absMax the absolute maximum factor; can be of any type that can be converted to a
+     * @param normFactor the normalization factor; can be of any type that can be converted to a
      *     double
      * @return the scaled double value, or null if the provided value is null
      * @throws FlinkRuntimeException if any error occurs during the processing
      */
-    public Double eval(Object value, Object absMax) {
+    public Double eval(Object value, Object normFactor) {
         try {
             if (Objects.isNull(value)) {
                 return null;
             }
             return getScaledValue(
                     Objects.requireNonNull(getDoubleValue(value, NAME)),
-                    getDoubleValue(absMax, NAME));
+                    getDoubleValue(normFactor, NAME));
         } catch (Throwable t) {
             throw new FlinkRuntimeException(t);
         }
     }
 
     /**
-     * Scales the given value by the absolute maximum value.
+     * Scales the value by the normalization factor.
      *
-     * @param value the value to scale.
-     * @param absMax the absolute maximum value.
-     * @return the scaled value.
-     * @throws FlinkRuntimeException if absMax is NaN or null.
+     * @param value The value to be normalized.
+     * @param normValue The normalization factor.
+     * @return The normalized value.
      */
-    private Double getScaledValue(Double value, Double absMax) {
+    private Double getScaledValue(Double value, Double normValue) {
         if (value.isNaN() || value.isInfinite()) {
             return value;
         }
-        if (Objects.isNull(absMax) || absMax.isNaN()) {
+        if (Objects.isNull(normValue) || normValue.isNaN()) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "The Absolute Maximum argument to %s function cannot be NaN or NULL.",
+                            "The Normalization Factor argument to %s function cannot be NaN or NULL.",
                             NAME));
         }
-        if (absMax.isInfinite()) {
+        if (normValue.isInfinite()) {
             return 0.0;
         }
-        // sets absMax to its absolute value if negative
-        absMax = Math.abs(absMax);
-        return value > absMax
-                ? 1.0
-                : (value < -absMax ? -1.0 : value / (absMax == 0.0 ? 1.0 : absMax));
+        return normValue == 0.0 ? value : (value / normValue);
     }
 
     /**
-     * Provides the type inference logic for this function.
+     * Returns the type inference logic for the function.
      *
-     * @param typeFactory the DataTypeFactory instance.
-     * @return the TypeInference instance.
+     * @param typeFactory The factory for creating data types.
+     * @return The type inference logic.
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
