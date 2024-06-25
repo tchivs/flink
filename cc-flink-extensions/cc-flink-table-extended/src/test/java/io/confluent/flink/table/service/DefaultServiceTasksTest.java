@@ -13,9 +13,12 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.CatalogModel;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogModel;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.QueryOperation;
@@ -29,6 +32,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import io.confluent.flink.table.connectors.ForegroundResultTableFactory;
 import io.confluent.flink.table.modules.core.CoreProxyModule;
 import io.confluent.flink.table.modules.ml.MLPredictFunction;
+import io.confluent.flink.table.modules.search.FederatedSearchFunction;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ServiceTasks.Service;
 import org.junit.jupiter.api.Test;
@@ -405,6 +409,62 @@ public class DefaultServiceTasksTest {
                                 "my_model_ml_evaluate_all",
                                 "my_model_ml_predict",
                                 "my_model_ml_evaluate"));
+    }
+
+    @Test
+    void testConfigureSearchFunctionModel() {
+        final TableEnvironment tableEnv =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap("confluent.federated-search.enabled", "true"),
+                Service.SQL_SERVICE);
+
+        String[] functions = tableEnv.listFunctions();
+        assertThat(Arrays.asList(functions).contains(FederatedSearchFunction.NAME)).isTrue();
+    }
+
+    @Test
+    void testRegisterFederatedSearchFunction() throws JsonProcessingException {
+        final ResolvedSchema schema =
+                ResolvedSchema.of(
+                        Column.physical("a", DataTypes.INT()),
+                        Column.physical("b", DataTypes.STRING()));
+        final Map<String, String> options = new HashMap<>();
+        options.put("connector", "mongodb");
+
+        final ResolvedCatalogTable resolvedCatalogTable =
+                new ResolvedCatalogTable(
+                        CatalogTable.of(
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
+                                null,
+                                Collections.emptyList(),
+                                options),
+                        schema);
+        final TableEnvironmentImpl tableEnv =
+                (TableEnvironmentImpl)
+                        TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+
+        final ObjectMapper mapper = new ObjectMapper();
+        final String serializedTable =
+                mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(resolvedCatalogTable.toProperties());
+
+        ObjectIdentifier objectIdentifier =
+                ObjectIdentifier.of("my_catalog", "my_db", "my_table_FEDERATED_SEARCH");
+        tableEnv.registerCatalog("my_catalog", new GenericInMemoryCatalog("my_catalog", "my_db"));
+        INSTANCE.configureEnvironment(
+                tableEnv,
+                Collections.emptyMap(),
+                Collections.singletonMap(objectIdentifier.toString(), serializedTable),
+                Service.JOB_SUBMISSION_SERVICE);
+
+        tableEnv.useCatalog("my_catalog");
+        tableEnv.useDatabase("my_db");
+        final String[] udfs = tableEnv.listUserDefinedFunctions();
+        assertThat(Arrays.asList(udfs).contains("my_table_federated_search")).isTrue();
     }
 
     @Test

@@ -63,6 +63,7 @@ import io.confluent.flink.table.modules.otlp.OtlpFunctionsModule;
 import io.confluent.flink.table.modules.remoteudf.ConfiguredRemoteScalarFunction;
 import io.confluent.flink.table.modules.remoteudf.RemoteUdfModule;
 import io.confluent.flink.table.modules.remoteudf.UdfUtil;
+import io.confluent.flink.table.modules.search.FederatedSearchFunction;
 import io.confluent.flink.table.modules.search.FederatedSearchFunctionsModule;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundJobResultPlan;
 import io.confluent.flink.table.service.ForegroundResultPlan.ForegroundLocalResultPlan;
@@ -418,6 +419,40 @@ class DefaultServiceTasks implements ServiceTasks {
                                                 new MLEvaluateFunction(
                                                         functionIdentifier, properties));
                                     }
+                                }
+                            });
+        }
+
+        if (service == Service.JOB_SUBMISSION_SERVICE
+                || privateConfig.get(ServiceTasksOptions.CONFLUENT_FEDERATED_SEARCH_ENABLED)) {
+            // federated search functions are rewritten and put into the config together with
+            // serialized external table in sql service. We use temporary functions since permanent
+            // functions serialization has issues and need changes in FunctionCatalog which we
+            // don't want to modify in open source Flink
+            final ObjectMapper mapper = new ObjectMapper();
+            privateConfig
+                    .toMap()
+                    .forEach(
+                            (functionIdentifier, serializedObj) -> {
+                                String functionName = functionIdentifier.toUpperCase(Locale.ROOT);
+                                if (functionName.contains(FederatedSearchFunction.NAME)) {
+                                    Map<String, String> properties;
+                                    try {
+                                        properties =
+                                                mapper.readValue(
+                                                        serializedObj,
+                                                        new TypeReference<
+                                                                Map<String, String>>() {});
+                                    } catch (JsonProcessingException e) {
+                                        throw new IllegalArgumentException(
+                                                "Cannot deserialize federated search function argument for "
+                                                        + "functionName: "
+                                                        + functionName);
+                                    }
+                                    tableEnvironment.createTemporaryFunction(
+                                            functionIdentifier,
+                                            new FederatedSearchFunction(
+                                                    functionIdentifier, properties));
                                 }
                             });
         }
