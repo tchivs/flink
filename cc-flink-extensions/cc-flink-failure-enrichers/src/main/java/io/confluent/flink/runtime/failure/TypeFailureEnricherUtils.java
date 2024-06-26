@@ -64,21 +64,11 @@ final class TypeFailureEnricherUtils {
      */
     public static Optional<Throwable> findThrowableByName(
             Throwable throwable, Class<?> searchType) {
-        if (throwable == null || searchType == null) {
+        if (searchType == null) {
             return Optional.empty();
         }
-        // Canonical name is the same as used in an import statement
         final String searchName = searchType.getCanonicalName();
-        Throwable t = throwable;
-        while (t != null) {
-            // SQL-1836: Check for contains name instead of exact match to support shaded deps
-            if (t.getClass().getName().contains(searchName)) {
-                return Optional.of(t);
-            } else {
-                t = t.getCause();
-            }
-        }
-
-        return Optional.empty();
+        return ExceptionUtils.findThrowable(
+                throwable, (t) -> t.getClass().getName().contains(searchName));
     }
 }
