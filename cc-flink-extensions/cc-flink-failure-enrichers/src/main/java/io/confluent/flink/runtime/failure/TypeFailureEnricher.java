@@ -10,6 +10,8 @@ import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.IllegalUserInputException;
+import org.apache.flink.util.IllegalUserInputRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import io.confluent.flink.runtime.failure.util.FailureMessageUtil;
@@ -111,6 +113,12 @@ public class TypeFailureEnricher implements FailureEnricher {
         KAFKA_SASL_AUTH_CLUSTER_NOT_FOUND(18, "TODO"),
         PEKKO_SERIALIZATION(19, "TODO"),
         KAFKA_NOT_AUTHORIZED_TO_ACCESS_GROUP(20, "Kafka group read permissions have been removed."),
+        ILLEGAL_USER_INPUT_RUNTIME(
+                21,
+                "General exception that was caused by illegal input from the user caught at runtime. See exception message for further details."),
+        ILLEGAL_USER_INPUT(
+                22,
+                "General exception that was caused by illegal input from the user. See exception message for further details."),
         ;
 
         /** Unique code for the error class. */
@@ -239,6 +247,13 @@ public class TypeFailureEnricher implements FailureEnricher {
         forPredicate(
                 ExceptionUtils::isJvmFatalOrOutOfMemoryError,
                 Classification.of(Type.SYSTEM, Handling.RECOVER, ErrorClass.JVM_FATAL_OR_OOM)),
+        // General illegal user inputs
+        forUserThrowable(
+                IllegalUserInputException.class,
+                Classification.of(Type.USER, Handling.FAIL, ErrorClass.ILLEGAL_USER_INPUT)),
+        forUserThrowable(
+                IllegalUserInputRuntimeException.class,
+                Classification.of(Type.USER, Handling.FAIL, ErrorClass.ILLEGAL_USER_INPUT_RUNTIME)),
         // Catch all.
         throwable ->
                 Optional.of(Classification.of(Type.UNKNOWN, Handling.RECOVER, ErrorClass.UNKNOWN))

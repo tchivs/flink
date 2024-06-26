@@ -25,6 +25,7 @@ import org.apache.flink.table.data.binary.BinaryStringDataUtil;
 import org.apache.flink.table.utils.EncodingUtils;
 import org.apache.flink.table.utils.ThreadLocalCache;
 import org.apache.flink.util.CollectionUtil;
+import org.apache.flink.util.IllegalUserInputRuntimeException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -1175,11 +1176,15 @@ public class SqlFunctionUtils {
     }
 
     public static BinaryStringData fromBase64(BinaryStringData bs) {
-        return BinaryStringData.fromBytes(Base64.getDecoder().decode(bs.toBytes()));
+        return fromBase64(bs.toBytes());
     }
 
     public static BinaryStringData fromBase64(byte[] bytes) {
-        return BinaryStringData.fromBytes(Base64.getDecoder().decode(bytes));
+        try {
+            return BinaryStringData.fromBytes(Base64.getDecoder().decode(bytes));
+        } catch (IllegalArgumentException iae) {
+            throw new IllegalUserInputRuntimeException(iae);
+        }
     }
 
     public static String uuid() {

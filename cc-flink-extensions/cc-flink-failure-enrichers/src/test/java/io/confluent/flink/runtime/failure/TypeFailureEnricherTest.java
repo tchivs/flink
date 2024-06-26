@@ -8,6 +8,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.runtime.operators.testutils.ExpectedTestException;
 import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.runtime.functions.SqlFunctionUtils;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -290,6 +291,28 @@ class TypeFailureEnricherTest {
                                         .MockedException(),
                                 io.confluent.flink.runtime.failure.mock.MockedException.class)
                         .isPresent());
+    }
+
+    @Test
+    void testIllegalUserInput() throws ExecutionException, InterruptedException {
+        final byte[] testBytes = {Byte.MAX_VALUE, Byte.MIN_VALUE};
+        // We label the case where the decoding is called from a SQL function as user error.
+        try {
+            SqlFunctionUtils.fromBase64(testBytes);
+        } catch (Exception ex) {
+            assertFailureEnricherLabels(
+                    new Exception("Wrapper", ex),
+                    "ERROR_CLASS_CODE",
+                    "21",
+                    "TYPE",
+                    "USER",
+                    "USER_ERROR_MSG",
+                    "Wrapper\n"
+                            + "Caused by: java.lang.IllegalArgumentException: Illegal base64 character 7f\n"
+                            + "Caused by: Illegal base64 character 7f",
+                    "JOB_CANNOT_RESTART",
+                    "");
+        }
     }
 
     /** Pack the generated classes into a JAR and return the path of the JAR. */
