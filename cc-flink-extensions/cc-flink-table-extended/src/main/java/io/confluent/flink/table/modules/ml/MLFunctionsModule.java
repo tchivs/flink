@@ -4,6 +4,8 @@
 
 package io.confluent.flink.table.modules.ml;
 
+import io.confluent.flink.table.modules.ml.functions.MLRobustScalerFunction;
+
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.module.Module;
 
@@ -56,6 +58,9 @@ public class MLFunctionsModule implements Module {
                         put(
                                 MLNormalizerFunction.NAME,
                                 new MLNormalizerFunction(MLNormalizerFunction.NAME));
+                        put(
+                                MLRobustScalerFunction.NAME,
+                                new MLRobustScalerFunction(MLRobustScalerFunction.NAME));
                     }
                 };
     }
