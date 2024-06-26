@@ -14,6 +14,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.DynamicMessage;
 import io.confluent.flink.formats.converters.protobuf.CommonConstants;
 import io.confluent.flink.formats.converters.protobuf.CommonMappings;
@@ -46,7 +47,7 @@ public class TestData {
             this.flink = flink;
         }
 
-        public Descriptor getProtoSchema() {
+        public FileDescriptor getProtoSchema() {
             return typeMapping.getProtoSchema();
         }
 
@@ -71,7 +72,8 @@ public class TestData {
     /** @see CommonMappings#NULLABLE_ARRAYS_CASE */
     public static TypeMappingWithData createDataForNullableArraysCase() {
         final TypeMapping typeMapping = CommonMappings.NULLABLE_ARRAYS_CASE;
-        final Descriptor schema = typeMapping.getProtoSchema();
+        final FileDescriptor fileDescriptor = typeMapping.getProtoSchema().getFile();
+        final Descriptor schema = fileDescriptor.findMessageTypeByName("Row");
 
         // repeated elementNullableArrayElement elementNullable = 2 [(confluent.field_meta) = {
         final FieldDescriptor elementNullableField = schema.findFieldByName("elementNullable");
@@ -147,7 +149,8 @@ public class TestData {
     /** @see CommonMappings#NULLABLE_COLLECTIONS_CASE */
     public static TypeMappingWithData createDataForNullableCollectionsCase() {
         final TypeMapping typeMapping = CommonMappings.NULLABLE_COLLECTIONS_CASE;
-        final Descriptor schema = typeMapping.getProtoSchema();
+        final FileDescriptor fileDescriptor = typeMapping.getProtoSchema().getFile();
+        final Descriptor schema = fileDescriptor.findMessageTypeByName("Row");
 
         // repeated arrayOfMapsArrayElement arrayOfMaps = 2 [(confluent.field_meta) = {
         final FieldDescriptor arrayOfMapsField = schema.findFieldByName("arrayOfMaps");
@@ -262,7 +265,8 @@ public class TestData {
     /** @see CommonMappings#MULTISET_CASE */
     public static TypeMappingWithData createDataForMultisetCase() {
         final TypeMapping typeMapping = CommonMappings.MULTISET_CASE;
-        Descriptor schema = typeMapping.getProtoSchema();
+        final FileDescriptor fileDescriptor = typeMapping.getProtoSchema().getFile();
+        final Descriptor schema = fileDescriptor.findMessageTypeByName("Row");
         final Descriptor mapSchema =
                 schema.getNestedTypes().stream()
                         .filter(descriptor -> descriptor.getName().equals("MultisetEntry"))
@@ -297,7 +301,8 @@ public class TestData {
     /** @see CommonMappings#COLLECTIONS_CASE */
     public static TypeMappingWithData createDataForMapCase() {
         final TypeMapping typeMapping = CommonMappings.COLLECTIONS_CASE;
-        final Descriptor schema = typeMapping.getProtoSchema();
+        final FileDescriptor fileDescriptor = typeMapping.getProtoSchema().getFile();
+        final Descriptor schema = fileDescriptor.findMessageTypeByName("Row");
         final Descriptor mapSchema =
                 schema.getNestedTypes().stream()
                         .filter(descriptor -> descriptor.getName().equals("MapEntry"))

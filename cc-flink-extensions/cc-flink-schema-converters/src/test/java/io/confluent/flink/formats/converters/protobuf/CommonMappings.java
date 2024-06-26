@@ -27,7 +27,7 @@ import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
 
-import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import io.confluent.flink.formats.converters.utils.SchemaUtils;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 
@@ -43,17 +43,17 @@ public final class CommonMappings {
     /** A mapping between corresponding Avro and Flink types. */
     public static class TypeMapping {
 
-        private final Descriptor protoSchema;
+        private final FileDescriptor protoSchema;
         private final LogicalType flinkType;
         private final String schemaStr;
 
         public TypeMapping(String schemaStr, LogicalType flinkType) {
             this.schemaStr = schemaStr;
-            this.protoSchema = new ProtobufSchema(schemaStr).toDescriptor();
+            this.protoSchema = new ProtobufSchema(schemaStr).toDescriptor().getFile();
             this.flinkType = flinkType;
         }
 
-        public Descriptor getProtoSchema() {
+        public FileDescriptor getProtoSchema() {
             return protoSchema;
         }
 

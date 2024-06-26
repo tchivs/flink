@@ -23,6 +23,7 @@ import com.google.protobuf.BytesValue;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.DoubleValue;
 import com.google.protobuf.DynamicMessage;
@@ -78,7 +79,24 @@ public class RowDataToProtoConverters {
      * Creates a runtime converter according to the given logical type that converts objects of
      * Flink Table & SQL internal data structures to corresponding Protobuf data structures.
      */
-    public static RowDataToProtoConverter createConverter(RowType type, Descriptor targetSchema) {
+    public static RowDataToProtoConverter createConverter(
+            RowType type, FileDescriptor targetSchema) {
+        final List<Descriptor> messageTypes = targetSchema.getMessageTypes();
+        if (messageTypes.size() != 1) {
+            // TODO: [SQL-2123] Implement runtime converter for schema with multiple message types.
+            throw new IllegalArgumentException(
+                    "Expected a single message type in the schema, but found: " + messageTypes);
+        }
+
+        final Descriptor targetMessageType = messageTypes.get(0);
+        if (targetMessageType.getRealOneofs().isEmpty()) {
+            return createNoOneOfConverter(type, targetMessageType);
+        } else {
+            return createOneOfFieldSetter(type, targetMessageType);
+        }
+    }
+
+    private static RowDataToProtoConverter createConverter(RowType type, Descriptor targetSchema) {
         if (targetSchema.getRealOneofs().isEmpty()) {
             return createNoOneOfConverter(type, targetSchema);
         } else {

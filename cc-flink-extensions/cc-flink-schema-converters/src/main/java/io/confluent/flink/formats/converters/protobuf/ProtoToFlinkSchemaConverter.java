@@ -34,6 +34,7 @@ import org.apache.flink.util.StringUtils;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 import io.confluent.protobuf.MetaProto;
 import io.confluent.protobuf.MetaProto.Meta;
@@ -106,10 +107,47 @@ public class ProtoToFlinkSchemaConverter {
      * href="https://github.com/confluentinc/schema-registry/blob/610fbed58a3a8d778ec7a9de5b8d2d0c1465c6f9/protobuf-converter/src/main/java/io/confluent/connect/protobuf/ProtobufData.java">ProtobufData</a>
      * Should be kept in sync to handle all connect data types.
      */
-    public static LogicalType toFlinkSchema(final Descriptor schema) {
+    public static LogicalType toFlinkSchema(final FileDescriptor schema) {
         final CycleContext context = new CycleContext();
-        // top-level row must not be NULLABLE in SQL, thus we change the nullability of the top row
-        return toFlinkSchemaNested(false, schema, context);
+        final List<Descriptor> messageTypes = schema.getMessageTypes();
+        if (messageTypes.size() == 1) {
+            // top-level row must not be NULLABLE in SQL,
+            // thus we change the nullability of the top row
+            return toFlinkSchemaNested(false, messageTypes.get(0), context);
+        }
+
+        return toFlinkSchemaMultiMessages(schema.getMessageTypes(), context);
+    }
+
+    /**
+     * Converts multi-message schema to nested Flink RowType. Each inner Row represents a message
+     * from the PROTOBUF schema. The resulting structure is:
+     *
+     * <PRE>
+     *                                    Row(
+     *   message1{field1, field2, ...} ->     Row1(field1, field2, ...)
+     *   message2{field1, field2, ...} ->     Row2(field1, field2, ...)
+     *   ...                           ->     ...
+     *                                        )
+     * </PRE>
+     */
+    private static LogicalType toFlinkSchemaMultiMessages(
+            final List<Descriptor> messageTypes, final CycleContext context) {
+        final int messageCount = messageTypes.size();
+        final LogicalType[] fieldTypes = new LogicalType[messageCount];
+        final String[] fieldNames = new String[messageCount];
+
+        // Convert each message type to a nested Flink schema and extract names
+        for (int i = 0; i < messageCount; i++) {
+            Descriptor messageType = messageTypes.get(i);
+
+            // all message types in protobuf are NULLABLE (true)
+            fieldTypes[i] = toFlinkSchemaNested(true, messageType, context);
+            fieldNames[i] = messageType.getName();
+        }
+
+        // top-level row must not be NULLABLE in SQL (false)
+        return RowType.of(false, fieldTypes, fieldNames);
     }
 
     private static LogicalType toFlinkSchemaNested(

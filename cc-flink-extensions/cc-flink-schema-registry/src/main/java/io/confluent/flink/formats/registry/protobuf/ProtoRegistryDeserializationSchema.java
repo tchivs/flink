@@ -65,7 +65,8 @@ public class ProtoRegistryDeserializationSchema implements DeserializationSchema
                 (ProtobufSchema)
                         schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         this.descriptor = schema.toDescriptor();
-        this.runtimeConverter = ProtoToRowDataConverters.createConverter(descriptor, rowType);
+        this.runtimeConverter =
+                ProtoToRowDataConverters.createConverter(descriptor.getFile(), rowType);
         this.inputStream = new MutableByteArrayInputStream();
     }
 

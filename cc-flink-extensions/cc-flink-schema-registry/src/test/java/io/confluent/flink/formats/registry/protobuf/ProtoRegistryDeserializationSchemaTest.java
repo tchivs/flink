@@ -177,7 +177,7 @@ class ProtoRegistryDeserializationSchemaTest {
     private ProtoRegistryDeserializationSchema initializeDeserializationSchema(
             ProtobufSchema protobufSchema, int schemaId) throws Exception {
         LogicalType flinkType =
-                ProtoToFlinkSchemaConverter.toFlinkSchema(protobufSchema.toDescriptor());
+                ProtoToFlinkSchemaConverter.toFlinkSchema(protobufSchema.toDescriptor().getFile());
 
         ProtoRegistryDeserializationSchema deserializationSchema =
                 new ProtoRegistryDeserializationSchema(

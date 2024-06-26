@@ -61,7 +61,7 @@ public class ProtoRegistrySerializationSchema implements SerializationSchema<Row
                 (ProtobufSchema)
                         schemaRegistryClient.getSchemaById(schemaRegistryConfig.getSchemaId());
         this.runtimeConverter =
-                RowDataToProtoConverters.createConverter(rowType, schema.toDescriptor());
+                RowDataToProtoConverters.createConverter(rowType, schema.toDescriptor().getFile());
         this.arrayOutputStream = new ByteArrayOutputStream();
     }
 

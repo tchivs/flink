@@ -141,7 +141,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final int timestampSeconds = 960000000;
         final int timestampNanos = 34567890;
@@ -241,7 +241,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final GenericRowData row = new GenericRowData(7);
         row.setField(0, StringData.fromString("Random string"));
@@ -306,7 +306,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final GenericRowData row = new GenericRowData(7);
 
@@ -360,7 +360,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final GenericRowData row = new GenericRowData(1);
         final GenericRowData tags = new GenericRowData(2);
@@ -456,7 +456,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final GenericRowData row = new GenericRowData(2);
         row.setField(0, BinaryStringData.fromString("ON"));
@@ -529,7 +529,7 @@ class RowDataToProtoConvertersTest {
         Descriptor schema = protoSchema.toDescriptor();
 
         final RowDataToProtoConverter converter =
-                RowDataToProtoConverters.createConverter(rowType, schema);
+                RowDataToProtoConverters.createConverter(rowType, schema.getFile());
 
         final int timestampSeconds = 960000000;
         final int timestampNanos = 34567890;

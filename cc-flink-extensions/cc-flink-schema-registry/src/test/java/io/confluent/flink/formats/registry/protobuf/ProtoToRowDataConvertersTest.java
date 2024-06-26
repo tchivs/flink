@@ -18,6 +18,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.EnumDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Timestamp;
 import com.google.type.Date;
@@ -97,13 +98,8 @@ class ProtoToRowDataConvertersTest {
                         + "  optional bytes bytes = 20;\n"
                         + "}";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        Descriptor schema = createDescriptor(schemaStr);
+        ProtoToRowDataConverter converter = createConverter(schema);
 
         final FieldDescriptor decimalDescriptor = schema.findFieldByName("decimal");
         final int timestampSeconds = 960000000;
@@ -176,13 +172,8 @@ class ProtoToRowDataConvertersTest {
                         + "  optional int32 int = 2;\n"
                         + "}";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        final Descriptor schema = createDescriptor(schemaStr);
+        final ProtoToRowDataConverter converter = createConverter(schema);
 
         final DynamicMessage message = DynamicMessage.newBuilder(schema).build();
         final RowData row = (RowData) converter.convert(message);
@@ -212,8 +203,7 @@ class ProtoToRowDataConvertersTest {
                         + "  }\n"
                         + "}\n";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
+        final Descriptor schema = createDescriptor(schemaStr);
         final Descriptor metaSchema =
                 schema.getNestedTypes().stream()
                         .filter(descriptor -> descriptor.getName().equals("meta_Row"))
@@ -226,10 +216,7 @@ class ProtoToRowDataConvertersTest {
                         .findFirst()
                         .get();
 
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        final ProtoToRowDataConverter converter = createConverter(schema);
 
         final DynamicMessage message =
                 DynamicMessage.newBuilder(schema)
@@ -288,18 +275,14 @@ class ProtoToRowDataConvertersTest {
                         + "  }\n"
                         + "}";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
+        final Descriptor schema = createDescriptor(schemaStr);
         final Descriptor targetSchema =
                 schema.getNestedTypes().stream()
                         .filter(descriptor -> descriptor.getName().equals("Target"))
                         .findFirst()
                         .get();
 
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        final ProtoToRowDataConverter converter = createConverter(schema);
 
         final FieldDescriptor actionFieldDescriptor = schema.findFieldByName("action");
         final EnumDescriptor enumType = actionFieldDescriptor.getEnumType();
@@ -343,13 +326,8 @@ class ProtoToRowDataConvertersTest {
                         + "  google.protobuf.BoolValue boolean = 7;\n"
                         + "}\n";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        Descriptor schema = createDescriptor(schemaStr);
+        ProtoToRowDataConverter converter = createConverter(schema);
 
         final DynamicMessage message = DynamicMessage.newBuilder(schema).build();
         RowData row = (RowData) converter.convert(message);
@@ -382,13 +360,8 @@ class ProtoToRowDataConvertersTest {
                         + "  optional .google.protobuf.Timestamp timestamp_ltz = 2;"
                         + "}";
 
-        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
-        Descriptor schema = protoSchema.toDescriptor();
-
-        final RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(schema);
-
-        final ProtoToRowDataConverter converter =
-                ProtoToRowDataConverters.createConverter(schema, flinkSchema);
+        Descriptor schema = createDescriptor(schemaStr);
+        ProtoToRowDataConverter converter = createConverter(schema);
 
         final int timestampSeconds = 960000000;
         final int timestampNanos = 34567890;
@@ -438,5 +411,22 @@ class ProtoToRowDataConvertersTest {
         final Object converted = converter.convert(mapping.getProtoData());
 
         assertThat(converted).isEqualTo(mapping.getFlinkData());
+    }
+
+    // --------------------------------------------------------------------------------
+    // HELPERS
+    // --------------------------------------------------------------------------------
+
+    /** Creates a {@link Descriptor} from a protobuf schema string. */
+    private Descriptor createDescriptor(String schemaStr) {
+        ProtobufSchema protoSchema = new ProtobufSchema(schemaStr);
+        return protoSchema.toDescriptor();
+    }
+
+    /** {@link Descriptor} -> {@link LogicalType} -> {@link ProtoToRowDataConverter}. */
+    private ProtoToRowDataConverter createConverter(Descriptor schema) {
+        FileDescriptor fileDescriptor = schema.getFile();
+        RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(fileDescriptor);
+        return ProtoToRowDataConverters.createConverter(fileDescriptor, flinkSchema);
     }
 }

@@ -15,7 +15,7 @@ import org.apache.flink.table.types.logical.RowType.RowField;
 import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.util.TestLoggerExtension;
 
-import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import io.confluent.flink.formats.converters.protobuf.CommonMappings.TypeMapping;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ProtoToFlinkSchemaConverterTest {
 
     public static Stream<Arguments> typesToCheck() {
-        return Stream.concat(CommonMappings.get(), Stream.of(WRAPPERS_CASE, CUSTOM_SCHEMA_CASE))
+        return Stream.concat(
+                        CommonMappings.get(),
+                        Stream.of(
+                                WRAPPERS_CASE,
+                                CUSTOM_SCHEMA_CASE,
+                                MULTIPLE_MESSAGES_CASE,
+                                MULTIPLE_MESSAGES_WITH_NESTING_CASE,
+                                MULTIPLE_NESTED_MESSAGES_CASE,
+                                MULTIPLE_MESSAGES_WITH_SR_NOTNULL_METADATA_CASE))
                 .map(Arguments::of);
     }
 
@@ -50,9 +58,10 @@ class ProtoToFlinkSchemaConverterTest {
     @ParameterizedTest
     @MethodSource("typesToCheck")
     void testTypeMappingAfterNormalization(TypeMapping mapping) {
-        final Descriptor schema = mapping.getProtoSchema();
+        final FileDescriptor schema = mapping.getProtoSchema();
         final String normalizedString = new ProtobufSchema(schema).normalize().canonicalString();
-        final Descriptor descriptor = new ProtobufSchema(normalizedString).toDescriptor();
+        final FileDescriptor descriptor =
+                new ProtobufSchema(normalizedString).toDescriptor().getFile();
         assertThat(ProtoToFlinkSchemaConverter.toFlinkSchema(descriptor))
                 .isEqualTo(mapping.getFlinkType());
     }
@@ -75,13 +84,15 @@ class ProtoToFlinkSchemaConverterTest {
         assertThatThrownBy(
                         () ->
                                 ProtoToFlinkSchemaConverter.toFlinkSchema(
-                                        new ProtobufSchema(schemaStr).toDescriptor()))
+                                        new ProtobufSchema(schemaStr).toDescriptor().getFile()))
                 .isInstanceOf(ValidationException.class)
                 .hasMessage("Cyclic schemas are not supported.");
     }
 
     public static final VarCharType STRING_NOT_NULL_TYPE =
             new VarCharType(false, VarCharType.MAX_LENGTH);
+    private static final RowField ZIP_FIELD_OF_INT_NOT_NULL_TYPE =
+            new RowField("zip", new IntType(false));
     private static final TypeMapping CUSTOM_SCHEMA_CASE =
             new TypeMapping(
                     "syntax = \"proto3\";\n"
@@ -154,4 +165,173 @@ class ProtoToFlinkSchemaConverterTest {
                                     new RowField("float", new FloatType(true)),
                                     new RowField("double", new DoubleType(true)),
                                     new RowField("boolean", new BooleanType(true)))));
+
+    private static final TypeMapping MULTIPLE_MESSAGES_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package mypackage;\n"
+                            + "\n"
+                            + "message Customer {\n"
+                            + "  string name = 1;\n"
+                            + "}\n"
+                            + "message Address {\n"
+                            + "  int32 zip = 1;\n"
+                            + "}\n",
+                    /*
+                    ROW<
+                        `Customer` ROW<
+                                `name` VARCHAR NOT NULL         -> not null because string
+                                >                               -> nullable because message
+                                `Address` ROW<
+                                    `zip` INT NOT NULL          -> not null because int32
+                        >                                       -> nullable because message
+                    > NOT NULL                                  -> not null because top level row
+                    */
+                    new RowType(
+                            false,
+                            asList(
+                                    new RowField(
+                                            "Customer",
+                                            new RowType(
+                                                    true,
+                                                    asList(
+                                                            new RowField(
+                                                                    "name",
+                                                                    STRING_NOT_NULL_TYPE)))),
+                                    new RowField(
+                                            "Address",
+                                            new RowType(
+                                                    true,
+                                                    asList(ZIP_FIELD_OF_INT_NOT_NULL_TYPE))))));
+
+    private static final TypeMapping MULTIPLE_MESSAGES_WITH_NESTING_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package mypackage;\n"
+                            + "\n"
+                            + "message Customer {\n"
+                            + "  Address address = 1;\n"
+                            + "}\n"
+                            + "message Address {\n"
+                            + "  int32 zip = 1;\n"
+                            + "}\n",
+                    /*
+                    ROW<
+                        `Customer` ROW<
+                                `address` ROW<
+                                        `zip` INT NOT NULL      -> not null because int32
+                                >                               -> nullable because of message
+                        >                                       -> nullable because of message
+                        `Address` ROW<
+                                `zip` INT NOT NULL              -> not null because int32
+                        >                                       -> nullable because of message
+                    > NOT NULL                                  -> not null because top level row always NOT NULL
+                    */
+                    new RowType(
+                            false,
+                            asList(
+                                    new RowField(
+                                            "Customer",
+                                            new RowType(
+                                                    true,
+                                                    asList(
+                                                            new RowField(
+                                                                    "address",
+                                                                    new RowType(
+                                                                            true,
+                                                                            asList(
+                                                                                    ZIP_FIELD_OF_INT_NOT_NULL_TYPE)))))),
+                                    new RowField(
+                                            "Address",
+                                            new RowType(
+                                                    true,
+                                                    asList(ZIP_FIELD_OF_INT_NOT_NULL_TYPE))))));
+
+    private static final TypeMapping MULTIPLE_NESTED_MESSAGES_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package mypackage;\n"
+                            + "\n"
+                            + "message MyFirstMessage {\n"
+                            + "  Address addr = 1;\n"
+                            + "  message Address {\n"
+                            + "    string city = 1;\n"
+                            + "    string street = 2;\n"
+                            + "  }\n"
+                            + "}\n",
+                    /*
+                    ROW<
+                        `addr` ROW<
+                                `city` STRING NOT NULL,         -> not null because string
+                                `street` STRING NOT NULL        -> not null because string
+                        >                                       -> nullable because of message
+                    > NOT NULL                                  -> not null because top level row
+                    */
+                    new RowType(
+                            false,
+                            asList(
+                                    new RowField(
+                                            "addr",
+                                            new RowType(
+                                                    true,
+                                                    asList(
+                                                            new RowField(
+                                                                    "city", STRING_NOT_NULL_TYPE),
+                                                            new RowField(
+                                                                    "street",
+                                                                    STRING_NOT_NULL_TYPE)))))));
+
+    private static final TypeMapping MULTIPLE_MESSAGES_WITH_SR_NOTNULL_METADATA_CASE =
+            new TypeMapping(
+                    "syntax = \"proto3\";\n"
+                            + "package mypackage;\n"
+                            + "\n"
+                            + "message Customer {\n"
+                            + "  Address address = 1  [(confluent.field_meta) = {\n"
+                            + "    params: [\n"
+                            + "      {\n"
+                            + "        key: \"flink.version\",\n"
+                            + "        value: \"1\"\n"
+                            + "      },\n"
+                            + "      {\n"
+                            + "        key: \"flink.notNull\",\n"
+                            + "        value: \"true\"\n"
+                            + "      }\n"
+                            + "    ]\n"
+                            + "  }];\n"
+                            + "}\n"
+                            + "message Address {\n"
+                            + "  int32 zip = 1;\n"
+                            + "}\n",
+                    /*
+                    ROW<
+                        `Customer` ROW<
+                                `address` ROW<
+                                        `zip` INT NOT NULL      -> not null because int32
+                                > NOT NULL                      -> not null because `flink.notNull` metadata
+                        >                                       -> nullable because message
+                        `Address` ROW<
+                                `zip` INT NOT NULL              -> not null because int32
+                        >                                       -> nullable because message
+                    > NOT NULL                                  -> not null because top level row
+                    */
+                    new RowType(
+                            false,
+                            asList(
+                                    new RowField(
+                                            "Customer",
+                                            new RowType(
+                                                    true,
+                                                    asList(
+                                                            new RowField(
+                                                                    "address",
+                                                                    new RowType(
+                                                                            false,
+                                                                            asList(
+                                                                                    ZIP_FIELD_OF_INT_NOT_NULL_TYPE)))))),
+                                    new RowField(
+                                            "Address",
+                                            new RowType(
+                                                    true,
+                                                    asList(ZIP_FIELD_OF_INT_NOT_NULL_TYPE))))));
 }

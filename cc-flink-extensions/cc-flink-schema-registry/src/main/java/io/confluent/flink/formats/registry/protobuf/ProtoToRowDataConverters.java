@@ -26,6 +26,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Message;
 import io.confluent.flink.formats.converters.protobuf.CommonConstants;
@@ -75,6 +76,19 @@ public class ProtoToRowDataConverters {
 
     /** Creates a runtime converter. */
     public static ProtoToRowDataConverter createConverter(
+            FileDescriptor readSchema, RowType targetType) {
+        final List<Descriptor> messageTypes = readSchema.getMessageTypes();
+        if (messageTypes.size() != 1) {
+            // TODO: [SQL-2123] Implement runtime converter for schema with multiple message types.
+            throw new IllegalArgumentException(
+                    "Expected a single message type in the schema, but found "
+                            + messageTypes.size()
+                            + " message types.");
+        }
+        return createConverter(messageTypes.get(0), targetType);
+    }
+
+    private static ProtoToRowDataConverter createConverter(
             Descriptor readSchema, RowType targetType) {
         if (readSchema.getRealOneofs().isEmpty()) {
             return createNoOneOfRowConverter(readSchema, targetType);

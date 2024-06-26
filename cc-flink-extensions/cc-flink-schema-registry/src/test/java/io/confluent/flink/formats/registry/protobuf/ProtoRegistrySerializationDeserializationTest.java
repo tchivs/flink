@@ -149,7 +149,8 @@ class ProtoRegistrySerializationDeserializationTest {
                                 + "}");
         final int schemaId = client.register(SUBJECT + "-value", stockTradeSchema, 0, 100002);
         final LogicalType flinkSchema =
-                ProtoToFlinkSchemaConverter.toFlinkSchema(stockTradeSchema.toDescriptor());
+                ProtoToFlinkSchemaConverter.toFlinkSchema(
+                        stockTradeSchema.toDescriptor().getFile());
 
         // Create a StockTrade message
         Object stockTrade =
