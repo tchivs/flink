@@ -253,14 +253,16 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
                                         + "\n"
-                                        + "Caused by: Table (or view) 'not_exist' does not exist or you do not have permission to access it.\n"
+                                        + "Caused by: Table (or view) 'not_exist' does not exist, may be on a private cluster, or you do not have permission to access it.\n"
+                                        + "If the cluster is private, please connect using a private network.\n"
                                         + "Using current catalog '' and current database ''."),
 
                 // ---
                 TestSpec.test("alter table that does not exist")
                         .executeSql("ALTER TABLE `not_exist` ADD (b INT)")
                         .expectExactUserError(
-                                "Table `default_catalog`.`default_database`.`not_exist` does not exist or you do not have permission to access it."),
+                                "Table `default_catalog`.`default_database`.`not_exist` does not exist, may be on a private cluster, or you do not have permission to access it.\n"
+                                        + "If the cluster is private, please connect using a private network."),
 
                 // ---
                 TestSpec.test("alter a table when no database is set")
@@ -283,7 +285,8 @@ public class ClassifiedExceptionTest {
                                 ExceptionKind.USER,
                                 "SQL validation failed. Error from line 1, column 15 to line 1, column 25.\n"
                                         + "\n"
-                                        + "Caused by: Table (or view) '<<removed>>' does not exist or you do not have permission to access it."),
+                                        + "Caused by: Table (or view) '<<removed>>' does not exist, may be on a private cluster, or you do not have permission to access it.\n"
+                                        + "If the cluster is private, please connect using a private network."),
                 // ---
                 TestSpec.test("error for unsupported RAW type from CREATE TABLE")
                         .executeSql(
