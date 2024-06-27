@@ -111,7 +111,8 @@ public class VertexAIProviderTest extends ProviderTestBase {
         request.body().writeTo(buffer);
         // Check that the request used the gemini format by default.
         assertThat(buffer.readUtf8())
-                .isEqualTo("{\"contents\":[{\"parts\":[{\"text\":\"input-text-prompt\"}]}]}");
+                .isEqualTo(
+                        "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"input-text-prompt\"}]}]}");
     }
 
     @Test

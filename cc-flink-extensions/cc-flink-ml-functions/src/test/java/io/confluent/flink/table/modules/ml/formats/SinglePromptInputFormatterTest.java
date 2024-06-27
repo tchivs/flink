@@ -158,8 +158,8 @@ public class SinglePromptInputFormatterTest {
         Object[] args = new Object[] {"input-text-prompt"};
         assertThat(new String(formatter.format(args)))
                 .isEqualTo(
-                        "{\"contents\":[{\"parts\":[{\"text\":\"input-text-prompt\"}]}],"
-                                + "\"system_instructions\":[{\"parts\":[{\"text\":\"System Prompt!\"}]}],"
+                        "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"input-text-prompt\"}]}],"
+                                + "\"system_instruction\":{\"parts\":[{\"text\":\"System Prompt!\"}]},"
                                 + "\"generationConfig\":{\"temperature\":0.5,\"topP\":0.9,\"topK\":10.0,"
                                 + "\"maxOutputTokens\":100,\"stopSequences\":[\"stop1\",\"stop2\"]}}");
     }

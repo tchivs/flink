@@ -266,16 +266,14 @@ public class SinglePromptInputFormatter implements InputFormatter {
                         ObjectNode node = mapper.createObjectNode();
                         final ArrayNode contents = node.putArray("contents");
                         final ObjectNode content = contents.addObject();
+                        content.put("role", "user");
                         final ArrayNode parts = content.putArray("parts");
                         final ObjectNode part = parts.addObject();
                         part.put("text", "");
 
                         if (params.getSystemPrompt() != null) {
-                            // Note: As of 2024-05-02, system_instructions is still only on the
-                            // v1beta API.
-                            final ArrayNode systemInstructions =
-                                    node.putArray("system_instructions");
-                            final ObjectNode systemInstruction = systemInstructions.addObject();
+                            final ObjectNode systemInstruction =
+                                    node.putObject("system_instruction");
                             final ArrayNode systemParts = systemInstruction.putArray("parts");
                             final ObjectNode systemPart = systemParts.addObject();
                             params.linkSystemPrompt(systemPart, "text");

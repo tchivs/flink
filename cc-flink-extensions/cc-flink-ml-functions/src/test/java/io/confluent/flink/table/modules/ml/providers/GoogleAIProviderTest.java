@@ -69,7 +69,8 @@ public class GoogleAIProviderTest extends ProviderTestBase {
         Buffer buffer = new Buffer();
         request.body().writeTo(buffer);
         assertThat(buffer.readUtf8())
-                .isEqualTo("{\"contents\":[{\"parts\":[{\"text\":\"input-text-prompt\"}]}]}");
+                .isEqualTo(
+                        "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"input-text-prompt\"}]}]}");
     }
 
     @Test
