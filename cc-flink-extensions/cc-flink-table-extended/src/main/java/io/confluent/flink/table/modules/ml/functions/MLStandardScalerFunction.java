@@ -5,21 +5,13 @@
 package io.confluent.flink.table.modules.ml.functions;
 
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.DataTypeFactory;
-import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.inference.ArgumentCount;
-import org.apache.flink.table.types.inference.CallContext;
-import org.apache.flink.table.types.inference.InputTypeStrategy;
-import org.apache.flink.table.types.inference.Signature;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +19,7 @@ import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
 
 /** Scalar function for standard scaling of values. */
 public class MLStandardScalerFunction extends ScalarFunction {
@@ -155,96 +148,43 @@ public class MLStandardScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return TypeInference.newBuilder()
-                .inputTypeStrategy(
-                        new InputTypeStrategy() {
-                            @Override
-                            public ArgumentCount getArgumentCount() {
-                                return new ArgumentCount() {
-                                    @Override
-                                    public boolean isValidCount(int count) {
-                                        return count >= 3 && count <= 5;
-                                    }
+        return getTypeInferenceForScalerFunctions(
+                3,
+                5,
+                DataTypes.DOUBLE(),
+                count -> count >= 3 && count <= 5,
+                this::validateInputTypes);
+    }
 
-                                    @Override
-                                    public Optional<Integer> getMinCount() {
-                                        return Optional.of(3);
-                                    }
-
-                                    @Override
-                                    public Optional<Integer> getMaxCount() {
-                                        return Optional.of(5);
-                                    }
-                                };
-                            }
-
-                            @Override
-                            public Optional<List<DataType>> inferInputTypes(
-                                    CallContext callContext, boolean throwOnFailure) {
-                                List<DataType> argumentDataTypes =
-                                        callContext.getArgumentDataTypes();
-                                Optional<String> errorMessage =
-                                        IntStream.range(0, argumentDataTypes.size())
-                                                .mapToObj(
-                                                        i -> {
-                                                            DataType argDataType =
-                                                                    argumentDataTypes.get(i);
-                                                            if (i < 3) {
-                                                                if (!argDataType.equals(
-                                                                                DataTypes.NULL())
-                                                                        && !argDataType
-                                                                                .getLogicalType()
-                                                                                .isAnyOf(
-                                                                                        LogicalTypeFamily
-                                                                                                .NUMERIC,
-                                                                                        LogicalTypeFamily
-                                                                                                .TIMESTAMP,
-                                                                                        LogicalTypeFamily
-                                                                                                .TIME,
-                                                                                        LogicalTypeFamily
-                                                                                                .INTERVAL,
-                                                                                        LogicalTypeFamily
-                                                                                                .DATETIME)) {
-                                                                    return String.format(
-                                                                            "%s datatype is not supported as argument %s to %s function. Please refer documentation for supported datatypes",
-                                                                            i, argDataType, NAME);
-                                                                }
-                                                            } else {
-                                                                if (!argDataType
-                                                                        .nullable()
-                                                                        .equals(
-                                                                                DataTypes
-                                                                                        .BOOLEAN())) {
-                                                                    return String.format(
-                                                                            "Arguments withCentering and withScaling to %s function need to be of type Boolean",
-                                                                            NAME);
-                                                                }
-                                                            }
-                                                            return null;
-                                                        })
-                                                .filter(Objects::nonNull)
-                                                .findFirst();
-                                if (errorMessage.isPresent()) {
-                                    if (throwOnFailure) {
-                                        throw new ValidationException(errorMessage.get());
-                                    } else {
-                                        return Optional.empty();
-                                    }
+    private Optional<String> validateInputTypes(List<DataType> argumentDataTypes) {
+        return IntStream.range(0, argumentDataTypes.size())
+                .mapToObj(
+                        i -> {
+                            DataType argDataType = argumentDataTypes.get(i);
+                            if (i < 3) {
+                                if (!argDataType.equals(DataTypes.NULL())
+                                        && !argDataType
+                                                .getLogicalType()
+                                                .isAnyOf(
+                                                        LogicalTypeFamily.NUMERIC,
+                                                        LogicalTypeFamily.TIMESTAMP,
+                                                        LogicalTypeFamily.TIME,
+                                                        LogicalTypeFamily.INTERVAL,
+                                                        LogicalTypeFamily.DATETIME)) {
+                                    return String.format(
+                                            "%s datatype is not supported as argument %s to %s function. Please refer documentation for supported datatypes",
+                                            i, argDataType, NAME);
                                 }
-                                return Optional.of(argumentDataTypes);
-                            }
-
-                            @Override
-                            public List<Signature> getExpectedSignatures(
-                                    FunctionDefinition definition) {
-                                final List<Signature.Argument> arguments = new ArrayList<>();
-                                for (int i = 0; i < 5; i++) {
-                                    arguments.add(Signature.Argument.of("input" + i));
+                            } else {
+                                if (!argDataType.nullable().equals(DataTypes.BOOLEAN())) {
+                                    return String.format(
+                                            "Arguments withCentering and withScaling to %s function need to be of type Boolean",
+                                            NAME);
                                 }
-                                return Collections.singletonList(Signature.of(arguments));
                             }
+                            return null;
                         })
-                .outputTypeStrategy(callContext -> Optional.of(DataTypes.DOUBLE()))
-                .build();
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 }

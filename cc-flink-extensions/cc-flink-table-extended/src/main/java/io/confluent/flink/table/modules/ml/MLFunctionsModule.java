@@ -11,6 +11,7 @@ import io.confluent.flink.table.modules.ml.functions.MLBucketizeFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMaxAbsScalerFunction;
 import io.confluent.flink.table.modules.ml.functions.MLMinMaxScalerFunction;
 import io.confluent.flink.table.modules.ml.functions.MLNormalizerFunction;
+import io.confluent.flink.table.modules.ml.functions.MLRobustScalerFunction;
 import io.confluent.flink.table.modules.ml.functions.MLStandardScalerFunction;
 
 import java.util.Collections;
@@ -56,6 +57,9 @@ public class MLFunctionsModule implements Module {
                         put(
                                 MLNormalizerFunction.NAME,
                                 new MLNormalizerFunction(MLNormalizerFunction.NAME));
+                        put(
+                                MLRobustScalerFunction.NAME,
+                                new MLRobustScalerFunction(MLRobustScalerFunction.NAME));
                     }
                 };
     }
