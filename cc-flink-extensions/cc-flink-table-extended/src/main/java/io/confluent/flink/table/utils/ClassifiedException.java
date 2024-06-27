@@ -461,7 +461,8 @@ public final class ClassifiedException {
                                         "The pattern should've been matched.");
                             }
                             return String.format(
-                                    "Table (or view) '%s' does not exist or you do not have permission to access it.\n"
+                                    "Table (or view) '%s' does not exist, may be on a private cluster, or you do not have permission to access it.\n"
+                                            + "If the cluster is private, please connect using a private network.\n"
                                             + "Using current catalog '%s' and current database '%s'.",
                                     matcher.group(1),
                                     publicOptions
@@ -486,7 +487,8 @@ public final class ClassifiedException {
                         (msg) ->
                                 msg.replace(
                                         "doesn't exist or is a temporary table.",
-                                        "does not exist or you do not have permission to access it.")));
+                                        "does not exist, may be on a private cluster, or you do not have permission to access it.\n"
+                                                + "If the cluster is private, please connect using a private network.")));
 
         // Don't expose internal errors during failed validation
         putClassifiedException(
