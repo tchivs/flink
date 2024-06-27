@@ -4,15 +4,21 @@
 
 package io.confluent.flink.table.modules.ml.functions;
 
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.DataTypeFactory;
 import org.apache.flink.table.functions.ScalarFunction;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.inference.TypeInference;
+import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForNormalizer;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
 
 /**
  * A ScalarFunction that implements the ML_MAX_ABS_SCALER function. This function scales the input
@@ -92,6 +98,38 @@ public class MLMaxAbsScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForNormalizer(NAME);
+        return getTypeInferenceForScalerFunctions(
+                2, 2, DataTypes.DOUBLE(), count -> count == 2, this::validateInputTypes);
+    }
+
+    private Optional<String> validateInputTypes(List<DataType> argumentDataTypes) {
+        return IntStream.range(0, argumentDataTypes.size())
+                .mapToObj(
+                        i -> {
+                            DataType argDataType = argumentDataTypes.get(i);
+                            // Check if the data type is supported
+                            if (!argDataType.equals(DataTypes.NULL())
+                                    && !argDataType
+                                            .getLogicalType()
+                                            .isAnyOf(
+                                                    LogicalTypeFamily.NUMERIC,
+                                                    LogicalTypeFamily.TIMESTAMP,
+                                                    LogicalTypeFamily.TIME,
+                                                    LogicalTypeFamily.INTERVAL,
+                                                    LogicalTypeFamily.DATETIME)) {
+                                return String.format(
+                                        "%s datatype is not supported as first argument to %s function. Please refer documentation for supported datatypes",
+                                        argDataType, NAME);
+                            }
+                            // Check if absolute Maximum value
+                            // is null
+                            if (i > 0 && argDataType.equals(DataTypes.NULL())) {
+                                return String.format(
+                                        "Second argument to %s function cannot be NULL", NAME);
+                            }
+                            return null;
+                        })
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 }

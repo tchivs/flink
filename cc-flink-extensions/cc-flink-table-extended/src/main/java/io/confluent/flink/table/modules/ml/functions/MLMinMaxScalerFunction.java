@@ -5,21 +5,13 @@
 package io.confluent.flink.table.modules.ml.functions;
 
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.DataTypeFactory;
-import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.inference.ArgumentCount;
-import org.apache.flink.table.types.inference.CallContext;
-import org.apache.flink.table.types.inference.InputTypeStrategy;
-import org.apache.flink.table.types.inference.Signature;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +19,7 @@ import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
 
 /** A scalar function for performing Min-Max scaling on numerical values. */
 public class MLMinMaxScalerFunction extends ScalarFunction {
@@ -127,101 +120,43 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return TypeInference.newBuilder()
-                .inputTypeStrategy(
-                        new InputTypeStrategy() {
-                            @Override
-                            public ArgumentCount getArgumentCount() {
-                                return new ArgumentCount() {
-                                    @Override
-                                    public boolean isValidCount(int count) {
-                                        return count == 3;
-                                    }
+        return getTypeInferenceForScalerFunctions(
+                3, 3, DataTypes.DOUBLE(), count -> count == 3, this::validateInputTypes);
+    }
 
-                                    @Override
-                                    public Optional<Integer> getMinCount() {
-                                        return Optional.of(3);
-                                    }
-
-                                    @Override
-                                    public Optional<Integer> getMaxCount() {
-                                        return Optional.of(3);
-                                    }
-                                };
+    private Optional<String> validateInputTypes(List<DataType> argumentDataTypes) {
+        return IntStream.range(0, argumentDataTypes.size())
+                .mapToObj(
+                        i -> {
+                            DataType argDataType = argumentDataTypes.get(i);
+                            // Check if the data type is supported
+                            if (!argDataType.equals(DataTypes.NULL())
+                                    && !argDataType
+                                            .getLogicalType()
+                                            .isAnyOf(
+                                                    LogicalTypeFamily.NUMERIC,
+                                                    LogicalTypeFamily.TIMESTAMP,
+                                                    LogicalTypeFamily.TIME,
+                                                    LogicalTypeFamily.INTERVAL,
+                                                    LogicalTypeFamily.DATETIME)) {
+                                return String.format(
+                                        "%s datatype is not supported as argument to %s function. Please refer documentation for supported datatypes",
+                                        argDataType, NAME);
                             }
 
-                            @Override
-                            public Optional<List<DataType>> inferInputTypes(
-                                    CallContext callContext, boolean throwOnFailure) {
-                                List<DataType> argsDataTypes = callContext.getArgumentDataTypes();
-
-                                // Use IntStream.range to create indices for elements in
-                                // argsDataTypes list
-                                Optional<String> errorMessage =
-                                        IntStream.range(0, argsDataTypes.size())
-                                                .mapToObj(
-                                                        i -> {
-                                                            DataType argDataType =
-                                                                    argsDataTypes.get(i);
-                                                            // Check if the data type is supported
-                                                            if (!argDataType.equals(
-                                                                            DataTypes.NULL())
-                                                                    && !argDataType
-                                                                            .getLogicalType()
-                                                                            .isAnyOf(
-                                                                                    LogicalTypeFamily
-                                                                                            .NUMERIC,
-                                                                                    LogicalTypeFamily
-                                                                                            .TIMESTAMP,
-                                                                                    LogicalTypeFamily
-                                                                                            .TIME,
-                                                                                    LogicalTypeFamily
-                                                                                            .INTERVAL,
-                                                                                    LogicalTypeFamily
-                                                                                            .DATETIME)) {
-                                                                return String.format(
-                                                                        "%s datatype is not supported as argument to %s function. Please refer documentation for supported datatypes",
-                                                                        argDataType, NAME);
-                                                            }
-
-                                                            // Check if dataMin and dataMax value
-                                                            // are null
-                                                            if (i > 0
-                                                                    && argDataType.equals(
-                                                                            DataTypes.NULL())) {
-                                                                return String.format(
-                                                                        "The min and max arguments to %s function cannot be NULL",
-                                                                        NAME);
-                                                            }
-
-                                                            return null; // Return null if no error
-                                                        })
-                                                .filter(Objects::nonNull) // Filter out null error
-                                                // messages
-                                                .findFirst(); // Find the first error message
-
-                                if (errorMessage.isPresent()) {
-                                    if (throwOnFailure) {
-                                        throw new ValidationException(errorMessage.get());
-                                    } else {
-                                        return Optional.empty();
-                                    }
-                                }
-                                return Optional.of(argsDataTypes);
+                            // Check if dataMin and dataMax value
+                            // are null
+                            if (i > 0 && argDataType.equals(DataTypes.NULL())) {
+                                return String.format(
+                                        "The min and max arguments to %s function cannot be NULL",
+                                        NAME);
                             }
 
-                            @Override
-                            public List<Signature> getExpectedSignatures(
-                                    FunctionDefinition definition) {
-                                final List<Signature.Argument> arguments = new ArrayList<>();
-                                for (int i = 0; i < 3; i++) {
-                                    arguments.add(Signature.Argument.of("input" + i));
-                                }
-                                return Collections.singletonList(Signature.of(arguments));
-                            }
+                            return null; // Return null if no error
                         })
-                .outputTypeStrategy(callContext -> Optional.of(DataTypes.DOUBLE()))
-                .build();
+                .filter(Objects::nonNull) // Filter out null error
+                // messages
+                .findFirst(); // Find the first error message
     }
 
     /**

@@ -5,15 +5,9 @@
 package io.confluent.flink.table.modules.ml.functions;
 
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.DataTypeFactory;
-import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.inference.ArgumentCount;
-import org.apache.flink.table.types.inference.CallContext;
-import org.apache.flink.table.types.inference.InputTypeStrategy;
-import org.apache.flink.table.types.inference.Signature;
 import org.apache.flink.table.types.inference.TypeInference;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -22,11 +16,12 @@ import io.confluent.flink.table.utils.mlutils.MlFunctionsUtil;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.IntStream;
+
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
 
 /** A scaler function that assigns a numerical expression to a bucket. */
 public class MLBucketizeFunction extends ScalarFunction {
@@ -127,171 +122,94 @@ public class MLBucketizeFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return TypeInference.newBuilder()
-                .inputTypeStrategy(
-                        new InputTypeStrategy() {
-                            @Override
-                            public ArgumentCount getArgumentCount() {
-                                return new ArgumentCount() {
-                                    @Override
-                                    public boolean isValidCount(int count) {
-                                        return count == 2 || count == 3;
-                                    }
-
-                                    @Override
-                                    public Optional<Integer> getMinCount() {
-                                        return Optional.of(2);
-                                    }
-
-                                    @Override
-                                    public Optional<Integer> getMaxCount() {
-                                        return Optional.of(3);
-                                    }
-                                };
-                            }
-
-                            @Override
-                            public Optional<List<DataType>> inferInputTypes(
-                                    CallContext callContext, boolean throwOnFailure) {
-                                List<DataType> argumentDataTypes =
-                                        callContext.getArgumentDataTypes();
-
-                                Optional<String> errorMessage =
-                                        IntStream.range(0, argumentDataTypes.size())
-                                                .mapToObj(
-                                                        i -> {
-                                                            DataType argDataType =
-                                                                    argumentDataTypes.get(i);
-                                                            switch (i) {
-                                                                case (0):
-                                                                    if (!argDataType.equals(
-                                                                                    DataTypes
-                                                                                            .NULL())
-                                                                            && !argDataType
-                                                                                    .getLogicalType()
-                                                                                    .isAnyOf(
-                                                                                            LogicalTypeFamily
-                                                                                                    .NUMERIC,
-                                                                                            LogicalTypeFamily
-                                                                                                    .TIME,
-                                                                                            LogicalTypeFamily
-                                                                                                    .TIMESTAMP,
-                                                                                            LogicalTypeFamily
-                                                                                                    .DATETIME,
-                                                                                            LogicalTypeFamily
-                                                                                                    .INTERVAL)) {
-                                                                        return String.format(
-                                                                                "%s data type is not supported as the first argument to %s function.",
-                                                                                argDataType, NAME);
-                                                                    }
-                                                                    break;
-                                                                case (1):
-                                                                    if (argDataType
-                                                                            .getConversionClass()
-                                                                            .isArray()) {
-                                                                        DataType childDataType =
-                                                                                argDataType
-                                                                                        .getChildren()
-                                                                                        .get(0);
-                                                                        if (!argDataType.equals(
-                                                                                        DataTypes
-                                                                                                .NULL())
-                                                                                && !childDataType
-                                                                                        .getLogicalType()
-                                                                                        .isAnyOf(
-                                                                                                LogicalTypeFamily
-                                                                                                        .NUMERIC,
-                                                                                                LogicalTypeFamily
-                                                                                                        .TIME,
-                                                                                                LogicalTypeFamily
-                                                                                                        .TIMESTAMP,
-                                                                                                LogicalTypeFamily
-                                                                                                        .DATETIME,
-                                                                                                LogicalTypeFamily
-                                                                                                        .INTERVAL)) {
-                                                                            return String.format(
-                                                                                    "Array of type %s is not supported as the second argument to %s function.",
-                                                                                    childDataType,
-                                                                                    NAME);
-                                                                        }
-                                                                    } else {
-                                                                        return String.format(
-                                                                                "The second argument to the %s function must be as ARRAY.",
-                                                                                NAME);
-                                                                    }
-                                                                    break;
-                                                                case (2):
-                                                                    if (argDataType
-                                                                            .getConversionClass()
-                                                                            .isArray()) {
-                                                                        DataType childDataType =
-                                                                                argDataType
-                                                                                        .getChildren()
-                                                                                        .get(0);
-                                                                        if (!childDataType
-                                                                                .getLogicalType()
-                                                                                .isAnyOf(
-                                                                                        LogicalTypeFamily
-                                                                                                .NUMERIC,
-                                                                                        LogicalTypeFamily
-                                                                                                .TIME,
-                                                                                        LogicalTypeFamily
-                                                                                                .TIMESTAMP,
-                                                                                        LogicalTypeFamily
-                                                                                                .DATETIME,
-                                                                                        LogicalTypeFamily
-                                                                                                .INTERVAL,
-                                                                                        LogicalTypeFamily
-                                                                                                .CHARACTER_STRING)) {
-                                                                            return String.format(
-                                                                                    "Array of type %s is not supported as the third argument to %s function. ",
-                                                                                    childDataType,
-                                                                                    NAME);
-                                                                        }
-                                                                    } else {
-                                                                        return String.format(
-                                                                                "Third argument to %s function must be as ARRAY.",
-                                                                                NAME);
-                                                                    }
-                                                                    break;
-                                                                default:
-                                                                    return String.format(
-                                                                            "Invalid number of arguments passed to the %s function.",
-                                                                            NAME);
-                                                            }
-
-                                                            return null;
-                                                        })
-                                                .filter(Objects::nonNull)
-                                                .findFirst();
-
-                                if (errorMessage.isPresent()) {
-                                    if (throwOnFailure) {
-                                        throw new ValidationException(errorMessage.get());
-                                    } else {
-                                        return Optional.empty();
-                                    }
-                                }
-                                return Optional.of(argumentDataTypes);
-                            }
-
-                            @Override
-                            public List<Signature> getExpectedSignatures(
-                                    FunctionDefinition definition) {
-                                final List<Signature.Argument> arguments = new ArrayList<>();
-                                for (int i = 0; i < 3; i++) {
-                                    arguments.add(Signature.Argument.of("input" + i));
-                                }
-                                return Collections.singletonList(Signature.of(arguments));
-                            }
-                        })
-                .outputTypeStrategy(callContext -> Optional.of(DataTypes.STRING()))
-                .build();
+        return getTypeInferenceForScalerFunctions(
+                2,
+                3,
+                DataTypes.STRING(),
+                count -> count == 2 || count == 3,
+                this::validateInputTypes);
     }
 
     @Override
     public String toString() {
         return String.format("MLBucketizeFunction {functionName=%s}", functionName);
+    }
+
+    private Optional<String> validateInputTypes(List<DataType> argumentDataTypes) {
+        return IntStream.range(0, argumentDataTypes.size())
+                .mapToObj(
+                        i -> {
+                            DataType argDataType = argumentDataTypes.get(i);
+                            switch (i) {
+                                case (0):
+                                    if (!argDataType.equals(DataTypes.NULL())
+                                            && !argDataType
+                                                    .getLogicalType()
+                                                    .isAnyOf(
+                                                            LogicalTypeFamily.NUMERIC,
+                                                            LogicalTypeFamily.TIME,
+                                                            LogicalTypeFamily.TIMESTAMP,
+                                                            LogicalTypeFamily.DATETIME,
+                                                            LogicalTypeFamily.INTERVAL)) {
+                                        return String.format(
+                                                "%s data type is not supported as the first argument to %s function.",
+                                                argDataType, NAME);
+                                    }
+                                    break;
+                                case (1):
+                                    if (argDataType.getConversionClass().isArray()) {
+                                        DataType childDataType = argDataType.getChildren().get(0);
+                                        if (!argDataType.equals(DataTypes.NULL())
+                                                && !childDataType
+                                                        .getLogicalType()
+                                                        .isAnyOf(
+                                                                LogicalTypeFamily.NUMERIC,
+                                                                LogicalTypeFamily.TIME,
+                                                                LogicalTypeFamily.TIMESTAMP,
+                                                                LogicalTypeFamily.DATETIME,
+                                                                LogicalTypeFamily.INTERVAL)) {
+                                            return String.format(
+                                                    "Array of type %s is not supported as the second argument to %s function.",
+                                                    childDataType, NAME);
+                                        }
+                                    } else {
+                                        return String.format(
+                                                "The second argument to the %s function must be as ARRAY.",
+                                                NAME);
+                                    }
+                                    break;
+                                case (2):
+                                    if (argDataType.getConversionClass().isArray()) {
+                                        DataType childDataType = argDataType.getChildren().get(0);
+                                        if (!childDataType
+                                                .getLogicalType()
+                                                .isAnyOf(
+                                                        LogicalTypeFamily.NUMERIC,
+                                                        LogicalTypeFamily.TIME,
+                                                        LogicalTypeFamily.TIMESTAMP,
+                                                        LogicalTypeFamily.DATETIME,
+                                                        LogicalTypeFamily.INTERVAL,
+                                                        LogicalTypeFamily.CHARACTER_STRING)) {
+                                            return String.format(
+                                                    "Array of type %s is not supported as the third argument to %s function. ",
+                                                    childDataType, NAME);
+                                        }
+                                    } else {
+                                        return String.format(
+                                                "Third argument to %s function must be as ARRAY.",
+                                                NAME);
+                                    }
+                                    break;
+                                default:
+                                    return String.format(
+                                            "Invalid number of arguments passed to the %s function.",
+                                            NAME);
+                            }
+
+                            return null;
+                        })
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 
     @SuppressWarnings("unchecked")

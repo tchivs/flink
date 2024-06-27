@@ -4,7 +4,6 @@
 
 package io.confluent.flink.table.utils.mlutils;
 
-import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.functions.FunctionDefinition;
 import org.apache.flink.table.types.DataType;
@@ -13,7 +12,6 @@ import org.apache.flink.table.types.inference.CallContext;
 import org.apache.flink.table.types.inference.InputTypeStrategy;
 import org.apache.flink.table.types.inference.Signature;
 import org.apache.flink.table.types.inference.TypeInference;
-import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import java.time.Duration;
@@ -29,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.IntStream;
+import java.util.function.Function;
 
 /**
  * Utility class for ML functions. Provides methods for type conversion and data type validation.
@@ -106,12 +104,23 @@ public class MlFunctionsUtil {
     }
 
     /**
-     * Returns the type inference logic for Normalizer/AbsScaler functions.
+     * Creates a TypeInference object for scaler functions with configurable input and output type
+     * strategies.
      *
-     * @param name Name of the function
-     * @return the type inference
+     * @param minCount The minimum number of arguments expected.
+     * @param maxCount The maximum number of arguments expected.
+     * @param outputDataType The DataType of the output.
+     * @param isValidCount A function that determines if the given argument count is valid.
+     * @param validateInputTypes A function that validates the input types and returns an error
+     *     message if invalid.
+     * @return A TypeInference object with the specified input and output type strategies.
      */
-    public static TypeInference getTypeInferenceForNormalizer(String name) {
+    public static TypeInference getTypeInferenceForScalerFunctions(
+            Integer minCount,
+            Integer maxCount,
+            DataType outputDataType,
+            Function<Integer, Boolean> isValidCount,
+            Function<List<DataType>, Optional<String>> validateInputTypes) {
         return TypeInference.newBuilder()
                 .inputTypeStrategy(
                         new InputTypeStrategy() {
@@ -121,17 +130,17 @@ public class MlFunctionsUtil {
 
                                     @Override
                                     public boolean isValidCount(int count) {
-                                        return count == 2;
+                                        return isValidCount.apply(count);
                                     }
 
                                     @Override
                                     public Optional<Integer> getMinCount() {
-                                        return Optional.of(2);
+                                        return Optional.of(minCount);
                                     }
 
                                     @Override
                                     public Optional<Integer> getMaxCount() {
-                                        return Optional.of(2);
+                                        return Optional.of(maxCount);
                                     }
                                 };
                             }
@@ -144,44 +153,7 @@ public class MlFunctionsUtil {
                                 // Use IntStream.range to create indices for elements in
                                 // argsDataTypes list and returns errorMessage if any
                                 Optional<String> errorMessage =
-                                        IntStream.range(0, argumentDataTypes.size())
-                                                .mapToObj(
-                                                        i -> {
-                                                            DataType argDataType =
-                                                                    argumentDataTypes.get(i);
-                                                            // Check if the data type is supported
-                                                            if (!argDataType.equals(
-                                                                            DataTypes.NULL())
-                                                                    && !argDataType
-                                                                            .getLogicalType()
-                                                                            .isAnyOf(
-                                                                                    LogicalTypeFamily
-                                                                                            .NUMERIC,
-                                                                                    LogicalTypeFamily
-                                                                                            .TIMESTAMP,
-                                                                                    LogicalTypeFamily
-                                                                                            .TIME,
-                                                                                    LogicalTypeFamily
-                                                                                            .INTERVAL,
-                                                                                    LogicalTypeFamily
-                                                                                            .DATETIME)) {
-                                                                return String.format(
-                                                                        "%s datatype is not supported as first argument to %s function. Please refer documentation for supported datatypes",
-                                                                        argDataType, name);
-                                                            }
-                                                            // Check if absolute Maximum value
-                                                            // is null
-                                                            if (i > 0
-                                                                    && argDataType.equals(
-                                                                            DataTypes.NULL())) {
-                                                                return String.format(
-                                                                        "Second argument to %s function cannot be NULL",
-                                                                        name);
-                                                            }
-                                                            return null;
-                                                        })
-                                                .filter(Objects::nonNull)
-                                                .findFirst();
+                                        validateInputTypes.apply(argumentDataTypes);
 
                                 if (errorMessage.isPresent()) {
                                     if (throwOnFailure) {
@@ -197,13 +169,13 @@ public class MlFunctionsUtil {
                             public List<Signature> getExpectedSignatures(
                                     FunctionDefinition definition) {
                                 final List<Signature.Argument> arguments = new ArrayList<>();
-                                for (int i = 0; i < 2; i++) {
+                                for (int i = 0; i < maxCount; i++) {
                                     arguments.add(Signature.Argument.of("input" + i));
                                 }
                                 return Collections.singletonList(Signature.of(arguments));
                             }
                         })
-                .outputTypeStrategy(callContext -> Optional.of(DataTypes.DOUBLE()))
+                .outputTypeStrategy(callContext -> Optional.of(outputDataType))
                 .build();
     }
 }
