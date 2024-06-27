@@ -1716,6 +1716,16 @@ class JobMasterTest {
                                 .map(Event::getAttributes)
                                 .map(x -> x.get("newJobStatus")))
                 .containsExactly("RUNNING", "FAILING", "FAILED");
+
+        assertThat(
+                        jobEvents.stream()
+                                .filter(
+                                        event ->
+                                                Events.AllSubtasksStatusChange.name()
+                                                        .equals(event.getName()))
+                                .map(Event::getAttributes)
+                                .map(x -> x.get("allRunningOrFinished")))
+                .containsExactly("true", "false");
     }
 
     @Test
@@ -1739,6 +1749,16 @@ class JobMasterTest {
                                 .map(Event::getAttributes)
                                 .map(x -> x.get("newJobStatus")))
                 .containsExactly("RUNNING", "FAILING", "FAILED");
+
+        assertThat(
+                        jobEvents.stream()
+                                .filter(
+                                        event ->
+                                                Events.AllSubtasksStatusChange.name()
+                                                        .equals(event.getName()))
+                                .map(Event::getAttributes)
+                                .map(x -> x.get("allRunningOrFinished")))
+                .containsExactly("true", "false");
     }
 
     /**

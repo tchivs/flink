@@ -23,6 +23,7 @@ public enum Events {
     Checkpoint,
     JobStatusChange,
     JobFailure,
+    AllSubtasksStatusChange,
     ;
 
     public EventBuilder builder(Class<?> classScope) {

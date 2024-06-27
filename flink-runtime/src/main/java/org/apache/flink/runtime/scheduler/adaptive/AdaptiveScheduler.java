@@ -56,6 +56,7 @@ import org.apache.flink.runtime.executiongraph.DefaultVertexAttemptNumberStore;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.executiongraph.ExecutionStateUpdateListener;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.executiongraph.MutableVertexAttemptNumberStore;
@@ -114,7 +115,9 @@ import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.EnforceMinimalI
 import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.RescalingController;
 import org.apache.flink.runtime.scheduler.exceptionhistory.ExceptionHistoryEntry;
 import org.apache.flink.runtime.scheduler.exceptionhistory.RootExceptionHistoryEntry;
+import org.apache.flink.runtime.scheduler.metrics.AllSubTasksRunningOrFinishedStateTimeMetrics;
 import org.apache.flink.runtime.scheduler.metrics.DeploymentStateTimeMetrics;
+import org.apache.flink.runtime.scheduler.metrics.ExecutionStatusMetricsRegistrar;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.util.BoundedFIFOQueue;
 import org.apache.flink.runtime.util.ResourceCounter;
@@ -228,7 +231,7 @@ public class AdaptiveScheduler
 
     private final SchedulerExecutionMode executionMode;
 
-    private final DeploymentStateTimeMetrics deploymentTimeMetrics;
+    private final List<ExecutionStatusMetricsRegistrar> executionStateMetricsRegistrars;
 
     private final BoundedFIFOQueue<RootExceptionHistoryEntry> exceptionHistory;
     private JobGraphJobInformation jobInformation;
@@ -315,14 +318,20 @@ public class AdaptiveScheduler
         final MetricOptions.JobStatusMetricsSettings jobStatusMetricsSettings =
                 MetricOptions.JobStatusMetricsSettings.fromConfiguration(configuration);
 
-        deploymentTimeMetrics =
-                new DeploymentStateTimeMetrics(jobGraph.getJobType(), jobStatusMetricsSettings);
+        this.executionStateMetricsRegistrars = new ArrayList<>(2);
+        this.executionStateMetricsRegistrars.add(
+                new DeploymentStateTimeMetrics(jobGraph.getJobType(), jobStatusMetricsSettings));
+        if (jobGraph.getJobType() == JobType.STREAMING) {
+            this.executionStateMetricsRegistrars.add(
+                    new AllSubTasksRunningOrFinishedStateTimeMetrics(
+                            jobGraph.getJobType(), jobStatusMetricsSettings));
+        }
 
         SchedulerBase.registerJobMetrics(
                 jobManagerJobMetricGroup,
                 jobStatusStore,
                 () -> (long) numRestarts,
-                deploymentTimeMetrics,
+                this.executionStateMetricsRegistrars,
                 tmpJobStatusListeners::add,
                 initializationTimestamp,
                 jobStatusMetricsSettings);
@@ -1184,6 +1193,17 @@ public class AdaptiveScheduler
     @Nonnull
     private ExecutionGraph createExecutionGraphAndRestoreState(
             VertexParallelismStore adjustedParallelismStore) throws Exception {
+
+        final ExecutionStateUpdateListener combinedExecutionStateUpdateListener;
+        if (executionStateMetricsRegistrars.size() == 1) {
+            combinedExecutionStateUpdateListener = executionStateMetricsRegistrars.get(0);
+        } else {
+            combinedExecutionStateUpdateListener =
+                    ExecutionStateUpdateListener.combine(
+                            executionStateMetricsRegistrars.toArray(
+                                    new ExecutionStateUpdateListener[0]));
+        }
+
         return executionGraphFactory.createAndRestoreExecutionGraph(
                 jobInformation.copyJobGraph(),
                 completedCheckpointStore,
@@ -1193,7 +1213,7 @@ public class AdaptiveScheduler
                 initializationTimestamp,
                 vertexAttemptNumberStore,
                 adjustedParallelismStore,
-                deploymentTimeMetrics,
+                combinedExecutionStateUpdateListener,
                 // adaptive scheduler works in streaming mode, actually it only
                 // supports must be pipelined result partition, mark partition finish is
                 // no need.
