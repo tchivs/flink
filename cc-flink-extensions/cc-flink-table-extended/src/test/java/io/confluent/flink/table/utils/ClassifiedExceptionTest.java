@@ -141,6 +141,20 @@ public class ClassifiedExceptionTest {
                                 "Model '`default_catalog`.`default_database`.`m`' does not exist."),
 
                 // ---
+                TestSpec.test("create function that already exists")
+                        .executeSql(
+                                "CREATE FUNCTION f as 'io.confluent.MySumClass' USING JAR 'confluent-artifact://flink-udf-ghijkl/v1'")
+                        .executeSql(
+                                "CREATE FUNCTION f as 'io.confluent.MySumClass' USING JAR 'confluent-artifact://flink-udf-ghijkl/v1'")
+                        .expectExactUserError(
+                                "Function default_database.f already exists in Catalog default_catalog."),
+
+                // ---
+                TestSpec.test("cannot find function to drop")
+                        .executeSql("DROP FUNCTION `f`")
+                        .expectExactUserError(
+                                "Function default_database.f does not exist in Catalog default_catalog."),
+                // ---
                 TestSpec.test("unsupported scripts")
                         .executeSql("SELECT 1; SELECT 1;")
                         .expectExactUserError(
@@ -222,7 +236,8 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error from line 1, column 8 to line 1, column 20.\n"
                                         + "\n"
-                                        + "Caused by: No match found for function signature notExisting()"),
+                                        + "Caused by: Function 'notExisting()' does not exist or you do not have permission to access it.\n"
+                                        + "Using current catalog '' and current database ''."),
                 // ---
                 TestSpec.test("type inference failed during validation")
                         .executeSql("CREATE TABLE t (a BIGINT) " + "WITH ('connector' = 'datagen')")
@@ -230,7 +245,8 @@ public class ClassifiedExceptionTest {
                         .expectExactUserError(
                                 "SQL validation failed. Error from line 1, column 8 to line 1, column 19.\n"
                                         + "\n"
-                                        + "Caused by: No match found for function signature ARRAY_JOIN()"),
+                                        + "Caused by: Function 'ARRAY_JOIN()' does not exist or you do not have permission to access it.\n"
+                                        + "Using current catalog '' and current database ''."),
                 // ---
                 TestSpec.test("show helpful error during SQL validation at point")
                         .executeSql("SELECT n")
@@ -255,6 +271,13 @@ public class ClassifiedExceptionTest {
                                         + "\n"
                                         + "Caused by: Table (or view) 'not_exist' does not exist, may be on a private cluster, or you do not have permission to access it.\n"
                                         + "If the cluster is private, please connect using a private network.\n"
+                                        + "Using current catalog '' and current database ''."),
+                TestSpec.test("select a function that does not exist")
+                        .executeSql("SELECT not_exist()")
+                        .expectExactUserError(
+                                "SQL validation failed. Error from line 1, column 8 to line 1, column 18.\n"
+                                        + "\n"
+                                        + "Caused by: Function 'not_exist()' does not exist or you do not have permission to access it.\n"
                                         + "Using current catalog '' and current database ''."),
 
                 // ---

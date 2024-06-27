@@ -15,9 +15,13 @@ import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.FunctionAlreadyExistException;
+import org.apache.flink.table.catalog.exceptions.FunctionNotExistException;
 import org.apache.flink.table.catalog.exceptions.ModelNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.operations.ddl.CreateCatalogFunctionOperation;
+import org.apache.flink.table.operations.ddl.DropCatalogFunctionOperation;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
 import org.apache.flink.table.planner.codegen.CodeGenException;
 import org.apache.flink.table.planner.codegen.ExpressionReducer;
@@ -85,6 +89,8 @@ public final class ClassifiedException {
                             ModelNotExistException.class,
                             TableNotExistException.class,
                             TableAlreadyExistException.class,
+                            FunctionNotExistException.class,
+                            FunctionAlreadyExistException.class,
                             SqlValidatorException.class));
 
     private final ExceptionKind exceptionKind;
@@ -245,6 +251,9 @@ public final class ClassifiedException {
     private static final Pattern CATALOG_NOT_FOUND =
             Pattern.compile("A catalog with name \\[(.*)] does not exist\\.");
 
+    private static final Pattern FUNCTION_SIGNATURE_NOT_FOUND =
+            Pattern.compile("No match found for function signature (.*)");
+
     static {
         classifiedExceptions = new HashMap<>();
 
@@ -276,6 +285,22 @@ public final class ClassifiedException {
         putClassifiedException(
                 CodeLocation.inClass(CatalogManager.class, TableException.class),
                 Handler.forwardCauseOnly("Could not execute AlterModel", ExceptionKind.USER));
+
+        putClassifiedException(
+                CodeLocation.inClass(
+                        CreateCatalogFunctionOperation.class, ValidationException.class),
+                Handler.forwardCauseOnly("already exists in Catalog", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CreateCatalogFunctionOperation.class, TableException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute CREATE CATALOG FUNCTION", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(DropCatalogFunctionOperation.class, ValidationException.class),
+                Handler.forwardCauseOnly("does not exist in Catalog", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(DropCatalogFunctionOperation.class, TableException.class),
+                Handler.forwardCauseOnly(
+                        "Could not execute DROP CATALOG FUNCTION", ExceptionKind.USER));
 
         putClassifiedException(
                 CodeLocation.inClass(CatalogManager.class, TableException.class),
@@ -463,6 +488,29 @@ public final class ClassifiedException {
                             return String.format(
                                     "Table (or view) '%s' does not exist, may be on a private cluster, or you do not have permission to access it.\n"
                                             + "If the cluster is private, please connect using a private network.\n"
+                                            + "Using current catalog '%s' and current database '%s'.",
+                                    matcher.group(1),
+                                    publicOptions
+                                            .getOptional(ServiceTasksOptions.SQL_CURRENT_CATALOG)
+                                            .orElse(""),
+                                    publicOptions
+                                            .getOptional(ServiceTasksOptions.SQL_CURRENT_DATABASE)
+                                            .orElse(""));
+                        }));
+
+        putClassifiedException(
+                CodeLocation.ofClass(SqlValidatorException.class),
+                Handler.rewriteMessageOnPattern(
+                        FUNCTION_SIGNATURE_NOT_FOUND,
+                        ExceptionKind.USER,
+                        (msg, publicOptions) -> {
+                            final Matcher matcher = FUNCTION_SIGNATURE_NOT_FOUND.matcher(msg);
+                            if (!matcher.matches()) {
+                                throw new IllegalStateException(
+                                        "The pattern should've been matched.");
+                            }
+                            return String.format(
+                                    "Function '%s' does not exist or you do not have permission to access it.\n"
                                             + "Using current catalog '%s' and current database '%s'.",
                                     matcher.group(1),
                                     publicOptions
