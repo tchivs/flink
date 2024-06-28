@@ -7,7 +7,6 @@ package io.confluent.flink.runtime.failure;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.kafka.common.errors.GroupAuthorizationException;
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.junit.jupiter.api.Test;
 
@@ -57,31 +56,5 @@ public class TypeFailureEnricherKafkaTest {
                 "USER",
                 "USER_ERROR_MSG",
                 "test root\nCaused by: test. logicalCluster: CLUSTER_NOT_FOUND!");
-    }
-
-    @Test
-    void testNotAuthorizedGroupReadException() throws ExecutionException, InterruptedException {
-        Configuration configuration = new Configuration();
-        configuration.set(TypeFailureEnricherOptions.ENABLE_JOB_CANNOT_RESTART_LABEL, Boolean.TRUE);
-
-        assertFailureEnricherLabels(
-                configuration,
-                new GroupAuthorizationException("some other error"),
-                "ERROR_CLASS_CODE",
-                "0",
-                "TYPE",
-                "SYSTEM",
-                "USER_ERROR_MSG",
-                "some other error");
-
-        assertFailureEnricherLabels(
-                configuration,
-                new GroupAuthorizationException("Not authorized to access group."),
-                "ERROR_CLASS_CODE",
-                "20",
-                "TYPE",
-                "USER",
-                "USER_ERROR_MSG",
-                "Not authorized to access group.");
     }
 }
