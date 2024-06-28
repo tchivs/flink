@@ -27,7 +27,7 @@ import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.core.execution.CheckpointType;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.failure.FailureEnricher;
-import org.apache.flink.events.Event;
+import org.apache.flink.events.Events;
 import org.apache.flink.queryablestate.KvStateID;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.blob.BlobWriter;
@@ -369,7 +369,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId>
                             schedulerListener,
                             (jobId, newJobStatus, timestamp) ->
                                     jobManagerJobMetricGroup.addEvent(
-                                            Event.builder(JobMaster.class, "JobStatusChanged")
+                                            Events.JobStatusChange.builder(JobMaster.class)
                                                     .setObservedTsMillis(timestamp)
                                                     .setSeverity("INFO")
                                                     .setAttribute(

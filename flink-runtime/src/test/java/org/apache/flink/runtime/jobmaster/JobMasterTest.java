@@ -40,6 +40,7 @@ import org.apache.flink.core.io.InputSplitSource;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.events.Event;
 import org.apache.flink.events.EventBuilder;
+import org.apache.flink.events.Events;
 import org.apache.flink.runtime.blocklist.BlockedNode;
 import org.apache.flink.runtime.blocklist.DefaultBlocklistHandler;
 import org.apache.flink.runtime.checkpoint.CheckpointProperties;
@@ -1706,7 +1707,14 @@ class JobMasterTest {
                                 localTaskManagerLocation.getResourceID(),
                                 new FlinkException("Test disconnectTaskManager exception.")),
                 jobEvents);
-        assertThat(jobEvents.stream().map(Event::getAttributes).map(x -> x.get("newJobStatus")))
+        assertThat(
+                        jobEvents.stream()
+                                .filter(
+                                        event ->
+                                                Events.JobStatusChange.name()
+                                                        .equals(event.getName()))
+                                .map(Event::getAttributes)
+                                .map(x -> x.get("newJobStatus")))
                 .containsExactly("RUNNING", "FAILING", "FAILED");
     }
 
@@ -1722,7 +1730,14 @@ class JobMasterTest {
                         testingHeartbeatService.triggerHeartbeatTimeout(
                                 jmResourceId, localTaskManagerLocation.getResourceID()),
                 jobEvents);
-        assertThat(jobEvents.stream().map(Event::getAttributes).map(x -> x.get("newJobStatus")))
+        assertThat(
+                        jobEvents.stream()
+                                .filter(
+                                        event ->
+                                                Events.JobStatusChange.name()
+                                                        .equals(event.getName()))
+                                .map(Event::getAttributes)
+                                .map(x -> x.get("newJobStatus")))
                 .containsExactly("RUNNING", "FAILING", "FAILED");
     }
 

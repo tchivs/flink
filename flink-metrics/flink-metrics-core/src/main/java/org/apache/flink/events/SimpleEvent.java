@@ -77,4 +77,26 @@ public class SimpleEvent implements Event {
     public Map<String, Object> getAttributes() {
         return attributes;
     }
+
+    @Override
+    public String toString() {
+        return "SimpleEvent{"
+                + "observedTsMillis="
+                + observedTsMillis
+                + ", name='"
+                + name
+                + '\''
+                + ", classScope='"
+                + classScope
+                + '\''
+                + ", body='"
+                + body
+                + '\''
+                + ", severity='"
+                + severity
+                + '\''
+                + ", attributes="
+                + attributes
+                + '}';
+    }
 }
