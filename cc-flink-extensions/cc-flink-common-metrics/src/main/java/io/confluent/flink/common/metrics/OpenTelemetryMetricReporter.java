@@ -138,6 +138,8 @@ public class OpenTelemetryMetricReporter extends OpenTelemetryReporterBase
                                 ImmutableMap.toImmutableMap(
                                         e -> VariableNameUtil.getVariableName(e.getKey()),
                                         Entry::getValue));
+        LOG.debug("Adding metric {} with variables {}", metricName, variables);
+
         Map<String, String> confluentVariables = ConfluentAdapter.adaptVariables(name, variables);
         final String confluentMetricName = ConfluentAdapter.adaptMetricName(name);
         MetricMetadata metricMetadata = new MetricMetadata(confluentMetricName, confluentVariables);
