@@ -406,7 +406,8 @@ class ProtoToRowDataConvertersTest {
     void testCollections(TypeMappingWithData mapping) throws IOException {
         final ProtoToRowDataConverter converter =
                 ProtoToRowDataConverters.createConverter(
-                        mapping.getProtoSchema(), (RowType) mapping.getFlinkSchema());
+                        mapping.getProtoSchema().getMessageTypes().get(0),
+                        (RowType) mapping.getFlinkSchema());
 
         final Object converted = converter.convert(mapping.getProtoData());
 
@@ -427,6 +428,6 @@ class ProtoToRowDataConvertersTest {
     private ProtoToRowDataConverter createConverter(Descriptor schema) {
         FileDescriptor fileDescriptor = schema.getFile();
         RowType flinkSchema = (RowType) ProtoToFlinkSchemaConverter.toFlinkSchema(fileDescriptor);
-        return ProtoToRowDataConverters.createConverter(fileDescriptor, flinkSchema);
+        return ProtoToRowDataConverters.createConverter(schema, flinkSchema);
     }
 }

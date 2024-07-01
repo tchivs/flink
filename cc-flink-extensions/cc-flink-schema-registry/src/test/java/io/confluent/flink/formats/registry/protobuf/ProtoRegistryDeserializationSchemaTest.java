@@ -4,12 +4,16 @@
 
 package io.confluent.flink.formats.registry.protobuf;
 
+import org.apache.flink.table.api.TableRuntimeException;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.TestLoggerExtension;
 
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
+import com.google.protobuf.DynamicMessage;
 import io.confluent.flink.formats.converters.protobuf.ProtoToFlinkSchemaConverter;
 import io.confluent.flink.formats.registry.utils.MockInitializationContext;
 import io.confluent.flink.formats.registry.utils.TestKafkaSerializerConfig;
@@ -31,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link ProtoRegistryDeserializationSchema}. */
 @ExtendWith(TestLoggerExtension.class)
@@ -170,6 +175,245 @@ class ProtoRegistryDeserializationSchemaTest {
                         });
     }
 
+    @Test
+    void testDeserializeMultipleMessages() throws Exception {
+        // Given: a protobuf schema with two messages purchase and pageview
+        ProtobufSchema pageviewPurchaseProto =
+                new ProtobufSchema(
+                        "syntax = \"proto3\";\n"
+                                + "package mypackage;\n"
+                                + "\n"
+                                + "message Purchase {"
+                                + "  string item = 1;"
+                                + "  double amount = 2;"
+                                + "  string customer_id = 3;"
+                                + "}\n"
+                                + "message Pageview {"
+                                + "  string url = 1;"
+                                + "  bool is_special = 2;"
+                                + "  string customer_id = 3;"
+                                + "}");
+
+        // Given: registered under subject pageview-purchase-value
+        int id = client.register("pageview-purchase-value", pageviewPurchaseProto);
+
+        // Given: purchase message is serialized to the pageview-event topic
+        // (implicitly using pageview-event-value schema)
+        Descriptor purchaseDescriptor = PURCHASE_SCHEMA.toDescriptor();
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(purchaseDescriptor);
+        builder.setField(purchaseDescriptor.findFieldByName("item"), "apple");
+        builder.setField(purchaseDescriptor.findFieldByName("amount"), 123.45);
+        builder.setField(purchaseDescriptor.findFieldByName("customer_id"), "u-1234567890");
+        Object purchaseEvent = builder.build();
+
+        byte[] serializedPurchaseEvent =
+                protobufSerializer.serialize("pageview-purchase", purchaseEvent);
+
+        // When: the message is deserialized with the deserialization schema
+        RowData rowData =
+                initializeDeserializationSchema(pageviewPurchaseProto, id)
+                        .deserialize(serializedPurchaseEvent);
+
+        // Then: the message is deserialized to a row
+        verifyPurchase(rowData);
+    }
+
+    @Test
+    void testDeserializeMultipleMessagesWithNestedSchema() throws Exception {
+        // Given: Action has 2 nested messages Purchase and Pageview
+        ProtobufSchema actionProto =
+                new ProtobufSchema(
+                        "syntax = \"proto3\";\n"
+                                + "package mypackage;\n"
+                                + "\n"
+                                + "message Action {\n"
+                                + "  Purchase purchase = 1;\n"
+                                + "  Pageview pageview = 2;\n"
+                                + "}\n"
+                                + "message Purchase {\n"
+                                + "  string item = 1;\n"
+                                + "  double amount = 2;\n"
+                                + "  string customer_id = 3;\n"
+                                + "}\n"
+                                + "message Pageview {\n"
+                                + "  string url = 1;\n"
+                                + "  bool is_special = 2;\n"
+                                + "  string customer_id = 3;\n"
+                                + "}\n");
+
+        // Given: registered under subject pageview-purchase-value
+        int id = client.register("action-value", actionProto);
+        FileDescriptor fileDescriptor = actionProto.toDescriptor().getFile();
+
+        // serialize different messages
+        Object purchaseEvent =
+                ProtobufSchemaUtils.toObject(
+                        "{\"item\": \"apple\", \"amount\": 123.45, \"customer_id\": \"u-1234567890\"}",
+                        new ProtobufSchema(fileDescriptor.findMessageTypeByName("Purchase")));
+
+        Object actionEvent =
+                ProtobufSchemaUtils.toObject(
+                        "{\n"
+                                + "  \"purchase\": {\n"
+                                + "    \"item\": \"apple\",\n"
+                                + "    \"amount\": 123.45,\n"
+                                + "    \"customer_id\": \"u-1234567890\"\n"
+                                + "  },\n"
+                                + "  \"pageview\": {\n"
+                                + "    \"url\": \"https://example.com\",\n"
+                                + "    \"is_special\": true,\n"
+                                + "    \"customer_id\": \"u-1234567890\"\n"
+                                + "  }\n"
+                                + "}",
+                        new ProtobufSchema(fileDescriptor.findMessageTypeByName("Action")));
+
+        // serialize purchase as top level input
+        byte[] serializedPurchase = protobufSerializer.serialize("action", purchaseEvent);
+        // serialize action as top level input
+        byte[] serializedAction = protobufSerializer.serialize("action", actionEvent);
+
+        ProtoRegistryDeserializationSchema deserializationSchema =
+                initializeDeserializationSchema(actionProto, id);
+
+        // When: the message is deserialized with the deserialization schema
+        RowData purchaseAsTopLevelInput = deserializationSchema.deserialize(serializedPurchase);
+
+        // Then: the message is deserialized to a row
+        verifyPurchase(purchaseAsTopLevelInput);
+
+        // When: the message is deserialized with the deserialization schema
+        RowData actionAsTopLevelInput = deserializationSchema.deserialize(serializedAction);
+
+        // Then: the message is deserialized to a row with two fields purchase and pageview
+        assertThat(actionAsTopLevelInput)
+                .satisfies(
+                        row -> {
+                            assertThat(row.getArity()).isEqualTo(2);
+                            RowData purchase = row.getRow(0, 1);
+                            verifyPurchase(purchase);
+                            RowData pageview = row.getRow(1, 1);
+                            verifyPageview(pageview);
+                        });
+    }
+
+    @Test
+    void testDeserializeWithNotNull() throws Exception {
+        // Given: Action has 2 nested messages Purchase and Pageview
+        ProtobufSchema actionProto =
+                new ProtobufSchema(
+                        "syntax = \"proto3\";\n"
+                                + "package io.confluent.developer.proto;\n"
+                                + "\n"
+                                + "message Action {\n"
+                                + "  Purchase purchase = 1;\n"
+                                + "  Pageview pageview = 2 [(confluent.field_meta) = {\n"
+                                + "    params: [\n"
+                                + "      {\n"
+                                + "        key: \"flink.version\",\n"
+                                + "        value: \"1\"\n"
+                                + "      },\n"
+                                + "      {\n"
+                                + "        key: \"flink.notNull\",\n"
+                                + "        value: \"true\"\n"
+                                + "      }\n"
+                                + "    ]\n"
+                                + "  }];\n"
+                                + "}\n"
+                                + "message Purchase {\n"
+                                + "  string item = 1;\n"
+                                + "  double amount = 2;\n"
+                                + "  string customer_id = 3;\n"
+                                + "}\n"
+                                + "message Pageview {\n"
+                                + "  string url = 1;\n"
+                                + "  bool is_special = 2;\n"
+                                + "  string customer_id = 3;\n"
+                                + "}\n");
+
+        // Given: registered under subject pageview-purchase-value
+        int id = client.register("action-value", actionProto);
+        FileDescriptor fileDescriptor = actionProto.toDescriptor().getFile();
+
+        // serialize action message without purchase
+        Object actionWithoutPurchase =
+                ProtobufSchemaUtils.toObject(
+                        "{\n"
+                                + "  \"pageview\": {\n"
+                                + "    \"url\": \"https://example.com\",\n"
+                                + "    \"is_special\": true,\n"
+                                + "    \"customer_id\": \"u-1234567890\"\n"
+                                + "  }\n"
+                                + "}",
+                        new ProtobufSchema(fileDescriptor.findMessageTypeByName("Action")));
+
+        // serialize purchase as top level input
+        byte[] serializedActionWithoutPurchase =
+                protobufSerializer.serialize("action", actionWithoutPurchase);
+        ProtoRegistryDeserializationSchema deserializationSchema =
+                initializeDeserializationSchema(actionProto, id);
+
+        // When: the message is deserialized with the deserialization schema
+        RowData actionWithoutPurchaseRow =
+                deserializationSchema.deserialize(serializedActionWithoutPurchase);
+
+        // Then: the message is deserialized to a row
+        assertThat(actionWithoutPurchaseRow)
+                .satisfies(
+                        row -> {
+                            assertThat(row.getArity()).isEqualTo(2);
+                            assertThat(row.isNullAt(0)).isTrue();
+                            assertThat(row.isNullAt(1)).isFalse();
+                            RowData pageview = row.getRow(1, 1);
+                            verifyPageview(pageview);
+                        });
+    }
+
+    @Test
+    void testDeserializeMessageSerializedWithNestedTypeFails() throws Exception {
+        // Given: a schema with a nested type Purchase
+        ProtobufSchema actionProto =
+                new ProtobufSchema(
+                        "syntax = \"proto3\";\n"
+                                + "package mypackage;\n"
+                                + "\n"
+                                + "message Action {\n"
+                                + "  Purchase purrrrrrr = 1;\n"
+                                + "  message Purchase {\n"
+                                + "    string item = 1;\n"
+                                + "    double amount = 2;\n"
+                                + "    string customer_id = 3;\n"
+                                + "  }\n"
+                                + "}\n");
+
+        // Given: registered under subject action-value
+        int id = client.register("action-value", actionProto);
+
+        // serialize Purchase message with Purchase schema
+        Object purchase =
+                ProtobufSchemaUtils.toObject(
+                        "{\n"
+                                + "  \"item\": \"apple\",\n"
+                                + "  \"amount\": 123.45,\n"
+                                + "  \"customer_id\": \"u-1234567890\"\n"
+                                + "}",
+                        new ProtobufSchema(actionProto.toDescriptor().getNestedTypes().get(0)));
+
+        // serialize purchase as top level input
+        byte[] serializedPurchase = protobufSerializer.serialize("action", purchase);
+
+        // open a deserialization schema with Action schema
+        ProtoRegistryDeserializationSchema deserializationSchema =
+                initializeDeserializationSchema(actionProto, id);
+        // When: the message is deserialized with the deserialization schema
+        assertThatThrownBy(() -> deserializationSchema.deserialize(serializedPurchase))
+                .isInstanceOf(IOException.class)
+                .hasMessage("Failed to deserialize Protobuf message.")
+                .cause()
+                .isInstanceOf(TableRuntimeException.class)
+                .hasMessage(
+                        "Payload could not be deserialized. The 'protobuf-registry' format only supports deserialization of messages that have been defined as top-level messages in the schema. Nested messages as top-level messages is not supported.");
+    }
+
     // --------------------------------------------------------------------------------------------
     // HELPERS
     // --------------------------------------------------------------------------------------------
@@ -193,6 +437,12 @@ class ProtoRegistryDeserializationSchemaTest {
     private void verifyPurchase(RowData row) {
         assertThat(row.getString(0).toString()).isEqualTo("apple");
         assertThat(row.getDouble(1)).isEqualTo(123.45);
+        assertThat(row.getString(2).toString()).isEqualTo("u-1234567890");
+    }
+
+    private void verifyPageview(RowData row) {
+        assertThat(row.getString(0).toString()).isEqualTo("https://example.com");
+        assertThat(row.getBoolean(1)).isTrue();
         assertThat(row.getString(2).toString()).isEqualTo("u-1234567890");
     }
 }
