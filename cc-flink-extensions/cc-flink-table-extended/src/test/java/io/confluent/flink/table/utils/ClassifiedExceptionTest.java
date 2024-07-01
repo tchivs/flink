@@ -129,14 +129,20 @@ public class ClassifiedExceptionTest {
                                 "Cannot find table '`default_catalog`.`default_database`.`t`'."),
 
                 // ---
-                TestSpec.test("not find model")
+                TestSpec.test("error for describe model cannot be found")
                         .executeSql("DESCRIBE MODEL `m`")
                         .expectExactUserError(
                                 "Cannot find model '`default_catalog`.`default_database`.`m`'."),
 
                 // ---
-                TestSpec.test("not find model for alter")
+                TestSpec.test("error for alter model does not exist")
                         .executeSql("ALTER MODEL `m` SET ('task' = 'classification')")
+                        .expectExactUserError(
+                                "Model '`default_catalog`.`default_database`.`m`' does not exist."),
+
+                // ---
+                TestSpec.test("error for drop model does not exist")
+                        .executeSql("DROP MODEL `m`")
                         .expectExactUserError(
                                 "Model '`default_catalog`.`default_database`.`m`' does not exist."),
 

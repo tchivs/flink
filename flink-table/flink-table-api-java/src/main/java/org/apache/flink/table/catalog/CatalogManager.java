@@ -1414,10 +1414,10 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
      *     exist.
      */
     public void dropModel(ObjectIdentifier objectIdentifier, boolean ignoreIfNotExists) {
-        final Optional<ResolvedCatalogModel> resultOpt = getModel(objectIdentifier);
-        if (resultOpt.isPresent()) {
-            execute(
-                    (catalog, path) -> {
+        execute(
+                (catalog, path) -> {
+                    Optional<ResolvedCatalogModel> resultOpt = getModel(objectIdentifier);
+                    if (resultOpt.isPresent()) {
                         ResolvedCatalogModel resolvedModel = resultOpt.get();
                         catalog.dropModel(path, ignoreIfNotExists);
                         catalogModificationListeners.forEach(
@@ -1430,16 +1430,14 @@ public final class CatalogManager implements CatalogRegistry, AutoCloseable {
                                                         objectIdentifier,
                                                         resolvedModel,
                                                         ignoreIfNotExists)));
-                    },
-                    objectIdentifier,
-                    ignoreIfNotExists,
-                    "DropModel");
-        } else if (!ignoreIfNotExists) {
-            throw new ValidationException(
-                    String.format(
-                            "Model with identifier '%s' does not exist.",
-                            objectIdentifier.asSummaryString()));
-        }
+                    } else if (!ignoreIfNotExists) {
+                        throw new ModelNotExistException(
+                                objectIdentifier.getCatalogName(), objectIdentifier.toObjectPath());
+                    }
+                },
+                objectIdentifier,
+                ignoreIfNotExists,
+                "DropModel");
     }
 
     public ResolvedCatalogModel resolveCatalogModel(CatalogModel model) {

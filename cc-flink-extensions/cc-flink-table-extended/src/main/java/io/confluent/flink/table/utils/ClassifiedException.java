@@ -285,6 +285,12 @@ public final class ClassifiedException {
         putClassifiedException(
                 CodeLocation.inClass(CatalogManager.class, TableException.class),
                 Handler.forwardCauseOnly("Could not execute AlterModel", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, ValidationException.class),
+                Handler.forwardCauseOnly("Could not execute DropModel", ExceptionKind.USER));
+        putClassifiedException(
+                CodeLocation.inClass(CatalogManager.class, TableException.class),
+                Handler.forwardCauseOnly("Could not execute DropModel", ExceptionKind.USER));
 
         putClassifiedException(
                 CodeLocation.inClass(

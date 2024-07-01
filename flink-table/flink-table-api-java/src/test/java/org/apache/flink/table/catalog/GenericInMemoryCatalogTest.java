@@ -146,7 +146,8 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
         assertThat(catalog.getModel(modelPath1)).isNotNull();
         catalog.dropModel(modelPath1, false);
         assertThatThrownBy(() -> catalog.getModel(modelPath1))
-                .isInstanceOf(ModelNotExistException.class);
+                .isInstanceOf(ModelNotExistException.class)
+                .hasMessage("Model '`test-catalog`.`db1`.`m1`' does not exist.");
     }
 
     @Test
@@ -227,6 +228,21 @@ class GenericInMemoryCatalogTest extends CatalogTestBase {
                         "new model");
         // Nothing happens since ignoreIfNotExists is true
         catalog.alterModel(modelPath1, newModel, true);
+    }
+
+    @Test
+    public void testDropMissingModelNotExistException() throws Exception {
+        catalog.createDatabase(db1, createDb(), false);
+        assertThatThrownBy(() -> catalog.dropModel(modelPath1, false))
+                .isInstanceOf(ModelNotExistException.class)
+                .hasMessage("Model '`test-catalog`.`db1`.`m1`' does not exist.");
+    }
+
+    @Test
+    public void testDropMissingModelIgnoreIfNotExist() throws Exception {
+        catalog.createDatabase(db1, createDb(), false);
+        // Nothing happens since ignoreIfNotExists is true
+        catalog.dropModel(modelPath1, true);
     }
 
     // ------ tables ------
