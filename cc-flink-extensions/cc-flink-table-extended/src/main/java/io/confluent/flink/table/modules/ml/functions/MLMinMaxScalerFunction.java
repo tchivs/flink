@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForMLScalarFunctions;
 
 /** A scalar function for performing Min-Max scaling on numerical values. */
 public class MLMinMaxScalerFunction extends ScalarFunction {
@@ -120,7 +120,7 @@ public class MLMinMaxScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForScalerFunctions(
+        return getTypeInferenceForMLScalarFunctions(
                 3, 3, DataTypes.DOUBLE(), count -> count == 3, this::validateInputTypes);
     }
 

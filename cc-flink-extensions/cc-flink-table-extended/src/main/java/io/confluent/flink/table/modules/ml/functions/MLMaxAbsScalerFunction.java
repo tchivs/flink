@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForMLScalarFunctions;
 
 /**
  * A ScalarFunction that implements the ML_MAX_ABS_SCALER function. This function scales the input
@@ -98,7 +98,7 @@ public class MLMaxAbsScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForScalerFunctions(
+        return getTypeInferenceForMLScalarFunctions(
                 2, 2, DataTypes.DOUBLE(), count -> count == 2, this::validateInputTypes);
     }
 

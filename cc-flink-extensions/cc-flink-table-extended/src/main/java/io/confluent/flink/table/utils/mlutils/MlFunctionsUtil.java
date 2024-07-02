@@ -115,7 +115,7 @@ public class MlFunctionsUtil {
      *     message if invalid.
      * @return A TypeInference object with the specified input and output type strategies.
      */
-    public static TypeInference getTypeInferenceForScalerFunctions(
+    public static TypeInference getTypeInferenceForMLScalarFunctions(
             Integer minCount,
             Integer maxCount,
             DataType outputDataType,

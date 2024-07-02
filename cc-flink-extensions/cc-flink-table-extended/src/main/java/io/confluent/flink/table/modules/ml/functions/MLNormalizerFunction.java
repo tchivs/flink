@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForMLScalarFunctions;
 
 /** Scalar function for normalizing values. */
 public class MLNormalizerFunction extends ScalarFunction {
@@ -90,7 +90,7 @@ public class MLNormalizerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForScalerFunctions(
+        return getTypeInferenceForMLScalarFunctions(
                 2, 2, DataTypes.DOUBLE(), count -> count == 2, this::validateInputTypes);
     }
 

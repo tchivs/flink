@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
 
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getDoubleValue;
 import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getLongValue;
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForMLScalarFunctions;
 
 /** Scalar function for standard scaling of values. */
 public class MLStandardScalerFunction extends ScalarFunction {
@@ -148,7 +148,7 @@ public class MLStandardScalerFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForScalerFunctions(
+        return getTypeInferenceForMLScalarFunctions(
                 3,
                 5,
                 DataTypes.DOUBLE(),
@@ -173,7 +173,7 @@ public class MLStandardScalerFunction extends ScalarFunction {
                                                         LogicalTypeFamily.DATETIME)) {
                                     return String.format(
                                             "%s datatype is not supported as argument %s to %s function. Please refer documentation for supported datatypes",
-                                            i, argDataType, NAME);
+                                            i + 1, argDataType, NAME);
                                 }
                             } else {
                                 if (!argDataType.nullable().equals(DataTypes.BOOLEAN())) {

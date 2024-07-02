@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
-import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForScalerFunctions;
+import static io.confluent.flink.table.utils.mlutils.MlFunctionsUtil.getTypeInferenceForMLScalarFunctions;
 
 /** A scaler function that assigns a numerical expression to a bucket. */
 public class MLBucketizeFunction extends ScalarFunction {
@@ -122,7 +122,7 @@ public class MLBucketizeFunction extends ScalarFunction {
      */
     @Override
     public TypeInference getTypeInference(DataTypeFactory typeFactory) {
-        return getTypeInferenceForScalerFunctions(
+        return getTypeInferenceForMLScalarFunctions(
                 2,
                 3,
                 DataTypes.STRING(),
