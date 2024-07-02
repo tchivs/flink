@@ -17,7 +17,10 @@
 # limitations under the License.
 ################################################################################
 
-set -euo pipefail
+set -eo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+source ${SCRIPT_DIR}/../maven-utils.sh
 
 REMOTE="apache"
 
@@ -31,10 +34,8 @@ BASE_VERSION="$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout 
 VERSION=$(git tag -l "release-${BASE_VERSION}*" | grep -v "\-rc" | sort -V -r | head -n1 | cut -d'-' -f 2)
 
 if [ -n "$VERSION" ]; then
-  echo "SKIP Setting base version $VERSION based on most recent upstream tag"
-  # disabled as a temporary fix for https://confluentinc.atlassian.net/browse/DP-14979
-  # echo "Setting base version $VERSION based on most recent upstream tag"
-  # mvn versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+  echo "Setting base version $VERSION based on most recent upstream tag"
+  run_mvn versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
   make mvn-bump-nanoversion
 else
   echo "Unable to derive version"
