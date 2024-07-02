@@ -75,7 +75,7 @@ blocks:
             # skip checks from pre-compile-checks
             - export PROFILE="${PROFILE} -Drat.skip -Dcheckstyle.skip -Dspotless.check.skip"
             - ./tools/ci/compile_ci.sh || exit $?
-            - if [ -n "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CACHE_PREFIX"-maven-cache ${MAVEN_LOCAL_CACHE}; fi
+            - if [ -z "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CACHE_PREFIX"-maven-cache ${MAVEN_LOCAL_CACHE}; fi
   - name: compile_ci
     dependencies: []
     task:
@@ -128,7 +128,7 @@ blocks:
           commands:
             - source .semaphore/functions.sh && publish_test_results "tests-${module}"
             - ./tools/azure-pipelines/cache_docker_images.sh save
-            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
+            - if [ -z "$SEMAPHORE_GIT_PR_BRANCH" ]; then cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER; fi
         on_fail:
           commands:
             - tar -czf flink_debug_files_"$module".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
@@ -180,9 +180,12 @@ blocks:
           commands:
             - source .semaphore/functions.sh && publish_test_results "e2e-tests-${group}"
             - ./tools/azure-pipelines/cache_docker_images.sh save
-            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
-            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache $E2E_CACHE_FOLDER
-            - cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache $E2E_TARBALL_CACHE
+            - |
+              if [ -z "$SEMAPHORE_GIT_PR_BRANCH" ]; then 
+                cache store "$CURRENT_SHARED_CACHE_PREFIX"-docker-cache $DOCKER_IMAGES_CACHE_FOLDER
+                cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-cache $E2E_CACHE_FOLDER
+                cache store "$CURRENT_SHARED_CACHE_PREFIX"-e2e-artifact-cache $E2E_TARBALL_CACHE
+              fi
         on_fail:
           commands:
             - tar -czf flink_debug_files_"$group".tar.gz -C $DEBUG_FILES_OUTPUT_DIR .
