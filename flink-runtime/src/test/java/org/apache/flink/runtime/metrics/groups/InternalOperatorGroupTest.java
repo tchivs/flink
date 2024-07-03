@@ -30,9 +30,11 @@ import org.apache.flink.runtime.metrics.MetricRegistryTestUtils;
 import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 import org.apache.flink.runtime.metrics.util.DummyCharacterFilter;
+import org.apache.flink.runtime.metrics.util.TestingMetricRegistry;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.After;
+import org.apache.flink.shaded.curator5.com.google.common.collect.ImmutableSet;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -50,20 +52,12 @@ import static org.junit.Assert.assertNotNull;
 /** Tests for the {@link InternalOperatorMetricGroup}. */
 public class InternalOperatorGroupTest extends TestLogger {
 
-    private MetricRegistryImpl registry;
+    private static final int NUMBER_OF_REPORTERS = 1;
+    private TestingMetricRegistry registry;
 
     @Before
     public void setup() {
-        registry =
-                new MetricRegistryImpl(
-                        MetricRegistryTestUtils.defaultMetricRegistryConfiguration());
-    }
-
-    @After
-    public void teardown() throws Exception {
-        if (registry != null) {
-            registry.closeAsync().get();
-        }
+        registry = TestingMetricRegistry.builder().setNumberReporters(NUMBER_OF_REPORTERS).build();
     }
 
     @Test
@@ -91,6 +85,14 @@ public class InternalOperatorGroupTest extends TestLogger {
                 "theHostName.taskmanager.test-tm-id.myJobName.myOpName.11.name",
                 opGroup.getMetricIdentifier("name"));
 
+        /**
+         * {@link InternalOperatorMetricGroup#getAllVariables()} and {@link
+         * InternalOperatorMetricGroup#getAllVariables(int, Set)} work quite differently, so we have
+         * to test them separately.
+         */
+        assertThat(opGroup.getAllVariables(NUMBER_OF_REPORTERS - 1, ImmutableSet.of("foo")))
+                .contains(entry("bar", "44"))
+                .doesNotContain(entry("foo", "42"));
         assertThat(opGroup.getAllVariables()).contains(entry("foo", "42"), entry("bar", "44"));
     }
 

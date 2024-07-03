@@ -28,7 +28,6 @@ import org.apache.flink.runtime.metrics.dump.QueryScopeInfo;
 import org.apache.flink.runtime.metrics.scope.ScopeFormat;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -59,13 +58,6 @@ public class InternalOperatorMetricGroup extends ComponentMetricGroup<TaskMetric
         this.additionalVariables = additionalVariables;
 
         ioMetrics = new InternalOperatorIOMetricGroup(this);
-    }
-
-    @Override
-    public Map<String, String> getAllVariables() {
-        HashMap<String, String> allVariables = new HashMap<>(super.getAllVariables());
-        allVariables.putAll(additionalVariables);
-        return allVariables;
     }
 
     // ------------------------------------------------------------------------
@@ -108,6 +100,7 @@ public class InternalOperatorMetricGroup extends ComponentMetricGroup<TaskMetric
     protected void putVariables(Map<String, String> variables) {
         variables.put(ScopeFormat.SCOPE_OPERATOR_ID, String.valueOf(operatorID));
         variables.put(ScopeFormat.SCOPE_OPERATOR_NAME, operatorName);
+        variables.putAll(additionalVariables);
         // we don't enter the subtask_index as the task group does that already
     }
 
