@@ -16,22 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.dispatcher;
+package org.apache.flink.runtime.jobmanager;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.runtime.jobmanager.JobGraphStore;
 
-/** No operation {@link JobGraphStore.JobGraphListener} implemetation for testing purposes. */
-public enum NoOpJobGraphListener implements JobGraphStore.JobGraphListener {
-    INSTANCE;
+/**
+ * ExecutionPlanStore utility interfaces. For example, convert a name(e.g. ZooKeeper path, key name
+ * in Kubernetes ConfigMap) to {@link JobID}, or vice versa.
+ */
+public interface ExecutionPlanStoreUtil {
 
-    @Override
-    public void onAddedJobGraph(JobID jobId) {
-        // No op
-    }
+    /**
+     * Get the name in external storage from job id.
+     *
+     * @param jobId job id
+     * @return Key name in ConfigMap or child path name in ZooKeeper
+     */
+    String jobIDToName(JobID jobId);
 
-    @Override
-    public void onRemovedJobGraph(JobID jobId) {
-        // No op
-    }
+    /**
+     * Get the job id from name.
+     *
+     * @param name Key name in ConfigMap or child path name in ZooKeeper
+     * @return parsed job id.
+     */
+    JobID nameToJobID(String name);
 }
